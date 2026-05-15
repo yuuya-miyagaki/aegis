@@ -161,6 +161,24 @@ python3 scripts/check_status.py --root . --strict
 
 ## Migration
 
+### From v0.12.1 to v0.12.2
+
+**Hot-fix release**: Hook output schemas migrated to current Claude Code spec.
+The old form (top-level `permissionDecision`/`message`) is silently ignored
+by Claude Code 2.x — `deny` / `block` were not actually enforced before this fix.
+
+1. **PreToolUse 8 hooks**: top-level `permissionDecision`/`message` → `hookSpecificOutput.permissionDecision`/`permissionDecisionReason`. Affects `check-gate.sh`, `check-control-plane.sh`, `check-secrets.sh`, `check-destructive.sh`, `check-deploy-gate.sh`, `check-deploy-mcp-gate.sh`, `check-tdd.sh`, `check-client-info.sh`.
+2. **PostToolUse hook** (`post-status-audit.sh`): top-level `permissionDecision`/`message` → top-level `decision: "block"`/`reason`. Restores gate-tamper / phase-skip / mode-tamper detection.
+3. **post-bash.sh**: migrated from `PostToolUse` to **`PostToolUseFailure`** event. Output uses `hookSpecificOutput.additionalContext` (informational; never blocks). The internal exit-code check is removed — the event itself fires only on failures.
+4. **pre-compact.sh**: block path → top-level `decision`/`reason`; allow path → `hookSpecificOutput.additionalContext` + `hookEventName`.
+5. **`if` filter removed** from `templates/hooks.template.json` for `post-status-audit.sh`. The official spec restricts `if` to a single permission rule (no `||`). Replaced by the existing `case TARGET_FILE in *STATUS.md` filter inside the hook script (covers Edit/Write/NotebookEdit fully).
+6. **New event registration**: `PostToolUseFailure` section added to `templates/hooks.template.json` for `post-bash.sh`.
+7. **Contract tests**: new `tests/test_hook_output_schema.py` (12 cases) covers all hook output schemas. Reference: `hooks/session-start.sh` was already conformant.
+
+**Action for existing projects**: re-run `bash bin/setup.sh --profile=<your-profile>` to refresh `.claude/settings.local.json` with the new `templates/hooks.template.json`. The old schema was already non-functional in Claude Code 2.x, so this is a strict improvement (no functional regression).
+
+Driven by a 5-round external review (Round 1〜5, 25 issues raised, all reflected). See `docs/plans/v0130-modernization-plan.md` Rev.5 for full context. The remainder of v0.13.0 (subagent / effort / Plan / Skill / TaskCreated|Completed event hooks etc.) follows.
+
 ### From v0.9.0 to v0.10.0
 
 1. **browser-assist skill added**: new `.claude/skills/browser-assist/SKILL.md`

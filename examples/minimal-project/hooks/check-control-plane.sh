@@ -109,5 +109,5 @@ if [ -n "$CHECK_CMD" ]; then
 fi
 
 # Default: deny. Control plane path present, not allowlisted, not read-only.
-printf '{"permissionDecision":"deny","message":"[integrity] Bash command referencing control plane path blocked during project work (task_type=%s). Use Edit/Write tools for auditable changes, or set task_type=framework."}\n' "$TASK_TYPE"
+printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"[integrity] Bash command referencing control plane path blocked during project work (task_type=%s). Use Edit/Write tools for auditable changes, or set task_type=framework."}}\n' "$TASK_TYPE"
 exit 0

@@ -747,8 +747,8 @@ class TestPhaseSkipHookDenyJSON(unittest.TestCase):
             stdin = '{"tool_name":"Edit","tool_input":{"file_path":"docs/STATUS.md"}}'
             rc, out = run_hook(self.HOOK_NAME, root, stdin)
             self.assertEqual(rc, 0, f"Hook should exit 0 even on deny, got rc={rc}")
-            self.assertIn('"permissionDecision":"deny"', out,
-                          f"Expected deny JSON for phase skip, got: {out}")
+            self.assertIn('"decision":"block"', out,
+                          f"Expected block JSON for phase skip, got: {out}")
             self.assertIn("[phase-skip]", out,
                           f"Deny message should include phase-skip tag: {out}")
 
@@ -1106,8 +1106,8 @@ class TestPostStatusAuditAllGateChanges(unittest.TestCase):
             stdin = '{"tool_name":"Edit","tool_input":{"file_path":"docs/STATUS.md"}}'
             rc, out = run_hook(self.HOOK_NAME, root, stdin)
             self.assertEqual(rc, 0)
-            self.assertIn('"permissionDecision":"deny"', out,
-                          f"pending→n/a direct edit should be denied: {out}")
+            self.assertIn('"decision":"block"', out,
+                          f"pending→n/a direct edit should be blocked: {out}")
             self.assertIn("gate-tamper", out,
                           f"Deny message should include gate-tamper tag: {out}")
 
@@ -1134,8 +1134,8 @@ class TestPostStatusAuditAllGateChanges(unittest.TestCase):
             stdin = '{"tool_name":"Edit","tool_input":{"file_path":"docs/STATUS.md"}}'
             rc, out = run_hook(self.HOOK_NAME, root, stdin)
             self.assertEqual(rc, 0)
-            self.assertIn('"permissionDecision":"deny"', out,
-                          f"approved→pending direct edit should be denied: {out}")
+            self.assertIn('"decision":"block"', out,
+                          f"approved→pending direct edit should be blocked: {out}")
 
     def test_no_change_passes(self):
         """Same gates in snapshot and STATUS.md → allow."""
@@ -1253,8 +1253,8 @@ class TestModeChangeAudit(unittest.TestCase):
             stdin = '{"tool_name":"Edit","tool_input":{"file_path":"docs/STATUS.md"}}'
             rc, out = run_hook(self.HOOK_NAME, root, stdin)
             self.assertEqual(rc, 0)
-            self.assertIn('"permissionDecision":"deny"', out,
-                          f"Mode change without gate should be denied: {out}")
+            self.assertIn('"decision":"block"', out,
+                          f"Mode change without gate should be blocked: {out}")
             self.assertIn("mode-tamper", out,
                           f"Deny message should include mode-tamper tag: {out}")
 

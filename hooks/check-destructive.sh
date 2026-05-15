@@ -85,7 +85,7 @@ fi
 
 if [ -n "$WARN" ]; then
   WARN_ESCAPED=$(printf '%s' "$WARN" | sed 's/"/\\"/g')
-  printf '{"permissionDecision":"ask","message":"[careful] %s"}\n' "$WARN_ESCAPED"
+  printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"ask","permissionDecisionReason":"[careful] %s"}}\n' "$WARN_ESCAPED"
 else
   echo '{}'
 fi

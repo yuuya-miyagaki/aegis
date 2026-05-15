@@ -58,7 +58,7 @@ if command -v git >/dev/null 2>&1; then
 fi
 
 if [ "$HAS_TEST_CHANGES" = false ]; then
-  printf '{"permissionDecision":"ask","message":"[TDD] テストファイルの変更が検出されません。TDDルール: テストを先に書き、失敗を確認してから実装してください。"}\n'
+  printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"ask","permissionDecisionReason":"[TDD] テストファイルの変更が検出されません。TDDルール: テストを先に書き、失敗を確認してから実装してください。"}}\n'
 else
   echo '{}'
 fi

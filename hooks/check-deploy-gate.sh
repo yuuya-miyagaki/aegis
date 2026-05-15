@@ -46,7 +46,7 @@ RC=$?
 set -e
 if [ $RC -ne 0 ]; then
   MSG=$(printf '%s' "$RESULT" | tr '\n' ' ')
-  printf '{"permissionDecision":"deny","message":"[deploy-gate] %s"}\n' "$MSG"
+  printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"[deploy-gate] %s"}}\n' "$MSG"
   exit 0
 fi
 

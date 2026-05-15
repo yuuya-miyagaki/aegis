@@ -62,21 +62,22 @@
     ],
     "PostToolUse": [
       {
+        "matcher": "Edit|Write|NotebookEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash hooks/post-status-audit.sh"
+          }
+        ]
+      }
+    ],
+    "PostToolUseFailure": [
+      {
         "matcher": "Bash",
         "hooks": [
           {
             "type": "command",
             "command": "bash hooks/post-bash.sh"
-          }
-        ]
-      },
-      {
-        "matcher": "Edit|Write|NotebookEdit",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bash hooks/post-status-audit.sh",
-            "if": "Edit(*STATUS.md) || Write(*STATUS.md) || NotebookEdit(*STATUS.md)"
           }
         ]
       }

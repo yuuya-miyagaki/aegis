@@ -31,7 +31,7 @@ STRIPPED=$(printf '%s' "$CMD" | sed -E "s/${SAFE_ENV_SUFFIXES}//g")
 
 # Direct .env staging: git add .env, git add .env.local, git add path/.env
 if printf '%s' "$STRIPPED" | grep -qE 'git\s+add\s+.*\.env' 2>/dev/null; then
-  printf '{"permissionDecision":"deny","message":"[secrets] .env ファイルを git に追加しないでください。認証情報がリポジトリに漏洩します。"}\n'
+  printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"[secrets] .env ファイルを git に追加しないでください。認証情報がリポジトリに漏洩します。"}}\n'
   exit 0
 fi
 
@@ -53,7 +53,7 @@ if printf '%s' "$CMD" | grep -qE 'git\s+add\s+(-A|--all|\.)' 2>/dev/null; then
     -not -path '*/.venv/*' \
     2>/dev/null || true)
   if [ "$HAS_SECRET_ENV" = true ]; then
-    printf '{"permissionDecision":"deny","message":"[secrets] git add -A / git add . は .env を含む可能性があります。個別のファイル名を指定して git add してください。"}\n'
+    printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"[secrets] git add -A / git add . は .env を含む可能性があります。個別のファイル名を指定して git add してください。"}}\n'
     exit 0
   fi
 fi
@@ -63,7 +63,7 @@ fi
 if printf '%s' "$CMD" | grep -qE 'git\s+commit' 2>/dev/null; then
   # Check if any secret .env file is in the staging area (exclude safe variants)
   if git diff --cached --name-only 2>/dev/null | grep -E '\.env' | grep -vE "${SAFE_ENV_SUFFIXES}$" | grep -q . 2>/dev/null; then
-    printf '{"permissionDecision":"deny","message":"[secrets] .env ファイルがステージングされています。git reset HEAD .env で除外してからコミットしてください。"}\n'
+    printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"[secrets] .env ファイルがステージングされています。git reset HEAD .env で除外してからコミットしてください。"}}\n'
     exit 0
   fi
 fi
@@ -78,11 +78,11 @@ if printf '%s' "$STRIPPED_WRITE" | grep -qE '>\s*\.env|>\s*\S+/\.env|cp\s+.*\.en
   ROOT=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
   if [ -f "${ROOT}/.gitignore" ]; then
     if ! grep -qE '^\s*\.env' "${ROOT}/.gitignore" 2>/dev/null; then
-      printf '{"permissionDecision":"ask","message":"[secrets] .gitignore に .env が含まれていません。先に .gitignore に .env を追加することを推奨します。"}\n'
+      printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"ask","permissionDecisionReason":"[secrets] .gitignore に .env が含まれていません。先に .gitignore に .env を追加することを推奨します。"}}\n'
       exit 0
     fi
   else
-    printf '{"permissionDecision":"ask","message":"[secrets] .gitignore が見つかりません。.env をリポジトリに含めないよう .gitignore を先に作成してください。"}\n'
+    printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"ask","permissionDecisionReason":"[secrets] .gitignore が見つかりません。.env をリポジトリに含めないよう .gitignore を先に作成してください。"}}\n'
     exit 0
   fi
 fi

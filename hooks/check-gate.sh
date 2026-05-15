@@ -45,7 +45,7 @@ case "$TARGET_FILE" in
       echo '{}'
       exit 0
     fi
-    printf '{"permissionDecision":"deny","message":"[integrity] Template edit blocked during project work (task_type=%s). Templates are framework-controlled files."}\n' "$TASK_TYPE"
+    printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"[integrity] Template edit blocked during project work (task_type=%s). Templates are framework-controlled files."}}\n' "$TASK_TYPE"
     exit 0
     ;;
 esac
@@ -59,7 +59,7 @@ case "$TARGET_FILE" in
       echo '{}'
       exit 0
     fi
-    printf '{"permissionDecision":"deny","message":"[integrity] Framework control file edit blocked during project work (task_type=%s). Only framework tasks may edit hooks/scripts/.claude/CLAUDE.md."}\n' "$TASK_TYPE"
+    printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"[integrity] Framework control file edit blocked during project work (task_type=%s). Only framework tasks may edit hooks/scripts/.claude/CLAUDE.md."}}\n' "$TASK_TYPE"
     exit 0
     ;;
 esac
@@ -70,13 +70,13 @@ PLAN_GATE=$(grep -A20 "^gate_approvals:" "$STATUS_FILE" | grep -m1 "plan:" | sed
 
 # Block code edits in Client mode.
 if [ "$MODE" = "Client" ]; then
-  printf '{"permissionDecision":"deny","message":"[gate] Client mode: code edits are blocked. Complete Client phases and get client_ready_for_dev approval first."}\n'
+  printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"[gate] Client mode: code edits are blocked. Complete Client phases and get client_ready_for_dev approval first."}}\n'
   exit 0
 fi
 
 # Block code edits when plan gate is not approved.
 if [ "$PLAN_GATE" != "approved" ] && [ "$PLAN_GATE" != "n/a" ]; then
-  printf '{"permissionDecision":"deny","message":"[gate] Plan gate is %s. Complete brainstorm and plan phases before editing code."}\n' "$PLAN_GATE"
+  printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"[gate] Plan gate is %s. Complete brainstorm and plan phases before editing code."}}\n' "$PLAN_GATE"
   exit 0
 fi
 

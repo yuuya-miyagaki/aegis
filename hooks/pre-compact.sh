@@ -7,9 +7,15 @@
 # This catches cases where compaction would discard context before
 # the agent has persisted its working state to STATUS.md.
 #
-# Exit codes:
-#   0 = allow compaction
-#   2 = block compaction (Claude Code PreCompact convention)
+# Block / Allow contract (v0.12.2):
+#   Both paths use exit 0. Block is signaled by stdout JSON
+#   `{"decision":"block","reason":"..."}` (top-level).
+#   Allow is signaled by stdout JSON
+#   `{"hookSpecificOutput":{"hookEventName":"PreCompact","additionalContext":"..."}}`.
+#   IMPORTANT: do NOT use exit 2 here. Claude Code Hooks spec accepts either
+#   exit 2 OR JSON `decision:block` for blocking PreCompact, but they are mutually
+#   exclusive: exit 2 makes the runtime ignore stdout JSON and treat output as
+#   stderr feedback only. aegis v0.12.2 採用方針は JSON block + exit 0。
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -56,15 +62,19 @@ ELAPSED=$(( NOW - FILE_MTIME ))
 
 if [ "$ELAPSED" -gt "$STALE_THRESHOLD" ] && [ -n "$PHASE" ] && [ "$PHASE" != "null" ]; then
   # STATUS.md is stale and there is an active phase — block compaction.
+  # Per Claude Code Hooks spec, PreCompact uses top-level decision/reason.
+  # IMPORTANT: must exit 0 — exit 2 causes Claude Code to ignore stdout JSON
+  # and treat output as stderr feedback only. v0.12.2 採用方針は JSON block。
   MSG="[PreCompact BLOCKED] STATUS.md was last updated ${ELAPSED}s ago (threshold: ${STALE_THRESHOLD}s). mode=${MODE} phase=${PHASE} | Update STATUS.md before compaction to preserve working state."
   ESCAPED=$(escape_for_json "$MSG")
-  printf '{"decision":"block","hookSpecificOutput":{"message":"%s"}}\n' "$ESCAPED"
-  exit 2
+  printf '{"decision":"block","reason":"%s"}\n' "$ESCAPED"
+  exit 0
 fi
 
 # STATUS.md is current or no active phase — allow compaction with context.
+# Per Claude Code Hooks spec, PreCompact context uses hookSpecificOutput.additionalContext + hookEventName.
 MSG="[PreCompact] mode=${MODE} phase=${PHASE} | next: ${NEXT_ACTION} | STATUS.md is current. Compaction allowed."
 ESCAPED=$(escape_for_json "$MSG")
 
-printf '{"hookSpecificOutput":{"message":"%s"}}\n' "$ESCAPED"
+printf '{"hookSpecificOutput":{"hookEventName":"PreCompact","additionalContext":"%s"}}\n' "$ESCAPED"
 exit 0
