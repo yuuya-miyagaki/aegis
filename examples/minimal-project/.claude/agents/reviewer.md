@@ -3,7 +3,7 @@ description: "Trigger: implementation complete, ready for pre-QA code review."
 maxTurns: 20
 readOnly: true
 skills:
-  - review
+  - aegis-review-gate
 model: inherit
 disallowedTools:
   - Edit

@@ -29,12 +29,31 @@ extract_command() {
   printf '%s' "$result"
 }
 
-# Extract exit_code from PostToolUse tool_result JSON.
+# Extract exit_code from PostToolUse / PostToolUseFailure tool result JSON.
+#
+# v0.13.0 Phase 0b: support both key schemas to bridge implementation drift.
+# The official Claude Code Hooks docs do not explicitly document the
+# PostToolUse result key name. We probe in priority order:
+#   1. tool_response.exitCode (camelCase, current Claude Code 2.x suspected)
+#   2. tool_response.exit_code (snake_case under tool_response, defensive)
+#   3. tool_result.exit_code   (legacy / aegis pre-v0.12.2 wire format)
+#   4. tool_result.exitCode    (defensive)
+# Returns the first non-null value found, or 0 if none.
 extract_exit_code() {
   local input="$1"
   printf '%s' "$input" | python3 -c '
 import sys, json
-data = json.loads(sys.stdin.read())
-print(data.get("tool_result", {}).get("exit_code", 0))
+try:
+    data = json.loads(sys.stdin.read())
+except Exception:
+    print(0)
+    sys.exit(0)
+tr = data.get("tool_response") or {}
+tl = data.get("tool_result") or {}
+for v in (tr.get("exitCode"), tr.get("exit_code"), tl.get("exit_code"), tl.get("exitCode")):
+    if v is not None:
+        print(v)
+        sys.exit(0)
+print(0)
 ' 2>/dev/null || echo "0"
 }

@@ -1,5 +1,6 @@
 # Runtime artifacts
 .claude/.gate-snapshot
+.claude/.task-event-debug.log
 
 # macOS
 .DS_Store

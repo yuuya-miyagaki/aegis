@@ -25,9 +25,11 @@ source "${SCRIPT_DIR}/lib/extract-input.sh"
 # Read stdin (JSON with tool_input/tool_result).
 INPUT=$(cat)
 
-# Defense-in-depth: skip audit if the edited file is not STATUS.md.
-# The `if` field in hooks config handles this for Claude Code >= v2.1.85,
-# but older versions silently ignore `if` and fire this hook on all Edit/Write.
+# Primary target filter (v0.12.2+): hooks.template.json no longer uses an `if`
+# field — the Claude Code Hooks spec restricts `if` to a single permission rule
+# with no `||`, which silently neutered the previous Write/NotebookEdit coverage.
+# The matcher is `Edit|Write|NotebookEdit`, and this `case "$TARGET_FILE" in
+# *STATUS.md` is the authoritative filter covering all three tool variants.
 TARGET_FILE=$(extract_file_path "$INPUT")
 case "$TARGET_FILE" in
   *STATUS.md) ;; # proceed with audit

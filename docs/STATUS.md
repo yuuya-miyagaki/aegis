@@ -1,31 +1,31 @@
 ---
 framework: aegis
-framework_version: "0.12.2"
+framework_version: "0.13.0-pre"
 project_name: "Aegis"
 mode: Dev
-phase: docs
+phase: implement
 task_type: framework
-task_size: M
-task_size_rationale: "v0.12.2 hotfix: 11 hooks の出力スキーマ移行（PreToolUse 8 + PostToolUse 1 + PostToolUseFailure 1 + PreCompact 1）+ if 削除 + テスト追加。各 hook 小規模パターン適用。"
-iteration: 7
+task_size: L
+task_size_rationale: "v0.13.0 Phase 0b: 新 PreToolUse hook 2 (check-skill-gate, check-cron-gate) + 専用 event hook 2 (TaskCreated, TaskCompleted) + 既存 hook 拡張 (secrets, destructive, extract_exit_code 両対応) + スキル名衝突解消 3 件 rename + 全参照更新。合計 30+ ファイル変更見込み。"
+iteration: 8
 ui_surface: false
 last_updated: "2026-05-15T00:00:00Z"
 gate_approvals:
   client_ready_for_dev: n/a
   brainstorm: approved
   plan: approved
-  review: approved
-  qa: approved
-  security: approved
-  deploy: n/a
-  dev_ready_for_client: approved
+  review: pending
+  qa: pending
+  security: pending
+  deploy: pending
+  dev_ready_for_client: pending
 current_refs:
   requirements: []
   plan: "docs/plans/v0130-modernization-plan.md"
   spec: null
-  review: "docs/qa-reports/v0122-review.md"
-  qa: "docs/qa-reports/v0122-review.md"
-  security: "docs/qa-reports/v0122-review.md"
+  review: null
+  qa: null
+  security: null
   deploy: null
   translation: null
 external_evidence:
@@ -37,7 +37,7 @@ external_evidence:
     scope: "v0.12.2 実装後 4 ラウンドレビュー"
     findings: "Round 6 (P1×2, P2×1: pre-compact exit 2 / minimal-project / test rc), Round 7 (P1×1, P3×1: git add 漏れ / テスト件数表記), Round 8 (P2×1, P3×1: stale last_updated / grep 自己マッチ), Round 9 (P3×2: コメント不整合)"
     resolution: "9件全反映。tier 1/2 PASS、134 tests PASS、本体と minimal-project 完全同期確認済み。"
-next_action: "v0.13.0 Phase 0b へ。新 PreToolUse / event hook（Skill, CronCreate, TaskCreated, TaskCompleted）追加、スキル名衝突解消、secrets/destructive パターン拡張、`extract_exit_code` 両キー対応。"
+next_action: "v0.13.0 Phase 0b 実装: Task 0b-1 (Skill/Cron PreToolUse hooks) → Task 0b-2 (TaskCreated/Completed event hooks) → Task 0b-3 (secrets/destructive 拡張 + extract_exit_code 両対応) → Task 0b-4 (スキル名衝突 3 件改名)。計画 Rev.5 に基づく。"
 blockers: []
 failure_tracking: null
 session_history:

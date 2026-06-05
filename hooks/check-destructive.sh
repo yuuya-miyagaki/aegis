@@ -83,6 +83,27 @@ if [ -z "$WARN" ] && printf '%s' "$CMD" | grep -qE 'git\s+clean\s+.*-f' 2>/dev/n
   WARN="Destructive: git clean removes untracked files."
 fi
 
+# v0.13.0 Phase 0b: high-risk patterns added.
+if [ -z "$WARN" ] && printf '%s' "$CMD" | grep -qE 'git\s+filter-branch' 2>/dev/null; then
+  WARN="Destructive: git filter-branch rewrites repository history (irreversible)."
+fi
+
+if [ -z "$WARN" ] && printf '%s' "$CMD" | grep -qE 'git\s+update-ref\s+-d' 2>/dev/null; then
+  WARN="Destructive: git update-ref -d deletes a ref permanently."
+fi
+
+if [ -z "$WARN" ] && printf '%s' "$CMD" | grep -qE 'git\s+reflog\s+expire.*--expire=now' 2>/dev/null; then
+  WARN="Destructive: git reflog expire --expire=now wipes reflog (no recovery)."
+fi
+
+if [ -z "$WARN" ] && printf '%s' "$CMD" | grep -qE 'npx\s+rimraf' 2>/dev/null; then
+  WARN="Destructive: npx rimraf bulk-deletes files recursively."
+fi
+
+if [ -z "$WARN" ] && printf '%s' "$CMD" | grep -qE 'find\s+.+\s+-delete' 2>/dev/null; then
+  WARN="Destructive: find -delete bulk-deletes matching files."
+fi
+
 if [ -n "$WARN" ]; then
   WARN_ESCAPED=$(printf '%s' "$WARN" | sed 's/"/\\"/g')
   printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"ask","permissionDecisionReason":"[careful] %s"}}\n' "$WARN_ESCAPED"

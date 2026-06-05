@@ -51,11 +51,29 @@
         ]
       },
       {
-        "matcher": "mcp__.*__deploy.*",
+        "matcher": "mcp__claude_ai_Vercel__deploy_to_vercel",
         "hooks": [
           {
             "type": "command",
             "command": "bash hooks/check-deploy-mcp-gate.sh"
+          }
+        ]
+      },
+      {
+        "matcher": "Skill",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash hooks/check-skill-gate.sh"
+          }
+        ]
+      },
+      {
+        "matcher": "CronCreate",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash hooks/check-cron-gate.sh"
           }
         ]
       }
@@ -88,6 +106,26 @@
           {
             "type": "command",
             "command": "bash hooks/pre-compact.sh"
+          }
+        ]
+      }
+    ],
+    "TaskCreated": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash hooks/check-task-created.sh"
+          }
+        ]
+      }
+    ],
+    "TaskCompleted": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash hooks/check-task-completed.sh"
           }
         ]
       }

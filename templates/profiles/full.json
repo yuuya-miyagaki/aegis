@@ -31,14 +31,14 @@
     "hooks/check-secrets.sh",
     ".claude/skills/tdd/SKILL.md",
     ".claude/skills/subagent-dev/SKILL.md",
-    ".claude/skills/brainstorming/SKILL.md",
+    ".claude/skills/aegis-brainstorm/SKILL.md",
     ".claude/skills/bug-diagnosis/SKILL.md",
     ".claude/skills/deploy/SKILL.md",
     ".claude/skills/client-workflow/SKILL.md",
     ".claude/skills/session-recovery/SKILL.md",
     ".claude/skills/ship-and-docs/SKILL.md",
-    ".claude/skills/review/SKILL.md",
-    ".claude/skills/security-review/SKILL.md",
+    ".claude/skills/aegis-review-gate/SKILL.md",
+    ".claude/skills/aegis-security-gate/SKILL.md",
     ".claude/skills/docs-sync/SKILL.md",
     ".claude/skills/qa-verification/SKILL.md",
     ".claude/agents/implementer.md",
@@ -73,6 +73,10 @@
     "post-status-audit.sh",
     "pre-compact.sh",
     "check-client-info.sh",
-    "check-secrets.sh"
+    "check-secrets.sh",
+    "check-skill-gate.sh",
+    "check-cron-gate.sh",
+    "check-task-created.sh",
+    "check-task-completed.sh"
   ]
 }

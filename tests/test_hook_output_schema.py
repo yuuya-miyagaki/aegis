@@ -30,12 +30,24 @@ ROOT = Path(__file__).resolve().parents[1]
 HOOKS = ROOT / "hooks"
 
 
-def run_hook(script: str, payload: dict, *, cwd: Path | None = None) -> tuple[int, dict, str]:
+def run_hook(
+    script: str,
+    payload: dict,
+    *,
+    cwd: Path | None = None,
+    env: dict | None = None,
+) -> tuple[int, dict, str]:
     """Run a hook script with JSON payload on stdin.
 
     Returns (returncode, parsed_stdout, stderr).
     parsed_stdout is {} if stdout is empty/whitespace/'{}'.
+
+    The optional `env` dict is merged onto os.environ before invoking the hook
+    (used by TaskCreated/TaskCompleted tests to set AEGIS_ROOT_OVERRIDE).
     """
+    actual_env = os.environ.copy()
+    if env:
+        actual_env.update(env)
     result = subprocess.run(
         ["bash", str(HOOKS / script)],
         input=json.dumps(payload),
@@ -43,6 +55,7 @@ def run_hook(script: str, payload: dict, *, cwd: Path | None = None) -> tuple[in
         text=True,
         check=False,
         cwd=str(cwd or ROOT),
+        env=actual_env,
     )
     out = result.stdout.strip()
     parsed = {} if not out or out == "{}" else json.loads(out)
@@ -485,6 +498,452 @@ class TestPreCompactHook(HookSchemaAssertions):
             os.utime(aegis_status, (original_mtime, original_mtime))
         self.assertTrue(out, "pre-compact.sh must emit JSON when current (got empty)")
         self.assert_precompact_allow(out, rc=rc, hint="pre-compact allow")
+
+
+# ---------------------------------------------------------------------------
+# Skill PreToolUse hook (check-skill-gate.sh, v0.13.0 Phase 0b)
+# ---------------------------------------------------------------------------
+
+
+class TestSkillGateHook(HookSchemaAssertions):
+    """check-skill-gate.sh: control-plane skills (update-config / keybindings-help /
+    fewer-permission-prompts) must trigger ask. Other skills pass through."""
+
+    def _payload(self, skill_name: str) -> dict:
+        return make_pretool_payload("Skill", {"skill": skill_name})
+
+    def test_update_config_asks(self):
+        rc, out, err = run_hook("check-skill-gate.sh", self._payload("update-config"))
+        self.assertEqual(rc, 0)
+        self.assert_pretool_decision(out, "ask", hint="check-skill-gate update-config")
+
+    def test_keybindings_help_asks(self):
+        rc, out, err = run_hook("check-skill-gate.sh", self._payload("keybindings-help"))
+        self.assertEqual(rc, 0)
+        self.assert_pretool_decision(out, "ask", hint="check-skill-gate keybindings-help")
+
+    def test_fewer_permission_prompts_asks(self):
+        rc, out, err = run_hook("check-skill-gate.sh", self._payload("fewer-permission-prompts"))
+        self.assertEqual(rc, 0)
+        self.assert_pretool_decision(out, "ask", hint="check-skill-gate fewer-permission-prompts")
+
+    def test_non_control_plane_skill_passes_through(self):
+        """A regular skill (e.g. brainstorming) must NOT trigger ask."""
+        rc, out, err = run_hook("check-skill-gate.sh", self._payload("brainstorming"))
+        self.assertEqual(rc, 0)
+        # Pass-through: output is empty dict {} (no permissionDecision).
+        self.assertEqual(
+            out, {},
+            f"non control-plane skill must pass through (empty output), got: {out}",
+        )
+
+    def test_missing_skill_name_passes_through(self):
+        """Defensive default: if tool_input.skill is missing, allow."""
+        payload = make_pretool_payload("Skill", {})
+        rc, out, err = run_hook("check-skill-gate.sh", payload)
+        self.assertEqual(rc, 0)
+        self.assertEqual(out, {}, f"missing skill must pass through, got: {out}")
+
+
+# ---------------------------------------------------------------------------
+# CronCreate PreToolUse hook (check-cron-gate.sh, v0.13.0 Phase 0b)
+# ---------------------------------------------------------------------------
+
+
+class TestCronGateHook(HookSchemaAssertions):
+    """check-cron-gate.sh: payloads containing deploy/destructive commands must
+    trigger ask. Safe payloads pass through."""
+
+    def _payload(self, prompt: str) -> dict:
+        return make_pretool_payload("CronCreate", {"prompt": prompt})
+
+    def test_vercel_deploy_in_prompt_asks(self):
+        rc, out, err = run_hook("check-cron-gate.sh", self._payload("Run vercel deploy --prod every morning"))
+        self.assertEqual(rc, 0)
+        self.assert_pretool_decision(out, "ask", hint="check-cron-gate vercel deploy")
+
+    def test_rm_rf_in_prompt_asks(self):
+        rc, out, err = run_hook("check-cron-gate.sh", self._payload("rm -rf /tmp/old-logs every week"))
+        self.assertEqual(rc, 0)
+        self.assert_pretool_decision(out, "ask", hint="check-cron-gate rm -rf")
+
+    def test_git_force_push_asks(self):
+        rc, out, err = run_hook("check-cron-gate.sh", self._payload("git push origin main --force"))
+        self.assertEqual(rc, 0)
+        self.assert_pretool_decision(out, "ask", hint="check-cron-gate git force-push")
+
+    def test_safe_prompt_passes_through(self):
+        """A benign scheduled task should NOT trigger ask."""
+        rc, out, err = run_hook("check-cron-gate.sh", self._payload("Generate a daily report from production logs"))
+        self.assertEqual(rc, 0)
+        self.assertEqual(out, {}, f"safe payload must pass through, got: {out}")
+
+    def test_empty_prompt_passes_through(self):
+        """If we cannot extract a prompt, allow (defensive default)."""
+        rc, out, err = run_hook("check-cron-gate.sh", self._payload(""))
+        self.assertEqual(rc, 0)
+        self.assertEqual(out, {}, f"empty payload must pass through, got: {out}")
+
+
+# ---------------------------------------------------------------------------
+# TaskCreated event hook (check-task-created.sh, v0.13.0 Phase 0b)
+# ---------------------------------------------------------------------------
+
+
+class TestTaskCreatedHook(HookSchemaAssertions):
+    """check-task-created.sh: hard stop via {"continue":false,"stopReason":"..."}
+    when plan gate is pending during implement phase (Round 4-C 採用方針)."""
+
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp(prefix="aegis-task-created-test-")
+        self.addCleanup(shutil.rmtree, self.tmp, ignore_errors=True)
+        (Path(self.tmp) / "docs").mkdir()
+        (Path(self.tmp) / ".claude").mkdir()
+
+    def _write_status(self, *, phase: str, plan_gate: str):
+        path = Path(self.tmp) / "docs" / "STATUS.md"
+        path.write_text(
+            "---\n"
+            f"phase: {phase}\n"
+            "mode: Dev\n"
+            "gate_approvals:\n"
+            f"  plan: {plan_gate}\n"
+            "---\n"
+        )
+
+    def _payload(self, subject: str) -> dict:
+        """Official Claude Code Hooks payload key for TaskCreated is task_subject
+        (per Hooks reference). Use that as the primary test fixture."""
+        return {"task_subject": subject}
+
+    def test_hard_stop_when_plan_pending_in_implement_phase(self):
+        self._write_status(phase="implement", plan_gate="pending")
+        rc, out, err = run_hook(
+            "check-task-created.sh",
+            self._payload("Implement new feature foo"),
+            cwd=Path(self.tmp),
+            env={"AEGIS_ROOT_OVERRIDE": str(self.tmp)},
+        )
+        self.assertEqual(rc, 0, "TaskCreated hard-stop emits via JSON, exit code 0")
+        self.assertEqual(
+            out.get("continue"), False,
+            f"hard stop must use continue:false (NOT decision:block). got: {out}",
+        )
+        self.assertIn("stopReason", out)
+        self.assertTrue(out["stopReason"].strip(), "stopReason must be non-empty")
+        # PreToolUse-style decision must NOT be present.
+        self.assertNotIn(
+            "decision", out,
+            "TaskCreated uses continue:false, not decision:block (Round 4-C)",
+        )
+
+    def test_pass_through_when_plan_approved(self):
+        self._write_status(phase="implement", plan_gate="approved")
+        rc, out, err = run_hook(
+            "check-task-created.sh",
+            self._payload("Implement new feature foo"),
+            cwd=Path(self.tmp),
+            env={"AEGIS_ROOT_OVERRIDE": str(self.tmp)},
+        )
+        self.assertEqual(rc, 0)
+        self.assertEqual(out, {}, f"plan approved must pass through, got: {out}")
+
+    def test_pass_through_in_plan_phase(self):
+        """phase=plan: TaskCreate for planning sub-work is legitimate."""
+        self._write_status(phase="plan", plan_gate="pending")
+        rc, out, err = run_hook(
+            "check-task-created.sh",
+            self._payload("Sketch plan for X"),
+            cwd=Path(self.tmp),
+            env={"AEGIS_ROOT_OVERRIDE": str(self.tmp)},
+        )
+        self.assertEqual(rc, 0)
+        self.assertEqual(out, {}, f"plan phase must allow task creation, got: {out}")
+
+    def test_unparseable_payload_dumps_and_passes(self):
+        """fail-safe: parse failure dumps to .claude/.task-event-debug.log and passes."""
+        self._write_status(phase="implement", plan_gate="pending")
+        rc, out, err = run_hook(
+            "check-task-created.sh",
+            {"unknown_key": "value"},  # no subject/title/description
+            cwd=Path(self.tmp),
+            env={"AEGIS_ROOT_OVERRIDE": str(self.tmp)},
+        )
+        self.assertEqual(rc, 0)
+        self.assertEqual(out, {})
+        log = Path(self.tmp) / ".claude" / ".task-event-debug.log"
+        self.assertTrue(log.exists(), "raw_input must be dumped on parse failure")
+
+
+# ---------------------------------------------------------------------------
+# TaskCompleted event hook (check-task-completed.sh, v0.13.0 Phase 0b)
+# ---------------------------------------------------------------------------
+
+
+class TestTaskCompletedHook(HookSchemaAssertions):
+    """check-task-completed.sh: 差し戻し via exit 2 + stderr when STATUS.md
+    next_action is empty (Round 4-C 採用方針)."""
+
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp(prefix="aegis-task-completed-test-")
+        self.addCleanup(shutil.rmtree, self.tmp, ignore_errors=True)
+        (Path(self.tmp) / "docs").mkdir()
+        (Path(self.tmp) / ".claude").mkdir()
+
+    def _write_status(self, *, next_action: str):
+        path = Path(self.tmp) / "docs" / "STATUS.md"
+        path.write_text(
+            "---\n"
+            "phase: implement\n"
+            "mode: Dev\n"
+            f"next_action: {next_action}\n"
+            "---\n"
+        )
+
+    def _payload(self, subject: str) -> dict:
+        """Official Claude Code Hooks payload key for TaskCompleted is task_subject
+        (per Hooks reference). Use that as the primary test fixture."""
+        return {"task_subject": subject}
+
+    def test_push_back_when_next_action_empty(self):
+        self._write_status(next_action="")
+        rc, out, err = run_hook(
+            "check-task-completed.sh",
+            self._payload("Task foo done"),
+            cwd=Path(self.tmp),
+            env={"AEGIS_ROOT_OVERRIDE": str(self.tmp)},
+        )
+        # TaskCompleted: exit 2 + stderr for 差し戻し
+        self.assertEqual(rc, 2, "TaskCompleted push-back must exit 2 (NOT continue:false)")
+        self.assertEqual(out, {}, "stdout must be empty on push-back; stderr carries reason")
+        self.assertIn("task-completed", err)
+        self.assertIn("next_action", err)
+
+    def test_pass_through_when_next_action_set(self):
+        self._write_status(next_action="Move to qa phase")
+        rc, out, err = run_hook(
+            "check-task-completed.sh",
+            self._payload("Task foo done"),
+            cwd=Path(self.tmp),
+            env={"AEGIS_ROOT_OVERRIDE": str(self.tmp)},
+        )
+        self.assertEqual(rc, 0)
+        self.assertEqual(out, {}, f"valid completion must pass through, got: {out}")
+
+    def test_push_back_when_next_action_null(self):
+        """next_action: null is also treated as empty → push back."""
+        self._write_status(next_action="null")
+        rc, out, err = run_hook(
+            "check-task-completed.sh",
+            self._payload("Task done"),
+            cwd=Path(self.tmp),
+            env={"AEGIS_ROOT_OVERRIDE": str(self.tmp)},
+        )
+        self.assertEqual(rc, 2, "next_action: null must also trigger push-back")
+
+    def test_unparseable_payload_dumps_and_passes(self):
+        """fail-safe: parse failure dumps + passes through."""
+        self._write_status(next_action="OK")
+        rc, out, err = run_hook(
+            "check-task-completed.sh",
+            {"unknown_key": "value"},
+            cwd=Path(self.tmp),
+            env={"AEGIS_ROOT_OVERRIDE": str(self.tmp)},
+        )
+        self.assertEqual(rc, 0)
+        self.assertEqual(out, {})
+        log = Path(self.tmp) / ".claude" / ".task-event-debug.log"
+        self.assertTrue(log.exists())
+
+
+# ---------------------------------------------------------------------------
+# extract_exit_code dual-schema support (v0.13.0 Phase 0b)
+# ---------------------------------------------------------------------------
+
+
+class TestExtractExitCode(unittest.TestCase):
+    """lib/extract-input.sh の extract_exit_code が tool_response.exitCode と
+    tool_result.exit_code の両方を読めること。priority: tool_response > tool_result."""
+
+    def _run(self, payload: dict) -> str:
+        script = (
+            f"source {HOOKS}/lib/extract-input.sh\n"
+            "extract_exit_code \"$(cat)\"\n"
+        )
+        result = subprocess.run(
+            ["bash", "-c", script],
+            input=json.dumps(payload),
+            capture_output=True,
+            text=True,
+        )
+        return result.stdout.strip()
+
+    def test_tool_response_exit_code_camel_case(self):
+        """Primary key: tool_response.exitCode (camelCase, Claude Code 2.x suspected)."""
+        self.assertEqual(self._run({"tool_response": {"exitCode": 42}}), "42")
+
+    def test_tool_response_exit_code_snake_case(self):
+        """Defensive: tool_response.exit_code (snake_case)."""
+        self.assertEqual(self._run({"tool_response": {"exit_code": 7}}), "7")
+
+    def test_tool_result_exit_code_legacy(self):
+        """Legacy / aegis pre-v0.12.2 schema: tool_result.exit_code."""
+        self.assertEqual(self._run({"tool_result": {"exit_code": 13}}), "13")
+
+    def test_priority_tool_response_over_tool_result(self):
+        """When both schemas present, tool_response wins (priority order)."""
+        payload = {"tool_response": {"exitCode": 1}, "tool_result": {"exit_code": 99}}
+        self.assertEqual(self._run(payload), "1")
+
+    def test_default_zero_when_missing(self):
+        """No exit code anywhere → default 0."""
+        self.assertEqual(self._run({}), "0")
+
+    def test_zero_exit_returned_correctly(self):
+        """Exit 0 (success) is distinguished from missing (also defaults to 0)."""
+        self.assertEqual(self._run({"tool_response": {"exitCode": 0}}), "0")
+
+
+# ---------------------------------------------------------------------------
+# check-destructive.sh extensions (v0.13.0 Phase 0b)
+# ---------------------------------------------------------------------------
+
+
+class TestCheckDestructiveExtensions(HookSchemaAssertions):
+    """v0.13.0 Phase 0b 追加された ask パターン (history-rewriting / bulk-delete)。"""
+
+    def _run(self, command: str):
+        return run_hook("check-destructive.sh", make_pretool_payload("Bash", {"command": command}))
+
+    def test_git_filter_branch_asks(self):
+        rc, out, err = self._run("git filter-branch --tree-filter 'rm -rf bad' HEAD")
+        self.assertEqual(rc, 0)
+        self.assert_pretool_decision(out, "ask", hint="git filter-branch")
+
+    def test_git_update_ref_delete_asks(self):
+        rc, out, err = self._run("git update-ref -d refs/heads/feature")
+        self.assertEqual(rc, 0)
+        self.assert_pretool_decision(out, "ask", hint="git update-ref -d")
+
+    def test_git_reflog_expire_now_asks(self):
+        rc, out, err = self._run("git reflog expire --expire=now --all")
+        self.assertEqual(rc, 0)
+        self.assert_pretool_decision(out, "ask", hint="git reflog expire --expire=now")
+
+    def test_npx_rimraf_asks(self):
+        rc, out, err = self._run("npx rimraf node_modules")
+        self.assertEqual(rc, 0)
+        self.assert_pretool_decision(out, "ask", hint="npx rimraf")
+
+    def test_find_delete_asks(self):
+        rc, out, err = self._run("find /tmp/cache -name '*.log' -delete")
+        self.assertEqual(rc, 0)
+        self.assert_pretool_decision(out, "ask", hint="find -delete")
+
+
+# ---------------------------------------------------------------------------
+# check-secrets.sh high-risk credential patterns (v0.13.0 Phase 0b)
+# ---------------------------------------------------------------------------
+
+
+class TestCheckSecretsHighRisk(HookSchemaAssertions):
+    """v0.13.0 Phase 0b: PEM鍵/SSH鍵/credentials.json/service-account.json
+    などの高リスク認証ファイルへの git add を deny。"""
+
+    def _run(self, command: str):
+        return run_hook("check-secrets.sh", make_pretool_payload("Bash", {"command": command}))
+
+    def test_git_add_pem_denies(self):
+        rc, out, err = self._run("git add server.pem")
+        self.assertEqual(rc, 0)
+        self.assert_pretool_decision(out, "deny", hint="git add *.pem")
+
+    def test_git_add_id_rsa_denies(self):
+        rc, out, err = self._run("git add ~/.ssh/id_rsa")
+        self.assertEqual(rc, 0)
+        self.assert_pretool_decision(out, "deny", hint="git add id_rsa")
+
+    def test_git_add_credentials_json_denies(self):
+        rc, out, err = self._run("git add my-credentials.json")
+        self.assertEqual(rc, 0)
+        self.assert_pretool_decision(out, "deny", hint="git add credentials.json")
+
+    def test_git_add_service_account_denies(self):
+        rc, out, err = self._run("git add service-account-key.json")
+        self.assertEqual(rc, 0)
+        self.assert_pretool_decision(out, "deny", hint="git add service-account*.json")
+
+
+# ---------------------------------------------------------------------------
+# check-secrets.sh broad staging + commit (v0.13.0 Phase 0b NO-GO fix)
+# ---------------------------------------------------------------------------
+
+
+class TestCheckSecretsBroadStaging(HookSchemaAssertions):
+    """v0.13.0 Phase 0b NO-GO fix: broad staging (git add . / git add -A) と
+    git commit でも高リスク認証ファイル (PEM/SSH/credentials/service-account) を
+    検知して deny する。"""
+
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp(prefix="aegis-secrets-broad-")
+        self.addCleanup(shutil.rmtree, self.tmp, ignore_errors=True)
+        # Initialize a minimal git repo so check-secrets.sh's git commands work.
+        subprocess.run(["git", "init", "-q", self.tmp], check=True, capture_output=True)
+        subprocess.run(["git", "-C", self.tmp, "config", "user.email", "test@example.com"], check=True, capture_output=True)
+        subprocess.run(["git", "-C", self.tmp, "config", "user.name", "Test"], check=True, capture_output=True)
+
+    def _payload(self, command: str) -> dict:
+        return make_pretool_payload("Bash", {"command": command})
+
+    def test_git_add_dot_with_pem_in_repo_denies(self):
+        """git add . when *.pem exists → deny via find-based recursive scan."""
+        (Path(self.tmp) / "server.pem").write_text("-----FAKE-----")
+        rc, out, err = run_hook("check-secrets.sh", self._payload("git add ."), cwd=Path(self.tmp))
+        self.assertEqual(rc, 0)
+        self.assert_pretool_decision(out, "deny", hint="git add . with *.pem")
+
+    def test_git_add_A_with_id_rsa_denies(self):
+        (Path(self.tmp) / "id_rsa").write_text("-----PRIVATE KEY-----")
+        rc, out, err = run_hook("check-secrets.sh", self._payload("git add -A"), cwd=Path(self.tmp))
+        self.assertEqual(rc, 0)
+        self.assert_pretool_decision(out, "deny", hint="git add -A with id_rsa")
+
+    def test_git_add_dot_with_credentials_json_denies(self):
+        (Path(self.tmp) / "my-credentials.json").write_text("{}")
+        rc, out, err = run_hook("check-secrets.sh", self._payload("git add ."), cwd=Path(self.tmp))
+        self.assertEqual(rc, 0)
+        self.assert_pretool_decision(out, "deny", hint="git add . with credentials.json")
+
+    def test_git_add_dot_with_service_account_denies(self):
+        (Path(self.tmp) / "service-account-key.json").write_text("{}")
+        rc, out, err = run_hook("check-secrets.sh", self._payload("git add ."), cwd=Path(self.tmp))
+        self.assertEqual(rc, 0)
+        self.assert_pretool_decision(out, "deny", hint="git add . with service-account*.json")
+
+    def test_git_commit_with_pem_staged_denies(self):
+        """git commit when *.pem is in cached diff → deny via cached scan."""
+        pem = Path(self.tmp) / "key.pem"
+        pem.write_text("-----FAKE-----")
+        subprocess.run(["git", "-C", self.tmp, "add", "key.pem"], check=True, capture_output=True)
+        rc, out, err = run_hook("check-secrets.sh", self._payload("git commit -m feat"), cwd=Path(self.tmp))
+        self.assertEqual(rc, 0)
+        self.assert_pretool_decision(out, "deny", hint="git commit with staged *.pem")
+
+    def test_git_commit_with_id_rsa_staged_denies(self):
+        rsa = Path(self.tmp) / "id_rsa"
+        rsa.write_text("-----PRIVATE-----")
+        subprocess.run(["git", "-C", self.tmp, "add", "id_rsa"], check=True, capture_output=True)
+        rc, out, err = run_hook("check-secrets.sh", self._payload("git commit -m feat"), cwd=Path(self.tmp))
+        self.assertEqual(rc, 0)
+        self.assert_pretool_decision(out, "deny", hint="git commit with staged id_rsa")
+
+    def test_git_commit_clean_passes_through(self):
+        """git commit without high-risk staged → empty {} pass-through."""
+        (Path(self.tmp) / "README.md").write_text("hi")
+        subprocess.run(["git", "-C", self.tmp, "add", "README.md"], check=True, capture_output=True)
+        rc, out, err = run_hook("check-secrets.sh", self._payload("git commit -m feat"), cwd=Path(self.tmp))
+        self.assertEqual(rc, 0)
+        self.assertEqual(out, {}, f"clean commit must pass through, got: {out}")
 
 
 # ---------------------------------------------------------------------------

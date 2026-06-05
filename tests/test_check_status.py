@@ -525,11 +525,17 @@ class TestMCPDeployGateHook(unittest.TestCase):
                     matchers.append(m)
         self.assertTrue(len(matchers) > 0, "No matchers found in template")
         # Cross-check: deploy matcher against known tool names via Node.js.
-        deploy_matcher = "mcp__.*__deploy.*"
+        # v0.13.0 Phase 0b: matcher was narrowed from the broad regex
+        # `mcp__.*__deploy.*` (which also caught get_deployment*/list_deployments)
+        # to the literal `mcp__claude_ai_Vercel__deploy_to_vercel`. Other MCP
+        # deploy tools (Firebase, etc.) are intentionally NOT covered yet; they
+        # will be added as explicit matchers in a later phase when added to the
+        # supported MCP set.
+        deploy_matcher = "mcp__claude_ai_Vercel__deploy_to_vercel"
         self.assertIn(deploy_matcher, matchers)
         test_cases = [
             ("mcp__claude_ai_Vercel__deploy_to_vercel", True),
-            ("mcp__firebase__deploy_hosting", True),
+            ("mcp__firebase__deploy_hosting", False),  # excluded since Phase 0b narrowing
             ("mcp__github__push_files", False),
             ("mcp__claude_ai_Vercel__list_deployments", False),
         ]

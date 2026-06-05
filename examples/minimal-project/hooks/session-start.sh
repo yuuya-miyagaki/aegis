@@ -122,7 +122,7 @@ case "$PHASE" in
     if [ "$TASK_TYPE" = "bugfix" ] || [ "$TASK_TYPE" = "hotfix" ]; then
       HINT="skill: bug-diagnosis / TDD必須 / brainstorm+plan=n/a"
     else
-      HINT="skill: brainstorming / TDD必須 / エビデンスなき完了なし"
+      HINT="skill: aegis-brainstorm / TDD必須 / エビデンスなき完了なし"
     fi
     ;;
   plan)
@@ -138,7 +138,7 @@ case "$PHASE" in
     HINT="skill: qa-verification / エビデンスなき完了なし / 再現・検証を実行せよ"
     ;;
   security)
-    HINT="skill: security-review / エビデンスなき完了なし / 残留リスクを記録せよ"
+    HINT="skill: aegis-security-gate / エビデンスなき完了なし / 残留リスクを記録せよ"
     ;;
   deploy)
     HINT="skill: deploy / Security Blockers確認必須 / 3回失敗=ゴールベースカウント"

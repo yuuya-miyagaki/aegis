@@ -50,7 +50,8 @@ REQUIRED_AGENT_FILES = [
 ]
 
 REQUIRED_SKILL_FILES = [
-    ROOT / ".claude/skills/brainstorming/SKILL.md",
+    # v0.13.0 Phase 0b: aegis-* に改名（公式同名スキル衝突回避）
+    ROOT / ".claude/skills/aegis-brainstorm/SKILL.md",
     ROOT / ".claude/skills/bug-diagnosis/SKILL.md",
     ROOT / ".claude/skills/tdd/SKILL.md",
     ROOT / ".claude/skills/subagent-dev/SKILL.md",
@@ -59,8 +60,8 @@ REQUIRED_SKILL_FILES = [
     ROOT / ".claude/skills/client-workflow/SKILL.md",
     ROOT / ".claude/skills/session-recovery/SKILL.md",
     ROOT / ".claude/skills/ship-and-docs/SKILL.md",
-    ROOT / ".claude/skills/review/SKILL.md",
-    ROOT / ".claude/skills/security-review/SKILL.md",
+    ROOT / ".claude/skills/aegis-review-gate/SKILL.md",
+    ROOT / ".claude/skills/aegis-security-gate/SKILL.md",
     ROOT / ".claude/skills/docs-sync/SKILL.md",
     ROOT / ".claude/skills/qa-verification/SKILL.md",
     ROOT / ".claude/skills/translation-mapping/SKILL.md",
@@ -191,9 +192,10 @@ REQUIRED_EXAMPLE_FILES = [
 ]
 
 # Example skill directories — check SKILL.md exists in each.
+# v0.13.0 Phase 0b: brainstorming/review/security-review を aegis-* に改名
 REQUIRED_EXAMPLE_SKILL_DIRS = [
-    "brainstorming", "bug-diagnosis", "client-workflow", "deploy",
-    "docs-sync", "qa-verification", "review", "security-review",
+    "aegis-brainstorm", "bug-diagnosis", "client-workflow", "deploy",
+    "docs-sync", "qa-verification", "aegis-review-gate", "aegis-security-gate",
     "session-recovery", "ship-and-docs", "subagent-dev", "tdd",
     "translation-mapping",
     "integration-assist",

@@ -3,7 +3,7 @@ description: "Trigger: change touches auth, secrets, data exposure, or untrusted
 maxTurns: 20
 readOnly: true
 skills:
-  - security-review
+  - aegis-security-gate
 model: inherit
 permissionMode: plan
 effort: high
@@ -24,7 +24,7 @@ color: red
 1. `docs/STATUS.md`
 2. active plan, review, and QA refs
 3. the code diff and security-relevant files
-4. security-review skill (OWASP checklist and evidence requirements)
+4. aegis-security-gate skill (OWASP checklist and evidence requirements)
 
 ## Produce
 

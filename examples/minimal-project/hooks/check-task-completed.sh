@@ -1,0 +1,89 @@
+#!/usr/bin/env bash
+# TaskCompleted event hook (v0.13.0 Phase 0b).
+#
+# Per Claude Code Hooks spec, TaskCompleted does not accept a matcher and fires
+# unconditionally whenever a task is marked complete. We normalize the payload
+# at the top of the script and apply integrity checks.
+#
+# Use case (v0.13.0 採用方針 — see docs/plans/v0130-modernization-plan.md Rev.5
+# Round 4-C):
+#   TaskCompleted = minor inconsistency = 差し戻し (exit 2 + stderr).
+#   Example: STATUS.md `next_action` is empty when a task completion is signaled
+#   → push back via exit 2 so the model receives the feedback and can correct
+#     the report, without halting the entire teammate session.
+#
+# raw_input fail-safe: dump unparseable payloads to .claude/.task-event-debug.log
+# (gitignored) and pass through.
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+DEFAULT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+# Allow ROOT override via env (test fixtures use this to isolate from real aegis state).
+ROOT="${AEGIS_ROOT_OVERRIDE:-${DEFAULT_ROOT}}"
+STATUS_FILE="${ROOT}/docs/STATUS.md"
+DUMP_LOG="${ROOT}/.claude/.task-event-debug.log"
+
+INPUT=$(cat)
+
+# Normalize payload via python3 JSON probing.
+# Per Claude Code Hooks reference, TaskCompleted input uses `task_subject` and
+# `task_description` (v0.13.0 Phase 0b NO-GO fix). Official keys probed first,
+# legacy keys kept as forward-compat fallback.
+SUBJECT=$(printf '%s' "$INPUT" | python3 -c '
+import sys, json
+try:
+    data = json.loads(sys.stdin.read())
+    for key in ("task_subject", "task_description", "subject", "title", "description", "task"):
+        v = data.get(key)
+        if isinstance(v, str) and v.strip():
+            print(v)
+            sys.exit(0)
+    for parent in ("tool_input", "task", "input"):
+        sub = data.get(parent) or {}
+        if isinstance(sub, dict):
+            for key in ("task_subject", "task_description", "subject", "title", "description"):
+                v = sub.get(key)
+                if isinstance(v, str) and v.strip():
+                    print(v)
+                    sys.exit(0)
+    print("")
+except Exception:
+    print("")
+' 2>/dev/null || true)
+
+# fail-safe dump.
+if [ -z "$SUBJECT" ]; then
+  mkdir -p "$(dirname "$DUMP_LOG")"
+  {
+    printf '%s\n' "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] check-task-completed: unparseable payload"
+    printf '%s\n---\n' "$INPUT"
+  } >> "$DUMP_LOG" 2>/dev/null || true
+  echo '{}'
+  exit 0
+fi
+
+if [ ! -f "$STATUS_FILE" ]; then
+  echo '{}'
+  exit 0
+fi
+
+# Extract next_action from STATUS.md.
+NEXT_ACTION=$(grep -m1 "^next_action:" "$STATUS_FILE" | sed "s/^next_action:[[:space:]]*//" | sed 's/^"//;s/"$//' || true)
+
+# Strip whitespace.
+NEXT_ACTION_STRIPPED=$(printf '%s' "$NEXT_ACTION" | tr -d '[:space:]')
+
+# 差し戻し condition: next_action is empty or null.
+# This catches cases where the model marks a task complete without updating
+# STATUS.md to reflect what's next.
+if [ -z "$NEXT_ACTION_STRIPPED" ] || [ "$NEXT_ACTION_STRIPPED" = "null" ]; then
+  SUBJECT_PREVIEW=$(printf '%s' "$SUBJECT" | head -c 80 | tr '\n' ' ')
+  # TaskCompleted uses exit 2 + stderr for 差し戻し per v0.13.0 採用方針 (Round 4-C).
+  # The model receives the stderr text as feedback and can correct the report.
+  printf '[task-completed] TaskCompleted (subject: %s) しましたが STATUS.md next_action が未更新です。完了前に next_action を更新してください。\n' "$SUBJECT_PREVIEW" >&2
+  exit 2
+fi
+
+# Pass-through.
+echo '{}'
+exit 0

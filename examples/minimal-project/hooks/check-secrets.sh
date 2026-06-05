@@ -23,6 +23,16 @@ fi
 # Safe .env variants that are NOT secrets (may be committed).
 SAFE_ENV_SUFFIXES='\.env\.(example|template|sample)'
 
+# v0.13.0 Phase 0b: high-risk credential file patterns beyond .env.
+# These should never be staged regardless of variants.
+HIGH_RISK_RE='\.pem(\b|$)|id_rsa(\b|$)|credentials.*\.json|service-account.*\.json'
+
+# --- Check 0: Deny staging high-risk credential files ---
+if printf '%s' "$CMD" | grep -qE "git\s+add\s+.*(${HIGH_RISK_RE})" 2>/dev/null; then
+  printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"[secrets] 高リスク認証ファイル (PEM鍵/SSH鍵/credentials.json/service-account.json 等) を git に追加しないでください。鍵が漏洩します。"}}\n'
+  exit 0
+fi
+
 # --- Check 1: Deny staging .env files ---
 # Exclude safe variants: .env.example, .env.template, .env.sample
 
@@ -35,11 +45,32 @@ if printf '%s' "$STRIPPED" | grep -qE 'git\s+add\s+.*\.env' 2>/dev/null; then
   exit 0
 fi
 
-# Broad staging that would include .env: git add -A, git add .
+# Broad staging that would include .env or high-risk credentials: git add -A, git add .
 if printf '%s' "$CMD" | grep -qE 'git\s+add\s+(-A|--all|\.)' 2>/dev/null; then
+  ROOT=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
+
+  # v0.13.0 Phase 0b NO-GO fix: broad staging must also catch PEM/SSH/credentials
+  # files (these have no "safe variant", so any presence in the repo is risky).
+  HAS_HIGH_RISK=false
+  while IFS= read -r f; do
+    case "$(basename "$f")" in
+      *.pem|id_rsa|id_rsa.pub|*credentials*.json|service-account*.json)
+        HAS_HIGH_RISK=true; break ;;
+    esac
+  done < <(find "$ROOT" \
+    \( -name '*.pem' -o -name 'id_rsa*' -o -name '*credentials*.json' -o -name 'service-account*.json' \) \
+    -not -path '*/node_modules/*' \
+    -not -path '*/.git/*' \
+    -not -path '*/vendor/*' \
+    -not -path '*/.venv/*' \
+    2>/dev/null || true)
+  if [ "$HAS_HIGH_RISK" = true ]; then
+    printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"[secrets] git add -A / git add . は repository 内の高リスク認証ファイル (PEM鍵/SSH鍵/credentials.json/service-account.json) を含む可能性があります。個別のファイル名を指定し、高リスクファイルは事前に削除/移動してください。"}}\n'
+    exit 0
+  fi
+
   # Check if actual secret .env files exist anywhere in the repo (excluding safe variants).
   # Recursive search handles monorepo layouts (e.g., services/api/.env).
-  ROOT=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
   HAS_SECRET_ENV=false
   while IFS= read -r f; do
     case "$(basename "$f")" in
@@ -61,6 +92,11 @@ fi
 # --- Check 2: Deny commit when .env is staged ---
 
 if printf '%s' "$CMD" | grep -qE 'git\s+commit' 2>/dev/null; then
+  # v0.13.0 Phase 0b NO-GO fix: high-risk credential files in staged diff.
+  if git diff --cached --name-only 2>/dev/null | grep -E '\.pem$|(^|/)id_rsa(\.pub)?$|credentials.*\.json$|service-account.*\.json$' | grep -q . 2>/dev/null; then
+    printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"[secrets] 高リスク認証ファイル (PEM鍵/SSH鍵/credentials.json/service-account.json) がステージングされています。git reset HEAD でファイル名を指定して除外してからコミットしてください。"}}\n'
+    exit 0
+  fi
   # Check if any secret .env file is in the staging area (exclude safe variants)
   if git diff --cached --name-only 2>/dev/null | grep -E '\.env' | grep -vE "${SAFE_ENV_SUFFIXES}$" | grep -q . 2>/dev/null; then
     printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"[secrets] .env ファイルがステージングされています。git reset HEAD .env で除外してからコミットしてください。"}}\n'
