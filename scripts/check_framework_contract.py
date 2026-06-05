@@ -262,7 +262,7 @@ MODEL_EFFORT_POLICY = {
     "integration-specialist.md": ("inherit", "high"),
 }
 _OPUS_ONLY_EFFORTS = {"xhigh", "max"}
-_VERSION_ID_RE = re.compile(r"claude-[a-z]+-\d")
+_VERSION_ID_RE = re.compile(r"claude-[\w-]*\d")
 # root と example ミラーの両方を同一ポリシーで検証する。
 MODEL_POLICY_ROOTS = [ROOT, ROOT / "examples/minimal-project"]
 
@@ -288,8 +288,8 @@ def check_model_effort_policy(roots) -> list:
             fm = _frontmatter_section(read_text(path))
             mm = re.search(r"^model:\s*(\S+)", fm, re.MULTILINE)
             em = re.search(r"^effort:\s*(\S+)", fm, re.MULTILINE)
-            model = mm.group(1) if mm else None
-            effort = em.group(1) if em else None
+            model = mm.group(1).strip("\"'") if mm else None
+            effort = em.group(1).strip("\"'") if em else None
             rel = path.relative_to(ROOT)
             if model != exp_model:
                 failures.append(f"model-policy: {rel} model={model} expected {exp_model}")
