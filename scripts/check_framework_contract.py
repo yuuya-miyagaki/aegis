@@ -309,6 +309,26 @@ def check_model_effort_policy(roots) -> list:
     return failures
 
 
+def check_agent_names(roots) -> list:
+    """全 agent が frontmatter `name:` を持ち、値がファイル名 stem と一致することを検証。"""
+    failures = []
+    for base in roots:
+        agents_dir = base / ".claude/agents"
+        if not agents_dir.exists():
+            continue
+        for path in sorted(agents_dir.glob("*.md")):
+            fm = _frontmatter_section(read_text(path))
+            nm = re.search(r"^name:\s*(\S+)", fm, re.MULTILINE)
+            rel = path.relative_to(ROOT)
+            if not nm:
+                failures.append(f"agent-name: {rel} missing name in frontmatter")
+                continue
+            name = nm.group(1).strip("\"'")
+            if name != path.stem:
+                failures.append(f"agent-name: {rel} name={name} expected {path.stem} (must match filename)")
+    return failures
+
+
 def word_count(text: str) -> int:
     return len(text.split())
 
@@ -864,6 +884,7 @@ def main() -> int:
                 failures.append("name-lint: exited with non-zero status but produced no output")
 
     failures.extend(check_model_effort_policy(MODEL_POLICY_ROOTS))
+    failures.extend(check_agent_names(MODEL_POLICY_ROOTS))
 
     if failures:
         for failure in failures:

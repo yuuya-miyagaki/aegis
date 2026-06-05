@@ -1,4 +1,5 @@
 ---
+name: planner
 description: "Trigger: phase transition needed, design ambiguity found, or implementation plan required."
 maxTurns: 30
 readOnly: true

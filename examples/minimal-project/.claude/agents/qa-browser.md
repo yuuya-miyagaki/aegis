@@ -1,4 +1,5 @@
 ---
+name: qa-browser
 description: "Trigger: ui_surface is true and QA agent needs browser verification."
 maxTurns: 20
 readOnly: false

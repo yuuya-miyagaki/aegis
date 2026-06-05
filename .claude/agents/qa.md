@@ -1,4 +1,5 @@
 ---
+name: qa
 description: "Trigger: review passed, ready for verification and evidence collection."
 maxTurns: 30
 readOnly: true

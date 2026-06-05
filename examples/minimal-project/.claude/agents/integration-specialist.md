@@ -1,4 +1,5 @@
 ---
+name: integration-specialist
 description: "Trigger: external service integration, API setup, OAuth configuration, connect to third-party service."
 model: inherit
 maxTurns: 30

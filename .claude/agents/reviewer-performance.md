@@ -1,4 +1,5 @@
 ---
+name: reviewer-performance
 description: "Trigger: review diff includes loop, query, data structure, or API call changes."
 maxTurns: 15
 readOnly: true

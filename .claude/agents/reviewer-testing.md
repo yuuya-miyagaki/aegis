@@ -1,4 +1,5 @@
 ---
+name: reviewer-testing
 description: "Trigger: review diff includes test file changes or test coverage is questionable."
 maxTurns: 15
 readOnly: true

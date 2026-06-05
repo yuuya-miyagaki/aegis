@@ -1,4 +1,5 @@
 ---
+name: translation-specialist
 description: "Trigger: Client terminology needs translation to functional specs and implementation hints."
 model: sonnet
 maxTurns: 15

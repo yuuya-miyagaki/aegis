@@ -1,4 +1,5 @@
 ---
+name: reviewer-maintainability
 description: "Trigger: review diff spans 3+ files or adds a new module."
 maxTurns: 15
 readOnly: true

@@ -1,4 +1,5 @@
 ---
+name: ui
 description: "Trigger: task requires visual judgment, interaction flow design, or design-system fit."
 maxTurns: 40
 model: inherit

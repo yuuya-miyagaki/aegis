@@ -1,4 +1,5 @@
 ---
+name: implementer
 description: "Trigger: plan approved, code/test changes needed for a specific planned task."
 maxTurns: 50
 skills:
