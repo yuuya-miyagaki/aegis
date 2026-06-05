@@ -54,7 +54,7 @@ Git 戦略は Project Overrides に定義。未定義なら feature branch + squ
 
 ### タスク 1: <コンポーネント名>
 
-**blockedBy:** なし | **モデル:** `haiku`/`sonnet`/`opus`
+**blockedBy:** なし | **モデル:** `inherit`/`sonnet`/`opus`
 **ファイル:** 対象 `<パス>` / テスト `<パス>`
 **意図:** <1-2 文>
 **TDD:** テスト → FAIL確認 → 最小実装 → PASS確認 → コミット
