@@ -3,7 +3,10 @@
 # are not approved.
 # Thin wrapper — delegates all gate logic to check_status.py --check-deploy-ready.
 # Companion to check-deploy-gate.sh (covers CLI deploys via Bash matcher).
-# Matcher: mcp__.*__deploy.* (Vercel deploy, Firebase deploy, etc.)
+# Matcher (registered in settings.json / hooks.template.json): the literal
+# mcp__claude_ai_Vercel__deploy_to_vercel. v0.13.0 Phase 0b で broad regex
+# mcp__.*__deploy.* から narrowing 済み。Firebase 等の他 MCP deploy は未対応
+# （将来、対応 MCP を増やす際に明示 matcher として追加）。
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"

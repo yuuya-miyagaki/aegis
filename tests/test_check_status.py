@@ -476,32 +476,11 @@ class TestMCPDeployGateHook(unittest.TestCase):
             self.assertEqual(rc, 0)
             self.assertEqual(out, "{}")
 
-    def test_matcher_covers_deploy_tools(self):
-        """Matcher regex must match known deploy MCP tool names."""
-        import re
-        matcher = re.compile(r"mcp__.*__deploy.*")
-        deploy_tools = [
-            "mcp__claude_ai_Vercel__deploy_to_vercel",
-            "mcp__claude_ai_Vercel__deploy_preview",
-            "mcp__firebase__deploy_hosting",
-        ]
-        for tool in deploy_tools:
-            self.assertRegex(tool, matcher, f"Matcher should cover: {tool}")
-
-    def test_matcher_excludes_non_deploy(self):
-        """Matcher regex must NOT match non-deploy MCP tool names."""
-        import re
-        matcher = re.compile(r"mcp__.*__deploy.*")
-        non_deploy_tools = [
-            "mcp__github__push_files",
-            "mcp__github__get_file_contents",
-            "mcp__github__create_pull_request",
-            "mcp__claude_ai_Vercel__list_deployments",
-            "mcp__claude_ai_Vercel__get_deployment",
-            "mcp__memory__create_entities",
-        ]
-        for tool in non_deploy_tools:
-            self.assertNotRegex(tool, matcher, f"Matcher should NOT cover: {tool}")
+    # NOTE: the old broad-regex tests (mcp__.*__deploy.*) were removed in the
+    # Round 3 P3 cleanup — that regex is NOT the registered matcher. The actual
+    # literal matcher (mcp__claude_ai_Vercel__deploy_to_vercel) and its coverage
+    # (Vercel deploy = match; Firebase / list_deployments / github = no match)
+    # are validated authoritatively by test_matcher_valid_js_regex below.
 
     def test_matcher_valid_js_regex(self):
         """All matchers in hooks.template.json must be valid JS RegExp and match
