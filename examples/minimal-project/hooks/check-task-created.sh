@@ -83,9 +83,12 @@ PHASE=$(grep -m1 "^phase:" "$STATUS_FILE" | sed "s/^phase:[[:space:]]*//" | sed 
 # task management even before plan approval — TaskCreate is legitimate sub-task
 # planning in those contexts.
 if [ "$PHASE" = "implement" ] && [ "$PLAN_GATE" != "approved" ] && [ "$PLAN_GATE" != "n/a" ]; then
-  # Build reason. Sanitize the external subject to a single printable line;
-  # emit.sh handles JSON escaping of the assembled reason.
-  SUBJECT_PREVIEW=$(printf '%s' "$SUBJECT" | head -c 80 | tr '\n' ' ')
+  # Build reason. Sanitize the external subject to a single printable line:
+  # collapse ALL control chars (0x00-0x1F + DEL) to space, so emit.sh — which
+  # only escapes structural JSON chars — never receives a raw control byte that
+  # would make the hard-stop JSON malformed (Round 3 P1: malformed JSON on a
+  # safety-boundary hard stop = fail-open).
+  SUBJECT_PREVIEW=$(printf '%s' "$SUBJECT" | head -c 80 | tr '\000-\037\177' ' ')
   REASON=$(printf '[task-created] phase=implement で plan gate=%s。TaskCreate (subject: %s) を hard stop。先に /gate approve plan を実行してください。' "$PLAN_GATE" "$SUBJECT_PREVIEW")
   # TaskCreated uses {"continue": false, "stopReason": "..."} per v0.13.0 採用方針 (Round 4-C).
   emit_continue_false "$REASON"

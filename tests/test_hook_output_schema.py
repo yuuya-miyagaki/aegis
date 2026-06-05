@@ -572,6 +572,14 @@ class TestCronGateHook(HookSchemaAssertions):
         self.assertEqual(rc, 0)
         self.assert_pretool_decision(out, "ask", hint="check-cron-gate git force-push")
 
+    def test_control_char_prompt_emits_valid_json(self):
+        """Regression (Round 3 P1): a cron prompt with a control char (\\u0001) plus
+        a deploy keyword must still produce VALID ask JSON. The preview embedded in
+        the reason must be sanitized to printable, or emit produces malformed JSON."""
+        rc, out, err = run_hook("check-cron-gate.sh", self._payload("vercel deploy \u0001 prod"))
+        self.assertEqual(rc, 0)
+        self.assert_pretool_decision(out, "ask", hint="cron-gate control-char prompt")
+
     def test_safe_prompt_passes_through(self):
         """A benign scheduled task should NOT trigger ask."""
         rc, out, err = run_hook("check-cron-gate.sh", self._payload("Generate a daily report from production logs"))
@@ -636,6 +644,24 @@ class TestTaskCreatedHook(HookSchemaAssertions):
             "decision", out,
             "TaskCreated uses continue:false, not decision:block (Round 4-C)",
         )
+
+    def test_control_char_subject_emits_valid_json(self):
+        """Regression (Round 3 P1): task_subject with a control char (\\u0001) must
+        still produce VALID hard-stop JSON. TaskCreated is a safety-boundary hard
+        stop, so malformed JSON would fail open (Claude Code ignores unparseable
+        output). The preview must be sanitized to printable before emit."""
+        self._write_status(phase="implement", plan_gate="pending")
+        # run_hook json.loads the stdout; if the hook emits invalid JSON this raises.
+        rc, out, err = run_hook(
+            "check-task-created.sh",
+            self._payload("Implement \u0001 feature"),
+            cwd=Path(self.tmp),
+            env={"AEGIS_ROOT_OVERRIDE": str(self.tmp)},
+        )
+        self.assertEqual(rc, 0)
+        self.assertEqual(out.get("continue"), False, f"must hard-stop with valid JSON, got: {out}")
+        self.assertIn("stopReason", out)
+        self.assertTrue(out["stopReason"].strip())
 
     def test_pass_through_when_plan_approved(self):
         self._write_status(phase="implement", plan_gate="approved")

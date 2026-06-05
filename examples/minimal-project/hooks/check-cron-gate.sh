@@ -46,8 +46,10 @@ fi
 DANGER_RE='vercel +deploy|vercel *$|firebase +deploy|netlify +deploy|gcloud +app +deploy|(npm|pnpm|yarn|bun) +(run +)?deploy|flyctl +deploy|railway +deploy|rm\s+-[a-zA-Z]*r|drop\s+(table|database)|git\s+push\s+.*(-f\b|--force)|git\s+reset\s+--hard|git\s+filter-branch|git\s+update-ref\s+-d|git\s+reflog\s+expire.*--expire=now|npx\s+rimraf|find\s+.*-delete'
 
 if printf '%s' "$PROMPT" | grep -qEi "$DANGER_RE"; then
-  # Truncate the prompt preview to 200 chars to keep the reason readable.
-  PREVIEW=$(printf '%s' "$PROMPT" | head -c 200 | tr '\n' ' ')
+  # Truncate the prompt preview to 200 chars and sanitize to a single printable
+  # line: collapse ALL control chars (0x00-0x1F + DEL) to space so emit.sh never
+  # receives a raw control byte that would make the ask JSON malformed (Round 3 P1).
+  PREVIEW=$(printf '%s' "$PROMPT" | head -c 200 | tr '\000-\037\177' ' ')
   REASON=$(printf '[cron-gate] スケジュール対象 prompt にデプロイ/破壊的コマンドが含まれています。承認の前に内容を確認してください。preview: %s' "$PREVIEW")
   emit_ask "$REASON"
   exit 0
