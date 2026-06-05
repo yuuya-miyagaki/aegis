@@ -11,6 +11,7 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 # Load shared input extraction.
 source "${SCRIPT_DIR}/lib/extract-input.sh"
+source "${SCRIPT_DIR}/lib/emit.sh"
 
 INPUT=$(cat)
 
@@ -26,8 +27,8 @@ case "$CMD" in
 esac
 
 if [ "$IS_TEST" = true ]; then
-  printf '{"hookSpecificOutput":{"hookEventName":"PostToolUseFailure","additionalContext":"[ReAct] テスト失敗。Observe: エラー出力を読む → Think: 原因仮説1つ → Act: 最小変更1つ。複数変更を同時にしない。"}}\n'
+  emit_context PostToolUseFailure "[ReAct] テスト失敗。Observe: エラー出力を読む → Think: 原因仮説1つ → Act: 最小変更1つ。複数変更を同時にしない。"
 else
-  echo '{}'
+  emit_allow
 fi
 exit 0

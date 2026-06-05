@@ -10,12 +10,14 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 STATUS_FILE="${ROOT}/docs/STATUS.md"
 
+source "${SCRIPT_DIR}/lib/emit.sh"
+
 # Read stdin (JSON with tool_name and tool_input).
 INPUT=$(cat)
 
 # If STATUS.md doesn't exist, allow.
 if [ ! -f "$STATUS_FILE" ]; then
-  echo '{}'
+  emit_allow
   exit 0
 fi
 
@@ -30,9 +32,10 @@ RC=$?
 set -e
 if [ $RC -ne 0 ]; then
   MSG=$(printf '%s' "$RESULT" | tr '\n' ' ')
-  printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"[deploy-gate-mcp] %s"}}\n' "$MSG"
+  REASON=$(printf '[deploy-gate-mcp] %s' "$MSG")
+  emit_deny "$REASON"
   exit 0
 fi
 
-echo '{}'
+emit_allow
 exit 0

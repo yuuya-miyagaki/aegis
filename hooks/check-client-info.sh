@@ -9,6 +9,7 @@ STATUS_FILE="${ROOT}/docs/STATUS.md"
 
 # Load shared input extraction.
 source "${SCRIPT_DIR}/lib/extract-input.sh"
+source "${SCRIPT_DIR}/lib/emit.sh"
 
 # Read stdin (JSON with tool_input).
 INPUT=$(cat)
@@ -21,31 +22,31 @@ case "$TARGET_FILE" in
   *docs/requirements/*)
     ;;
   *)
-    echo '{}'
+    emit_allow
     exit 0
     ;;
 esac
 
 # If STATUS.md doesn't exist, allow.
 if [ ! -f "$STATUS_FILE" ]; then
-  echo '{}'
+  emit_allow
   exit 0
 fi
 
 # Check MODE: skip if Dev.
 MODE=$(grep -m1 "^mode:" "$STATUS_FILE" | sed "s/^mode:[[:space:]]*//" | sed 's/^"//;s/"$//' || true)
 if [ "$MODE" = "Dev" ]; then
-  echo '{}'
+  emit_allow
   exit 0
 fi
 
 # Check if docs/client/context.md exists.
 CLIENT_CONTEXT="${ROOT}/docs/client/context.md"
 if [ -f "$CLIENT_CONTEXT" ]; then
-  echo '{}'
+  emit_allow
   exit 0
 fi
 
 # docs/client/context.md is missing: deny the edit.
-printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"docs/client/context.md が見つかりません。requirements 編集の前にクライアント情報を記録してください。→ client-workflow skill の onboard フェーズを実行"}}\n'
+emit_deny "docs/client/context.md が見つかりません。requirements 編集の前にクライアント情報を記録してください。→ client-workflow skill の onboard フェーズを実行"
 exit 0

@@ -10,13 +10,14 @@ STATUS_FILE="${ROOT}/docs/STATUS.md"
 
 # Load shared input extraction.
 source "${SCRIPT_DIR}/lib/extract-input.sh"
+source "${SCRIPT_DIR}/lib/emit.sh"
 
 # Read stdin (JSON with tool_input).
 INPUT=$(cat)
 
 # If STATUS.md doesn't exist, allow.
 if [ ! -f "$STATUS_FILE" ]; then
-  echo '{}'
+  emit_allow
   exit 0
 fi
 
@@ -25,14 +26,14 @@ TARGET_FILE=$(extract_file_path "$INPUT")
 
 # If we can't determine target, allow.
 if [ -z "$TARGET_FILE" ]; then
-  echo '{}'
+  emit_allow
   exit 0
 fi
 
 # --- Allowlist: project work files (always allowed) ---
 case "$TARGET_FILE" in
   */docs/*|docs/*|*.gitkeep)
-    echo '{}'
+    emit_allow
     exit 0
     ;;
 esac
@@ -42,10 +43,11 @@ case "$TARGET_FILE" in
   */templates/*|templates/*)
     TASK_TYPE=$(grep -m1 "^task_type:" "$STATUS_FILE" | sed "s/^task_type:[[:space:]]*//" | sed 's/^"//;s/"$//' || true)
     if [ "$TASK_TYPE" = "framework" ]; then
-      echo '{}'
+      emit_allow
       exit 0
     fi
-    printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"[integrity] Template edit blocked during project work (task_type=%s). Templates are framework-controlled files."}}\n' "$TASK_TYPE"
+    REASON=$(printf '[integrity] Template edit blocked during project work (task_type=%s). Templates are framework-controlled files.' "$TASK_TYPE")
+    emit_deny "$REASON"
     exit 0
     ;;
 esac
@@ -56,10 +58,11 @@ case "$TARGET_FILE" in
     # Allow only when task_type is "framework".
     TASK_TYPE=$(grep -m1 "^task_type:" "$STATUS_FILE" | sed "s/^task_type:[[:space:]]*//" | sed 's/^"//;s/"$//' || true)
     if [ "$TASK_TYPE" = "framework" ]; then
-      echo '{}'
+      emit_allow
       exit 0
     fi
-    printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"[integrity] Framework control file edit blocked during project work (task_type=%s). Only framework tasks may edit hooks/scripts/.claude/CLAUDE.md."}}\n' "$TASK_TYPE"
+    REASON=$(printf '[integrity] Framework control file edit blocked during project work (task_type=%s). Only framework tasks may edit hooks/scripts/.claude/CLAUDE.md.' "$TASK_TYPE")
+    emit_deny "$REASON"
     exit 0
     ;;
 esac
@@ -70,15 +73,16 @@ PLAN_GATE=$(grep -A20 "^gate_approvals:" "$STATUS_FILE" | grep -m1 "plan:" | sed
 
 # Block code edits in Client mode.
 if [ "$MODE" = "Client" ]; then
-  printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"[gate] Client mode: code edits are blocked. Complete Client phases and get client_ready_for_dev approval first."}}\n'
+  emit_deny "[gate] Client mode: code edits are blocked. Complete Client phases and get client_ready_for_dev approval first."
   exit 0
 fi
 
 # Block code edits when plan gate is not approved.
 if [ "$PLAN_GATE" != "approved" ] && [ "$PLAN_GATE" != "n/a" ]; then
-  printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"[gate] Plan gate is %s. Complete brainstorm and plan phases before editing code."}}\n' "$PLAN_GATE"
+  REASON=$(printf '[gate] Plan gate is %s. Complete brainstorm and plan phases before editing code.' "$PLAN_GATE")
+  emit_deny "$REASON"
   exit 0
 fi
 
-echo '{}'
+emit_allow
 exit 0

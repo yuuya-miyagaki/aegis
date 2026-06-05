@@ -12,6 +12,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+source "${SCRIPT_DIR}/lib/emit.sh"
 
 # Read stdin (JSON with tool_input containing the cron prompt).
 INPUT=$(cat)
@@ -36,7 +37,7 @@ except Exception:
 
 # If no prompt extractable, allow (defensive: payload shape may differ).
 if [ -z "$PROMPT" ]; then
-  echo '{}'
+  emit_allow
   exit 0
 fi
 
@@ -46,12 +47,12 @@ DANGER_RE='vercel +deploy|vercel *$|firebase +deploy|netlify +deploy|gcloud +app
 
 if printf '%s' "$PROMPT" | grep -qEi "$DANGER_RE"; then
   # Truncate the prompt preview to 200 chars to keep the reason readable.
-  PREVIEW=$(printf '%s' "$PROMPT" | head -c 200 | tr '\n' ' ' | sed 's/"/\\"/g')
+  PREVIEW=$(printf '%s' "$PROMPT" | head -c 200 | tr '\n' ' ')
   REASON=$(printf '[cron-gate] スケジュール対象 prompt にデプロイ/破壊的コマンドが含まれています。承認の前に内容を確認してください。preview: %s' "$PREVIEW")
-  printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"ask","permissionDecisionReason":"%s"}}\n' "$REASON"
+  emit_ask "$REASON"
   exit 0
 fi
 
 # No dangerous pattern: allow.
-echo '{}'
+emit_allow
 exit 0

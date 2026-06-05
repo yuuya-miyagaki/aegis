@@ -6,9 +6,11 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 STATUS_FILE="${ROOT}/docs/STATUS.md"
 
+source "${SCRIPT_DIR}/lib/emit.sh"
+
 # If STATUS.md doesn't exist, allow silently.
 if [ ! -f "$STATUS_FILE" ]; then
-  echo '{}'
+  emit_allow
   exit 0
 fi
 
@@ -197,18 +199,5 @@ fi
 # Locale hint.
 CONTEXT="${CONTEXT} / ドキュメントは日本語"
 
-# Escape for JSON.
-escape_for_json() {
-  local s="$1"
-  s="${s//\\/\\\\}"
-  s="${s//\"/\\\"}"
-  s="${s//$'\n'/\\n}"
-  s="${s//$'\r'/\\r}"
-  s="${s//$'\t'/\\t}"
-  printf '%s' "$s"
-}
-
-ESCAPED=$(escape_for_json "$CONTEXT")
-
-printf '{"hookSpecificOutput":{"hookEventName":"SessionStart","additionalContext":"%s"}}\n' "$ESCAPED"
+emit_context SessionStart "$CONTEXT"
 exit 0

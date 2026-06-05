@@ -22,9 +22,11 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 STATUS_FILE="${ROOT}/docs/STATUS.md"
 
+source "${SCRIPT_DIR}/lib/emit.sh"
+
 # If STATUS.md doesn't exist, allow silently.
 if [ ! -f "$STATUS_FILE" ]; then
-  echo '{}'
+  emit_allow
   exit 0
 fi
 
@@ -37,17 +39,6 @@ extract_value() {
 MODE=$(extract_value "mode")
 PHASE=$(extract_value "phase")
 NEXT_ACTION=$(extract_value "next_action")
-
-# Escape for JSON.
-escape_for_json() {
-  local s="$1"
-  s="${s//\\/\\\\}"
-  s="${s//\"/\\\"}"
-  s="${s//$'\n'/\\n}"
-  s="${s//$'\r'/\\r}"
-  s="${s//$'\t'/\\t}"
-  printf '%s' "$s"
-}
 
 # Staleness check: block compaction if STATUS.md was not recently updated.
 # Default: 5 minutes (300 seconds). Override with ULTRA_PRECOMPACT_INTERVAL.
@@ -66,15 +57,13 @@ if [ "$ELAPSED" -gt "$STALE_THRESHOLD" ] && [ -n "$PHASE" ] && [ "$PHASE" != "nu
   # IMPORTANT: must exit 0 — exit 2 causes Claude Code to ignore stdout JSON
   # and treat output as stderr feedback only. v0.12.2 採用方針は JSON block。
   MSG="[PreCompact BLOCKED] STATUS.md was last updated ${ELAPSED}s ago (threshold: ${STALE_THRESHOLD}s). mode=${MODE} phase=${PHASE} | Update STATUS.md before compaction to preserve working state."
-  ESCAPED=$(escape_for_json "$MSG")
-  printf '{"decision":"block","reason":"%s"}\n' "$ESCAPED"
+  emit_block "$MSG"
   exit 0
 fi
 
 # STATUS.md is current or no active phase — allow compaction with context.
 # Per Claude Code Hooks spec, PreCompact context uses hookSpecificOutput.additionalContext + hookEventName.
 MSG="[PreCompact] mode=${MODE} phase=${PHASE} | next: ${NEXT_ACTION} | STATUS.md is current. Compaction allowed."
-ESCAPED=$(escape_for_json "$MSG")
 
-printf '{"hookSpecificOutput":{"hookEventName":"PreCompact","additionalContext":"%s"}}\n' "$ESCAPED"
+emit_context PreCompact "$MSG"
 exit 0

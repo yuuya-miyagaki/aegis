@@ -19,6 +19,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+source "${SCRIPT_DIR}/lib/emit.sh"
 DEFAULT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 # Allow ROOT override via env (test fixtures use this to isolate from real aegis state).
 ROOT="${AEGIS_ROOT_OVERRIDE:-${DEFAULT_ROOT}}"
@@ -63,13 +64,13 @@ if [ -z "$SUBJECT" ]; then
     printf '%s\n' "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] check-task-created: unparseable payload"
     printf '%s\n---\n' "$INPUT"
   } >> "$DUMP_LOG" 2>/dev/null || true
-  echo '{}'
+  emit_allow
   exit 0
 fi
 
 # If STATUS.md doesn't exist (e.g. test scaffold), pass through.
 if [ ! -f "$STATUS_FILE" ]; then
-  echo '{}'
+  emit_allow
   exit 0
 fi
 
@@ -82,14 +83,15 @@ PHASE=$(grep -m1 "^phase:" "$STATUS_FILE" | sed "s/^phase:[[:space:]]*//" | sed 
 # task management even before plan approval — TaskCreate is legitimate sub-task
 # planning in those contexts.
 if [ "$PHASE" = "implement" ] && [ "$PLAN_GATE" != "approved" ] && [ "$PLAN_GATE" != "n/a" ]; then
-  # Build reason — keep simple (no internal double quotes in the JSON string).
-  SUBJECT_PREVIEW=$(printf '%s' "$SUBJECT" | head -c 80 | tr '\n' ' ' | sed "s/'/\\\\'/g; s/\"/\\\\\\\"/g")
+  # Build reason. Sanitize the external subject to a single printable line;
+  # emit.sh handles JSON escaping of the assembled reason.
+  SUBJECT_PREVIEW=$(printf '%s' "$SUBJECT" | head -c 80 | tr '\n' ' ')
   REASON=$(printf '[task-created] phase=implement で plan gate=%s。TaskCreate (subject: %s) を hard stop。先に /gate approve plan を実行してください。' "$PLAN_GATE" "$SUBJECT_PREVIEW")
   # TaskCreated uses {"continue": false, "stopReason": "..."} per v0.13.0 採用方針 (Round 4-C).
-  printf '{"continue":false,"stopReason":"%s"}\n' "$REASON"
+  emit_continue_false "$REASON"
   exit 0
 fi
 
 # Pass-through.
-echo '{}'
+emit_allow
 exit 0

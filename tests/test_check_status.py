@@ -354,6 +354,9 @@ class TempProjectWithHooks(TempProject):
         (lib_dir / "extract-input.sh").symlink_to(
             ROOT / "hooks" / "lib" / "extract-input.sh"
         )
+        (lib_dir / "emit.sh").symlink_to(
+            ROOT / "hooks" / "lib" / "emit.sh"
+        )
         # Copy each hook script (not symlink — so dirname resolves to temp).
         import shutil
         for hook_name in [
@@ -1373,6 +1376,9 @@ class TestSecretsHookMonorepo(unittest.TestCase):
         (lib_dir / "extract-input.sh").symlink_to(
             ROOT / "hooks" / "lib" / "extract-input.sh"
         )
+        (lib_dir / "emit.sh").symlink_to(
+            ROOT / "hooks" / "lib" / "emit.sh"
+        )
         return tmpdir, root
 
     def _run_hook(self, root: str, cmd: str) -> tuple[int, str]:
@@ -1466,6 +1472,9 @@ class TestTemplateProtection(unittest.TestCase):
         (lib_dir / "extract-input.sh").symlink_to(
             ROOT / "hooks" / "lib" / "extract-input.sh"
         )
+        (lib_dir / "emit.sh").symlink_to(
+            ROOT / "hooks" / "lib" / "emit.sh"
+        )
         return tmpdir, root
 
     def _run_hook(self, root: str, file_path: str) -> tuple[int, str]:
@@ -1540,6 +1549,9 @@ class TestControlPlaneAllowlistBypass(unittest.TestCase):
         lib_dir.mkdir()
         (lib_dir / "extract-input.sh").symlink_to(
             ROOT / "hooks" / "lib" / "extract-input.sh"
+        )
+        (lib_dir / "emit.sh").symlink_to(
+            ROOT / "hooks" / "lib" / "emit.sh"
         )
         return tmpdir, root
 

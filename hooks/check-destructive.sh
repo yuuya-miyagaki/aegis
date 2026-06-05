@@ -6,6 +6,7 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 # Load shared input extraction.
 source "${SCRIPT_DIR}/lib/extract-input.sh"
+source "${SCRIPT_DIR}/lib/emit.sh"
 
 # Read stdin.
 INPUT=$(cat)
@@ -15,7 +16,7 @@ CMD=$(extract_command "$INPUT")
 
 # If no command extracted, allow.
 if [ -z "$CMD" ]; then
-  echo '{}'
+  emit_allow
   exit 0
 fi
 
@@ -39,7 +40,7 @@ if [ -n "$SAFE_TARGETS" ]; then
     esac
   done
   if [ "$SAFE_ONLY" = true ]; then
-    echo '{}'
+    emit_allow
     exit 0
   fi
 fi
@@ -105,9 +106,8 @@ if [ -z "$WARN" ] && printf '%s' "$CMD" | grep -qE 'find\s+.+\s+-delete' 2>/dev/
 fi
 
 if [ -n "$WARN" ]; then
-  WARN_ESCAPED=$(printf '%s' "$WARN" | sed 's/"/\\"/g')
-  printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"ask","permissionDecisionReason":"[careful] %s"}}\n' "$WARN_ESCAPED"
+  emit_ask "[careful] $WARN"
 else
-  echo '{}'
+  emit_allow
 fi
 exit 0

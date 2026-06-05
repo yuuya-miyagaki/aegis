@@ -11,20 +11,21 @@ STATUS_FILE="${ROOT}/docs/STATUS.md"
 
 # Load shared input extraction.
 source "${SCRIPT_DIR}/lib/extract-input.sh"
+source "${SCRIPT_DIR}/lib/emit.sh"
 
 # Read stdin (JSON with tool_input).
 INPUT=$(cat)
 
 # If STATUS.md doesn't exist, allow.
 if [ ! -f "$STATUS_FILE" ]; then
-  echo '{}'
+  emit_allow
   exit 0
 fi
 
 # Extract command from tool_input.
 CMD=$(extract_command "$INPUT")
 if [ -z "$CMD" ]; then
-  echo '{}'
+  emit_allow
   exit 0
 fi
 
@@ -34,7 +35,7 @@ fi
 #           netlify deploy, npm/pnpm/yarn/bun [run] deploy, flyctl/railway/gcloud deploy.
 DEPLOY_RE='(^|[;&|] *)(vercel +deploy|vercel *$|firebase +deploy|netlify +deploy|(npm|pnpm|yarn|bun) +(run +)?deploy|flyctl +deploy|railway +deploy|gcloud +app +deploy)'
 if ! printf '%s' "$CMD" | grep -qEi "$DEPLOY_RE"; then
-  echo '{}'
+  emit_allow
   exit 0
 fi
 
@@ -46,9 +47,10 @@ RC=$?
 set -e
 if [ $RC -ne 0 ]; then
   MSG=$(printf '%s' "$RESULT" | tr '\n' ' ')
-  printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"[deploy-gate] %s"}}\n' "$MSG"
+  REASON=$(printf '[deploy-gate] %s' "$MSG")
+  emit_deny "$REASON"
   exit 0
 fi
 
-echo '{}'
+emit_allow
 exit 0

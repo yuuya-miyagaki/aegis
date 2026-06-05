@@ -23,13 +23,14 @@ STATUS_FILE="${ROOT}/docs/STATUS.md"
 
 # Load shared input extraction.
 source "${SCRIPT_DIR}/lib/extract-input.sh"
+source "${SCRIPT_DIR}/lib/emit.sh"
 
 # Read stdin (raw hook input).
 INPUT=$(cat)
 
 # If STATUS.md doesn't exist, allow (no framework context).
 if [ ! -f "$STATUS_FILE" ]; then
-  echo '{}'
+  emit_allow
   exit 0
 fi
 
@@ -40,7 +41,7 @@ CONTROL_PLANE='STATUS\.md|CLAUDE\.md|\.claude/|\.claude[^A-Za-z0-9_/]|hooks/|scr
 # truncation on commands with internal quotes (e.g. python3 -c "...STATUS.md...").
 if ! printf '%s' "$INPUT" | grep -qE "$CONTROL_PLANE"; then
   # No control plane path in entire input — allow.
-  echo '{}'
+  emit_allow
   exit 0
 fi
 
@@ -72,7 +73,7 @@ is_allowlisted() {
 
 # Check extracted command.
 if [ -n "$CMD" ] && is_allowlisted "$CMD"; then
-  echo '{}'
+  emit_allow
   exit 0
 fi
 
@@ -80,14 +81,14 @@ fi
 # Extract command via python3 for full fidelity.
 FULL_CMD=$(printf '%s' "$INPUT" | python3 -c 'import sys,json; print(json.loads(sys.stdin.read()).get("tool_input",{}).get("command",""))' 2>/dev/null || true)
 if [ -n "$FULL_CMD" ] && is_allowlisted "$FULL_CMD"; then
-  echo '{}'
+  emit_allow
   exit 0
 fi
 
 # Check task_type: allow all if framework task.
 TASK_TYPE=$(grep -m1 "^task_type:" "$STATUS_FILE" | sed "s/^task_type:[[:space:]]*//" | sed 's/^"//;s/"$//' || true)
 if [ "$TASK_TYPE" = "framework" ]; then
-  echo '{}'
+  emit_allow
   exit 0
 fi
 
@@ -102,12 +103,13 @@ if [ -n "$CHECK_CMD" ]; then
     WRITE_INDICATORS='sed\s+-i|>\s*[^&]|>>\s|tee\s|cp\s|mv\s|chmod\s|rm\s|mkdir\s|touch\s|install\s|ln\s|write_text|write_bytes|open\(.*[wax]|\.write\(|truncate|Path\(.*\.write|unlink|remove|rename'
     if printf '%s' "$CHECK_CMD" | grep -qE "$READ_ONLY_STARTS" && \
        ! printf '%s' "$CHECK_CMD" | grep -qE "$WRITE_INDICATORS"; then
-      echo '{}'
+      emit_allow
       exit 0
     fi
   fi
 fi
 
 # Default: deny. Control plane path present, not allowlisted, not read-only.
-printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"[integrity] Bash command referencing control plane path blocked during project work (task_type=%s). Use Edit/Write tools for auditable changes, or set task_type=framework."}}\n' "$TASK_TYPE"
+REASON=$(printf '[integrity] Bash command referencing control plane path blocked during project work (task_type=%s). Use Edit/Write tools for auditable changes, or set task_type=framework.' "$TASK_TYPE")
+emit_deny "$REASON"
 exit 0

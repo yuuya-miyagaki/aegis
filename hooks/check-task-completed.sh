@@ -17,6 +17,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+source "${SCRIPT_DIR}/lib/emit.sh"
 DEFAULT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 # Allow ROOT override via env (test fixtures use this to isolate from real aegis state).
 ROOT="${AEGIS_ROOT_OVERRIDE:-${DEFAULT_ROOT}}"
@@ -58,12 +59,12 @@ if [ -z "$SUBJECT" ]; then
     printf '%s\n' "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] check-task-completed: unparseable payload"
     printf '%s\n---\n' "$INPUT"
   } >> "$DUMP_LOG" 2>/dev/null || true
-  echo '{}'
+  emit_allow
   exit 0
 fi
 
 if [ ! -f "$STATUS_FILE" ]; then
-  echo '{}'
+  emit_allow
   exit 0
 fi
 
@@ -85,5 +86,5 @@ if [ -z "$NEXT_ACTION_STRIPPED" ] || [ "$NEXT_ACTION_STRIPPED" = "null" ]; then
 fi
 
 # Pass-through.
-echo '{}'
+emit_allow
 exit 0

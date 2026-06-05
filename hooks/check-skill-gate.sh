@@ -13,6 +13,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+source "${SCRIPT_DIR}/lib/emit.sh"
 
 # Read stdin (JSON with tool_input.skill).
 INPUT=$(cat)
@@ -31,7 +32,7 @@ except Exception:
 
 # If we cannot determine the skill name, allow (defensive default).
 if [ -z "$SKILL_NAME" ]; then
-  echo '{}'
+  emit_allow
   exit 0
 fi
 
@@ -40,13 +41,13 @@ fi
 # Skill tool runs the mutation internally.
 case "$SKILL_NAME" in
   update-config|keybindings-help|fewer-permission-prompts)
-    # Avoid double-quotes inside the JSON string to keep stdout valid JSON.
     # Skill name is wrapped in backticks; parentheses are used for parenthetical text.
-    printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"ask","permissionDecisionReason":"[skill-gate] Skill `%s` は aegis 制御層 (.claude/settings.json または keybindings) を変更する可能性があります。スキル本文と引数を確認してから承認してください。"}}\n' "$SKILL_NAME"
+    REASON=$(printf '[skill-gate] Skill `%s` は aegis 制御層 (.claude/settings.json または keybindings) を変更する可能性があります。スキル本文と引数を確認してから承認してください。' "$SKILL_NAME")
+    emit_ask "$REASON"
     exit 0
     ;;
 esac
 
 # Non-control-plane skill: allow.
-echo '{}'
+emit_allow
 exit 0

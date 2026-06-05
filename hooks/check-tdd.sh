@@ -6,6 +6,7 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 # Load shared input extraction.
 source "${SCRIPT_DIR}/lib/extract-input.sh"
+source "${SCRIPT_DIR}/lib/emit.sh"
 
 # Read stdin (JSON with tool_input).
 INPUT=$(cat)
@@ -15,7 +16,7 @@ TARGET_FILE=$(extract_file_path "$INPUT")
 
 # If we can't determine target, allow.
 if [ -z "$TARGET_FILE" ]; then
-  echo '{}'
+  emit_allow
   exit 0
 fi
 
@@ -25,7 +26,7 @@ case "$TARGET_FILE" in
   *CLAUDE.md|*STATUS.md|*LEARNINGS.md|*README.md|\
   *.gitkeep|*.gitignore|*.json|*.yaml|*.yml|*.toml|*.ini|*.cfg|\
   *.md|*.txt|*.lock)
-    echo '{}'
+    emit_allow
     exit 0
     ;;
 esac
@@ -35,7 +36,7 @@ esac
 case "$TARGET_FILE" in
   */__tests__/*|__tests__/*|*/test/*|test/*|*/tests/*|tests/*|\
   *.test.*|*.spec.*|*_test.*|*_spec.*)
-    echo '{}'
+    emit_allow
     exit 0
     ;;
 esac
@@ -58,8 +59,8 @@ if command -v git >/dev/null 2>&1; then
 fi
 
 if [ "$HAS_TEST_CHANGES" = false ]; then
-  printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"ask","permissionDecisionReason":"[TDD] テストファイルの変更が検出されません。TDDルール: テストを先に書き、失敗を確認してから実装してください。"}}\n'
+  emit_ask "[TDD] テストファイルの変更が検出されません。TDDルール: テストを先に書き、失敗を確認してから実装してください。"
 else
-  echo '{}'
+  emit_allow
 fi
 exit 0

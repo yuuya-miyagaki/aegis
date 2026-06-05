@@ -21,6 +21,7 @@ SNAPSHOT_FILE="${ROOT}/.claude/.gate-snapshot"
 
 # Load shared input extraction.
 source "${SCRIPT_DIR}/lib/extract-input.sh"
+source "${SCRIPT_DIR}/lib/emit.sh"
 
 # Read stdin (JSON with tool_input/tool_result).
 INPUT=$(cat)
@@ -34,14 +35,14 @@ TARGET_FILE=$(extract_file_path "$INPUT")
 case "$TARGET_FILE" in
   *STATUS.md) ;; # proceed with audit
   *)
-    echo '{}'
+    emit_allow
     exit 0
     ;;
 esac
 
 # If snapshot or STATUS.md doesn't exist, skip audit.
 if [ ! -f "$SNAPSHOT_FILE" ] || [ ! -f "$STATUS_FILE" ]; then
-  echo '{}'
+  emit_allow
   exit 0
 fi
 
@@ -60,7 +61,8 @@ for gate in client_ready_for_dev brainstorm plan review qa security deploy dev_r
   NEW=$(extract_gate "$STATUS_FILE" "$gate")
 
   if [ "$OLD" != "$NEW" ] && [ -n "$OLD" ]; then
-    printf '{"decision":"block","reason":"[gate-tamper] %s gate changed %s→%s without authorization. Use the /gate command to change gate values."}\n' "$gate" "$OLD" "$NEW"
+    REASON=$(printf '[gate-tamper] %s gate changed %s→%s without authorization. Use the /gate command to change gate values.' "$gate" "$OLD" "$NEW")
+    emit_block "$REASON"
     exit 0
   fi
 done
@@ -77,7 +79,8 @@ if [ -n "$OLD_PHASE" ] && [ -n "$NEW_PHASE" ] && [ "$OLD_PHASE" != "$NEW_PHASE" 
   set -e
   if [ $TRANSITION_RC -ne 0 ]; then
     MSG=$(printf '%s' "$TRANSITION_CHECK" | tr '\n' ' ')
-    printf '{"decision":"block","reason":"[phase-skip] %s"}\n' "$MSG"
+    REASON=$(printf '[phase-skip] %s' "$MSG")
+    emit_block "$REASON"
     exit 0
   fi
 fi
@@ -96,13 +99,15 @@ if [ -n "$OLD_MODE" ] && [ -n "$NEW_MODE" ] && [ "$OLD_MODE" != "$NEW_MODE" ]; t
   if [ "$OLD_MODE" = "Client" ] && [ "$NEW_MODE" = "Dev" ]; then
     BOUNDARY_GATE=$(extract_gate_from_status "client_ready_for_dev")
     if [ "$BOUNDARY_GATE" != "approved" ]; then
-      printf '{"decision":"block","reason":"[mode-tamper] Mode changed Client→Dev but client_ready_for_dev is '\''%s'\'' (must be approved). Use /gate approve client_ready_for_dev first."}\n' "$BOUNDARY_GATE"
+      REASON=$(printf "[mode-tamper] Mode changed Client→Dev but client_ready_for_dev is '%s' (must be approved). Use /gate approve client_ready_for_dev first." "$BOUNDARY_GATE")
+      emit_block "$REASON"
       exit 0
     fi
   elif [ "$OLD_MODE" = "Dev" ] && [ "$NEW_MODE" = "Client" ]; then
     BOUNDARY_GATE=$(extract_gate_from_status "dev_ready_for_client")
     if [ "$BOUNDARY_GATE" != "approved" ]; then
-      printf '{"decision":"block","reason":"[mode-tamper] Mode changed Dev→Client but dev_ready_for_client is '\''%s'\'' (must be approved). Use /gate approve dev_ready_for_client first."}\n' "$BOUNDARY_GATE"
+      REASON=$(printf "[mode-tamper] Mode changed Dev→Client but dev_ready_for_client is '%s' (must be approved). Use /gate approve dev_ready_for_client first." "$BOUNDARY_GATE")
+      emit_block "$REASON"
       exit 0
     fi
   fi
@@ -116,5 +121,5 @@ grep -m1 "^phase:" "$STATUS_FILE" >> "$SNAPSHOT_FILE" 2>/dev/null || true
 # Preserve mode in snapshot.
 grep -m1 "^mode:" "$STATUS_FILE" >> "$SNAPSHOT_FILE" 2>/dev/null || true
 
-echo '{}'
+emit_allow
 exit 0
