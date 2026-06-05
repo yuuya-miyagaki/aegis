@@ -4,9 +4,9 @@ maxTurns: 20
 readOnly: true
 skills:
   - aegis-security-gate
-model: inherit
+model: opus
 permissionMode: plan
-effort: high
+effort: max
 color: red
 ---
 

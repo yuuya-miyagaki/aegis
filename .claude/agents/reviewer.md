@@ -4,13 +4,13 @@ maxTurns: 20
 readOnly: true
 skills:
   - aegis-review-gate
-model: inherit
+model: opus
 disallowedTools:
   - Edit
   - Write
   - NotebookEdit
 permissionMode: plan
-effort: high
+effort: xhigh
 color: yellow
 ---
 

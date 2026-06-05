@@ -2,9 +2,9 @@
 description: "Trigger: review diff spans 3+ files or adds a new module."
 maxTurns: 15
 readOnly: true
-model: haiku
+model: sonnet
 permissionMode: plan
-effort: medium
+effort: high
 color: yellow
 ---
 

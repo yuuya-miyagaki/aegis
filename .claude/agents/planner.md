@@ -2,9 +2,9 @@
 description: "Trigger: phase transition needed, design ambiguity found, or implementation plan required."
 maxTurns: 30
 readOnly: true
-model: inherit
+model: opus
 permissionMode: plan
-effort: high
+effort: max
 color: blue
 ---
 

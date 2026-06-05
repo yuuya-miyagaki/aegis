@@ -242,6 +242,73 @@ def read_text(path: Path) -> str:
     return path.read_text(encoding="utf-8")
 
 
+# --- Model/Effort policy (design: 2026-06-05-v1-model-effort-policy-design.md) ---
+# frontmatter が唯一の真実。ここは検証器（逸脱=FAIL）。値は系統エイリアスか inherit のみ。
+MODEL_EFFORT_POLICY = {
+    # quality-pin (opus)
+    "planner.md": ("opus", "max"),
+    "security.md": ("opus", "max"),
+    "reviewer.md": ("opus", "xhigh"),
+    "qa.md": ("opus", "high"),
+    # cost-pin (sonnet floor; no haiku)
+    "reviewer-testing.md": ("sonnet", "high"),
+    "reviewer-performance.md": ("sonnet", "high"),
+    "reviewer-maintainability.md": ("sonnet", "high"),
+    "translation-specialist.md": ("sonnet", "high"),
+    # default (inherit, follows session)
+    "implementer.md": ("inherit", "high"),
+    "qa-browser.md": ("inherit", "high"),
+    "ui.md": ("inherit", "high"),
+    "integration-specialist.md": ("inherit", "high"),
+}
+_OPUS_ONLY_EFFORTS = {"xhigh", "max"}
+_VERSION_ID_RE = re.compile(r"claude-[a-z]+-\d")
+# root と example ミラーの両方を同一ポリシーで検証する。
+MODEL_POLICY_ROOTS = [ROOT, ROOT / "examples/minimal-project"]
+
+
+def _frontmatter_section(text: str) -> str:
+    m = re.match(r"---\s*\r?\n(.*?)\r?\n---", text, re.DOTALL)
+    return m.group(1) if m else ""
+
+
+def check_model_effort_policy(roots) -> list:
+    """役割→(model, effort) を root と example の両方で検証して失敗一覧を返す。"""
+    failures = []
+    for base in roots:
+        agents_dir = base / ".claude/agents"
+        if not agents_dir.exists():
+            failures.append(f"model-policy: missing agents dir {agents_dir}")
+            continue
+        for name, (exp_model, exp_effort) in MODEL_EFFORT_POLICY.items():
+            path = agents_dir / name
+            if not path.exists():
+                failures.append(f"model-policy: missing {path.relative_to(ROOT)}")
+                continue
+            fm = _frontmatter_section(read_text(path))
+            mm = re.search(r"^model:\s*(\S+)", fm, re.MULTILINE)
+            em = re.search(r"^effort:\s*(\S+)", fm, re.MULTILINE)
+            model = mm.group(1) if mm else None
+            effort = em.group(1) if em else None
+            rel = path.relative_to(ROOT)
+            if model != exp_model:
+                failures.append(f"model-policy: {rel} model={model} expected {exp_model}")
+            if effort != exp_effort:
+                failures.append(f"model-policy: {rel} effort={effort} expected {exp_effort}")
+            if model == "haiku":
+                failures.append(f"model-policy: {rel} uses haiku (forbidden; floor is sonnet)")
+            if model and _VERSION_ID_RE.search(model):
+                failures.append(f"model-policy: {rel} uses version-pinned id '{model}' (alias or inherit only)")
+            if effort in _OPUS_ONLY_EFFORTS and model != "opus":
+                failures.append(f"model-policy: {rel} effort={effort} only allowed on opus-pinned roles")
+        for path in sorted(agents_dir.glob("*.md")):
+            if path.name not in MODEL_EFFORT_POLICY:
+                failures.append(
+                    f"model-policy: {path.relative_to(ROOT)} not classified in MODEL_EFFORT_POLICY (assign a tier)"
+                )
+    return failures
+
+
 def word_count(text: str) -> int:
     return len(text.split())
 
@@ -795,6 +862,8 @@ def main() -> int:
                 failures.append(f"name-lint: crashed: {stderr_msg[:200]}")
             else:
                 failures.append("name-lint: exited with non-zero status but produced no output")
+
+    failures.extend(check_model_effort_policy(MODEL_POLICY_ROOTS))
 
     if failures:
         for failure in failures:

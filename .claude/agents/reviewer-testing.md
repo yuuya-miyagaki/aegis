@@ -2,9 +2,9 @@
 description: "Trigger: review diff includes test file changes or test coverage is questionable."
 maxTurns: 15
 readOnly: true
-model: haiku
+model: sonnet
 permissionMode: plan
-effort: medium
+effort: high
 color: yellow
 ---
 

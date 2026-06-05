@@ -4,7 +4,7 @@ maxTurns: 30
 readOnly: true
 skills:
   - qa-verification
-model: inherit
+model: opus
 permissionMode: plan
 effort: high
 color: cyan
