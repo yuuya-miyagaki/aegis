@@ -3,17 +3,17 @@ framework: aegis
 framework_version: "0.12.6"
 project_name: "Aegis"
 mode: Dev
-phase: implement
+phase: plan
 task_type: framework
 task_size: M
-task_size_rationale: "Phase R 最終項目: evidence 完了の TaskCompleted 強制化。(B) check-task-completed.sh 拡張。grill-plan 2巡で『新規二層実装』→『validate_status_file の gate-ref＋実在ロジックを evidence_integrity_violations に抽出・再利用』へ転換（gate_ref_mapping→GATE_REF_MAPPING 定数化で3重複解消）。Stop hook 却下・バイパス無し。実装完了: check_status.py + hook(root/example IDENTICAL) + テスト + v0.12.6、195 tests green。"
-iteration: 9
+task_size_rationale: "Phase D（仕上げ・F→R→A→D 最終）。F/R/A 完了済みで残るは D のみ。最小セットで v1.0.0 を仕上げる: ①migration guide(v0.12.2→v1.0.0・README インライン) ②README stale 修正 ③安定契約＋SemVer ポリシー明文化(運用契約のみ安定面=決定a) ④version 1.0.0 bump＋tag。INTEGRATION/CHANGELOG/LEARNINGS 大規模は YAGNI で out。読者はソロ＋uccc。設計 docs/plans/2026-06-06-v1-phase-d-v1.0.0-design.md。"
+iteration: 10
 ui_surface: false
 last_updated: "2026-06-06T00:00:00Z"
 gate_approvals:
   client_ready_for_dev: n/a
   brainstorm: approved
-  plan: approved
+  plan: pending
   review: pending
   qa: pending
   security: pending
@@ -21,8 +21,8 @@ gate_approvals:
   dev_ready_for_client: pending
 current_refs:
   requirements: []
-  plan: "docs/plans/2026-06-06-v1-evidence-completion-hook-implementation.md"
-  spec: "docs/plans/2026-06-06-v1-evidence-completion-hook-design.md"
+  plan: null
+  spec: "docs/plans/2026-06-06-v1-phase-d-v1.0.0-design.md"
   review: null
   qa: null
   security: null
@@ -41,7 +41,7 @@ external_evidence:
     scope: "v0.12.2 実装後 4 ラウンドレビュー"
     findings: "Round 6 (P1×2, P2×1: pre-compact exit 2 / minimal-project / test rc), Round 7 (P1×1, P3×1: git add 漏れ / テスト件数表記), Round 8 (P2×1, P3×1: stale last_updated / grep 自己マッチ), Round 9 (P3×2: コメント不整合)"
     resolution: "9件全反映。tier 1/2 PASS、134 tests PASS、本体と minimal-project 完全同期確認済み。"
-next_action: "evidence 完了強制化(B案) 実装完了（v0.12.6・195 tests green・contract/drift 0）。validate_status_file ロジック再利用＋check-task-completed.sh 配線＋CLAUDE.md 明文化。次は grill-code → review ゲート。governing doc: docs/plans/2026-06-05-v1-future-proof-rearchitecture-design.md。Phase R は本件で完了。残: README/INTEGRATION/version 整理(v1.0.0)・context observability(YAGNI 保留)。"
+next_action: "Phase D（v1.0.0 仕上げ）brainstorm 完了・設計書 docs/plans/2026-06-06-v1-phase-d-v1.0.0-design.md 承認済み。次は writing-plans → grill-plan → 実装 → grill-code → push → git tag v1.0.0。最小セット: migration guide(v0.12.2→v1.0.0)＋README リフレッシュ＋安定契約/SemVer 明文化＋version 1.0.0。F/R/A は完了済み。"
 blockers: []
 failure_tracking: null
 session_history:
