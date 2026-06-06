@@ -185,5 +185,71 @@ class TestVerdict(unittest.TestCase):
         self.assertEqual(v.overall, 2)
 
 
+class TestMain(unittest.TestCase):
+    def _git(self, root, *a):
+        sp.run(["git", "-C", str(root), *a], check=True, capture_output=True)
+
+    def _project(self, d, *, body, claims_block, review_ref="docs/qa-reports/review.md",
+                 test_result=None):
+        root = Path(d)
+        self._git(root, "init", "-q")
+        self._git(root, "config", "user.email", "t@t")
+        self._git(root, "config", "user.name", "t")
+        (root / "seed.py").write_text("s = 0\n", encoding="utf-8")
+        self._git(root, "add", "-A"); self._git(root, "commit", "-qm", "i")
+        (root / "m.py").write_text(body, encoding="utf-8")
+        docs = root / "docs"; (docs / "qa-reports").mkdir(parents=True)
+        (docs / "STATUS.md").write_text(
+            "---\ncurrent_refs:\n"
+            f"  review: {review_ref}\n  qa: null\n---\n", encoding="utf-8")
+        if review_ref != "null":
+            (root / review_ref).write_text("# review\n\n" + claims_block, encoding="utf-8")
+        if test_result is not None:
+            (docs / "qa-reports" / "test-result.json").write_text(
+                json.dumps(test_result), encoding="utf-8")
+        return root
+
+    def _run(self, root, gate="review"):
+        out = root / "docs" / "qa-reports" / f"judge-{gate}.md"
+        return sp.run(["python3", str(SCRIPT), "--gate", gate, "--root", str(root),
+                       "--report-out", str(out)], capture_output=True, text=True), out
+
+    def test_block_on_stub_exit1(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = self._project(
+                d, body="def f():\n    pass  # stub\n",
+                claims_block="```claims\nno_stubs: true\nverdict: approve\n```\n")
+            res, out = self._run(root)
+            self.assertEqual(res.returncode, 1, res.stdout + res.stderr)
+            self.assertIn("🔴", out.read_text())
+
+    def test_yellow_on_missing_second_opinion_exit2(self):
+        with tempfile.TemporaryDirectory() as d:
+            fp_body = "def f():\n    return 1\n"
+            root = self._project(
+                d, body=fp_body,
+                claims_block="```claims\nno_stubs: true\ntests_pass: true\nverdict: approve\n```\n")
+            # add a fresh green test-result so tests aren't unverified
+            fp = judge.code_fingerprint(root)
+            (root / "docs" / "qa-reports" / "test-result.json").write_text(
+                json.dumps({"status": "green", "code_fingerprint": fp}), encoding="utf-8")
+            res, out = self._run(root)
+            self.assertEqual(res.returncode, 2, res.stdout + res.stderr)
+
+    def test_green_exit0(self):
+        with tempfile.TemporaryDirectory() as d:
+            body = "def f():\n    return 1\n"
+            root = self._project(
+                d, body=body,
+                claims_block=("```claims\nno_stubs: true\ntests_pass: true\nverdict: approve\n"
+                              "second_opinion:\n  verdict: approve\n```\n"))
+            fp = judge.code_fingerprint(root)
+            (root / "docs" / "qa-reports" / "test-result.json").write_text(
+                json.dumps({"status": "green", "code_fingerprint": fp}), encoding="utf-8")
+            res, out = self._run(root)
+            self.assertEqual(res.returncode, 0, res.stdout + res.stderr)
+            self.assertIn("🟢", out.read_text())
+
+
 if __name__ == "__main__":
     unittest.main()
