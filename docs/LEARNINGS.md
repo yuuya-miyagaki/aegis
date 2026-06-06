@@ -14,6 +14,7 @@
 <!-- category: process -->
 
 - [confidence:9] `docs/STATUS.md` を短い状態ファイルとして維持すると、再開時の迷いが減る。
+- [confidence:8] `docs/plans/` の設計書（design）は決定の正典として durable に保ち、必要なら更新する。実装計画（implementation）は実行時点のスナップショットとして commit するが、マージ後は更新しない（行番号・厳密文字列が陳腐化し将来の読者を誤誘導するため）。design＋implementation＋git 差分＋親設計の §チェックリスト反映で「決定・手順・差分・追従」が揃う。
 
 ## コミュニケーション
 
