@@ -7,6 +7,7 @@ covering task_type × task_size × phase combinations.
 
 from __future__ import annotations
 
+import json
 import os
 import subprocess
 import tempfile
@@ -1748,6 +1749,66 @@ class TestEvidenceIntegrityFailClosed(unittest.TestCase):
         result = evidence_integrity_violations({"qa": "x"}, {"qa": "approved"}, None)
         self.assertTrue(result, "a crashed integrity check must return a violation, not []")
         self.assertIn("could not be completed", result[0])
+
+
+# =============================================================================
+# qa test-strength drill gate (B1, Approach A) tests
+# =============================================================================
+
+
+def _git(root, *args):
+    subprocess.run(["git", "-C", str(root), *args], check=True, capture_output=True)
+
+
+class TestQaDrillGate(unittest.TestCase):
+    """pre_approve_gate('qa') runs the drill live; PASS allows, else blocks."""
+
+    def _project(self, d, *, with_drill, blind=False):
+        root = Path(d)
+        _git(root, "init", "-q")
+        _git(root, "config", "user.email", "t@t")
+        _git(root, "config", "user.name", "t")
+        src = root / "src"
+        src.mkdir()
+        (src / "m.py").write_text("a = 1\n", encoding="utf-8")
+        _git(root, "add", "-A")
+        _git(root, "commit", "-qm", "i")
+        (src / "m.py").write_text("a = 1\nb = 2\n", encoding="utf-8")  # changed hunk
+        docs = root / "docs"
+        docs.mkdir(exist_ok=True)
+        (docs / "STATUS.md").write_text(make_status_md(
+            phase="qa", task_type="feature", task_size="M",
+            approvals={"review": "approved", "qa": "pending"},
+        ), encoding="utf-8")
+        qa_reports = docs / "qa-reports"
+        qa_reports.mkdir(parents=True, exist_ok=True)
+        if with_drill:
+            cmd = "true" if blind else "grep -q 'b = 2' src/m.py"
+            (qa_reports / "test-strength.drill").write_text(json.dumps({
+                "test_command": cmd, "timeout_seconds": 10,
+                "mutants": [{"file": "src/m.py", "line": 2,
+                             "original": "b = 2", "mutated": "b = 3"}],
+            }), encoding="utf-8")
+        return root
+
+    def test_qa_with_passing_drill_allows(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = self._project(d, with_drill=True)
+            rc, out = run_check(str(root), "--pre-approve-gate", "qa")
+            self.assertEqual(rc, 0, f"expected allow, got: {out}")
+
+    def test_qa_without_drill_blocks(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = self._project(d, with_drill=False)
+            rc, out = run_check(str(root), "--pre-approve-gate", "qa")
+            self.assertEqual(rc, 1)
+            self.assertIn("ドリル", out)
+
+    def test_qa_with_surviving_mutant_blocks(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = self._project(d, with_drill=True, blind=True)
+            rc, out = run_check(str(root), "--pre-approve-gate", "qa")
+            self.assertEqual(rc, 1, f"blind test must block, got: {out}")
 
 
 if __name__ == "__main__":

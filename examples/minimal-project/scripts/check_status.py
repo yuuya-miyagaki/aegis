@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import re
+import subprocess
 from pathlib import Path
 
 
@@ -742,6 +743,42 @@ def validate_with_pyyaml(text: str, path: Path) -> list[str]:
     return failures
 
 
+def run_qa_drill(root: Path) -> int:
+    """Run the test-strength drill (B1) at qa-gate approval time (Approach A).
+
+    The verdict is computed live by the harness here, so it cannot be forged or
+    go stale. Requires a drill spec; a task with no testable code should use
+    qa=n/a (reason) instead, which routes through pre_na_gate and skips this.
+    Returns 0 if the drill passes, 1 to block approval.
+    """
+    spec_path = root / "docs" / "qa-reports" / "test-strength.drill"
+    report_path = root / "docs" / "qa-reports" / "test-strength.md"
+    if not spec_path.is_file():
+        print("ERROR: qa を approve するにはテスト強度ドリルが必要です。")
+        print("       テスト対象コードが無いタスクは qa=n/a（理由付き）にしてください。")
+        print(f"       ドリル仕様が見つかりません: {spec_path}")
+        return 1
+    runner = Path(__file__).resolve().parent / "run-test-strength-drill.py"
+    if not runner.is_file():
+        print(f"ERROR: ドリルランナーが見つかりません: {runner}")
+        return 1
+    try:
+        proc = subprocess.run(
+            ["python3", str(runner), "--root", str(root),
+             "--spec", str(spec_path), "--report", str(report_path)],
+            capture_output=True, text=True,
+        )
+    except OSError as exc:
+        print(f"ERROR: ドリル起動に失敗: {exc}")
+        return 1
+    # surface the runner's plain output so update-gate.sh echoes it to the user
+    if proc.stdout:
+        print(proc.stdout.rstrip())
+    if proc.stderr:
+        print(proc.stderr.rstrip())
+    return 0 if proc.returncode == 0 else 1
+
+
 def pre_approve_gate(gate_name: str, root: Path) -> int:
     """Check if a gate can be approved given current STATUS.md state.
 
@@ -853,6 +890,12 @@ def pre_approve_gate(gate_name: str, root: Path) -> int:
                     f"approved (not n/a)."
                 )
                 return 1
+
+    # --- qa test-strength drill (B1, Approach A) ---
+    # Run the drill LIVE at approval; the verdict cannot be forged or go stale.
+    if gate_name == "qa":
+        if run_qa_drill(root) != 0:
+            return 1
 
     # Gate-ref consistency already checked above (before mode-transition gates).
     return 0
