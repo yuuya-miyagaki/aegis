@@ -16,6 +16,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 
 from check_status import (
+    check_gate_prerequisites,
     extract_approval_map,
     extract_blockers,
     extract_current_refs,
@@ -250,18 +251,18 @@ class TestExtractBlockers(unittest.TestCase):
 
 
 class TestPreApproveGateMapping(unittest.TestCase):
-    """Test all PHASE_REQUIRES_GATES mappings via subprocess.
+    """Unit-test the deterministic gate-prerequisite mapping in isolation.
 
-    Reuses make_status_md helper from test_check_status for reliable fixture
-    generation, and run_check for subprocess invocation.
+    Calls check_gate_prerequisites() directly — no subprocess, no git, no B1
+    drill, no B2 judge — because this layer is pure gate-state logic (phase
+    order, prerequisite approvals, strict-gate enforcement). The evidence-quality
+    checks (drill, judge) are layered on by pre_approve_gate and are exercised by
+    the integration tests in test_check_status (TestQaDrillGate / TestJudgeGate).
     """
 
-    CHECK_STATUS = ROOT / "scripts" / "check_status.py"
-
     @staticmethod
-    def _make(phase: str, approvals: dict[str, str]) -> str:
-        """Build STATUS.md content using the canonical helper pattern."""
-        gates = {
+    def _approvals(overrides: dict[str, str]) -> dict[str, str]:
+        base = {
             "client_ready_for_dev": "approved",
             "brainstorm": "pending",
             "plan": "pending",
@@ -271,53 +272,15 @@ class TestPreApproveGateMapping(unittest.TestCase):
             "deploy": "pending",
             "dev_ready_for_client": "pending",
         }
-        gates.update(approvals)
-        gate_lines = "\n".join(f"  {k}: {v}" for k, v in gates.items())
-        ref_lines = "\n".join(f"  {k}: null" for k in [
-            "requirements", "plan", "spec", "review",
-            "qa", "security", "deploy", "translation",
-        ])
-        return (
-            f"---\n"
-            f"framework: aegis\n"
-            f'framework_version: "0.12.0"\n'
-            f"project_name: test\n"
-            f"mode: Dev\n"
-            f"phase: {phase}\n"
-            f"task_type: feature\n"
-            f"task_size: L\n"
-            f'last_updated: "2026-04-22T00:00:00Z"\n'
-            f"gate_approvals:\n"
-            f"{gate_lines}\n"
-            f"current_refs:\n"
-            f"{ref_lines}\n"
-            f"next_action: test\n"
-            f"blockers: []\n"
-            f"session_history: []\n"
-            f"---\n"
-        )
+        base.update(overrides)
+        return base
 
     def _run(self, phase: str, gate: str, approvals: dict) -> tuple[int, str]:
-        import subprocess
-        import tempfile
-        content = self._make(phase, approvals)
-        with tempfile.TemporaryDirectory() as tmp:
-            status_dir = Path(tmp) / "docs"
-            status_dir.mkdir()
-            (status_dir / "STATUS.md").write_text(content, encoding="utf-8")
-            # This suite tests gate PREREQUISITE logic, not the B1 drill. Provide
-            # a skip drill so qa approval isolates the prerequisite check.
-            qa_reports = status_dir / "qa-reports"
-            qa_reports.mkdir()
-            (qa_reports / "test-strength.drill").write_text(
-                '{"skip": true, "reason": "prerequisite-logic test"}',
-                encoding="utf-8")
-            result = subprocess.run(
-                ["python3", str(self.CHECK_STATUS), "--root", tmp,
-                 "--pre-approve-gate", gate],
-                capture_output=True, text=True,
-            )
-            return result.returncode, (result.stdout + result.stderr).strip()
+        # ROOT is a valid existing dir; none of the gates exercised here read the
+        # filesystem (only client_ready_for_dev does, which is not tested).
+        rc = check_gate_prerequisites(
+            gate, ROOT, phase, "feature", "L", self._approvals(approvals))
+        return rc, ""
 
     def test_brainstorm_no_prerequisites(self):
         """brainstorm gate has no prerequisites."""

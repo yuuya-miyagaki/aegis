@@ -806,49 +806,44 @@ def run_qa_drill(root: Path) -> int:
     return 0 if proc.returncode == 0 else 1
 
 
-def pre_approve_gate(gate_name: str, root: Path) -> int:
-    """Check if a gate can be approved given current STATUS.md state.
+JUDGE_GATES = ("review", "qa", "security", "deploy")
 
-    Returns 0 if gate can be approved, 1 otherwise.
-    Uses PHASE_REQUIRES_GATES, SIZE_ALLOWED_PHASES, and gate_ref_mapping
-    as the single source of truth for gate approval contracts.
-    Called by update-gate.sh via --pre-approve-gate.
+
+def run_judge_card(gate: str, root: Path) -> int:
+    """Build the B2 judge card live at approval. Returns tri-state 0/1/2.
+    Builder crash => 1 (fail-closed)."""
+    builder = Path(__file__).resolve().parent / "build-judge-card.py"
+    if not builder.is_file():
+        print(f"ERROR: judge ビルダーが見つかりません: {builder}")
+        return 1
+    try:
+        proc = subprocess.run(
+            ["python3", str(builder), "--gate", gate, "--root", str(root)],
+            capture_output=True, text=True,
+        )
+    except OSError as exc:
+        print(f"ERROR: judge ビルダー起動失敗: {exc}")
+        return 1
+    if proc.stdout:
+        print(proc.stdout.rstrip())
+    if proc.stderr:
+        print(proc.stderr.rstrip())
+    return proc.returncode if proc.returncode in (0, 1, 2) else 1
+
+
+def check_gate_prerequisites(
+    gate_name: str, root: Path, phase: str, task_type: str,
+    task_size: str, approvals: dict,
+) -> int:
+    """Deterministic gate-prerequisite check: mode-transition requirements,
+    phase ordering, prerequisite gate approvals, and strict-gate enforcement.
+
+    Returns 0 if the gate's prerequisites are satisfied, 1 if blocked. This is
+    pure gating logic (the gate-state mapping); it deliberately does NOT run the
+    B1 drill or the B2 judge card — those are evidence-quality checks layered on
+    top by pre_approve_gate. Kept separate so the mapping can be unit-tested in
+    isolation from the (non-deterministic, fixture-heavy) evidence checks.
     """
-    status_path = root / "docs" / "STATUS.md"
-    if not status_path.exists():
-        print("ERROR: docs/STATUS.md not found")
-        return 1
-
-    text = read_text(status_path)
-    frontmatter = extract_frontmatter(text)
-    if frontmatter is None:
-        print("ERROR: docs/STATUS.md is missing YAML frontmatter")
-        return 1
-
-    phase = extract_scalar_value(frontmatter, "phase")
-    task_type = extract_scalar_value(frontmatter, "task_type")
-    task_size = extract_scalar_value(frontmatter, "task_size")
-    approvals = extract_approval_map(frontmatter)
-    refs = extract_current_refs(frontmatter)
-
-    # --- Gate-ref consistency (approval-time ADVISORY) ---
-    # Run before mode-transition gate handlers so the advisory fires for all gates.
-    # Approval-time is advisory only; the invariant is ENFORCED at completion by the
-    # TaskCompleted hook (check_status.py --check-completion-evidence).
-    if gate_name in GATE_REF_MAPPING:
-        ref_key = GATE_REF_MAPPING[gate_name]
-        ref_value = refs.get(ref_key)
-        ref_is_empty = ref_value is None or ref_value == "null" or ref_value == []
-        if ref_is_empty:
-            print(
-                f"ADVISORY: Approving '{gate_name}' but "
-                f"current_refs.{ref_key} is empty."
-            )
-            print(
-                f"         Set current_refs.{ref_key} to the evidence file path; "
-                f"it is enforced at completion by the TaskCompleted hook."
-            )
-
     # Mode-transition gates.
     if gate_name == "dev_ready_for_client":
         # Require review gate to be approved before handing back to Client.
@@ -918,13 +913,71 @@ def pre_approve_gate(gate_name: str, root: Path) -> int:
                 )
                 return 1
 
+    return 0
+
+
+def pre_approve_gate(gate_name: str, root: Path) -> int:
+    """Check if a gate can be approved given current STATUS.md state.
+
+    Returns tri-state: 0 = approvable, 1 = blocked (🔴), 2 = needs ack (🟡).
+    Composes the deterministic prerequisite check (check_gate_prerequisites)
+    with evidence-quality checks: the B1 test-strength drill (qa) and the B2
+    judge card (review/qa/security/deploy). Uses PHASE_REQUIRES_GATES,
+    SIZE_ALLOWED_PHASES, and gate_ref_mapping as the source of truth for the
+    gate approval contracts. Called by update-gate.sh via --pre-approve-gate.
+    """
+    status_path = root / "docs" / "STATUS.md"
+    if not status_path.exists():
+        print("ERROR: docs/STATUS.md not found")
+        return 1
+
+    text = read_text(status_path)
+    frontmatter = extract_frontmatter(text)
+    if frontmatter is None:
+        print("ERROR: docs/STATUS.md is missing YAML frontmatter")
+        return 1
+
+    phase = extract_scalar_value(frontmatter, "phase")
+    task_type = extract_scalar_value(frontmatter, "task_type")
+    task_size = extract_scalar_value(frontmatter, "task_size")
+    approvals = extract_approval_map(frontmatter)
+    refs = extract_current_refs(frontmatter)
+
+    # --- Gate-ref consistency (approval-time ADVISORY) ---
+    # Approval-time is advisory only; the invariant is ENFORCED at completion by
+    # the TaskCompleted hook (check_status.py --check-completion-evidence).
+    if gate_name in GATE_REF_MAPPING:
+        ref_key = GATE_REF_MAPPING[gate_name]
+        ref_value = refs.get(ref_key)
+        ref_is_empty = ref_value is None or ref_value == "null" or ref_value == []
+        if ref_is_empty:
+            print(
+                f"ADVISORY: Approving '{gate_name}' but "
+                f"current_refs.{ref_key} is empty."
+            )
+            print(
+                f"         Set current_refs.{ref_key} to the evidence file path; "
+                f"it is enforced at completion by the TaskCompleted hook."
+            )
+
+    # --- Deterministic prerequisite gating (mode/phase/prereq/strict) ---
+    prereq_rc = check_gate_prerequisites(
+        gate_name, root, phase, task_type, task_size, approvals)
+    if prereq_rc != 0:
+        return prereq_rc
+
     # --- qa test-strength drill (B1, Approach A) ---
     # Run the drill LIVE at approval; the verdict cannot be forged or go stale.
     if gate_name == "qa":
         if run_qa_drill(root) != 0:
             return 1
 
-    # Gate-ref consistency already checked above (before mode-transition gates).
+    # --- B2 judge card (review/qa/security/deploy, tri-state) ---
+    if gate_name in JUDGE_GATES:
+        rc = run_judge_card(gate_name, root)
+        if rc != 0:
+            return rc  # 1=🔴 block / 2=🟡 needs ack
+
     return 0
 
 

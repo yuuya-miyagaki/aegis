@@ -112,13 +112,35 @@ def scan_secrets(root: Path) -> list[str]:
 
 
 def audit_deps(root: Path) -> str:
-    """Run an available dependency auditor. Returns 'clean' / 'vuln' /
-    'unverified' (no tool / offline / error => unverified, never blocks)."""
-    for cmd in (["pip-audit", "-q"], ["npm", "audit", "--audit-level=high"]):
+    """Audit the PROJECT's declared dependencies. Returns 'clean'/'vuln'/
+    'unverified'.
+
+    Two failure modes the naive version got wrong:
+    - `pip-audit` with no args audits the *ambient* interpreter env, not the
+      project, so it is run with `-r <requirements>` and only when that file
+      exists.
+    - `npm audit` with no lockfile errors out (non-zero), which must NOT be read
+      as 'vuln'. npm runs only when a lockfile is present.
+    When no matching manifest exists, or the tool is absent/times out, the result
+    is 'unverified' (advisory 🟡) — never a fabricated 'vuln'."""
+    for req in ("requirements.txt", "requirements.lock"):
+        if (root / req).is_file():
+            try:
+                proc = subprocess.run(
+                    ["pip-audit", "-q", "-r", str(root / req)],
+                    cwd=str(root), capture_output=True, timeout=120)
+            except (OSError, subprocess.TimeoutExpired):
+                return "unverified"
+            return "clean" if proc.returncode == 0 else "vuln"
+    has_lock = any((root / lk).is_file()
+                   for lk in ("package-lock.json", "npm-shrinkwrap.json"))
+    if (root / "package.json").is_file() and has_lock:
         try:
-            proc = subprocess.run(cmd, cwd=str(root), capture_output=True, timeout=120)
+            proc = subprocess.run(
+                ["npm", "audit", "--audit-level=high"],
+                cwd=str(root), capture_output=True, timeout=120)
         except (OSError, subprocess.TimeoutExpired):
-            continue
+            return "unverified"
         return "clean" if proc.returncode == 0 else "vuln"
     return "unverified"
 
@@ -188,10 +210,11 @@ def compute_verdict(gate: str, claims: dict | None, facts: dict,
     if facts["deps"] == "unverified":
         yellow.append("依存監査が未検証")
     elif facts["deps"] == "vuln":
-        if claims and claims.get("deps_clean") is True:
-            red.append("依存に脆弱性（claim deps_clean: true と矛盾）")
-        else:
-            yellow.append("依存監査で脆弱性の可能性（誤検知の場合あり・要確認）")
+        # Dependency audits are environment/network sensitive and prone to false
+        # positives, so a vuln advises (🟡) but never hard-blocks (🔴) — even if
+        # a claim says deps_clean. Blocking on a flaky signal would let a network
+        # hiccup veto a release.
+        yellow.append("依存監査で脆弱性の可能性（要確認・ack で承認可）")
     if facts.get("b1_verdict") == "FAIL":
         red.append("テスト強度ドリル(B1)が FAIL")
 

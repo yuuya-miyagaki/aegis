@@ -572,20 +572,24 @@ class TestPreApproveGateRefCheck(unittest.TestCase):
             self.assertNotIn("ADVISORY", out)
 
     def test_review_gate_ref_empty_warns(self):
-        """Approving 'review' with empty ref → ADVISORY."""
+        """Approving 'review' with empty ref → ADVISORY printed AND the B2 judge
+        yields 🟡 (rc 2, ack-able): with no evidence ref there are no claims and
+        no recorded second opinion, which is advisory, not a hard block."""
         content = make_status_md(
             phase="review", task_size="L",
             approvals={"brainstorm": "approved", "plan": "approved"},
             refs={"review": "null"},
         )
         with TempProject(content) as root:
+            _init_git_repo(root)
             rc, out = run_check(root, "--pre-approve-gate", "review")
-            self.assertEqual(rc, 0)
+            self.assertEqual(rc, 2, f"empty-ref review judge should be ack-able 🟡: {out}")
             self.assertIn("ADVISORY", out,
                           f"review ref empty should warn: {out}")
 
     def test_deploy_gate_ref_empty_warns(self):
-        """Approving 'deploy' with empty ref → ADVISORY."""
+        """Approving 'deploy' with empty ref → ADVISORY printed AND the B2 judge
+        yields 🟡 (rc 2, ack-able) for the same reason as review."""
         content = make_status_md(
             phase="deploy", task_size="L",
             approvals={
@@ -595,8 +599,9 @@ class TestPreApproveGateRefCheck(unittest.TestCase):
             refs={"deploy": "null"},
         )
         with TempProject(content) as root:
+            _init_git_repo(root)
             rc, out = run_check(root, "--pre-approve-gate", "deploy")
-            self.assertEqual(rc, 0)
+            self.assertEqual(rc, 2, f"empty-ref deploy judge should be ack-able 🟡: {out}")
             self.assertIn("ADVISORY", out,
                           f"deploy ref empty should warn: {out}")
 
@@ -612,15 +617,19 @@ class TestPreApproveGateRefCheck(unittest.TestCase):
             self.assertNotIn("ADVISORY", out)
 
     def test_existing_status_no_ref_migration(self):
-        """Existing STATUS.md with all refs null → can still approve gates (migration path)."""
+        """Migration guarantee under B2: an existing STATUS.md with all refs null
+        is NOT hard-blocked. The judge surfaces the missing evidence as 🟡 (rc 2),
+        which the user can ack through — so old projects can still move forward,
+        they just get an explicit, ack-able prompt instead of a silent pass."""
         content = make_status_md(
             phase="review", task_size="L",
             approvals={"brainstorm": "approved", "plan": "approved"},
         )
         with TempProject(content) as root:
+            _init_git_repo(root)
             rc, out = run_check(root, "--pre-approve-gate", "review")
-            # Must succeed (return 0) — this is the migration guarantee.
-            self.assertEqual(rc, 0, f"Migration path broken: {out}")
+            # 🟡 (ack-able), never 🔴 (1): missing evidence must not hard-block.
+            self.assertEqual(rc, 2, f"Migration must be ack-able 🟡, not blocked: {out}")
 
 
 # =============================================================================
@@ -1760,6 +1769,19 @@ def _git(root, *args):
     subprocess.run(["git", "-C", str(root), *args], check=True, capture_output=True)
 
 
+def _init_git_repo(root):
+    """Initialize a minimal committed git repo so the B2 judge's diff-based
+    checks can run. Real aegis projects are always git repos; without one the
+    judge fail-closes (🔴), which is correct in production but not what these
+    evidence-absence tests intend to exercise."""
+    p = Path(root)
+    _git(p, "init", "-q")
+    _git(p, "config", "user.email", "t@t")
+    _git(p, "config", "user.name", "t")
+    _git(p, "add", "-A")
+    _git(p, "commit", "-qm", "init")
+
+
 class TestQaDrillGate(unittest.TestCase):
     """pre_approve_gate('qa') runs the drill live; PASS allows, else blocks."""
 
@@ -1791,11 +1813,15 @@ class TestQaDrillGate(unittest.TestCase):
             }), encoding="utf-8")
         return root
 
-    def test_qa_with_passing_drill_allows(self):
+    def test_qa_passing_drill_then_judge_yellow_ackable(self):
+        # The B1 drill passes, but no test-result.json is recorded and the qa ref
+        # has no claims, so the B2 judge yields 🟡 (rc 2, ack-able) — not auto-0.
+        # The fully-green qa path (recorded result + claims) is covered end-to-end
+        # in test_judge_card.TestMain and the Task 15 integration smoke.
         with tempfile.TemporaryDirectory() as d:
             root = self._project(d, with_drill=True)
             rc, out = run_check(str(root), "--pre-approve-gate", "qa")
-            self.assertEqual(rc, 0, f"expected allow, got: {out}")
+            self.assertEqual(rc, 2, f"drill passes but judge should be ack-able 🟡: {out}")
 
     def test_qa_without_drill_blocks(self):
         with tempfile.TemporaryDirectory() as d:
@@ -1810,7 +1836,9 @@ class TestQaDrillGate(unittest.TestCase):
             rc, out = run_check(str(root), "--pre-approve-gate", "qa")
             self.assertEqual(rc, 1, f"blind test must block, got: {out}")
 
-    def test_qa_with_skip_declaration_allows(self):
+    def test_qa_skip_declaration_then_judge_yellow_ackable(self):
+        # A valid drill skip passes the B1 layer (prints スキップ), but the B2
+        # judge still finds no recorded test-result/claims → 🟡 (rc 2, ack-able).
         with tempfile.TemporaryDirectory() as d:
             root = self._project(d, with_drill=False)
             drill_spec = root / "docs" / "qa-reports" / "test-strength.drill"
@@ -1818,8 +1846,45 @@ class TestQaDrillGate(unittest.TestCase):
                 json.dumps({"skip": True, "reason": "docs-only change"}),
                 encoding="utf-8")
             rc, out = run_check(str(root), "--pre-approve-gate", "qa")
-            self.assertEqual(rc, 0, f"valid skip must allow, got: {out}")
+            self.assertEqual(rc, 2, f"skip passes drill but judge should be ack-able 🟡: {out}")
             self.assertIn("スキップ", out)
+
+
+class TestJudgeGate(unittest.TestCase):
+    def _project(self, d, *, body, claims_block):
+        root = Path(d)
+        for a in (["init", "-q"], ["config", "user.email", "t@t"],
+                  ["config", "user.name", "t"]):
+            subprocess.run(["git", "-C", str(root), *a], check=True, capture_output=True)
+        (root / "seed.py").write_text("s = 0\n", encoding="utf-8")
+        subprocess.run(["git", "-C", str(root), "add", "-A"], check=True, capture_output=True)
+        subprocess.run(["git", "-C", str(root), "commit", "-qm", "i"], check=True,
+                       capture_output=True)
+        (root / "m.py").write_text(body, encoding="utf-8")
+        docs = root / "docs"; (docs / "qa-reports").mkdir(parents=True)
+        (docs / "STATUS.md").write_text(make_status_md(
+            phase="review", task_type="feature", task_size="M",
+            approvals={"review": "pending"},
+            refs={"plan": "docs/p.md", "review": "docs/qa-reports/review.md"},
+        ), encoding="utf-8")
+        (docs / "qa-reports" / "review.md").write_text("# review\n\n" + claims_block,
+                                                       encoding="utf-8")
+        return root
+
+    def test_review_blocks_on_stub(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = self._project(d, body="def f():\n    pass  # stub\n",
+                                 claims_block="```claims\nno_stubs: true\nverdict: approve\n```\n")
+            rc, out = run_check(str(root), "--pre-approve-gate", "review")
+            self.assertEqual(rc, 1, out)
+
+    def test_review_yellow_when_second_opinion_missing(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = self._project(
+                d, body="def f():\n    return 1\n",
+                claims_block="```claims\nno_stubs: true\nverdict: approve\n```\n")
+            rc, out = run_check(str(root), "--pre-approve-gate", "review")
+            self.assertEqual(rc, 2, out)
 
 
 if __name__ == "__main__":

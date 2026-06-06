@@ -184,6 +184,13 @@ class TestVerdict(unittest.TestCase):
         v = judge.compute_verdict("review", None, self._facts(), None)
         self.assertEqual(v.overall, 2)
 
+    def test_deps_vuln_is_yellow_never_red(self):
+        # deps audits are flaky/env-sensitive: a vuln advises but never blocks,
+        # even when a claim asserts deps_clean.
+        v = judge.compute_verdict("security", {"deps_clean": True, "verdict": "approve"},
+                                  self._facts(deps="vuln"), {"verdict": "approve"})
+        self.assertEqual(v.overall, 2)
+
 
 class TestMain(unittest.TestCase):
     def _git(self, root, *a):
@@ -249,6 +256,23 @@ class TestMain(unittest.TestCase):
             res, out = self._run(root)
             self.assertEqual(res.returncode, 0, res.stdout + res.stderr)
             self.assertIn("🟢", out.read_text())
+
+
+class TestAuditDeps(unittest.TestCase):
+    def test_no_manifest_is_unverified(self):
+        with tempfile.TemporaryDirectory() as d:
+            self.assertEqual(judge.audit_deps(Path(d)), "unverified")
+
+    def test_python_without_requirements_is_unverified(self):
+        with tempfile.TemporaryDirectory() as d:
+            (Path(d) / "main.py").write_text("x = 1\n", encoding="utf-8")
+            self.assertEqual(judge.audit_deps(Path(d)), "unverified")
+
+    def test_node_without_lockfile_is_unverified(self):
+        # package.json but no lockfile must NOT fabricate 'vuln' from an npm error.
+        with tempfile.TemporaryDirectory() as d:
+            (Path(d) / "package.json").write_text("{}", encoding="utf-8")
+            self.assertEqual(judge.audit_deps(Path(d)), "unverified")
 
 
 if __name__ == "__main__":

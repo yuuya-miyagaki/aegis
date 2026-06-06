@@ -3,10 +3,11 @@
 # Called by /gate command via Bash tool. Updates STATUS.md and .gate-snapshot atomically.
 # Because this runs via Bash (not Edit/Write), it naturally bypasses post-status-audit.sh.
 #
-# Usage: bash scripts/update-gate.sh <gate-name> [approve|na|reset]
+# Usage: bash scripts/update-gate.sh <gate-name> [approve|na|reset] [--ack "reason"]
 #   approve (default): pending → approved
 #   na:                pending → n/a (only brainstorm/plan)
 #   reset:             approved/n/a → pending
+#   --ack "reason":    acknowledge a 🟡 (tri-state) judge result when approving
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -17,6 +18,8 @@ SNAPSHOT_FILE="${SNAPSHOT_DIR}/.gate-snapshot"
 
 GATE_NAME="${1:-}"
 ACTION="${2:-approve}"
+ACK_FLAG="${3:-}"
+ACK_REASON="${4:-}"
 
 VALID_GATES="client_ready_for_dev brainstorm plan review qa security deploy dev_ready_for_client"
 VALID_ACTIONS="approve na reset"
@@ -98,18 +101,36 @@ case "$ACTION" in
       echo "If this gate should be active, first reset it to 'pending' via: bash scripts/update-gate.sh $GATE_NAME reset"
       exit 1
     fi
-    # Context validation: delegate to check_status.py.
-    # set +e: python returning non-zero is expected (deny) — must not abort before echoing.
+    # Context validation: delegate to check_status.py (tri-state 0/1/2).
+    # set +e: python returning non-zero is expected (deny/ack) — must not abort
+    # before echoing.
     set +e
     GATE_CHECK=$(python3 "${SCRIPT_DIR}/check_status.py" --root "$ROOT" --pre-approve-gate "$GATE_NAME" 2>&1)
     GATE_CHECK_RC=$?
     set -e
-    if [ $GATE_CHECK_RC -ne 0 ]; then
-      echo "$GATE_CHECK"
-      exit 1
-    fi
     if [ -n "$GATE_CHECK" ]; then
       echo "$GATE_CHECK"
+    fi
+    if [ "$GATE_CHECK_RC" -eq 0 ]; then
+      : # 🟢 approvable — fall through
+    elif [ "$GATE_CHECK_RC" -eq 2 ]; then
+      # 🟡 needs ack: approve only when an explicit reason is supplied.
+      if [ "$ACK_FLAG" != "--ack" ] || [ -z "$ACK_REASON" ]; then
+        echo ""
+        echo "🟡 要確認の項目があります（上記）。承認するには理由を添えてください:"
+        echo "  bash scripts/update-gate.sh $GATE_NAME approve --ack \"確認した理由\""
+        exit 1
+      fi
+      CARD="${ROOT}/docs/qa-reports/judge-${GATE_NAME}.md"
+      if [ -f "$CARD" ]; then
+        printf '\n## ACK\n- %s （%s）\n' "$ACK_REASON" "$(date '+%Y-%m-%d %H:%M')" >> "$CARD"
+      fi
+      # Brace-delimit ${CARD}: bash 3.2 (macOS default) mis-parses a bare $CARD
+      # immediately followed by a multibyte char like ）, yielding "unbound var".
+      echo "[gate-ack] ${GATE_NAME}: 🟡 を ack で承認（理由記録: ${CARD}）"
+    else
+      # 🔴 (1) or any unexpected code: hard block.
+      exit 1
     fi
     TARGET_VALUE="approved"
     ACTION_TAG="gate-approve"
