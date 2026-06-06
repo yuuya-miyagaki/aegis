@@ -3,16 +3,16 @@ framework: aegis
 framework_version: "0.12.5"
 project_name: "Aegis"
 mode: Dev
-phase: brainstorm
+phase: plan
 task_type: framework
 task_size: M
-task_size_rationale: "Phase R 最終項目: evidence 完了の TaskCompleted/Stop hook 強制化。現状の check-task-completed.sh は next_action 空のみ差し戻し。Completion Rule（成果物実在・ゲート承認・検査実行）の決定論的強制へ拡張。規模は brainstorm で確定（暫定 M: hook + テスト + docs）。"
+task_size_rationale: "Phase R 最終項目: evidence 完了の TaskCompleted 強制化。brainstorm 確定方針=(B) 既存 check-task-completed.sh 拡張（Stop hook 新設は却下・毎ターン誤爆回避）。検査は check_status.py に二層実装（層1 整合性=scalar ref 全実在 / 層2 結合=approved ゲートの ref 非 null。review/qa/security/deploy+plan）。requirements 除外・バイパス無し。規模 M: check_status.py + hook(root/example IDENTICAL) + テスト + version 0.12.6。"
 iteration: 9
 ui_surface: false
 last_updated: "2026-06-06T00:00:00Z"
 gate_approvals:
   client_ready_for_dev: n/a
-  brainstorm: pending
+  brainstorm: approved
   plan: pending
   review: pending
   qa: pending
@@ -22,7 +22,7 @@ gate_approvals:
 current_refs:
   requirements: []
   plan: null
-  spec: null
+  spec: "docs/plans/2026-06-06-v1-evidence-completion-hook-design.md"
   review: null
   qa: null
   security: null
@@ -41,7 +41,7 @@ external_evidence:
     scope: "v0.12.2 実装後 4 ラウンドレビュー"
     findings: "Round 6 (P1×2, P2×1: pre-compact exit 2 / minimal-project / test rc), Round 7 (P1×1, P3×1: git add 漏れ / テスト件数表記), Round 8 (P2×1, P3×1: stale last_updated / grep 自己マッチ), Round 9 (P3×2: コメント不整合)"
     resolution: "9件全反映。tier 1/2 PASS、134 tests PASS、本体と minimal-project 完全同期確認済み。"
-next_action: "Phase R 再配分: routing 原則化(0.12.3) / context budget 原則化(0.12.4) / model-effort inherit / name-hygiene / TDD profile+escape hatch(0.12.5) 完了・origin へ push 済み。次は Phase R 最終項目『evidence 完了の TaskCompleted/Stop hook 強制化』の brainstorm→design→grill-plan。governing doc: docs/plans/2026-06-05-v1-future-proof-rearchitecture-design.md。残: README/INTEGRATION/version 整理(v1.0.0)・context observability(YAGNI 保留)。"
+next_action: "evidence 完了強制化(B案) brainstorm 完了・設計書 docs/plans/2026-06-06-v1-evidence-completion-hook-design.md 承認済み。次は writing-plans で実装計画作成 → grill-plan → 実装(TDD) → grill-code。version は 0.12.6 予定。governing doc: docs/plans/2026-06-05-v1-future-proof-rearchitecture-design.md。残: README/INTEGRATION/version 整理(v1.0.0)・context observability(YAGNI 保留)。"
 blockers: []
 failure_tracking: null
 session_history:
