@@ -74,6 +74,11 @@ class TestMirrorIdentity(unittest.TestCase):
         from check_reference_drift import MIRROR_FILES
         self.assertIn(Path("scripts") / "run-test-strength-drill.py", MIRROR_FILES)
 
+    def test_b2_scripts_registered_in_mirror_files(self):
+        from check_reference_drift import MIRROR_FILES
+        for name in ("build-judge-card.py", "record-test-result.py"):
+            self.assertIn(Path("scripts") / name, MIRROR_FILES)
+
 
 if __name__ == "__main__":
     unittest.main()
