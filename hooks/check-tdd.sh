@@ -11,6 +11,13 @@ source "${SCRIPT_DIR}/lib/emit.sh"
 # Read stdin (JSON with tool_input).
 INPUT=$(cat)
 
+# ローカル escape hatch: AEGIS_TDD_MODE=off でこのセッションの TDD backstop を無効化（full profile）。
+# 小文字 "off" のみ。それ以外（未設定/strict/不正値）は strict 既定を維持（fail-safe）。
+if [ "${AEGIS_TDD_MODE:-}" = "off" ]; then
+  emit_allow
+  exit 0
+fi
+
 # Extract file_path from tool_input.
 TARGET_FILE=$(extract_file_path "$INPUT")
 

@@ -327,8 +327,26 @@ class TestPreToolUseHooks(HookSchemaAssertions):
         if out:
             self.assert_pretool_decision(out, "ask", hint="check-destructive.sh rm -rf")
 
-    # --- check-deploy-gate.sh / check-deploy-mcp-gate.sh / check-tdd.sh / check-client-info.sh -----
-    # 残りのケースは個別 hook 修正と並行して追加する（Task 0a-1 後半）
+    # --- check-deploy-gate.sh / check-deploy-mcp-gate.sh / check-client-info.sh -----
+    # 残りのケースは個別 hook 修正と並行して追加する。
+
+    # --- check-tdd.sh -------------------------------------------------
+
+    def test_check_tdd_asks_when_no_test_changes(self):
+        """AEGIS_TDD_MODE unset (strict default): prod edit without tests -> ask."""
+        payload = make_pretool_payload("Edit", {"file_path": "src/app.ts"})
+        rc, out, err = run_hook("check-tdd.sh", payload, cwd=Path(self.tmp))
+        # 非空を明示 assert（`if out:` ガードだと誤って allow を返しても空振りで PASS する）
+        self.assertNotEqual(out, {}, "strict default must not allow ({})")
+        self.assert_pretool_decision(out, "ask", hint="check-tdd strict default")
+
+    def test_check_tdd_off_allows(self):
+        """AEGIS_TDD_MODE=off: prod edit without tests -> allow (bypass)."""
+        payload = make_pretool_payload("Edit", {"file_path": "src/app.ts"})
+        rc, out, err = run_hook(
+            "check-tdd.sh", payload, cwd=Path(self.tmp), env={"AEGIS_TDD_MODE": "off"}
+        )
+        self.assertEqual(out, {}, "off must emit allow ({})")
 
     def test_check_deploy_gate_deny_when_gate_pending(self):
         """deploy gate pending 時の vercel deploy で deny。"""
