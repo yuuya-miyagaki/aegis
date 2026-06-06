@@ -65,3 +65,18 @@ Skill(skill="review")
 - evidence なき PASS 判定を出さない
 - diff を読まずにレビュー結果を出さない
 - severity 未付与の finding を報告しない
+
+## 盲検 第2意見（self-attested）
+
+1次レビュー確定後、**1次の verdict/コメントを渡さず**（fresh context・diff と spec/plan のみ）、
+別観点エージェント（例 `reviewer-maintainability`）で独立2次レビューを1回ディスパッチし、
+結果を 1次レポートの `claims` ブロックに記録する:
+
+```claims
+second_opinion:
+  verdict: approve|reject|approve_with_notes
+  divergence_points: ["..."]
+```
+
+注: ハーネスは2次の存在と相違のみ強制でき、実走/盲検は検証できない（カードで
+self-attested と明示される）。形式的に書かず、実際に独立レビューを回すこと。

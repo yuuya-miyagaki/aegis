@@ -83,3 +83,19 @@ session callback expose them to the browser via `/api/auth/session`.
 
 - open only plan + change diff + security-relevant files
 - reference QA reports only when needed
+
+## 機械照合用クレーム（必須・judge カードが裏取りする）
+
+レポート末尾に次の fenced ブロックを必ず含める。ハーネスが変更差分を実測して照合する:
+
+```claims
+tests_pass: true|false
+no_stubs: true|false
+no_secrets: true|false
+deps_clean: true|false
+verdict: approve|reject|approve_with_notes
+```
+
+- `tests_pass`/`no_stubs`/`no_secrets` の虚偽は決定論的に🔴ブロックになる。
+- `deps_clean` は参考扱い（依存監査は環境/ネットワーク依存で誤検知があるため🟡 advisory・🔴 にはしない）。
+- 確認していないことを true にしない。

@@ -75,3 +75,16 @@ Incorporate the returned evidence into the QA report yourself.
 
 - open only plan + test results + target files
 - reference review records only when needed
+
+## 機械照合用クレーム（必須・judge カードが裏取りする）
+
+レポート末尾に次の fenced ブロックを必ず含める。ハーネスが変更差分を実測して照合する:
+
+```claims
+tests_pass: true|false
+no_stubs: true|false
+verdict: approve|reject|approve_with_notes
+```
+
+- `tests_pass`/`no_stubs` の虚偽は決定論的に🔴ブロックになる（実測が claim と矛盾するため）。
+- 確認していないことを true にしない。実測で覆ると承認がブロックされる。
