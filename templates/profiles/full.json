@@ -29,6 +29,7 @@
     "hooks/check-control-plane.sh",
     "hooks/check-client-info.sh",
     "hooks/check-secrets.sh",
+    "scripts/run-test-strength-drill.py",
     ".claude/skills/tdd/SKILL.md",
     ".claude/skills/subagent-dev/SKILL.md",
     ".claude/skills/aegis-brainstorm/SKILL.md",

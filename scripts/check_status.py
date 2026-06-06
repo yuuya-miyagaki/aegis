@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import re
 import subprocess
 from pathlib import Path
@@ -747,17 +748,43 @@ def run_qa_drill(root: Path) -> int:
     """Run the test-strength drill (B1) at qa-gate approval time (Approach A).
 
     The verdict is computed live by the harness here, so it cannot be forged or
-    go stale. Requires a drill spec; a task with no testable code should use
-    qa=n/a (reason) instead, which routes through pre_na_gate and skips this.
-    Returns 0 if the drill passes, 1 to block approval.
+    go stale. A drill spec is required: either a real spec (mutants) for code
+    tasks, or an explicit, auditable skip spec ({"skip": true, "reason": "..."})
+    for tasks with no testable code (note: qa cannot be set to n/a via
+    update-gate.sh, so the skip is declared in the evidence file itself).
+    Returns 0 if the drill passes (or is validly skipped), 1 to block approval.
     """
     spec_path = root / "docs" / "qa-reports" / "test-strength.drill"
     report_path = root / "docs" / "qa-reports" / "test-strength.md"
     if not spec_path.is_file():
-        print("ERROR: qa を approve するにはテスト強度ドリルが必要です。")
-        print("       テスト対象コードが無いタスクは qa=n/a（理由付き）にしてください。")
-        print(f"       ドリル仕様が見つかりません: {spec_path}")
+        print("ERROR: qa を approve するにはテスト強度ドリル仕様が必要です。")
+        print("       コードを変更したタスク: mutant 入りの .drill を作成してください。")
+        print('       テスト対象コードが無いタスク: {"skip": true, "reason": "..."} '
+              "の .drill を作成してください。")
+        print(f"       場所: {spec_path}")
         return 1
+    # Explicit, auditable skip for tasks with no testable code. Unlike silently
+    # omitting the drill, the reason is recorded in the evidence file the user
+    # reviews, so a non-engineer can question it.
+    try:
+        spec_data = json.loads(spec_path.read_text(encoding="utf-8"))
+    except (ValueError, OSError) as exc:
+        print(f"ERROR: ドリル仕様が不正な JSON です: {exc}")
+        return 1
+    if isinstance(spec_data, dict) and spec_data.get("skip") is True:
+        reason = spec_data.get("reason", "(理由未記載)")
+        print(f"テスト強度ドリル: スキップ宣言（テスト対象コードなし）。理由: {reason}")
+        try:
+            report_path.parent.mkdir(parents=True, exist_ok=True)
+            report_path.write_text(
+                "# テスト強度ドリル結果（機械ブロック・ハーネス生成）\n\n"
+                "```\nverdict: SKIP\n"
+                f"reason: {reason}\n```\n",
+                encoding="utf-8",
+            )
+        except OSError:
+            pass
+        return 0
     runner = Path(__file__).resolve().parent / "run-test-strength-drill.py"
     if not runner.is_file():
         print(f"ERROR: ドリルランナーが見つかりません: {runner}")

@@ -305,6 +305,13 @@ class TestPreApproveGateMapping(unittest.TestCase):
             status_dir = Path(tmp) / "docs"
             status_dir.mkdir()
             (status_dir / "STATUS.md").write_text(content, encoding="utf-8")
+            # This suite tests gate PREREQUISITE logic, not the B1 drill. Provide
+            # a skip drill so qa approval isolates the prerequisite check.
+            qa_reports = status_dir / "qa-reports"
+            qa_reports.mkdir()
+            (qa_reports / "test-strength.drill").write_text(
+                '{"skip": true, "reason": "prerequisite-logic test"}',
+                encoding="utf-8")
             result = subprocess.run(
                 ["python3", str(self.CHECK_STATUS), "--root", tmp,
                  "--pre-approve-gate", gate],

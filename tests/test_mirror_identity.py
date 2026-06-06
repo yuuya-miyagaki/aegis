@@ -70,6 +70,10 @@ class TestMirrorIdentity(unittest.TestCase):
             failures, _ = check_mirror_identity(root)
             self.assertEqual(failures, [], f"one-sided file must be skipped, got: {failures}")
 
+    def test_drill_runner_registered_in_mirror_files(self):
+        from check_reference_drift import MIRROR_FILES
+        self.assertIn(Path("scripts") / "run-test-strength-drill.py", MIRROR_FILES)
+
 
 if __name__ == "__main__":
     unittest.main()

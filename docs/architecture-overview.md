@@ -91,6 +91,7 @@ aegis/
 │   ├── eval_scenario.py              # シナリオ評価
 │   ├── run_eval.py                   # 統合評価ランナー
 │   ├── update-gate.sh                # ゲート更新スクリプト
+│   ├── run-test-strength-drill.py    # テスト強度ドリル（qa 承認時に実走）
 │   ├── learnings_search.py           # LEARNINGS 検索
 │   ├── retro_report.py               # レトロスペクティブ生成
 │   └── status_doctor.py              # STATUS 修復ツール
@@ -178,6 +179,13 @@ CLAUDE.md はフレームワークの中核であり、常時コンテキスト�
 
 - `client_ready_for_dev`: Client → Dev の遷移に必要
 - `dev_ready_for_client`: Dev → Client へのハンドバックに必要
+
+**qa ゲートのテスト強度ドリル（B1）**: qa ゲートを承認するとき、`pre_approve_gate`
+が `scripts/run-test-strength-drill.py` を**承認の瞬間に実走**する。変更コードに
+仕込んだ mutant をテストが全て捕まえない限り承認を拒否する（verdict はその場で
+計算＝偽造・staleness 不能）。入力は `docs/qa-reports/test-strength.drill`、機械生成
+レポートは `docs/qa-reports/test-strength.md`（`current_refs.qa`）。テスト対象コードが
+無いタスクは `.drill` にスキップ宣言（`{"skip": true, "reason": "..."}`）を書く。
 
 ### 4.3 タスクサイズによるフェーズ省略
 

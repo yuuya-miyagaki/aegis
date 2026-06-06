@@ -1810,6 +1810,17 @@ class TestQaDrillGate(unittest.TestCase):
             rc, out = run_check(str(root), "--pre-approve-gate", "qa")
             self.assertEqual(rc, 1, f"blind test must block, got: {out}")
 
+    def test_qa_with_skip_declaration_allows(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = self._project(d, with_drill=False)
+            drill_spec = root / "docs" / "qa-reports" / "test-strength.drill"
+            drill_spec.write_text(
+                json.dumps({"skip": True, "reason": "docs-only change"}),
+                encoding="utf-8")
+            rc, out = run_check(str(root), "--pre-approve-gate", "qa")
+            self.assertEqual(rc, 0, f"valid skip must allow, got: {out}")
+            self.assertIn("スキップ", out)
+
 
 if __name__ == "__main__":
     unittest.main()
