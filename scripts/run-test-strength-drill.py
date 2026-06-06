@@ -20,6 +20,10 @@ REQUIRED_SPEC_KEYS = ("test_command", "timeout_seconds", "mutants")
 MAX_MUTANTS = 25  # bound approval wall-time; keep ~one mutant per changed hunk
 # The harness writes its own input/output here; never treat these as task code.
 DRILL_ARTIFACT_PREFIX = "docs/qa-reports/"
+# git's well-known empty-tree object; diffing against it makes a not-yet-
+# committed project treat all its current code as added.
+EMPTY_TREE = "4b825dc642cb6eb9a060e54bf8d69288fbee4904"
+BASELINE_OUTPUT_TAIL = 20  # lines of failing baseline output to surface
 
 
 class DrillError(Exception):
@@ -49,10 +53,24 @@ def parse_spec(path: Path) -> dict:
         raise DrillError(
             f"too many mutants ({len(data['mutants'])} > {MAX_MUTANTS}); "
             f"keep ~one per changed hunk to bound approval time")
+    if not isinstance(data["test_command"], str) or not data["test_command"].strip():
+        raise DrillError("'test_command' must be a non-empty string")
+    # bool is a subclass of int in Python; reject it explicitly
+    if (isinstance(data["timeout_seconds"], bool)
+            or not isinstance(data["timeout_seconds"], int)
+            or data["timeout_seconds"] <= 0):
+        raise DrillError("'timeout_seconds' must be a positive integer")
     for m in data["mutants"]:
+        if not isinstance(m, dict):
+            raise DrillError(f"each mutant must be an object: {m}")
         for k in ("file", "line", "original", "mutated"):
             if k not in m:
                 raise DrillError(f"mutant missing key '{k}': {m}")
+        if isinstance(m["line"], bool) or not isinstance(m["line"], int):
+            raise DrillError(f"mutant 'line' must be an integer: {m}")
+        for k in ("file", "original", "mutated"):
+            if not isinstance(m[k], str):
+                raise DrillError(f"mutant '{k}' must be a string: {m}")
     return data
 
 
@@ -96,12 +114,39 @@ def _untracked_files(root: Path) -> list[str]:
     return [p for p in out.splitlines() if p]
 
 
-def added_lines_by_file(root: Path, ref: str = "HEAD") -> dict[str, set[int]]:
+def resolve_diff_ref(root: Path) -> str:
+    """Return the ref to diff the working tree against: 'HEAD' when commits
+    exist, else git's empty-tree hash (so a not-yet-committed project treats all
+    its code as added). Raises DrillError with actionable guidance when `root` is
+    not a git repository — the drill's anti-gaming check fundamentally needs git.
+    """
+    try:
+        inside = subprocess.run(
+            ["git", "-C", str(root), "rev-parse", "--is-inside-work-tree"],
+            capture_output=True, text=True,
+        )
+    except OSError as exc:
+        raise DrillError(f"git is not available: {exc}")
+    if inside.returncode != 0 or inside.stdout.strip() != "true":
+        raise DrillError(
+            "このドリルは git リポジトリが必要です（変更差分で反ガミングを判定するため）。"
+            " 次を実行してください: git init && git add -A && git commit -m init")
+    head = subprocess.run(
+        ["git", "-C", str(root), "rev-parse", "--verify", "-q", "HEAD"],
+        capture_output=True, text=True,
+    )
+    return "HEAD" if head.returncode == 0 else EMPTY_TREE
+
+
+def added_lines_by_file(root: Path, ref: str = "HEAD",
+                        tracked: dict[str, set[int]] | None = None) -> dict[str, set[int]]:
     """Map each changed file to its set of ADDED (+) line numbers. Includes both
     tracked changes (git diff) AND brand-new untracked files (every line of a new
     file counts as added) so 'add a new module' tasks are drillable. The harness'
-    own artifacts under docs/qa-reports/ are excluded (they are not task code)."""
-    result = _tracked_added_lines(root, ref)
+    own artifacts under docs/qa-reports/ are excluded (they are not task code).
+    `tracked` may be a precomputed _tracked_added_lines map to avoid a second
+    git diff."""
+    result = dict(_tracked_added_lines(root, ref) if tracked is None else tracked)
     for rel in _untracked_files(root):
         if rel.startswith(DRILL_ARTIFACT_PREFIX):
             continue
@@ -165,45 +210,54 @@ def anti_gaming_violations(
     return violations
 
 
-def run_test(command: str, cwd: Path, timeout_seconds: int) -> str:
+def _execute(command: str, cwd: Path, timeout_seconds: int) -> tuple[str, str]:
     """Run the scoped test command WITHOUT a shell (no metachar interpretation,
     no command chaining/redirection => the approval-time drill cannot be turned
-    into an arbitrary-shell vector). Returns 'passed' (exit 0), 'failed'
-    (non-zero), 'timeout', or 'error' (unparseable/could not start)."""
+    into an arbitrary-shell vector). Returns (status, combined_output) where
+    status is 'passed' (exit 0), 'failed' (non-zero), 'timeout', or 'error'."""
     try:
         argv = shlex.split(command)
     except ValueError:
-        return "error"
+        return "error", "command could not be parsed (check quoting)"
     if not argv:
-        return "error"
+        return "error", "empty command"
     try:
         proc = subprocess.run(
             argv, cwd=str(cwd), capture_output=True, timeout=timeout_seconds,
         )
     except subprocess.TimeoutExpired:
-        return "timeout"
-    except OSError:
-        return "error"
-    return "passed" if proc.returncode == 0 else "failed"
+        return "timeout", ""
+    except OSError as exc:
+        return "error", str(exc)
+    output = (proc.stdout or b"") + (proc.stderr or b"")
+    text = output.decode("utf-8", errors="replace")
+    return ("passed" if proc.returncode == 0 else "failed"), text
 
 
-def check_baseline(command: str, cwd: Path, timeout_seconds: int) -> str:
-    """Run the test command twice on the UNMODIFIED code. Returns 'green' (both
-    passed), 'red' (a run failed), 'flaky' (passed then failed or vice versa),
-    or 'inconclusive' (timeout/error). A non-green baseline is fail-closed.
+def run_test(command: str, cwd: Path, timeout_seconds: int) -> str:
+    """Status-only wrapper around _execute (used during mutant runs)."""
+    return _execute(command, cwd, timeout_seconds)[0]
+
+
+def check_baseline(command: str, cwd: Path, timeout_seconds: int) -> tuple[str, str]:
+    """Run the test command twice on the UNMODIFIED code. Returns
+    (status, failure_output) where status is 'green' (both passed), 'red' (a run
+    failed), 'flaky' (passed then failed or vice versa), or 'inconclusive'
+    (timeout/error). A non-green baseline is fail-closed; failure_output is the
+    captured test output so a non-engineer can see WHY it is not green.
     NOTE: assumes an idempotent test command (cleanly runnable twice); a
     deterministic-but-non-idempotent suite may be reported as flaky."""
-    first = run_test(command, cwd, timeout_seconds)
+    first, out1 = _execute(command, cwd, timeout_seconds)
     if first in ("timeout", "error"):
-        return "inconclusive"
-    second = run_test(command, cwd, timeout_seconds)
+        return "inconclusive", out1
+    second, out2 = _execute(command, cwd, timeout_seconds)
     if second in ("timeout", "error"):
-        return "inconclusive"
+        return "inconclusive", out2
     if first == "passed" and second == "passed":
-        return "green"
+        return "green", ""
     if first == "failed" and second == "failed":
-        return "red"
-    return "flaky"
+        return "red", out1
+    return "flaky", (out1 or out2)
 
 
 def _current_line(data: bytes, line_no: int) -> str:
@@ -303,11 +357,13 @@ def run_drill(root: Path, spec_path: Path, report_path: Path) -> int:
         # transparency: surface what will actually be executed at approval time
         print(f"test command (executed at approval): {cmd}")
 
-        added = added_lines_by_file(root, "HEAD")
+        ref = resolve_diff_ref(root)  # 'HEAD', or empty-tree when no commits yet
+        tracked_map = _tracked_added_lines(root, ref)
+        added = added_lines_by_file(root, ref, tracked=tracked_map)
         # coverage floor applies to tracked changes (clearly task code) plus any
         # untracked file the agent actually mutated; untouched untracked files
         # (scratch/noise) are not force-covered.
-        tracked = {f for f in _tracked_added_lines(root, "HEAD")
+        tracked = {f for f in tracked_map
                    if not f.startswith(DRILL_ARTIFACT_PREFIX)}
         mutant_files = {m["file"] for m in spec["mutants"]}
         coverage_files = tracked | (mutant_files & set(added))
@@ -321,10 +377,14 @@ def run_drill(root: Path, spec_path: Path, report_path: Path) -> int:
                          caught=0, baseline="n/a", survived=[])
             return 1
 
-        base = check_baseline(cmd, root, timeout)
+        base, base_output = check_baseline(cmd, root, timeout)
         if base != "green":
             print(f"DRILL BLOCKED (baseline {base}): tests must be green and "
                   f"stable before drilling.")
+            if base_output.strip():
+                print("---- test output (last lines) ----")
+                tail = base_output.strip().splitlines()[-BASELINE_OUTPUT_TAIL:]
+                print("\n".join(tail))
             write_report(report_path, verdict="FAIL", total=len(spec["mutants"]),
                          caught=0, baseline=base, survived=[])
             return 1

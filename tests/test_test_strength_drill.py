@@ -77,6 +77,22 @@ class TestParseSpec(unittest.TestCase):
             with self.assertRaises(drill.DrillError):
                 drill.parse_spec(self._write(d, mutants=many))
 
+    def test_non_int_timeout_raises(self):
+        with tempfile.TemporaryDirectory() as d:
+            with self.assertRaises(drill.DrillError):
+                drill.parse_spec(self._write(d, timeout_seconds="abc"))
+
+    def test_non_int_mutant_line_raises(self):
+        with tempfile.TemporaryDirectory() as d:
+            bad = [{"file": "a", "line": "two", "original": "x", "mutated": "y"}]
+            with self.assertRaises(drill.DrillError):
+                drill.parse_spec(self._write(d, mutants=bad))
+
+    def test_empty_test_command_raises(self):
+        with tempfile.TemporaryDirectory() as d:
+            with self.assertRaises(drill.DrillError):
+                drill.parse_spec(self._write(d, test_command="   "))
+
 
 class TestAddedLines(unittest.TestCase):
     def test_tracked_added_lines(self):
@@ -180,16 +196,23 @@ class TestBaseline(unittest.TestCase):
 
     def test_green(self):
         with tempfile.TemporaryDirectory() as d:
-            self.assertEqual(drill.check_baseline("true", Path(d), 10), "green")
+            status, _ = drill.check_baseline("true", Path(d), 10)
+            self.assertEqual(status, "green")
 
-    def test_red(self):
+    def test_red_surfaces_output(self):
         with tempfile.TemporaryDirectory() as d:
-            self.assertEqual(drill.check_baseline("false", Path(d), 10), "red")
+            root = Path(d)
+            (root / "fail.py").write_text(
+                "import sys\nprint('boom-marker')\nsys.exit(1)\n", encoding="utf-8")
+            status, output = drill.check_baseline("python3 fail.py", root, 10)
+            self.assertEqual(status, "red")
+            self.assertIn("boom-marker", output)
 
     def test_flaky(self):
         with tempfile.TemporaryDirectory() as d:
             root = Path(d)
-            self.assertEqual(drill.check_baseline(self._flaky_cmd(root), root, 10), "flaky")
+            status, _ = drill.check_baseline(self._flaky_cmd(root), root, 10)
+            self.assertEqual(status, "flaky")
 
 
 class TestApplyMutant(unittest.TestCase):
@@ -339,6 +362,41 @@ class TestMainEndToEnd(unittest.TestCase):
             _git_init(root)
             res = self._run(root, root / "nope.drill", root / "r.md")
             self.assertEqual(res.returncode, 1)
+
+    def test_no_commit_repo_pass_exit0(self):
+        # git init but NO commit yet (no HEAD): must fall back to empty-tree diff
+        # and still drill the new code, not crash.
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            _git_init(root)
+            (root / "src").mkdir()
+            (root / "src" / "m.py").write_text("v = 7\n", encoding="utf-8")
+            _git(root, "add", "-A")  # staged, but never committed
+            spec = root / "s.drill"
+            spec.write_text(json.dumps({
+                "test_command": "grep -q 'v = 7' src/m.py",
+                "timeout_seconds": 10,
+                "mutants": [{"file": "src/m.py", "line": 1,
+                             "original": "v = 7", "mutated": "v = 8"}],
+            }), encoding="utf-8")
+            report = root / "r.md"
+            res = self._run(root, spec, report)
+            self.assertEqual(res.returncode, 0, res.stdout + res.stderr)
+            self.assertIn("verdict: PASS", report.read_text())
+
+    def test_not_a_git_repo_blocks_with_guidance(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)  # NOT a git repo
+            (root / "m.py").write_text("v = 7\n", encoding="utf-8")
+            spec = root / "s.drill"
+            spec.write_text(json.dumps({
+                "test_command": "true", "timeout_seconds": 10,
+                "mutants": [{"file": "m.py", "line": 1,
+                             "original": "v = 7", "mutated": "v = 8"}],
+            }), encoding="utf-8")
+            res = self._run(root, spec, root / "r.md")
+            self.assertEqual(res.returncode, 1)
+            self.assertIn("git", res.stdout + res.stderr)
 
 
 if __name__ == "__main__":
