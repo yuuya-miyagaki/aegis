@@ -1,19 +1,19 @@
 ---
 framework: aegis
-framework_version: "0.13.0-pre"
+framework_version: "0.12.5"
 project_name: "Aegis"
 mode: Dev
-phase: implement
+phase: brainstorm
 task_type: framework
-task_size: L
-task_size_rationale: "v0.13.0 Phase 0b: 新 PreToolUse hook 2 (check-skill-gate, check-cron-gate) + 専用 event hook 2 (TaskCreated, TaskCompleted) + 既存 hook 拡張 (secrets, destructive, extract_exit_code 両対応) + スキル名衝突解消 3 件 rename + 全参照更新。合計 30+ ファイル変更見込み。"
-iteration: 8
+task_size: M
+task_size_rationale: "Phase R 最終項目: evidence 完了の TaskCompleted/Stop hook 強制化。現状の check-task-completed.sh は next_action 空のみ差し戻し。Completion Rule（成果物実在・ゲート承認・検査実行）の決定論的強制へ拡張。規模は brainstorm で確定（暫定 M: hook + テスト + docs）。"
+iteration: 9
 ui_surface: false
-last_updated: "2026-06-05T00:00:00Z"
+last_updated: "2026-06-06T00:00:00Z"
 gate_approvals:
   client_ready_for_dev: n/a
-  brainstorm: approved
-  plan: approved
+  brainstorm: pending
+  plan: pending
   review: pending
   qa: pending
   security: pending
@@ -21,7 +21,7 @@ gate_approvals:
   dev_ready_for_client: pending
 current_refs:
   requirements: []
-  plan: "docs/plans/2026-06-05-v1-phase-f-foundation.md"
+  plan: null
   spec: null
   review: null
   qa: null
@@ -41,14 +41,10 @@ external_evidence:
     scope: "v0.12.2 実装後 4 ラウンドレビュー"
     findings: "Round 6 (P1×2, P2×1: pre-compact exit 2 / minimal-project / test rc), Round 7 (P1×1, P3×1: git add 漏れ / テスト件数表記), Round 8 (P2×1, P3×1: stale last_updated / grep 自己マッチ), Round 9 (P3×2: コメント不整合)"
     resolution: "9件全反映。tier 1/2 PASS、134 tests PASS、本体と minimal-project 完全同期確認済み。"
-next_action: "Foundation（emit.sh 単一出力源 / patterns.sh / version owner 確定）完了・main にローカルマージ済み（origin 未push）。選択肢: (a) origin に push (b) 実装差分の最終レビュー(Round 3) (c) 後続フェーズ R/A/D 計画。manifest 拡張 / context observability / model inherit ポリシー / TDD profile / README / version bump は後続フェーズ。"
+next_action: "Phase R 再配分: routing 原則化(0.12.3) / context budget 原則化(0.12.4) / model-effort inherit / name-hygiene / TDD profile+escape hatch(0.12.5) 完了・origin へ push 済み。次は Phase R 最終項目『evidence 完了の TaskCompleted/Stop hook 強制化』の brainstorm→design→grill-plan。governing doc: docs/plans/2026-06-05-v1-future-proof-rearchitecture-design.md。残: README/INTEGRATION/version 整理(v1.0.0)・context observability(YAGNI 保留)。"
 blockers: []
 failure_tracking: null
 session_history:
-  - date: "2026-05-08"
-    mode: Dev
-    phase: "implement"
-    note: "v0.13.0 計画策定 + 5 ラウンドレビュー（25件指摘 全反映）。v0.12.2 hotfix Phase 0a 着手。Claude Code 公式 hook 出力スキーマへ全面移行 + if 削除 + post-bash PostToolUseFailure 移行。"
   - date: "2026-05-15"
     mode: Dev
     phase: "docs"
@@ -57,6 +53,10 @@ session_history:
     mode: Dev
     phase: "implement"
     note: "future-proof 再アーキ着手。Phase 0b WIP を確定コミット後、Foundation 実装（F0 棚卸し+version owner / F1 pure-bash emit.sh 単一出力源+全16hook置換 / F2 patterns.sh）。Round 1/2 セカンドオピニオン反映。183 tests PASS、main にマージ（origin 未push）。"
+  - date: "2026-06-06"
+    mode: Dev
+    phase: "implement"
+    note: "Phase R 再配分を連続実装・origin push: routing 原則化(0.12.3)・context budget 原則化(0.12.4)・model/effort inherit ポリシー・name-hygiene・TDD backstop profile 化 + AEGIS_TDD_MODE=off escape hatch + session-start advisory(0.12.5)。186 tests green。次は evidence 完了の hook 強制化（brainstorm 入り）。"
 ---
 
 ## Summary
@@ -87,3 +87,4 @@ Claude Code ネイティブの Aegis 運用フレームワーク。2026-06-05、
 - 2026-04-22: v0.11.0 Hair Salon Bloom 振り返り7施策実装+コミット+プッシュ。
 - 2026-04-22: v0.12.0 MCP gate + ref check + name lint + health check。48テスト全PASS。
 - 2026-06-05: future-proof 再アーキ着手。Phase 0b 確定 + Foundation（emit.sh 単一出力源 / patterns.sh / version owner）実装。Round 1/2 セカンドオピニオン反映。183 tests PASS、main マージ（未push）。
+- 2026-06-06: Phase R 再配分を連続 ship（origin push 済み）。routing 原則化(0.12.3)・context budget 原則化(0.12.4)・model/effort inherit・name-hygiene・TDD profile + escape hatch(0.12.5)。186 tests green。次は evidence 完了の hook 強制化。
