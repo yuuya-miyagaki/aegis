@@ -97,6 +97,8 @@ bin/setup.sh --profile=standard --target=<your-project-dir>
 
 Available profiles: `minimal` (core only), `standard` (recommended), `full` (everything including agents).
 
+TDD backstop strictness follows the profile: `full` installs `check-tdd.sh` (strict — prompts when production code is edited without test changes); `minimal`/`standard` omit it (off). Within `full`, set `AEGIS_TDD_MODE=off` to disable the backstop for a single session (e.g. a large no-test refactor); session-start prints a warning while it is off. Lowercase `off` only.
+
 ### Manual setup
 
 1. Read [CLAUDE.md](CLAUDE.md)

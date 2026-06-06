@@ -14,7 +14,7 @@
   Record each failure in STATUS.md `failure_tracking` (goal/count/last_attempt).
   Reset to null when the goal is achieved or changed.
 - Destructive commands require explicit user approval. Enforce via hooks (PaC).
-- Hook enforcement level is set at install via `bin/setup.sh --profile`.
+- Hook enforcement level is set at install via `bin/setup.sh --profile` — TDD backstop is on in `full`, off in `minimal`/`standard`. In `full`, `AEGIS_TDD_MODE=off` disables it for the session (session-start warns).
 
 ## Session Start
 
