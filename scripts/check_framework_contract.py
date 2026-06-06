@@ -109,6 +109,7 @@ REQUIRED_TEMPLATE_FILES = [
     ROOT / "templates/CLIENT-OPEN-QUESTIONS.template.md",
     ROOT / "templates/TRANSLATION-MAPPING.template.md",
     ROOT / "templates/DECISION.template.md",
+    ROOT / "templates/MANUAL.template.md",
     ROOT / "templates/hooks.template.json",
 ]
 
