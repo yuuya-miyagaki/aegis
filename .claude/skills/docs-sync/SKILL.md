@@ -22,6 +22,7 @@ user-invocable: false
 - [ ] LEARNINGS.md に今回の教訓が反映されている（「該当なし」も明記）
 - [ ] plan/spec に記載の受入条件がすべて evidence にリンクしている
 - [ ] README / CHANGELOG が変更内容を反映している（該当する場合）
+- [ ] マニュアルが該当する案件なら `docs/handover/MANUAL.md` が存在し、front-matter の宣言読者と手順章が1対1（宣言ごとに章があり、宣言の無い孤児章も無い）。該当なしなら理由が記録されている
 
 ## Exit Criteria
 
