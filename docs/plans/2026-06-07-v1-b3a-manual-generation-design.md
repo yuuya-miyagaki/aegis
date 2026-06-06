@@ -13,7 +13,9 @@
 
 1. **読者パラメータ化（C）**: A=エンドユーザー操作マニュアル と B=クライアント運用者向けガイド を二択にせず、**1つの読者パラメータ化テンプレ＋生成 skill** とする。各案件が該当読者を宣言し、その分だけ手順章を生成。
    - 根拠: B（運用者）はほぼ全納品物で発生（LP/コーポレートでも更新者がいる）、A（利用者）はタスクのある製品限定。両者は読者とタスク集合が違うが**骨格（読者→前提→「〜するには」手順→つまずいたら→用語）は同一**。生成能力を1回作れば読者切替で A も B も出せる。LP=B のみ、アプリ=A+B、と案件差を吸収。
-2. **生成機構＝(i)＋advisory**: 新 `manual` skill を作り `ship-and-docs` から参照（既存 `docs-sync` 参照と同型）。Dev 終盤で生成。hook ハードゲート/新フェーズにはしない（TO-CLIENT/LEARNINGS と同じ「証拠として作る」運用）。
+2. **生成機構＝(i)＋advisory**: 新 `user-manual` skill を作り `ship-and-docs` から参照（既存 `docs-sync` 参照と同型）。Dev 終盤で生成。hook ハードゲート/新フェーズにはしない（TO-CLIENT/LEARNINGS と同じ「証拠として作る」運用）。
+
+> **grill-plan 反映（2026-06-07）**: skill 名は衝突回避の慣習に合わせ `manual`→`user-manual`。lint_names がスキルを双方向検査するため、skill 作成と登録（`REQUIRED_SKILL_FILES`＋`REQUIRED_EXAMPLE_SKILL_DIRS`＋`CLAUDE.md ## Skills`）は同一コミットで行う。architecture §6 への行追加は数値カウントが既に stale で非強制のため見送り。詳細は実装計画参照。
    - 根拠: state-machine を触らず段階開示と整合。運用ゲートが要るなら B3c（保守）で検討。
 3. **配置・参照・宣言**: 単一ファイル `docs/handover/MANUAL.md`（読者は章で分割）。**`current_refs` に新キーを追加しない**（check_status/テンプレ/テスト/example の4箇所同期を回避）。TO-CLIENT の納品物欄からリンクし、`docs-sync` が存在＋章充足を検証。読者は **MANUAL.md の front-matter `audiences:`** で宣言。
 4. **図＝(c)**: テンプレに図プレースホルダを置き、skill は「`ui_surface: true` で UI があれば `qa-browser`/`browser-assist` で主要画面を撮って貼る」と促すが**自動取得は必須化しない**。API/CLI 納品物もあるため browser 自動化への密結合を避ける。
@@ -31,17 +33,17 @@
 | # | 成果物 | 種別 |
 |---|---|---|
 | 1 | `templates/MANUAL.template.md` | 新規テンプレ |
-| 2 | `.claude/skills/manual/SKILL.md` | 新規 skill（pull-based・`disable-model-invocation: true`・`user-invocable: false`） |
+| 2 | `.claude/skills/user-manual/SKILL.md` | 新規 skill（pull-based・`disable-model-invocation: true`・`user-invocable: false`） |
 | 3 | `.claude/skills/ship-and-docs/SKILL.md` | 改修（ship フェーズに manual ステップ参照を追加） |
 | 4 | `.claude/skills/docs-sync/SKILL.md` | 改修（整合チェック項目を1つ追加） |
-| 5 | 登録・カウント更新 | `check_framework_contract.py`（REQUIRED_TEMPLATE_FILES＋REQUIRED_SKILL_FILES＋example 側）／`templates/profiles/full.json`／`CLAUDE.md` スキル一覧／`README.md` スキル数／`docs/architecture-overview.md`（§6 スキル数・§2 ツリー）＋ `.claude/skills` の example ミラー |
+| 5 | 登録 | `check_framework_contract.py`（`REQUIRED_TEMPLATE_FILES`＋`REQUIRED_SKILL_FILES`＋`REQUIRED_EXAMPLE_SKILL_DIRS`）／`CLAUDE.md ## Skills`（lint 必須）／`templates/profiles/full.json`＋ `.claude/skills` の example ミラー。architecture §6/README スキル数は既に stale で非強制のため本 spec では追わない |
 
 ## MANUAL.template.md の構造
 
 - front-matter:
   - `audiences: [end-user, operator]`（案件が該当読者のみ残す）
   - `product: "<記入>"` / `release: "<記入>"` / `date: "<記入>"`
-- 冒頭: `<!-- 正本: manual skill -->`、`<!-- exit-check: 宣言読者ごとに手順章あり・図 or 図不要理由・つまずいたら/用語記入済み -->`
+- 冒頭: `<!-- 正本: user-manual skill -->`、`<!-- exit-check: 宣言読者ごとに手順章あり・図 or 図不要理由・つまずいたら/用語記入済み -->`
 - **読者ごとに繰り返す章**（宣言された読者の数だけ）:
   - `## <読者名> 向け`
     - **対象読者**: 平易な一文（誰のための章か）
@@ -51,7 +53,7 @@
     - **用語**: 章中のエンジニア用語の平易な言い換え
 - 末尾: 改訂履歴（任意）。
 
-## manual skill の手順（SKILL.md 本文）
+## user-manual skill の手順（SKILL.md 本文）
 
 1. **読者決定**: `docs/requirements/SCOPE.md`・`PRD.md` と STATUS の `ui_surface` から該当読者（end-user / operator）を判定し、ユーザーに確認。MANUAL.md front-matter の `audiences` に宣言。
 2. **タスク抽出**: SCOPE/PRD/ACCEPTANCE＋出荷した機能から主要タスクを列挙。読者ごとに「〜するには」を**平易語**（非エンジニアが読める語彙）で記述。1タスク=1ブロック。
@@ -67,7 +69,7 @@
 
 ship フェーズ（現 Step1 証拠収集 → Step2 TO-CLIENT 作成 → Step3 ユーザー確認）に次を挿入:
 
-- **Step 2.5: 操作マニュアル作成（該当時）** — `manual` skill を読み、該当読者向けに `docs/handover/MANUAL.md` を作成。TO-CLIENT の納品物欄からリンク。該当しない場合は理由を TO-CLIENT もしくは STATUS に記録。
+- **Step 2.5: 操作マニュアル作成（該当時）** — `user-manual` skill を読み、該当読者向けに `docs/handover/MANUAL.md` を作成。TO-CLIENT の納品物欄からリンク。該当しない場合は理由を TO-CLIENT もしくは STATUS に記録。
 
 ## docs-sync への結合
 
@@ -77,16 +79,16 @@ ship フェーズ（現 Step1 証拠収集 → Step2 TO-CLIENT 作成 → Step3 
 
 ## 登録・ミラー（実装時の同期先）
 
-- `check_framework_contract.py`: `REQUIRED_TEMPLATE_FILES` に `templates/MANUAL.template.md`、`REQUIRED_SKILL_FILES` に `.claude/skills/manual/SKILL.md`、`REQUIRED_EXAMPLE_FILES` に example 側 `manual/SKILL.md`（example がスキルを持つ場合）。
-- `templates/profiles/full.json`: `recommended` に新スキル（テンプレの扱いは既存テンプレ群に倣う）。
-- `.claude/skills` 配下は MIRROR_DIRS のため、新 `manual` skill と改修した `ship-and-docs`/`docs-sync` を `examples/minimal-project` へ byte 同一ミラー。
-- `CLAUDE.md` の Skills 一覧に `manual` を追加。
-- `README.md`・`docs/architecture-overview.md` のスキル数（12→13）と一覧を更新。
-- 実行後 `check_reference_drift.py`／`check_framework_contract.py --profile=full/standard`／`test_mirror_identity` を green に。
+- `check_framework_contract.py`: `REQUIRED_TEMPLATE_FILES` に `templates/MANUAL.template.md`、`REQUIRED_SKILL_FILES` に `.claude/skills/user-manual/SKILL.md`、`REQUIRED_EXAMPLE_SKILL_DIRS` に `"user-manual"`（example スキルは SKILL_DIRS で管理。`REQUIRED_EXAMPLE_FILES` は触らない）。
+- `CLAUDE.md ## Skills` に `user-manual` を追加（**lint_names が双方向検査するため必須**・skill 作成と同一コミット）。
+- `templates/profiles/full.json`: `recommended` に `.claude/skills/user-manual/SKILL.md`（lint 非対象・分離可）。
+- `.claude/skills` 配下は MIRROR_DIRS のため、新 `user-manual` skill と改修した `ship-and-docs`/`docs-sync` を `examples/minimal-project` へ byte 同一ミラー。
+- architecture §6/README のスキル数（doc 上「12」だが実体 15+）は drift/contract 非強制かつ既に stale のため本 spec では追わない。
+- 実行後 `check_reference_drift.py`／`check_framework_contract.py --profile=full/standard`／`test_mirror_identity`／`eval_scaffold_smoke.py` を green に。
 
 ## テスト戦略（正直な明記）
 
-B3a は **実行コードを持たない**: `MANUAL.template.md` は静的 markdown、`manual` skill は LLM 向け手順、ship-and-docs/docs-sync 改修も手順文。よって B1/B2 のような Python ユニットテスト（振る舞い検証）は**書けないし書かない**。
+B3a は **実行コードを持たない**: `MANUAL.template.md` は静的 markdown、`user-manual` skill は LLM 向け手順、ship-and-docs/docs-sync 改修も手順文。よって B1/B2 のような Python ユニットテスト（振る舞い検証）は**書けないし書かない**。
 
 検証は次の2層:
 1. **構造的検証（自動）**: 新テンプレ＋skill の登録整合を既存インフラで担保 — `check_framework_contract`（必須ファイル存在・スキル数・name-lint）、`check_reference_drift`（参照名・ミラー byte 同一）、`test_mirror_identity`、`eval_scaffold_smoke`。これらが green であること。
