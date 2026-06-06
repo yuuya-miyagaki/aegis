@@ -50,7 +50,7 @@ Rules: lineage aliases or `inherit` only (no version-pinned ids); `xhigh`/`max` 
 
 L0 `CLAUDE.md`+`STATUS.md` (always-on), L1 phase refs, L2 task files, L3 on-demand.
 
-- Prefer repo files over chat history. Pull-based; max three docs at once.
+- Prefer repo files over chat history. Pull-based.
 - Summarize at phase transitions. Update `docs/STATUS.md` before pauses.
 
 ## Skills

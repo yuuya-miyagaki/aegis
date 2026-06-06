@@ -74,6 +74,6 @@ skip する場合は `gate_approvals.brainstorm` を `n/a` に設定する（`ba
 
 ## コンテキスト予算
 
-- L0 の `docs/STATUS.md` に加え、同時に開く refs は最大 3 つまで
+- L0 の `docs/STATUS.md` を起点に refs を pull する
 - 既存コードの調査は必要最小限
 - 記録は Step A で残す（公式 brainstorming スキル出力をそのまま dump しない）
