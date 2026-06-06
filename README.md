@@ -163,6 +163,43 @@ python3 scripts/check_status.py --root . --strict
 
 ## Migration
 
+### From v0.12.2 to v1.0.0
+
+**Future-proof re-architecture (F→R→A→D).** Everything since the `v0.12.2` tag,
+consolidated into the v1.0.0 milestone. The old "v0.13.0" line was reframed onto
+the `0.12.x` series and lands here.
+
+**Breaking — skill renames** (Phase 0b, official-name collision avoidance). Update
+any external references (e.g. uccc) to the new names:
+
+| Old skill | New skill |
+|-----------|-----------|
+| `brainstorming` | `aegis-brainstorm` |
+| `review` | `aegis-review-gate` |
+| `security-review` | `aegis-security-gate` |
+
+**New enforcement / behavior:**
+
+1. **New gate hooks**: `check-skill-gate.sh` (Skill), `check-cron-gate.sh` (CronCreate),
+   and Task event hooks — `check-task-created.sh` (TaskCreated → `continue:false` hard
+   stop when a gate blocks a new task) and `check-task-completed.sh` (TaskCompleted →
+   `exit 2` push-back).
+2. **Evidence-completion enforcement** (v0.12.6): TaskCompleted pushes back when an
+   approved `review`/`qa`/`security`/`deploy`/`plan` gate has no `current_refs` entry,
+   or a declared ref points to a missing file. Same invariant as `check_framework_contract`.
+3. **Model/effort policy**: agent frontmatter is now pinned by role tier (quality
+   roles on `opus`, cost roles on `sonnet`, default `inherit`); `haiku` removed.
+4. **TDD profile**: the `check-tdd.sh` backstop ships only in `full`; within `full`,
+   `AEGIS_TDD_MODE=off` disables it for a session (session-start warns).
+5. **Leaner rules**: `routing.md` reduced to principles + agent manifest; `CLAUDE.md`
+   dropped the hard context-doc count (pull-based).
+6. **Internal (behavior-unchanged)**: hook output schemas unified in `hooks/lib/emit.sh`,
+   destructive patterns in `hooks/lib/patterns.sh`.
+
+**Action for existing projects**: re-run `bash bin/setup.sh --profile=<your-profile>`
+to refresh `.claude/settings.local.json` and hooks, then update any external skill
+references to the renamed `aegis-*` skills above.
+
 ### From v0.12.1 to v0.12.2
 
 **Hot-fix release**: Hook output schemas migrated to current Claude Code spec.
