@@ -36,7 +36,7 @@ Aegis は成熟したハーネス（v0.12.2 ship 済み、v0.13.0 が Phase 0b �
 | STATUS 改竄防止 | `post-status-audit.sh` | 維持 |
 | evidence 必須完了 | Completion Rule（文章のみ） | **Stop/TaskCompleted hook で強制に格上げ** |
 | durable handover/restart | STATUS.md ledger | 維持（思想の中核） |
-| **TDD** | `check-tdd.sh`（手順の逐一監視） | **保証として維持、ただし backstop 化**（red→green を経たテストを伴う、を強制）。strictness は manifest profile 値（strict/advisory/off）、受託は既定 strict |
+| **TDD** | `check-tdd.sh`（手順の逐一監視） | **保証として維持、ただし backstop 化**（red→green を経たテストを伴う、を強制）。strictness は manifest profile 値（strict/advisory/off）、受託は既定 strict → **完了**（2026-06-06・v0.12.5・profile→strictness 明文化＋`AEGIS_TDD_MODE=off` escape hatch＋session-start advisory。red→green 自動検証は非スコープ・heuristic backstop 維持。`2026-06-06-v1-tdd-profile-design.md`） |
 
 ### 🤖 DELEGATE — 手順（モデルに委ねる）
 
@@ -190,6 +190,7 @@ aegis/
 - [ ] manifest / emit.sh / patterns.sh / drift detector（advisory）実装
 - [ ] 既存11 hook が emit.sh 経由、出力契約テスト全 PASS、174テスト緑維持
 - [x] CLAUDE.md から固定 context 数値撤廃（2026-06-06・v0.12.4） / [x] routing 原則化（2026-06-06・v0.12.3）
+- [x] TDD backstop+profile 化（2026-06-06・v0.12.5・明文化＋escape hatch＋advisory）
 - [ ] agent model が inherit 優先、明示オーバーライドは manifest 同期
 - [ ] evidence 完了の Stop/TaskCompleted hook 強制化（旧確定案を採用）
 - [ ] 新 hook 群・スキル改名・commands frontmatter（新方式で吸収）
