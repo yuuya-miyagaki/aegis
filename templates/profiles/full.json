@@ -60,6 +60,7 @@
     ".claude/skills/translation-mapping/SKILL.md",
     ".claude/skills/integration-assist/SKILL.md",
     ".claude/skills/browser-assist/SKILL.md",
+    ".claude/skills/user-manual/SKILL.md",
     "docs/client/context.md",
     "docs/client/glossary.md",
     "docs/client/open-questions.md",
