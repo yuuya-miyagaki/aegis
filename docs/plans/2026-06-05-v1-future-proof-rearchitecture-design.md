@@ -139,6 +139,8 @@ aegis/
 | **A：吸収**（catch-up を新方式で） | 新 hook 群（skill/cron/task-created/task-completed）を emit.sh+manifest matcher で実装・スキル改名3件・commands/skills frontmatter・schedule/loop 連携 | Phase 0b 全部 / Phase 2 全部 |
 | **D：仕上げ** | README・LEARNINGS・INTEGRATION・migration guide・version bump v1.0.0 | Phase 3 残り |
 
+> **状態（2026-06-06）**: **F・R・A 完了**。F=emit.sh/patterns.sh/drift（manifest は descoped）。R=context/routing/model-effort/TDD/evidence を v0.12.3〜0.12.6 で ship 済み。A=新 hook 群・aegis-* 改名・commands frontmatter（Phase 0b 完了）。**残るは D（ドキュメント統合＋v1.0.0 判断）のみ。**
+
 ### 旧計画から変わる/捨てる
 - ❌ Phase 1 Task 1-1「model/effort 一括ハードコード」→ 方向転換（inherit 優先で外す）
 - 🔄 secrets/destructive 拡張 → inline 追記でなく patterns.sh へ
@@ -154,7 +156,7 @@ aegis/
 - R1: emit.sh 化で出力が変わる → 契約テストで「emit 出力＝期待JSON」を全イベント assert、174テスト緑維持
 - R2: drift detector 誤検知で作業停止 → advisory 始動、env でバイパス可
 - R3: manifest↔lib の二重管理ズレ → drift detector が同期を検証（lockfile 的）
-- R4: `inherit` 化で意図せぬモデル降格 → 品質直結役割（review/security/planner）は明示固定する設計を後続フェーズで実装（**現状は inherit、未対応**）。CC の override 解決順を docs で再確認
+- R4: `inherit` 化で意図せぬモデル降格 → 品質直結役割（review/security/planner）は明示固定する設計を後続フェーズで実装 → **完了**（2026-06-06・`815b283`: planner/security=max・reviewer=xhigh・qa=high を frontmatter 固定、`CLAUDE_CODE_SUBAGENT_MODEL` 時のみ全降格＝session-start advisory）。CC の override 解決順（frontmatter>session）も実機確認済み
 - R5: スキル改名で外部（uccc）参照破壊 → migration guide + reference drift check
 - R6: CC が将来また hook スキーマ変更 → emit.sh 1ファイル修正で吸収（本設計の狙い）
 
@@ -187,12 +189,12 @@ aegis/
 
 > 下記は F→R→A→D を全て終えた「全体ビジョン」の完了条件。**Foundation の直近完了条件は `2026-06-05-v1-phase-f-foundation.md` の Verification を正とする**。
 
-- [ ] manifest / emit.sh / patterns.sh / drift detector（advisory）実装
-- [ ] 既存11 hook が emit.sh 経由、出力契約テスト全 PASS、174テスト緑維持
+- [x] emit.sh / patterns.sh / drift detector（advisory）実装（2026-06-05・Foundation）。manifest は descoped（実消費者が出るまで・Round 2 J-1）
+- [x] 既存 hook が emit.sh 経由、出力契約テスト全 PASS（2026-06-06・195テスト緑）
 - [x] CLAUDE.md から固定 context 数値撤廃（2026-06-06・v0.12.4） / [x] routing 原則化（2026-06-06・v0.12.3）
 - [x] TDD backstop+profile 化（2026-06-06・v0.12.5・明文化＋escape hatch＋advisory）
-- [ ] agent model が inherit 優先、明示オーバーライドは manifest 同期
+- [x] agent model/effort ポリシー（品質固定 opus / コスト固定 sonnet / 既定 inherit）（2026-06-06・`815b283`）。manifest 同期は manifest descoped により非該当
 - [x] evidence 完了の TaskCompleted hook 強制化（2026-06-06・v0.12.6・validate_status_file ロジック再利用＋hook 配線。Stop hook 不採用）
-- [ ] 新 hook 群・スキル改名・commands frontmatter（新方式で吸収）
-- [ ] README/LEARNINGS/INTEGRATION/migration guide、version v1.0.0
-- [ ] tier 1/2 eval・check_framework_contract・check_reference_drift 全 PASS
+- [x] 新 hook 群（skill/cron/task-created/task-completed）・スキル aegis-* 改名・commands frontmatter（Phase 0b 完了）
+- [ ] **README/LEARNINGS/INTEGRATION/migration guide、version v1.0.0**（← Phase D・唯一の残作業）
+- [x] tier 1/2 eval・check_framework_contract・check_reference_drift 全 PASS（2026-06-06 実測）
