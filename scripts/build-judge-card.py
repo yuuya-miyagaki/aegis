@@ -153,6 +153,65 @@ def resolve_gate_report(root: Path, gate: str) -> Path | None:
     return None
 
 
+# gates that require a self-attested second opinion (tier-2)
+SECOND_OPINION_GATES = ("review", "security")
+
+
+class Verdict:
+    # Plain class (not a dataclass): with `from __future__ import annotations`
+    # a dataclass resolves field annotations via sys.modules[__module__], which
+    # is absent when this file is loaded via importlib (record-test-result.py,
+    # tests) and raises. A plain class is load-mechanism agnostic.
+    def __init__(self, overall: int, red=None, yellow=None):
+        self.overall = overall          # 0=🟢 / 1=🔴 / 2=🟡
+        self.red = red if red is not None else []
+        self.yellow = yellow if yellow is not None else []
+
+
+def compute_verdict(gate: str, claims: dict | None, facts: dict,
+                    second_opinion: dict | None) -> Verdict:
+    """Harness-computed verdict. Tier-1 facts BLOCK (🔴); claims-absent and
+    tier-1-unverified and tier-2 divergence are advisory (🟡). Tier-2 NEVER
+    blocks (assurance is self-attested)."""
+    red: list[str] = []
+    yellow: list[str] = []
+
+    # tier-1 facts run unconditionally (independent of what was claimed)
+    if facts["stubs"]:
+        red.append(f"変更コードに未完成マーカー: {', '.join(facts['stubs'])}")
+    if facts["secrets"]:
+        red.append(f"シークレットの疑い: {', '.join(facts['secrets'])}")
+    if facts["tests"] == "red":
+        red.append("テストが赤")
+    elif facts["tests"] == "unverified":
+        yellow.append("テスト結果が未検証（記録なし/コード変更後）")
+    if facts["deps"] == "unverified":
+        yellow.append("依存監査が未検証")
+    elif facts["deps"] == "vuln":
+        if claims and claims.get("deps_clean") is True:
+            red.append("依存に脆弱性（claim deps_clean: true と矛盾）")
+        else:
+            yellow.append("依存監査で脆弱性の可能性（誤検知の場合あり・要確認）")
+    if facts.get("b1_verdict") == "FAIL":
+        red.append("テスト強度ドリル(B1)が FAIL")
+
+    # claims sanity (advisory; missing claims must not hard-block — §1.5)
+    if claims is None:
+        yellow.append("claims 未提出（要確認）")
+
+    # tier-2: self-attested second opinion (advisory only, never blocks)
+    if gate in SECOND_OPINION_GATES:
+        if second_opinion is None:
+            yellow.append("第2意見なし（self-attested・要確認）")
+        elif claims and second_opinion.get("verdict") != claims.get("verdict"):
+            yellow.append(
+                f"1次/2次レビューの相違（self-attested）: "
+                f"1次={claims.get('verdict')} / 2次={second_opinion.get('verdict')}")
+
+    overall = 1 if red else (2 if yellow else 0)
+    return Verdict(overall=overall, red=red, yellow=yellow)
+
+
 def _parse_scalar(v: str):
     s = v.strip()
     if s in ("true", "True"):

@@ -142,5 +142,48 @@ class TestResolveReport(unittest.TestCase):
             self.assertIsNone(judge.resolve_gate_report(root, "review"))
 
 
+class TestVerdict(unittest.TestCase):
+    def _facts(self, **over):
+        f = {"tests": "green", "stubs": [], "secrets": [],
+             "b1_verdict": None, "deps": "clean"}
+        f.update(over)
+        return f
+
+    def test_clean_all_green(self):
+        v = judge.compute_verdict("review", {"verdict": "approve"},
+                                  self._facts(), {"verdict": "approve"})
+        self.assertEqual(v.overall, 0)
+
+    def test_stub_blocks_even_without_claim(self):
+        v = judge.compute_verdict("review", {"verdict": "approve"},
+                                  self._facts(stubs=["m.py:2"]), None)
+        self.assertEqual(v.overall, 1)
+        self.assertTrue(v.red)
+
+    def test_claim_tests_pass_but_red_blocks(self):
+        v = judge.compute_verdict("review", {"tests_pass": True, "verdict": "approve"},
+                                  self._facts(tests="red"), None)
+        self.assertEqual(v.overall, 1)
+
+    def test_tests_unverified_is_yellow(self):
+        v = judge.compute_verdict("review", {"verdict": "approve"},
+                                  self._facts(tests="unverified"), {"verdict": "approve"})
+        self.assertEqual(v.overall, 2)
+
+    def test_second_opinion_divergence_is_yellow(self):
+        v = judge.compute_verdict("review", {"verdict": "approve"},
+                                  self._facts(), {"verdict": "reject"})
+        self.assertEqual(v.overall, 2)
+
+    def test_second_opinion_missing_is_yellow_for_review(self):
+        v = judge.compute_verdict("review", {"verdict": "approve"},
+                                  self._facts(), None)
+        self.assertEqual(v.overall, 2)
+
+    def test_claims_absent_is_yellow_not_red(self):
+        v = judge.compute_verdict("review", None, self._facts(), None)
+        self.assertEqual(v.overall, 2)
+
+
 if __name__ == "__main__":
     unittest.main()
