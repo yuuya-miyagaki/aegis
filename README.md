@@ -164,6 +164,32 @@ python3 scripts/check_status.py --root . --strict
 
 ## Migration
 
+### From v1.0.0 to v1.1.0
+
+**Non-breaking — additive deterministic-assurance features** (audit 2026-06-06 §4
+priority-4 follow-ups B1/B2, plus the priority 1-3 fix-forwards). No public
+operating-contract changes; existing projects keep working.
+
+- **B1 — test-strength drill at the qa gate.** `pre_approve_gate` runs
+  `scripts/run-test-strength-drill.py` live at qa approval: tests must catch the
+  mutants seeded into changed code, or approval is refused. Tasks with no testable
+  code declare an auditable skip (`{"skip": true, "reason": "..."}`) in
+  `docs/qa-reports/test-strength.drill`.
+- **B2 — judge card (tri-state) at review/qa/security/deploy.** `build-judge-card.py`
+  runs at approval and emits 🟢/🔴/🟡: tier-1 machine facts (changed-line stub scan,
+  secret scan, fingerprint-verified test result, B1 verdict) that contradict the
+  report's recorded `claims:` block hard-block (🔴); a missing/divergent
+  self-attested second opinion, absent claims, or a dependency-audit concern are
+  advisory (🟡), approvable via `update-gate.sh <gate> approve --ack "reason"`
+  (the reason is recorded into the card). `scripts/record-test-result.py` records
+  the test result the judge reads; `/judge` previews the card read-only.
+- **Gate exit codes are now tri-state.** `pre_approve_gate` / `update-gate.sh`
+  return 0/1/2 (was 0/1). A judge that cannot run (e.g. non-git project) yields an
+  ack-able 🟡, never a hard block, so one fault cannot lock every gate.
+- **Hardening (priority 1-3):** gate fail-closed behavior, deploy boundary, and
+  mirror-drift detection. New scripts are registered in the mirror and `full`
+  profile; agents/skills document the `claims:` convention and blind second opinion.
+
 ### From v0.12.2 to v1.0.0
 
 **Future-proof re-architecture (F→R→A→D).** Everything since the `v0.12.2` tag,

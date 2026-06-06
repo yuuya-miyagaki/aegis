@@ -1,19 +1,19 @@
 ---
 framework: aegis
-framework_version: "1.0.0"
+framework_version: "1.1.0"
 project_name: "Aegis"
 mode: Dev
-phase: implement
+phase: brainstorm
 task_type: framework
 task_size: M
-task_size_rationale: "Phase D（仕上げ・F→R→A→D 最終）完了。最小セットで v1.0.0: migration guide(v0.12.2→v1.0.0・README インライン)＋README stale 修正＋安定契約/SemVer ポリシー明文化(運用契約のみ安定面=決定a)＋version 1.0.0。INTEGRATION/CHANGELOG/LEARNINGS 大規模は YAGNI で out。contract/drift 0・195 tests・tier1/2 PASS。残: grill-code→push→git tag v1.0.0。設計 docs/plans/2026-06-06-v1-phase-d-v1.0.0-design.md。"
-iteration: 10
+task_size_rationale: "v1.1.0 締め完了（v1.0.0 以降の26コミット＝監査 P1-P3 fix-forward＋B1 テスト強度ドリル＋B2 judge 可視化を minor bump で集約）。version bump＋STATUS 同期＋README 移行節＋tag v1.1.0。次タスク B3（ライフサイクル後半の厚み: ⑨ MANUAL テンプレ/⑩ UAT 実行フェーズ/⑫ 保守 runbook・監視・agent）は再設計テーマのため brainstorm から開始（charter §6: 監査と再設計の分離）。"
+iteration: 11
 ui_surface: false
-last_updated: "2026-06-06T00:00:00Z"
+last_updated: "2026-06-07T00:00:00Z"
 gate_approvals:
   client_ready_for_dev: n/a
-  brainstorm: approved
-  plan: approved
+  brainstorm: pending
+  plan: pending
   review: pending
   qa: pending
   security: pending
@@ -21,8 +21,8 @@ gate_approvals:
   dev_ready_for_client: pending
 current_refs:
   requirements: []
-  plan: "docs/plans/2026-06-06-v1-phase-d-v1.0.0-implementation.md"
-  spec: "docs/plans/2026-06-06-v1-phase-d-v1.0.0-design.md"
+  plan: null
+  spec: null
   review: null
   qa: null
   security: null
@@ -41,7 +41,7 @@ external_evidence:
     scope: "v0.12.2 実装後 4 ラウンドレビュー"
     findings: "Round 6 (P1×2, P2×1: pre-compact exit 2 / minimal-project / test rc), Round 7 (P1×1, P3×1: git add 漏れ / テスト件数表記), Round 8 (P2×1, P3×1: stale last_updated / grep 自己マッチ), Round 9 (P3×2: コメント不整合)"
     resolution: "9件全反映。tier 1/2 PASS、134 tests PASS、本体と minimal-project 完全同期確認済み。"
-next_action: "Phase D 実装完了（v1.0.0）。migration guide(v0.12.2→v1.0.0)＋README stale 修正＋安定契約/SemVer 明文化＋version 1.0.0 bump。contract/drift 0・195 tests・tier1/2 PASS・migration の skill 名突合 OK。**再アーキ F→R→A→D 全完了。** 次は grill-code → push → git tag v1.0.0（push/tag はユーザー確認の上）。"
+next_action: "v1.1.0 締め完了（FRAMEWORK_VERSION 1.1.0・STATUS/テンプレ同期・README 移行節 v1.0.0→v1.1.0・tag v1.1.0 push 済み）。293 tests・contract(full/standard)・drift PASS。次は **B3 を brainstorm から**: ライフサイクル後半（⑨ MANUAL テンプレ/⑩ UAT 実行フェーズ/⑫ 保守 runbook・監視・保守 agent）のスコープ確定（どれから／どこまで）。出典 docs/audit-report-2026-06-06.md §4 優先度4。"
 blockers: []
 failure_tracking: null
 session_history:
