@@ -11,6 +11,7 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+import subprocess
 import sys
 from pathlib import Path
 
@@ -49,6 +50,77 @@ def code_fingerprint(root: Path) -> str:
         except OSError:
             h.update(b"<unreadable>")
     return h.hexdigest()
+
+
+STUB_PATTERN = re.compile(r"TODO|FIXME|XXX|NotImplementedError|pass\s*#\s*stub|placeholder",
+                          re.IGNORECASE)
+
+
+def scan_stubs(root: Path) -> list[str]:
+    """Scan ONLY changed (added) lines for stub/placeholder markers. Returns
+    a list of 'file:line' hits (empty = clean)."""
+    drill = _drill()
+    ref = drill.resolve_diff_ref(root)
+    added = drill.added_lines_by_file(root, ref)
+    hits: list[str] = []
+    for rel, lines in added.items():
+        try:
+            content = (root / rel).read_text(encoding="utf-8").split("\n")
+        except OSError:
+            continue
+        for ln in sorted(lines):
+            if 1 <= ln <= len(content) and STUB_PATTERN.search(content[ln - 1]):
+                hits.append(f"{rel}:{ln}")
+    return hits
+
+
+def read_test_result(root: Path) -> str:
+    """Read docs/qa-reports/test-result.json and verify freshness against the
+    current code fingerprint. Returns 'green' / 'red' / 'unverified'
+    (absent/stale/unreadable => unverified, never silent-green)."""
+    p = root / "docs" / "qa-reports" / "test-result.json"
+    if not p.is_file():
+        return "unverified"
+    try:
+        data = json.loads(p.read_text(encoding="utf-8"))
+    except (ValueError, OSError):
+        return "unverified"
+    if data.get("code_fingerprint") != code_fingerprint(root):
+        return "unverified"
+    status = data.get("status")
+    return status if status in ("green", "red") else "unverified"
+
+
+SECRET_PATTERN = re.compile(
+    r"(AKIA[0-9A-Z]{16}|-----BEGIN [A-Z ]*PRIVATE KEY-----|"
+    r"(?i:(api[_-]?key|secret|token|password)\s*[:=]\s*['\"][^'\"]{8,}['\"]))")
+
+
+def scan_secrets(root: Path) -> list[str]:
+    """Scan changed files for secret-like patterns. Returns 'file:line' hits."""
+    drill = _drill()
+    ref = drill.resolve_diff_ref(root)
+    hits: list[str] = []
+    for rel in drill.added_lines_by_file(root, ref):
+        try:
+            for i, line in enumerate((root / rel).read_text(encoding="utf-8").split("\n"), 1):
+                if SECRET_PATTERN.search(line):
+                    hits.append(f"{rel}:{i}")
+        except OSError:
+            continue
+    return hits
+
+
+def audit_deps(root: Path) -> str:
+    """Run an available dependency auditor. Returns 'clean' / 'vuln' /
+    'unverified' (no tool / offline / error => unverified, never blocks)."""
+    for cmd in (["pip-audit", "-q"], ["npm", "audit", "--audit-level=high"]):
+        try:
+            proc = subprocess.run(cmd, cwd=str(root), capture_output=True, timeout=120)
+        except (OSError, subprocess.TimeoutExpired):
+            continue
+        return "clean" if proc.returncode == 0 else "vuln"
+    return "unverified"
 
 
 def _parse_scalar(v: str):

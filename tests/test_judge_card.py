@@ -68,5 +68,58 @@ class TestFingerprint(unittest.TestCase):
             self.assertEqual(judge.code_fingerprint(root), judge.code_fingerprint(root))
 
 
+class TestTier1(unittest.TestCase):
+    def _git(self, root, *a):
+        sp.run(["git", "-C", str(root), *a], check=True, capture_output=True)
+
+    def _repo_with_change(self, d, body):
+        root = Path(d)
+        self._git(root, "init", "-q")
+        self._git(root, "config", "user.email", "t@t")
+        self._git(root, "config", "user.name", "t")
+        (root / "seed.py").write_text("s = 0\n", encoding="utf-8")
+        self._git(root, "add", "-A")
+        self._git(root, "commit", "-qm", "i")
+        (root / "m.py").write_text(body, encoding="utf-8")  # untracked change
+        return root
+
+    def test_scan_stubs_detects_todo_in_changed(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = self._repo_with_change(d, "def f():\n    pass  # stub\n")
+            hits = judge.scan_stubs(root)
+            self.assertTrue(hits)
+
+    def test_scan_stubs_clean(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = self._repo_with_change(d, "def f():\n    return 1\n")
+            self.assertEqual(judge.scan_stubs(root), [])
+
+    def test_read_test_result_fresh_green(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = self._repo_with_change(d, "def f():\n    return 1\n")
+            fp = judge.code_fingerprint(root)
+            qa = root / "docs" / "qa-reports"
+            qa.mkdir(parents=True)
+            (qa / "test-result.json").write_text(
+                json.dumps({"status": "green", "code_fingerprint": fp}),
+                encoding="utf-8")
+            self.assertEqual(judge.read_test_result(root), "green")
+
+    def test_read_test_result_stale_is_unverified(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = self._repo_with_change(d, "def f():\n    return 1\n")
+            qa = root / "docs" / "qa-reports"
+            qa.mkdir(parents=True)
+            (qa / "test-result.json").write_text(
+                json.dumps({"status": "green", "code_fingerprint": "STALE"}),
+                encoding="utf-8")
+            self.assertEqual(judge.read_test_result(root), "unverified")
+
+    def test_read_test_result_absent_is_unverified(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = self._repo_with_change(d, "def f():\n    return 1\n")
+            self.assertEqual(judge.read_test_result(root), "unverified")
+
+
 if __name__ == "__main__":
     unittest.main()
