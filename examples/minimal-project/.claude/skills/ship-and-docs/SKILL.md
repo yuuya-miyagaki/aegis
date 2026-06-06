@@ -54,6 +54,13 @@ user-invocable: false
 
 **証拠への参照を必ず含める。** 主張だけの記述は禁止。
 
+### Step 2.5: 操作マニュアル作成（該当時）
+
+`user-manual` skill を読み、製品を使う/運用する人がいる場合は
+`templates/MANUAL.template.md` をもとに `docs/handover/MANUAL.md` を作成する。
+該当読者（利用者/運用者）ごとに操作手順を記述し、TO-CLIENT の納品物欄からリンクする。
+使う人も運用者もいない場合は生成せず、理由を TO-CLIENT に記録する。
+
 ### Step 3: ユーザー確認
 
 TO-CLIENT の内容をユーザーに提示し、承認を得る。
