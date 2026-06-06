@@ -121,5 +121,26 @@ class TestTier1(unittest.TestCase):
             self.assertEqual(judge.read_test_result(root), "unverified")
 
 
+class TestResolveReport(unittest.TestCase):
+    def _status(self, root, review_ref):
+        docs = root / "docs"; docs.mkdir(exist_ok=True)
+        (docs / "STATUS.md").write_text(
+            "---\ncurrent_refs:\n"
+            f"  review: {review_ref}\n  qa: null\n---\n", encoding="utf-8")
+
+    def test_resolves_review_ref(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            self._status(root, "docs/qa-reports/review.md")
+            self.assertEqual(judge.resolve_gate_report(root, "review"),
+                             root / "docs/qa-reports/review.md")
+
+    def test_null_ref_returns_none(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            self._status(root, "null")
+            self.assertIsNone(judge.resolve_gate_report(root, "review"))
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -123,6 +123,36 @@ def audit_deps(root: Path) -> str:
     return "unverified"
 
 
+GATE_REF_KEY = {"review": "review", "qa": "qa", "security": "security",
+                "deploy": "deploy"}
+
+
+def resolve_gate_report(root: Path, gate: str) -> Path | None:
+    """Read current_refs.<ref_key> from STATUS.md; return the report path or
+    None when the ref is null/absent (=> 🟡 evidence-not-submitted upstream)."""
+    ref_key = GATE_REF_KEY.get(gate)
+    if not ref_key:
+        return None
+    status = root / "docs" / "STATUS.md"
+    if not status.is_file():
+        return None
+    in_refs = False
+    for line in status.read_text(encoding="utf-8").splitlines():
+        if re.match(r"^current_refs:\s*$", line):
+            in_refs = True
+            continue
+        if in_refs and re.match(r"^[A-Za-z_]", line):  # next top-level key
+            break
+        if in_refs:
+            m = re.match(rf"^\s+{ref_key}:\s*(.+)$", line)
+            if m:
+                val = m.group(1).strip().strip('"')
+                if val in ("null", "", "[]"):
+                    return None
+                return root / val
+    return None
+
+
 def _parse_scalar(v: str):
     s = v.strip()
     if s in ("true", "True"):
