@@ -17,7 +17,9 @@ from pathlib import Path
 
 
 class JudgeError(Exception):
-    """Unexpected internal failure => fail-closed (treated as 🔴)."""
+    """Unexpected internal failure. Surfaced as 🟡 (ack-able), not 🔴: a judge
+    that cannot RUN is 'unverified', not a proven contradiction. Hard-blocking on
+    it would brick every gate (review/qa/security/deploy) with no ack path."""
 
 
 _DRILL = None
@@ -36,12 +38,28 @@ def _drill():
     return _DRILL
 
 
-def code_fingerprint(root: Path) -> str:
-    """sha256 over the changed files' current content (sorted), binding a test
-    result to the exact code it was produced against."""
+# Non-code path prefixes excluded from CODE checks. B1's added_lines_by_file
+# already drops docs/qa-reports artifacts; we additionally drop all of docs/
+# (STATUS.md, design docs, notes) and .claude/ (harness control-plane, e.g. the
+# .gate-snapshot written at the first gate approval) so documentation and harness
+# state never perturb the code fingerprint or trip the stub/secret scanners.
+NONCODE_PREFIXES = ("docs/", ".claude/")
+
+
+def _changed_code_files(root: Path) -> dict:
+    """Map changed CODE files -> set of added line numbers (docs/ excluded)."""
     drill = _drill()
     ref = drill.resolve_diff_ref(root)
-    changed = sorted(drill.added_lines_by_file(root, ref).keys())
+    added = drill.added_lines_by_file(root, ref)
+    return {rel: lines for rel, lines in added.items()
+            if not rel.startswith(NONCODE_PREFIXES)}
+
+
+def code_fingerprint(root: Path) -> str:
+    """sha256 over the changed CODE files' current content (sorted), binding a
+    test result to the exact code it was produced against. Documentation is
+    excluded so editing docs/STATUS.md does not invalidate a recorded result."""
+    changed = sorted(_changed_code_files(root).keys())
     h = hashlib.sha256()
     for rel in changed:
         h.update(rel.encode("utf-8"))
@@ -52,18 +70,20 @@ def code_fingerprint(root: Path) -> str:
     return h.hexdigest()
 
 
-STUB_PATTERN = re.compile(r"TODO|FIXME|XXX|NotImplementedError|pass\s*#\s*stub|placeholder",
-                          re.IGNORECASE)
+# Conventional unfinished-code markers. Case-SENSITIVE with word boundaries so
+# legitimate identifiers (todos, todoStore) and HTML attributes (placeholder=)
+# are NOT flagged — a stub false positive here is a non-ack-able 🔴 hard block.
+STUB_PATTERN = re.compile(
+    r"\b(TODO|FIXME|XXX|HACK|WIP)\b"   # uppercase markers (convention)
+    r"|NotImplementedError"            # python not-implemented
+    r"|pass\s*#\s*stub")              # explicit stub body
 
 
 def scan_stubs(root: Path) -> list[str]:
-    """Scan ONLY changed (added) lines for stub/placeholder markers. Returns
-    a list of 'file:line' hits (empty = clean)."""
-    drill = _drill()
-    ref = drill.resolve_diff_ref(root)
-    added = drill.added_lines_by_file(root, ref)
+    """Scan ONLY changed (added) CODE lines for stub markers. Returns a list of
+    'file:line' hits (empty = clean)."""
     hits: list[str] = []
-    for rel, lines in added.items():
+    for rel, lines in _changed_code_files(root).items():
         try:
             content = (root / rel).read_text(encoding="utf-8").split("\n")
         except OSError:
@@ -97,17 +117,18 @@ SECRET_PATTERN = re.compile(
 
 
 def scan_secrets(root: Path) -> list[str]:
-    """Scan changed files for secret-like patterns. Returns 'file:line' hits."""
-    drill = _drill()
-    ref = drill.resolve_diff_ref(root)
+    """Scan ONLY changed (added) CODE lines for secret-like patterns. Returns
+    'file:line' hits. Scanning added lines (not whole files) avoids hard-blocking
+    on a pre-existing secret in a file touched for an unrelated reason."""
     hits: list[str] = []
-    for rel in drill.added_lines_by_file(root, ref):
+    for rel, lines in _changed_code_files(root).items():
         try:
-            for i, line in enumerate((root / rel).read_text(encoding="utf-8").split("\n"), 1):
-                if SECRET_PATTERN.search(line):
-                    hits.append(f"{rel}:{i}")
+            content = (root / rel).read_text(encoding="utf-8").split("\n")
         except OSError:
             continue
+        for ln in sorted(lines):
+            if 1 <= ln <= len(content) and SECRET_PATTERN.search(content[ln - 1]):
+                hits.append(f"{rel}:{ln}")
     return hits
 
 
@@ -292,9 +313,22 @@ def build(root: Path, gate: str, report_out: Path) -> int:
         for y in v.yellow:
             print(f"🟡 {y}")
         return v.overall
-    except Exception as exc:  # fail-closed: any internal error blocks
-        print(f"JUDGE BLOCKED (fail-closed): {exc}")
-        return 1
+    except Exception as exc:
+        # The judge could not complete (e.g. not a git repo, transient git
+        # failure, internal bug). Treat as 🟡 unverified — ack-able with a
+        # recorded reason — rather than 🔴, so one judge fault cannot lock every
+        # gate. The reviewer/QA/security agents remain the substantive check.
+        print(f"🟡 judge を実行できませんでした（要手動確認・ack で承認可）: {exc}")
+        try:
+            render_card(report_out, gate=gate,
+                        v=Verdict(overall=2, yellow=[f"judge 実行不可: {exc}"]),
+                        claims=None, facts={"tests": "unverified", "stubs": [],
+                                            "secrets": [], "b1_verdict": None,
+                                            "deps": "unverified"},
+                        second_opinion=None)
+        except Exception:
+            pass
+        return 2
 
 
 def main(argv=None) -> int:

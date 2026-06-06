@@ -67,6 +67,34 @@ class TestFingerprint(unittest.TestCase):
             (root / "a.py").write_text("x = 1\ny = 2\n", encoding="utf-8")
             self.assertEqual(judge.code_fingerprint(root), judge.code_fingerprint(root))
 
+    def test_fingerprint_ignores_docs_changes(self):
+        # Editing docs/ (incl. STATUS.md) must not perturb the CODE fingerprint,
+        # otherwise routine STATUS.md edits between recording tests and approval
+        # would spuriously invalidate a green test-result.
+        with tempfile.TemporaryDirectory() as d:
+            root = self._repo(d)
+            (root / "a.py").write_text("x = 1\ny = 2\n", encoding="utf-8")
+            (root / "docs").mkdir()
+            (root / "docs" / "STATUS.md").write_text("phase: review\n", encoding="utf-8")
+            fp1 = judge.code_fingerprint(root)
+            (root / "docs" / "STATUS.md").write_text("phase: qa\n", encoding="utf-8")
+            (root / "docs" / "design.md").write_text("# notes\n", encoding="utf-8")
+            fp2 = judge.code_fingerprint(root)
+            self.assertEqual(fp1, fp2, "docs changes must not change the code fingerprint")
+
+    def test_fingerprint_ignores_claude_control_plane(self):
+        # update-gate.sh writes .claude/.gate-snapshot at the first gate approval;
+        # this harness state must not perturb the code fingerprint, else recorded
+        # test results go stale at every subsequent gate (spurious 🟡).
+        with tempfile.TemporaryDirectory() as d:
+            root = self._repo(d)
+            (root / "a.py").write_text("x = 1\ny = 2\n", encoding="utf-8")
+            fp1 = judge.code_fingerprint(root)
+            (root / ".claude").mkdir()
+            (root / ".claude" / ".gate-snapshot").write_text("gate_approvals:\n", encoding="utf-8")
+            fp2 = judge.code_fingerprint(root)
+            self.assertEqual(fp1, fp2, ".claude control-plane must not change the fingerprint")
+
 
 class TestTier1(unittest.TestCase):
     def _git(self, root, *a):
@@ -119,6 +147,81 @@ class TestTier1(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             root = self._repo_with_change(d, "def f():\n    return 1\n")
             self.assertEqual(judge.read_test_result(root), "unverified")
+
+
+class TestStubPrecision(unittest.TestCase):
+    """Regression: stub scan must not hard-block legitimate code (#grill-code)."""
+
+    def _git(self, root, *a):
+        sp.run(["git", "-C", str(root), *a], check=True, capture_output=True)
+
+    def _repo_with_change(self, d, body, name="m.py"):
+        root = Path(d)
+        self._git(root, "init", "-q")
+        self._git(root, "config", "user.email", "t@t")
+        self._git(root, "config", "user.name", "t")
+        (root / "seed.py").write_text("s = 0\n", encoding="utf-8")
+        self._git(root, "add", "-A")
+        self._git(root, "commit", "-qm", "i")
+        target = root / name
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(body, encoding="utf-8")
+        return root
+
+    def test_lowercase_todo_identifiers_are_clean(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = self._repo_with_change(
+                d, "todos = []\nitems = todoStore.all()\ntodo = 1\n")
+            self.assertEqual(judge.scan_stubs(root), [],
+                             "lowercase identifiers must not be flagged as stubs")
+
+    def test_html_placeholder_attr_is_clean(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = self._repo_with_change(
+                d, '<input placeholder="お名前">\n', name="form.html")
+            self.assertEqual(judge.scan_stubs(root), [],
+                             "HTML placeholder attribute must not be flagged")
+
+    def test_uppercase_marker_is_flagged(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = self._repo_with_change(d, "x = 1  # TODO: finish\n")
+            self.assertTrue(judge.scan_stubs(root))
+
+    def test_docs_changes_are_not_scanned_for_stubs(self):
+        # A TODO in a changed doc must not hard-block a gate (docs aren't code).
+        with tempfile.TemporaryDirectory() as d:
+            root = self._repo_with_change(d, "# TODO: write this\n",
+                                          name="docs/notes.md")
+            self.assertEqual(judge.scan_stubs(root), [])
+
+
+class TestSecretScanScope(unittest.TestCase):
+    def _git(self, root, *a):
+        sp.run(["git", "-C", str(root), *a], check=True, capture_output=True)
+
+    def test_secret_on_added_line_flagged(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            self._git(root, "init", "-q"); self._git(root, "config", "user.email", "t@t")
+            self._git(root, "config", "user.name", "t")
+            (root / "seed.py").write_text("s = 0\n", encoding="utf-8")
+            self._git(root, "add", "-A"); self._git(root, "commit", "-qm", "i")
+            (root / "cfg.py").write_text('api_key = "abcd1234efgh"\n', encoding="utf-8")
+            self.assertTrue(judge.scan_secrets(root))
+
+    def test_preexisting_secret_on_unchanged_line_not_flagged(self):
+        # A secret on a committed (unchanged) line must NOT block a change that
+        # only touches an unrelated line of the same file.
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            self._git(root, "init", "-q"); self._git(root, "config", "user.email", "t@t")
+            self._git(root, "config", "user.name", "t")
+            (root / "cfg.py").write_text('api_key = "abcd1234efgh"\n', encoding="utf-8")
+            self._git(root, "add", "-A"); self._git(root, "commit", "-qm", "i")
+            (root / "cfg.py").write_text(
+                'api_key = "abcd1234efgh"\nunrelated = 1\n', encoding="utf-8")
+            self.assertEqual(judge.scan_secrets(root), [],
+                             "pre-existing secret on an unchanged line must not block")
 
 
 class TestResolveReport(unittest.TestCase):
@@ -256,6 +359,15 @@ class TestMain(unittest.TestCase):
             res, out = self._run(root)
             self.assertEqual(res.returncode, 0, res.stdout + res.stderr)
             self.assertIn("🟢", out.read_text())
+
+    def test_internal_error_is_yellow_not_hard_block(self):
+        # A judge that cannot run (e.g. non-git project) must yield ack-able 🟡
+        # (rc 2), not a non-ack-able 🔴 (rc 1) that bricks every gate.
+        with tempfile.TemporaryDirectory() as d:
+            out = Path(d) / "judge.md"
+            res = sp.run(["python3", str(SCRIPT), "--gate", "review", "--root", str(d),
+                          "--report-out", str(out)], capture_output=True, text=True)
+            self.assertEqual(res.returncode, 2, res.stdout + res.stderr)
 
 
 class TestRecorder(unittest.TestCase):
