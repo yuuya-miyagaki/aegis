@@ -58,8 +58,8 @@ user-invocable: false
 
 `user-manual` skill を読み、製品を使う/運用する人がいる場合は
 `templates/MANUAL.template.md` をもとに `docs/handover/MANUAL.md` を作成する。
-該当読者（利用者/運用者）ごとに操作手順を記述し、TO-CLIENT の納品物欄からリンクする。
-使う人も運用者もいない場合は生成せず、理由を TO-CLIENT に記録する。
+該当読者（利用者/運用者）ごとに操作手順を記述し、TO-CLIENT の「納品サマリー」の
+操作マニュアル欄にリンクする。使う人も運用者もいない場合は生成せず、理由を同欄に記録する。
 
 ### Step 3: ユーザー確認
 

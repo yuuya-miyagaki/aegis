@@ -43,7 +43,8 @@ SCOPE/PRD/ACCEPTANCE と出荷機能から、各読者の主要タスクを列�
 各章の「つまずいたら」（FAQ）と「用語」（平易化）を埋める。空欄を残さない。
 
 ### Step 5: TO-CLIENT からリンク
-`docs/handover/TO-CLIENT.md` の納品物に `docs/handover/MANUAL.md` へのリンクを追加する。
+`docs/handover/TO-CLIENT.md` の「納品サマリー」の操作マニュアル欄に
+`docs/handover/MANUAL.md` へのリンクを記入する。
 
 ### Step 6: 整合確認
 `docs-sync` skill を読み、MANUAL.md の存在と宣言読者ごとの章充足を確認する。

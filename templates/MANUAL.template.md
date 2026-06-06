@@ -7,6 +7,8 @@ date: "<記入>"
 # <製品名> 操作マニュアル
 <!-- 正本: user-manual skill -->
 <!-- exit-check: 宣言読者ごとに手順章あり・図 or 図不要理由・つまずいたら/用語記入済み -->
+<!-- audiences 対応: end-user → ## エンドユーザー向け / operator → ## 運用者向け
+     （front-matter の宣言と章は1対1。宣言を外したら対応章も削除する） -->
 
 > このマニュアルは製品を「使う / 運用する」人向けの操作手順です。技術的な完了報告は
 > `TO-CLIENT.md` を参照してください。front-matter の `audiences` に該当読者だけを残し、
