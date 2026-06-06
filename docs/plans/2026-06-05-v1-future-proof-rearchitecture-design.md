@@ -139,7 +139,7 @@ aegis/
 | **A：吸収**（catch-up を新方式で） | 新 hook 群（skill/cron/task-created/task-completed）を emit.sh+manifest matcher で実装・スキル改名3件・commands/skills frontmatter・schedule/loop 連携 | Phase 0b 全部 / Phase 2 全部 |
 | **D：仕上げ** | README・LEARNINGS・INTEGRATION・migration guide・version bump v1.0.0 | Phase 3 残り |
 
-> **状態（2026-06-06）**: **F・R・A 完了**。F=emit.sh/patterns.sh/drift（manifest は descoped）。R=context/routing/model-effort/TDD/evidence を v0.12.3〜0.12.6 で ship 済み。A=新 hook 群・aegis-* 改名・commands frontmatter（Phase 0b 完了）。**残るは D（ドキュメント統合＋v1.0.0 判断）のみ。**
+> **状態（2026-06-06）**: **F・R・A・D 全完了＝v1.0.0**。F=emit.sh/patterns.sh/drift（manifest は descoped）。R=context/routing/model-effort/TDD/evidence を v0.12.3〜0.12.6 で ship。A=新 hook 群・aegis-* 改名・commands frontmatter（Phase 0b）。D=migration guide(v0.12.2→v1.0.0)＋README リフレッシュ＋安定契約/SemVer 明文化＋version 1.0.0（INTEGRATION/CHANGELOG/LEARNINGS 大規模は YAGNI で out）。**「トレッドミルから降りる」看板を v1.0.0 として掲示完了。**
 
 ### 旧計画から変わる/捨てる
 - ❌ Phase 1 Task 1-1「model/effort 一括ハードコード」→ 方向転換（inherit 優先で外す）
@@ -196,5 +196,5 @@ aegis/
 - [x] agent model/effort ポリシー（品質固定 opus / コスト固定 sonnet / 既定 inherit）（2026-06-06・`815b283`）。manifest 同期は manifest descoped により非該当
 - [x] evidence 完了の TaskCompleted hook 強制化（2026-06-06・v0.12.6・validate_status_file ロジック再利用＋hook 配線。Stop hook 不採用）
 - [x] 新 hook 群（skill/cron/task-created/task-completed）・スキル aegis-* 改名・commands frontmatter（Phase 0b 完了）
-- [ ] **README/LEARNINGS/INTEGRATION/migration guide、version v1.0.0**（← Phase D・唯一の残作業）
+- [x] README リフレッシュ＋migration guide(v0.12.2→v1.0.0)＋安定契約/SemVer 明文化＋version 1.0.0（2026-06-06・Phase D。INTEGRATION/CHANGELOG/LEARNINGS 大規模は YAGNI で out）
 - [x] tier 1/2 eval・check_framework_contract・check_reference_drift 全 PASS（2026-06-06 実測）

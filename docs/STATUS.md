@@ -3,17 +3,17 @@ framework: aegis
 framework_version: "1.0.0"
 project_name: "Aegis"
 mode: Dev
-phase: plan
+phase: implement
 task_type: framework
 task_size: M
-task_size_rationale: "Phase D（仕上げ・F→R→A→D 最終）。F/R/A 完了済みで残るは D のみ。最小セットで v1.0.0 を仕上げる: ①migration guide(v0.12.2→v1.0.0・README インライン) ②README stale 修正 ③安定契約＋SemVer ポリシー明文化(運用契約のみ安定面=決定a) ④version 1.0.0 bump＋tag。INTEGRATION/CHANGELOG/LEARNINGS 大規模は YAGNI で out。読者はソロ＋uccc。設計 docs/plans/2026-06-06-v1-phase-d-v1.0.0-design.md。"
+task_size_rationale: "Phase D（仕上げ・F→R→A→D 最終）完了。最小セットで v1.0.0: migration guide(v0.12.2→v1.0.0・README インライン)＋README stale 修正＋安定契約/SemVer ポリシー明文化(運用契約のみ安定面=決定a)＋version 1.0.0。INTEGRATION/CHANGELOG/LEARNINGS 大規模は YAGNI で out。contract/drift 0・195 tests・tier1/2 PASS。残: grill-code→push→git tag v1.0.0。設計 docs/plans/2026-06-06-v1-phase-d-v1.0.0-design.md。"
 iteration: 10
 ui_surface: false
 last_updated: "2026-06-06T00:00:00Z"
 gate_approvals:
   client_ready_for_dev: n/a
   brainstorm: approved
-  plan: pending
+  plan: approved
   review: pending
   qa: pending
   security: pending
@@ -21,7 +21,7 @@ gate_approvals:
   dev_ready_for_client: pending
 current_refs:
   requirements: []
-  plan: null
+  plan: "docs/plans/2026-06-06-v1-phase-d-v1.0.0-implementation.md"
   spec: "docs/plans/2026-06-06-v1-phase-d-v1.0.0-design.md"
   review: null
   qa: null
@@ -41,7 +41,7 @@ external_evidence:
     scope: "v0.12.2 実装後 4 ラウンドレビュー"
     findings: "Round 6 (P1×2, P2×1: pre-compact exit 2 / minimal-project / test rc), Round 7 (P1×1, P3×1: git add 漏れ / テスト件数表記), Round 8 (P2×1, P3×1: stale last_updated / grep 自己マッチ), Round 9 (P3×2: コメント不整合)"
     resolution: "9件全反映。tier 1/2 PASS、134 tests PASS、本体と minimal-project 完全同期確認済み。"
-next_action: "Phase D（v1.0.0 仕上げ）brainstorm 完了・設計書 docs/plans/2026-06-06-v1-phase-d-v1.0.0-design.md 承認済み。次は writing-plans → grill-plan → 実装 → grill-code → push → git tag v1.0.0。最小セット: migration guide(v0.12.2→v1.0.0)＋README リフレッシュ＋安定契約/SemVer 明文化＋version 1.0.0。F/R/A は完了済み。"
+next_action: "Phase D 実装完了（v1.0.0）。migration guide(v0.12.2→v1.0.0)＋README stale 修正＋安定契約/SemVer 明文化＋version 1.0.0 bump。contract/drift 0・195 tests・tier1/2 PASS・migration の skill 名突合 OK。**再アーキ F→R→A→D 全完了。** 次は grill-code → push → git tag v1.0.0（push/tag はユーザー確認の上）。"
 blockers: []
 failure_tracking: null
 session_history:
@@ -56,7 +56,7 @@ session_history:
   - date: "2026-06-06"
     mode: Dev
     phase: "implement"
-    note: "Phase R 再配分を連続実装・origin push: routing 原則化(0.12.3)・context budget 原則化(0.12.4)・model/effort inherit・name-hygiene・TDD profile(0.12.5)。続けて Phase R 最終 evidence 完了強制化(0.12.6): validate_status_file の gate-ref＋実在ロジックを evidence_integrity_violations に抽出・再利用し check-task-completed.sh で TaskCompleted 時に強制。2段グリル反映。195 tests green。Phase R 完了。"
+    note: "Phase R 再配分(0.12.3〜0.12.6: routing/context/model-effort/name-hygiene/TDD/evidence)を連続 ship。続けて Phase D（仕上げ）: migration guide(v0.12.2→v1.0.0)＋README リフレッシュ＋安定契約/SemVer 明文化＋**version 1.0.0**。各 2段グリル反映。195 tests green・tier1/2 PASS。**再アーキ F→R→A→D 全完了＝v1.0.0。**"
 ---
 
 ## Summary
@@ -87,4 +87,4 @@ Claude Code ネイティブの Aegis 運用フレームワーク。2026-06-05、
 - 2026-04-22: v0.11.0 Hair Salon Bloom 振り返り7施策実装+コミット+プッシュ。
 - 2026-04-22: v0.12.0 MCP gate + ref check + name lint + health check。48テスト全PASS。
 - 2026-06-05: future-proof 再アーキ着手。Phase 0b 確定 + Foundation（emit.sh 単一出力源 / patterns.sh / version owner）実装。Round 1/2 セカンドオピニオン反映。183 tests PASS、main マージ（未push）。
-- 2026-06-06: Phase R 再配分を連続 ship（origin push 済み）。routing 原則化(0.12.3)・context budget 原則化(0.12.4)・model/effort inherit・name-hygiene・TDD profile + escape hatch(0.12.5)。続けて Phase R 最終 evidence 完了強制化(0.12.6): validate_status_file の gate-ref＋実在ロジックを evidence_integrity_violations に抽出・再利用、check-task-completed.sh で TaskCompleted 時に強制。2段グリルで再実装→再利用へ転換。195 tests green。Phase R 完了。
+- 2026-06-06: Phase R 再配分を連続 ship（routing 0.12.3／context 0.12.4／model-effort／name-hygiene／TDD 0.12.5／evidence 完了強制 0.12.6）。続けて Phase D（仕上げ）: migration guide(v0.12.2→v1.0.0)＋README リフレッシュ＋安定契約/SemVer 明文化＋version **1.0.0**。各タスクで brainstorm→2段グリル→実装→grill-code を完走。195 tests green・tier1/2 PASS。**再アーキ F→R→A→D 全完了＝v1.0.0「トレッドミルから降りる」看板を掲示。**
