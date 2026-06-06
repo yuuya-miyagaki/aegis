@@ -541,10 +541,10 @@ class TestMCPDeployGateHook(unittest.TestCase):
 
 
 class TestPreApproveGateRefCheck(unittest.TestCase):
-    """Verify gate-ref consistency check emits DEPRECATION WARNING."""
+    """Verify gate-ref consistency check emits ADVISORY."""
 
     def test_plan_gate_ref_empty_warns(self):
-        """Approving 'plan' with empty ref → DEPRECATION WARNING, return 0."""
+        """Approving 'plan' with empty ref → ADVISORY (advisory only), return 0."""
         content = make_status_md(
             phase="plan", task_size="L",
             approvals={"brainstorm": "approved"},
@@ -552,11 +552,11 @@ class TestPreApproveGateRefCheck(unittest.TestCase):
         )
         with TempProject(content) as root:
             rc, out = run_check(root, "--pre-approve-gate", "plan")
-            self.assertEqual(rc, 0, f"Should still allow (deprecation), got: {out}")
-            self.assertIn("DEPRECATION WARNING", out,
-                          f"Should show deprecation warning: {out}")
-            self.assertIn("v0.13.0", out,
-                          f"Should mention target version: {out}")
+            self.assertEqual(rc, 0, f"Approval-time is advisory only, got: {out}")
+            self.assertIn("ADVISORY", out,
+                          f"Should show the advisory: {out}")
+            self.assertIn("completion", out,
+                          f"Advisory should point to completion-time enforcement: {out}")
 
     def test_plan_gate_ref_set_no_warning(self):
         """Approving 'plan' with ref set → no warning."""
@@ -568,10 +568,10 @@ class TestPreApproveGateRefCheck(unittest.TestCase):
         with TempProject(content) as root:
             rc, out = run_check(root, "--pre-approve-gate", "plan")
             self.assertEqual(rc, 0)
-            self.assertNotIn("DEPRECATION WARNING", out)
+            self.assertNotIn("ADVISORY", out)
 
     def test_review_gate_ref_empty_warns(self):
-        """Approving 'review' with empty ref → DEPRECATION WARNING."""
+        """Approving 'review' with empty ref → ADVISORY."""
         content = make_status_md(
             phase="review", task_size="L",
             approvals={"brainstorm": "approved", "plan": "approved"},
@@ -580,11 +580,11 @@ class TestPreApproveGateRefCheck(unittest.TestCase):
         with TempProject(content) as root:
             rc, out = run_check(root, "--pre-approve-gate", "review")
             self.assertEqual(rc, 0)
-            self.assertIn("DEPRECATION WARNING", out,
+            self.assertIn("ADVISORY", out,
                           f"review ref empty should warn: {out}")
 
     def test_deploy_gate_ref_empty_warns(self):
-        """Approving 'deploy' with empty ref → DEPRECATION WARNING."""
+        """Approving 'deploy' with empty ref → ADVISORY."""
         content = make_status_md(
             phase="deploy", task_size="L",
             approvals={
@@ -596,7 +596,7 @@ class TestPreApproveGateRefCheck(unittest.TestCase):
         with TempProject(content) as root:
             rc, out = run_check(root, "--pre-approve-gate", "deploy")
             self.assertEqual(rc, 0)
-            self.assertIn("DEPRECATION WARNING", out,
+            self.assertIn("ADVISORY", out,
                           f"deploy ref empty should warn: {out}")
 
     def test_brainstorm_gate_no_ref_check(self):
@@ -608,7 +608,7 @@ class TestPreApproveGateRefCheck(unittest.TestCase):
         with TempProject(content) as root:
             rc, out = run_check(root, "--pre-approve-gate", "brainstorm")
             self.assertEqual(rc, 0)
-            self.assertNotIn("DEPRECATION WARNING", out)
+            self.assertNotIn("ADVISORY", out)
 
     def test_existing_status_no_ref_migration(self):
         """Existing STATUS.md with all refs null → can still approve gates (migration path)."""
@@ -1301,7 +1301,7 @@ class TestTranslationRefContract(unittest.TestCase):
                              f"Should not complain about existing translation file: {out}")
 
     def test_client_ready_for_dev_warns_on_empty_translation(self):
-        """Approving client_ready_for_dev with empty translation ref → DEPRECATION WARNING."""
+        """Approving client_ready_for_dev with empty translation ref → ADVISORY."""
         content = make_status_md(
             mode="Client", phase="handover",
             approvals={"client_ready_for_dev": "pending"},
@@ -1314,7 +1314,7 @@ class TestTranslationRefContract(unittest.TestCase):
             (trans_dir / "mapping.md").write_text("# Mapping\n")
             rc, out = run_check(root, "--pre-approve-gate", "client_ready_for_dev")
             self.assertEqual(rc, 0, f"Should still allow (deprecation): {out}")
-            self.assertIn("DEPRECATION WARNING", out,
+            self.assertIn("ADVISORY", out,
                           f"Should warn about empty translation ref: {out}")
 
 
@@ -1640,6 +1640,7 @@ class TestCheckCompletionEvidence(unittest.TestCase):
                 rc, out = run_check(root, "--check-completion-evidence")
                 self.assertIn("EVIDENCE:", out, f"{gate} approved+null must violate")
                 self.assertIn(gate, out)
+                self.assertEqual(rc, 1, f"{gate} violation must exit non-zero (A9), got rc={rc}")
 
     def test_approved_gate_existing_ref_ok(self):
         content = make_status_md(approvals={**ALL_PENDING, "qa": "approved"},
@@ -1649,6 +1650,7 @@ class TestCheckCompletionEvidence(unittest.TestCase):
             (Path(root) / "docs" / "qa-reports" / "qa1.md").write_text("ok")
             rc, out = run_check(root, "--check-completion-evidence")
             self.assertEqual(out, "", f"approved gate + real ref must pass, got: {out}")
+            self.assertEqual(rc, 0, f"clean evidence must exit 0 (A9), got rc={rc}")
 
     def test_approved_gate_missing_file_violates(self):
         content = make_status_md(approvals={**ALL_PENDING, "qa": "approved"},
@@ -1694,6 +1696,58 @@ class TestCheckCompletionEvidence(unittest.TestCase):
             rc, out = run_check(empty_root, "--check-completion-evidence")
             self.assertEqual(rc, 0)
             self.assertEqual(out, "", f"missing STATUS must be fail-safe, got: {out}")
+
+
+class TestTaskSizeRationaleEnforcement(unittest.TestCase):
+    """A11: a strict task type with task_size='S' (which exempts qa/security via
+    state-machine routing) requires a task_size_rationale — missing is a FAIL,
+    preventing a silent enforcement downgrade by mislabeling. Non-strict or
+    non-S sizing stays a WARNING."""
+
+    def test_strict_S_without_rationale_fails(self):
+        content = make_status_md(task_type="framework", task_size="S", phase="implement")
+        with TempProject(content) as root:
+            rc, out = run_check(root)
+            # The rationale FAIL is the isolating signal (make_status_md fixtures are
+            # not otherwise validate-clean, so rc alone is not specific).
+            self.assertIn("justification required", out,
+                          f"strict+S without rationale must FAIL: {out}")
+            self.assertNotEqual(rc, 0)
+
+    def test_strict_S_with_rationale_does_not_fail_on_that(self):
+        content = make_status_md(task_type="framework", task_size="S", phase="implement")
+        content = content.replace(
+            "task_size: S\n", 'task_size: S\ntask_size_rationale: "single-file fix"\n'
+        )
+        with TempProject(content) as root:
+            rc, out = run_check(root)
+            self.assertNotIn("justification required", out,
+                             f"rationale present must not trigger the FAIL: {out}")
+
+    def test_strict_non_S_without_rationale_is_warning_only(self):
+        content = make_status_md(task_type="framework", task_size="M", phase="implement")
+        with TempProject(content) as root:
+            rc, out = run_check(root)
+            # non-S sizing emits only the advisory WARNING, never the S-specific FAIL.
+            self.assertNotIn("justification required", out,
+                             f"non-S must not trigger the rationale FAIL: {out}")
+            self.assertIn("recommended to document", out,
+                          f"non-S without rationale should still WARN: {out}")
+
+
+class TestEvidenceIntegrityFailClosed(unittest.TestCase):
+    """M9: evidence_integrity_violations never raises, but a crash must surface a
+    fail-closed violation rather than be swallowed into 'no violations'."""
+
+    def test_internal_error_returns_violation(self):
+        import sys as _sys
+        from pathlib import Path as _Path
+        _sys.path.insert(0, str(_Path(__file__).resolve().parents[1] / "scripts"))
+        from check_status import evidence_integrity_violations
+        # root=None makes (root / value) raise TypeError inside the function.
+        result = evidence_integrity_violations({"qa": "x"}, {"qa": "approved"}, None)
+        self.assertTrue(result, "a crashed integrity check must return a violation, not []")
+        self.assertIn("could not be completed", result[0])
 
 
 if __name__ == "__main__":

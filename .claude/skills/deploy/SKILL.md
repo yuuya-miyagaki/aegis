@@ -100,5 +100,10 @@ deploy フェーズのゴール単位:
 ## Completion
 
 deploy フェーズ完了時に `DEPLOY-CHECKLIST.template.md` をベースにした
-チェックリストを `docs/qa-reports/` に保存し、STATUS.md の deploy ゲートを
-更新する。
+チェックリストを `docs/qa-reports/` に保存し、deploy ゲートを承認する:
+
+```bash
+bash scripts/update-gate.sh deploy approve
+```
+
+STATUS.md の直接編集は禁止（`update-gate.sh` が gate snapshot を含めて原子的に更新する唯一の経路）。

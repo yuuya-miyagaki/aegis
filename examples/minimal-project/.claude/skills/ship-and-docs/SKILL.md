@@ -92,8 +92,14 @@ TO-CLIENT の内容をユーザーに提示し、承認を得る。
 
 ユーザーに `dev_ready_for_client` ゲートの承認を申請する。
 
-承認後:
-- `gate_approvals.dev_ready_for_client` を `approved` に更新
+承認後、`dev_ready_for_client` ゲートを承認する（STATUS.md の直接編集は禁止・`update-gate.sh` が唯一の経路）:
+
+```bash
+bash scripts/update-gate.sh dev_ready_for_client approve
+```
+
+その後:
+
 - `mode` を `Client` に切り替える（次の Client フェーズに戻る場合）
 - または、タスクが完全に完了していればその旨を記録する
 

@@ -92,7 +92,6 @@ aegis/
 │   ├── run_eval.py                   # 統合評価ランナー
 │   ├── update-gate.sh                # ゲート更新スクリプト
 │   ├── learnings_search.py           # LEARNINGS 検索
-│   ├── restart_summary.py            # リスタートサマリ生成
 │   ├── retro_report.py               # レトロスペクティブ生成
 │   └── status_doctor.py              # STATUS 修復ツール
 │
@@ -330,7 +329,6 @@ PreCompact
 |-----------|------|
 | `update-gate.sh` | ゲート値の更新（STATUS.md の sed 置換） |
 | `learnings_search.py` | LEARNINGS.md 検索 |
-| `restart_summary.py` | セッションリスタート用サマリ生成 |
 | `retro_report.py` | レトロスペクティブレポート生成 |
 | `status_doctor.py` | STATUS.md の自動修復 |
 

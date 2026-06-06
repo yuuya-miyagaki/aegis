@@ -318,6 +318,14 @@ class TestPreToolUseHooks(HookSchemaAssertions):
         if out:
             self.assert_pretool_decision(out, "deny", hint="check-secrets.sh git add .env")
 
+    def test_check_secrets_deny_git_add_uppercase_env(self):
+        """git add .ENV must deny: on a case-insensitive FS it stages the real
+        .env secret (A15/M5)."""
+        payload = make_pretool_payload("Bash", {"command": "git add .ENV"})
+        rc, out, err = run_hook("check-secrets.sh", payload, cwd=Path(self.tmp))
+        self.assertNotEqual(out, {}, "git add .ENV must deny, not pass through")
+        self.assert_pretool_decision(out, "deny", hint="check-secrets.sh git add .ENV")
+
     # --- check-destructive.sh -----------------------------------------
 
     def test_check_destructive_ask_for_rm_rf(self):

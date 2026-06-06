@@ -40,8 +40,10 @@ fi
 # Strip safe variants from command text, then check for remaining .env refs.
 STRIPPED=$(printf '%s' "$CMD" | sed -E "s/${SAFE_ENV_SUFFIXES}//g")
 
-# Direct .env staging: git add .env, git add .env.local, git add path/.env
-if printf '%s' "$STRIPPED" | grep -qE 'git\s+add\s+.*\.env' 2>/dev/null; then
+# Direct .env staging: git add .env, git add .env.local, git add path/.env.
+# Case-insensitive: on a case-insensitive FS (macOS/Windows default) `git add .ENV`
+# stages the real `.env` secret.
+if printf '%s' "$STRIPPED" | grep -qiE 'git\s+add\s+.*\.env' 2>/dev/null; then
   emit_deny "[secrets] .env ファイルを git に追加しないでください。認証情報がリポジトリに漏洩します。"
   exit 0
 fi

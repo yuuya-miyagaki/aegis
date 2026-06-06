@@ -29,9 +29,6 @@ REQUIRED_TOP_LEVEL_KEYS = [
 
 OPTIONAL_TOP_LEVEL_KEYS: set[str] = {"task_size", "task_size_rationale", "iteration", "ui_surface", "external_evidence", "failure_tracking", "client_context"}
 
-# Version where gate-ref empty warnings become hard errors.
-REF_CHECK_ERROR_VERSION = "0.13.0"
-
 # Canonical gate -> evidence-ref mapping. Single source of truth reused by
 # validate_status_file, pre_approve_gate, and evidence_integrity_violations
 # (mirrored in bash by update-gate.sh's get_ref_key).
@@ -455,8 +452,11 @@ def evidence_integrity_violations(
             for rel_path in requirements:
                 if not (root / rel_path).exists():
                     violations.append(f"points to missing requirements ref: {rel_path}")
-    except Exception:
-        return []
+    except Exception as exc:
+        # Never raises (callers — validate_status_file and the TaskCompleted hook —
+        # must not crash). But do NOT swallow into "no violations": a crashed
+        # integrity check is reported as a fail-closed violation, not false-green.
+        return [f"evidence integrity check could not be completed: {exc}"]
     return violations
 
 
@@ -524,14 +524,23 @@ def validate_status_file(path: Path) -> list[str]:
                 "(task_size only applies to Dev phases)"
             )
 
-    # WARNING (not FAIL) when task_size is set but rationale is missing.
+    # task_size sizing should be justified. For strict task types, task_size='S'
+    # exempts qa/security (state-machine routing), so a missing rationale there is
+    # a FAIL — it prevents silently downgrading enforcement by mislabeling an L/M
+    # task as S. Other cases stay a WARNING.
     if task_size is not None:
         rationale = extract_scalar_value(frontmatter, "task_size_rationale")
         if rationale is None or rationale == "":
-            print(
-                f"WARNING: {path} has task_size '{task_size}' but no task_size_rationale "
-                "(recommended to document sizing justification)"
-            )
+            if task_type in STRICT_GATE_TASK_TYPES and task_size == "S":
+                failures.append(
+                    f"{path} task_type '{task_type}' with task_size 'S' skips qa/security "
+                    "but has no task_size_rationale (justification required)"
+                )
+            else:
+                print(
+                    f"WARNING: {path} has task_size '{task_size}' but no task_size_rationale "
+                    "(recommended to document sizing justification)"
+                )
 
     approvals = extract_approval_map(frontmatter)
     for key in REQUIRED_APPROVAL_KEYS:
@@ -758,21 +767,22 @@ def pre_approve_gate(gate_name: str, root: Path) -> int:
     approvals = extract_approval_map(frontmatter)
     refs = extract_current_refs(frontmatter)
 
-    # --- Gate-ref consistency (DEPRECATION WARNING — ERROR in v{REF_CHECK_ERROR_VERSION}) ---
-    # Run before mode-transition gate handlers so warnings fire for all gates.
+    # --- Gate-ref consistency (approval-time ADVISORY) ---
+    # Run before mode-transition gate handlers so the advisory fires for all gates.
+    # Approval-time is advisory only; the invariant is ENFORCED at completion by the
+    # TaskCompleted hook (check_status.py --check-completion-evidence).
     if gate_name in GATE_REF_MAPPING:
         ref_key = GATE_REF_MAPPING[gate_name]
         ref_value = refs.get(ref_key)
         ref_is_empty = ref_value is None or ref_value == "null" or ref_value == []
         if ref_is_empty:
             print(
-                f"DEPRECATION WARNING: Approving '{gate_name}' but "
+                f"ADVISORY: Approving '{gate_name}' but "
                 f"current_refs.{ref_key} is empty."
             )
-            print(f"         This will become a hard ERROR in v{REF_CHECK_ERROR_VERSION}.")
             print(
-                f"         Set current_refs.{ref_key} to the evidence file "
-                f"path before approving."
+                f"         Set current_refs.{ref_key} to the evidence file path; "
+                f"it is enforced at completion by the TaskCompleted hook."
             )
 
     # Mode-transition gates.
@@ -1196,14 +1206,18 @@ def main() -> int:
 
     if args.check_completion_evidence:
         status_path = root / "docs" / "STATUS.md"
+        violations: list[str] = []
         if status_path.exists():
             frontmatter = extract_frontmatter(read_text(status_path))
             if frontmatter is not None:
                 refs = extract_current_refs(frontmatter)
                 approvals = extract_approval_map(frontmatter)
-                for v in evidence_integrity_violations(refs, approvals, root):
+                violations = evidence_integrity_violations(refs, approvals, root)
+                for v in violations:
                     print(f"EVIDENCE: {v}")
-        return 0
+        # Exit-code coupled (belt-and-suspenders): the TaskCompleted hook keys on
+        # stdout, but any other caller can trust the exit code too.
+        return 1 if violations else 0
 
     status_path = root / "docs" / "STATUS.md"
     failures = validate_status_file(status_path)

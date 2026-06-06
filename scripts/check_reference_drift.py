@@ -383,6 +383,7 @@ def check_example_commands(root: Path) -> tuple[list[str], list[str]]:
 MIRROR_DIRS = [
     Path(".claude") / "agents",
     Path(".claude") / "rules",
+    Path(".claude") / "skills",
     Path("hooks"),
     Path(".claude") / "commands",
 ]

@@ -18,7 +18,6 @@
     "hooks/lib/extract-input.sh"
   ],
   "recommended": [
-    "hooks/check-tdd.sh",
     "hooks/post-bash.sh",
     "hooks/check-destructive.sh",
     "hooks/pre-compact.sh",
