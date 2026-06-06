@@ -92,6 +92,8 @@ aegis/
 │   ├── run_eval.py                   # 統合評価ランナー
 │   ├── update-gate.sh                # ゲート更新スクリプト
 │   ├── run-test-strength-drill.py    # テスト強度ドリル（qa 承認時に実走）
+│   ├── build-judge-card.py           # judge カードビルダー（B2・承認時に実走）
+│   ├── record-test-result.py         # テスト結果記録（judge が指紋照合で read）
 │   ├── learnings_search.py           # LEARNINGS 検索
 │   ├── retro_report.py               # レトロスペクティブ生成
 │   └── status_doctor.py              # STATUS 修復ツール
@@ -186,6 +188,16 @@ CLAUDE.md はフレームワークの中核であり、常時コンテキスト�
 計算＝偽造・staleness 不能）。入力は `docs/qa-reports/test-strength.drill`、機械生成
 レポートは `docs/qa-reports/test-strength.md`（`current_refs.qa`）。テスト対象コードが
 無いタスクは `.drill` にスキップ宣言（`{"skip": true, "reason": "..."}`）を書く。
+
+**judge カード（B2）**: review/qa/security/deploy を承認するとき、`pre_approve_gate`
+が `scripts/build-judge-card.py` を**承認の瞬間に実走**し、tri-state（🟢/🔴/🟡）の
+判定カードを生成する。ティア1の機械事実（変更行のスタブ scan・secret scan・指紋検証
+済みテスト結果・B1 verdict）が記録済み `claims:` と決定論的に矛盾すれば🔴ブロック。
+第2意見（self-attested）の相違・claims/証拠の不足・依存監査は🟡（`update-gate.sh
+<gate> approve --ack "理由"` で承認可、理由はカードに記録）。テスト結果は純 read を
+保つため別スクリプト `scripts/record-test-result.py` が
+`docs/qa-reports/test-result.json`（status＋コード指紋）に記録する。`/judge` で同じ
+カードを読み取り専用でプレビューできる。
 
 ### 4.3 タスクサイズによるフェーズ省略
 
@@ -315,6 +327,7 @@ PreCompact
 | `/next` | 次アクション・フェーズ遷移提案 |
 | `/retro` | レトロスペクティブレポート生成 |
 | `/tutorial` | フェーズ遷移ウォークスルーガイド |
+| `/judge` | judge カードのプレビュー（機械事実 vs claims・読取専用） |
 
 ---
 
@@ -335,7 +348,10 @@ PreCompact
 
 | スクリプト | 用途 |
 |-----------|------|
-| `update-gate.sh` | ゲート値の更新（STATUS.md の sed 置換） |
+| `update-gate.sh` | ゲート値の更新（STATUS.md の sed 置換・tri-state 解釈と `--ack` 記録） |
+| `run-test-strength-drill.py` | テスト強度ドリル（B1・qa 承認時に実走） |
+| `build-judge-card.py` | judge カードビルダー（B2・review/qa/security/deploy 承認時に実走・tri-state） |
+| `record-test-result.py` | テスト結果記録（test-result.json・judge が指紋照合で read） |
 | `learnings_search.py` | LEARNINGS.md 検索 |
 | `retro_report.py` | レトロスペクティブレポート生成 |
 | `status_doctor.py` | STATUS.md の自動修復 |
