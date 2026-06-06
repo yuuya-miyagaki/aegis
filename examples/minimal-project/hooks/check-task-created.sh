@@ -33,6 +33,10 @@ INPUT=$(cat)
 # `task_description` (v0.13.0 Phase 0b NO-GO fix). Aegis previously probed
 # only legacy / defensive keys; this revision probes the official keys first
 # and falls back to the legacy keys for forward compat.
+# Capture the interpreter exit code so a missing/broken python3 does NOT fail open.
+# The hard-stop decision below depends only on STATUS.md (grep/sed, no python3),
+# so the subject is needed only for the human-readable reason.
+set +e
 SUBJECT=$(printf '%s' "$INPUT" | python3 -c '
 import sys, json
 try:
@@ -55,10 +59,18 @@ try:
     print("")
 except Exception:
     print("")
-' 2>/dev/null || true)
+' 2>/dev/null)
+PY_RC=$?
+set -e
 
-# fail-safe: if SUBJECT could not be extracted, dump raw payload and pass through.
-if [ -z "$SUBJECT" ]; then
+if [ "$PY_RC" -ne 0 ]; then
+  # python3 unavailable/broken: do NOT fail open. The plan-gate check below is
+  # python3-free, so fall through with a placeholder subject and evaluate it.
+  SUBJECT="(subject unavailable: python3)"
+elif [ -z "$SUBJECT" ]; then
+  # python3 ran but found no recognizable subject = unrecognized payload shape.
+  # Deliberate fail-safe: dump the raw payload and pass through (do not hard-stop
+  # an event we could not understand).
   mkdir -p "$(dirname "$DUMP_LOG")"
   {
     printf '%s\n' "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] check-task-created: unparseable payload"

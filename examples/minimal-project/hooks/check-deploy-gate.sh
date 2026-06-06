@@ -6,7 +6,10 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+DEFAULT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+# Allow ROOT override via env (test fixtures use this to isolate from real aegis
+# state; same convention as check-task-created.sh). Unset in production.
+ROOT="${AEGIS_ROOT_OVERRIDE:-${DEFAULT_ROOT}}"
 STATUS_FILE="${ROOT}/docs/STATUS.md"
 
 # Load shared input extraction.
@@ -30,10 +33,15 @@ if [ -z "$CMD" ]; then
 fi
 
 # Deploy execution command trigger — match actual deploy commands only.
-# Avoids false positives on read-only commands like: rg deploy, cat DEPLOY-CHECKLIST.template.md
+# The tool name is anchored at a word boundary (start, or preceded by whitespace
+# / ; / & / |) so a benign prefix (npx, sudo, time, FOO=bar env-assignment) does
+# NOT slip the gate — `npx vercel deploy` is a normal phrasing. This still avoids
+# read-only false matches (rg deploy, cat DEPLOY-CHECKLIST.template.md) because
+# they contain no tool-name+deploy bigram. A leading non-boundary char (e.g. the
+# '-' in my-vercel) does not match.
 # Patterns: vercel deploy [flags], bare vercel (default=deploy), firebase deploy,
 #           netlify deploy, npm/pnpm/yarn/bun [run] deploy, flyctl/railway/gcloud deploy.
-DEPLOY_RE='(^|[;&|] *)(vercel +deploy|vercel *$|firebase +deploy|netlify +deploy|(npm|pnpm|yarn|bun) +(run +)?deploy|flyctl +deploy|railway +deploy|gcloud +app +deploy)'
+DEPLOY_RE='(^|[[:space:];&|])(vercel +deploy|vercel[[:space:]]*$|firebase +deploy|netlify +deploy|(npm|pnpm|yarn|bun) +(run +)?deploy|flyctl +deploy|railway +deploy|gcloud +app +deploy)'
 if ! printf '%s' "$CMD" | grep -qEi "$DEPLOY_RE"; then
   emit_allow
   exit 0

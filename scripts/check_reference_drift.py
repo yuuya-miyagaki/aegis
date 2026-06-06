@@ -375,6 +375,66 @@ def check_example_commands(root: Path) -> tuple[list[str], list[str]]:
     return failures, warnings
 
 
+# Control files copied verbatim into the example scaffold. These must stay
+# byte-identical to the framework root; content drift here is invisible to
+# existence-only contract checks and silently ships a stale example (the very
+# thing a non-engineer copies). Templated files (CLAUDE.md, STATUS.md) and the
+# scaffold-safe command variants are intentionally divergent and excluded.
+MIRROR_DIRS = [
+    Path(".claude") / "agents",
+    Path(".claude") / "rules",
+    Path("hooks"),
+    Path(".claude") / "commands",
+]
+MIRROR_FILES = [
+    Path("scripts") / "check_status.py",
+    Path("scripts") / "update-gate.sh",
+]
+MIRROR_ALLOWLIST = {
+    Path(".claude") / "commands" / "validate.md",
+    Path(".claude") / "commands" / "retro.md",
+}
+
+
+def check_mirror_identity(root: Path) -> tuple[list[str], list[str]]:
+    """#11: control files mirrored into examples/minimal-project must be
+    byte-identical to the framework root. Compares only files present on BOTH
+    sides (presence is enforced by check_framework_contract); reports content
+    drift as a FAIL."""
+    failures: list[str] = []
+    warnings: list[str] = []
+
+    example_root = root / "examples" / "minimal-project"
+    if not example_root.is_dir():
+        return failures, warnings
+
+    candidates: list[Path] = []
+    for d in MIRROR_DIRS:
+        root_dir = root / d
+        if not root_dir.is_dir():
+            continue
+        for p in sorted(root_dir.rglob("*")):
+            if p.is_file():
+                candidates.append(p.relative_to(root))
+    candidates.extend(MIRROR_FILES)
+
+    for rel in candidates:
+        if rel in MIRROR_ALLOWLIST:
+            continue
+        root_file = root / rel
+        example_file = example_root / rel
+        # Only compare when both exist; presence is enforced elsewhere.
+        if not root_file.is_file() or not example_file.is_file():
+            continue
+        if root_file.read_bytes() != example_file.read_bytes():
+            failures.append(
+                f"mirror drift: examples/minimal-project/{rel} differs from root "
+                f"{rel} (control file must be byte-identical to the framework root)"
+            )
+
+    return failures, warnings
+
+
 # ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
@@ -390,6 +450,7 @@ ALL_CHECKS = [
     ("session-start hints", check_session_start_hints),
     ("example README counts", check_example_readme_counts),
     ("example commands", check_example_commands),
+    ("mirror identity (root ↔ example)", check_mirror_identity),
 ]
 
 

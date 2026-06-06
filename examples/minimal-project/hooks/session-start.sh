@@ -196,6 +196,13 @@ if [ -n "$HEALTH_WARNINGS" ]; then
   CONTEXT="${CONTEXT} | [MAINTENANCE] ${HEALTH_SHORT}"
 fi
 
+# CLAUDE_CODE_SUBAGENT_MODEL advisory: this env overrides ALL subagent model
+# pins (incl. security/reviewer/qa/planner), bypassing the quality guarantee.
+# Advisory only (does not block); see model-effort-policy design §10.1.
+if [ -n "${CLAUDE_CODE_SUBAGENT_MODEL:-}" ]; then
+  CONTEXT="${CONTEXT} | [WARNING] CLAUDE_CODE_SUBAGENT_MODEL=${CLAUDE_CODE_SUBAGENT_MODEL} overrides all model pins (security/reviewer/qa/planner) — quality guarantees globally bypassed"
+fi
+
 # Locale hint.
 CONTEXT="${CONTEXT} / ドキュメントは日本語"
 

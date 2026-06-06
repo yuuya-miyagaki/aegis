@@ -18,7 +18,9 @@ source "${SCRIPT_DIR}/lib/emit.sh"
 # Read stdin (JSON with tool_input.skill).
 INPUT=$(cat)
 
-# Extract skill name from tool_input via python3 for JSON fidelity.
+# Extract skill name from tool_input via python3 for JSON fidelity. Capture the
+# interpreter exit code so a missing/broken python3 fails CLOSED, not open.
+set +e
 SKILL_NAME=$(printf '%s' "$INPUT" | python3 -c '
 import sys, json
 try:
@@ -28,9 +30,18 @@ try:
     print(tool_input.get("skill", ""))
 except Exception:
     print("")
-' 2>/dev/null || true)
+' 2>/dev/null)
+PY_RC=$?
+set -e
 
-# If we cannot determine the skill name, allow (defensive default).
+# python3 unavailable/broken: we cannot determine the skill, so we cannot clear
+# it. Fail CLOSED (ask) rather than allow a possible control-plane skill.
+if [ "$PY_RC" -ne 0 ]; then
+  emit_ask '[skill-gate] スキル名を判定できませんでした（python3 が利用不可）。aegis 制御層 (.claude/settings.json / keybindings) を変更しないか手動で確認してから承認してください。'
+  exit 0
+fi
+
+# python3 succeeded with an empty skill name = field genuinely absent → allow.
 if [ -z "$SKILL_NAME" ]; then
   emit_allow
   exit 0

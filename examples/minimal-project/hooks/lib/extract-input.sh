@@ -6,6 +6,16 @@
 extract_file_path() {
   local input="$1"
   local result
+  # Embedded escaped quote (\") makes the grep `"[^"]*"` capture truncate at the
+  # first internal quote. Use python3 for fidelity in that case (rare). Plain
+  # paths keep the grep fast-path (no python3 spawn on the hot path).
+  if printf '%s' "$input" | grep -q '\\"'; then
+    result=$(printf '%s' "$input" | python3 -c 'import sys,json; d=json.loads(sys.stdin.read()).get("tool_input",{}); print(d.get("file_path","") or d.get("notebook_path",""))' 2>/dev/null || true)
+    if [ -n "$result" ]; then
+      printf '%s' "$result"
+      return
+    fi
+  fi
   # Try file_path first (Edit/Write).
   result=$(printf '%s' "$input" | grep -o '"file_path"[[:space:]]*:[[:space:]]*"[^"]*"' | head -1 | sed 's/.*:[[:space:]]*"//;s/"$//' || true)
   # Fallback: try notebook_path (NotebookEdit).
@@ -22,6 +32,17 @@ extract_file_path() {
 extract_command() {
   local input="$1"
   local result
+  # Embedded escaped quote (\") truncates the grep `"[^"]*"` capture at the first
+  # internal quote, which previously hid a dangerous token placed after it
+  # (destructive/secrets bypass). Use python3 for fidelity when an escaped quote
+  # is present; otherwise keep the grep fast-path (no python3 on the hot path).
+  if printf '%s' "$input" | grep -q '\\"'; then
+    result=$(printf '%s' "$input" | python3 -c 'import sys,json; print(json.loads(sys.stdin.read()).get("tool_input",{}).get("command",""))' 2>/dev/null || true)
+    if [ -n "$result" ]; then
+      printf '%s' "$result"
+      return
+    fi
+  fi
   result=$(printf '%s' "$input" | grep -o '"command"[[:space:]]*:[[:space:]]*"[^"]*"' | head -1 | sed 's/.*:[[:space:]]*"//;s/"$//' || true)
   if [ -z "$result" ]; then
     result=$(printf '%s' "$input" | python3 -c 'import sys,json; print(json.loads(sys.stdin.read()).get("tool_input",{}).get("command",""))' 2>/dev/null || true)

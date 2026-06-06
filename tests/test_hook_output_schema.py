@@ -1056,6 +1056,156 @@ class TestCheckSecretsBroadStaging(HookSchemaAssertions):
 
 
 # ---------------------------------------------------------------------------
+# Audit fix-forward P1 (A1-A4): extraction fidelity, gate fail-closed,
+# deploy word-boundary. See docs/audit-report-2026-06-06.md and
+# docs/plans/2026-06-06-v1-audit-fixforward-p1p2-plan.md.
+# ---------------------------------------------------------------------------
+
+
+def _python3_broken_env(test) -> dict:
+    """Return an env whose PATH shadows python3 with a stub that exits 127,
+    simulating a missing/broken interpreter. Cleanup registered on `test`.
+
+    grep/sed/bash still resolve from the rest of PATH; only python3 is shadowed,
+    so the hook's python3-based extraction fails while the rest of the script runs.
+    """
+    shim_dir = tempfile.mkdtemp(prefix="aegis-no-python3-")
+    test.addCleanup(shutil.rmtree, shim_dir, ignore_errors=True)
+    stub = Path(shim_dir) / "python3"
+    stub.write_text("#!/bin/sh\nexit 127\n")
+    stub.chmod(0o755)
+    return {"PATH": f"{shim_dir}:{os.environ.get('PATH', '')}"}
+
+
+class TestExtractCommandFidelity(HookSchemaAssertions):
+    """A3: extract_command must not truncate at an embedded escaped quote.
+    A command with a quote BEFORE the dangerous token previously slipped the
+    destructive/secrets checks (grep `"[^"]*"` stopped at the first \\")."""
+
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp(prefix="aegis-extract-test-")
+        self.addCleanup(shutil.rmtree, self.tmp, ignore_errors=True)
+
+    def test_escaped_quote_does_not_truncate_destructive(self):
+        # Embedded quote precedes `rm -rf`; truncation would hide it and allow.
+        cmd = 'echo "done" && rm -rf /tmp/aegis-x'
+        rc, out, err = run_hook(
+            "check-destructive.sh",
+            make_pretool_payload("Bash", {"command": cmd}),
+            cwd=Path(self.tmp),
+        )
+        self.assertNotEqual(
+            out, {},
+            "escaped-quote command must still be inspected (not truncated to allow)",
+        )
+        self.assert_pretool_decision(out, "ask", hint="A3 escaped-quote destructive")
+
+    def test_plain_command_still_inspected(self):
+        # Control: no embedded quote, grep fast-path still works.
+        rc, out, err = run_hook(
+            "check-destructive.sh",
+            make_pretool_payload("Bash", {"command": "rm -rf /tmp/aegis-y"}),
+            cwd=Path(self.tmp),
+        )
+        self.assert_pretool_decision(out, "ask", hint="A3 plain destructive control")
+
+
+class TestGateHookFailClosed(HookSchemaAssertions):
+    """A1: gate hooks must NOT fail open when python3 is unavailable.
+    skill-gate / cron-gate → fail-closed ask; task-created → still evaluates
+    the (python3-free) plan-gate condition from STATUS.md and hard-stops."""
+
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp(prefix="aegis-failclosed-test-")
+        self.addCleanup(shutil.rmtree, self.tmp, ignore_errors=True)
+
+    def test_skill_gate_fails_closed_without_python3(self):
+        env = _python3_broken_env(self)
+        rc, out, err = run_hook(
+            "check-skill-gate.sh",
+            make_pretool_payload("Skill", {"skill": "update-config"}),
+            env=env,
+        )
+        self.assertNotEqual(out, {}, "python3 unavailable must NOT fail open (was allow {})")
+        self.assert_pretool_decision(out, "ask", hint="A1 skill-gate no-python3")
+
+    def test_cron_gate_fails_closed_without_python3(self):
+        env = _python3_broken_env(self)
+        rc, out, err = run_hook(
+            "check-cron-gate.sh",
+            make_pretool_payload("CronCreate", {"prompt": "Run vercel deploy --prod nightly"}),
+            env=env,
+        )
+        self.assertNotEqual(out, {}, "python3 unavailable must NOT fail open (was allow {})")
+        self.assert_pretool_decision(out, "ask", hint="A1 cron-gate no-python3")
+
+    def test_task_created_hard_stops_without_python3(self):
+        (Path(self.tmp) / "docs").mkdir()
+        (Path(self.tmp) / ".claude").mkdir()
+        (Path(self.tmp) / "docs" / "STATUS.md").write_text(
+            "---\nphase: implement\nmode: Dev\ngate_approvals:\n  plan: pending\n---\n"
+        )
+        env = _python3_broken_env(self)
+        env["AEGIS_ROOT_OVERRIDE"] = str(self.tmp)
+        rc, out, err = run_hook(
+            "check-task-created.sh",
+            {"task_subject": "Implement feature foo"},
+            cwd=Path(self.tmp),
+            env=env,
+        )
+        self.assertEqual(
+            out.get("continue"), False,
+            f"python3 unavailable must still hard-stop in implement+plan-pending, got: {out}",
+        )
+        self.assertIn("stopReason", out)
+        self.assertTrue(out["stopReason"].strip())
+
+
+class TestDeployGateWordBoundary(HookSchemaAssertions):
+    """A2: deploy gate must catch deploy commands behind a benign prefix
+    (npx / env-assignment / sudo), not only at command start."""
+
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp(prefix="aegis-deploy-wb-test-")
+        self.addCleanup(shutil.rmtree, self.tmp, ignore_errors=True)
+        (Path(self.tmp) / "docs").mkdir()
+        (Path(self.tmp) / "docs" / "STATUS.md").write_text(
+            "---\ntask_type: feature\nphase: deploy\nmode: Dev\ntask_size: L\n"
+            "gate_approvals:\n  plan: approved\n  review: approved\n  qa: approved\n"
+            "  security: approved\n  deploy: pending\n---\n"
+        )
+
+    def _expect_deny(self, command: str, hint: str):
+        rc, out, err = run_hook(
+            "check-deploy-gate.sh",
+            make_pretool_payload("Bash", {"command": command}),
+            cwd=Path(self.tmp),
+            env={"AEGIS_ROOT_OVERRIDE": str(self.tmp)},
+        )
+        self.assertNotEqual(out, {}, f"{hint}: deploy gate pending must deny, got allow {{}}")
+        self.assert_pretool_decision(out, "deny", hint=hint)
+
+    def test_bare_vercel_deploy_denies_control(self):
+        self._expect_deny("vercel deploy --prod", "A2 control bare vercel deploy")
+
+    def test_npx_prefix_denies(self):
+        self._expect_deny("npx vercel deploy --prod", "A2 npx prefix")
+
+    def test_env_assignment_prefix_denies(self):
+        self._expect_deny("FOO=bar vercel deploy --prod", "A2 env-assignment prefix")
+
+    def test_read_only_command_passes_through(self):
+        # Negative control: referencing a checklist file is not a deploy.
+        rc, out, err = run_hook(
+            "check-deploy-gate.sh",
+            make_pretool_payload("Bash", {"command": "cat docs/DEPLOY-CHECKLIST.template.md"}),
+            cwd=Path(self.tmp),
+            env={"AEGIS_ROOT_OVERRIDE": str(self.tmp)},
+        )
+        self.assertEqual(out, {}, f"read-only command must pass through, got: {out}")
+
+
+# ---------------------------------------------------------------------------
 # Entry
 # ---------------------------------------------------------------------------
 

@@ -14,6 +14,7 @@
   Record each failure in STATUS.md `failure_tracking` (goal/count/last_attempt).
   Reset to null when the goal is achieved or changed.
 - Destructive commands require explicit user approval. Enforce via hooks (PaC).
+- Hook enforcement level is set at install via `bin/setup.sh --profile` — TDD backstop is on in `full`, off in `minimal`/`standard`. In `full`, `AEGIS_TDD_MODE=off` disables it for the session (session-start warns).
 
 ## Session Start
 
@@ -34,6 +35,16 @@ Details in `.claude/rules/state-machine.md`.
 
 Subagents only when they make work clearer, safer, or smaller.
 Details in `.claude/rules/routing.md`.
+
+## Model Policy
+
+Agent `model`/`effort` is pinned by role tier (enforced by `scripts/check_framework_contract.py`):
+
+- Quality-pin (`opus`): `planner`=max, `security`=max, `reviewer`=xhigh, `qa`=high.
+- Cost-pin (`sonnet`, effort high): `reviewer-testing`/`reviewer-performance`/`reviewer-maintainability`, `translation-specialist`.
+- Default (`inherit`, effort high): `implementer`, `qa-browser`, `ui`, `integration-specialist`.
+
+Rules: lineage aliases or `inherit` only (no version-pinned ids); `xhigh`/`max` only on `opus` roles; `haiku` is not used. A pin sets the role default and survives a session `--model` downgrade (frontmatter outranks the session model); it is overridden only by `CLAUDE_CODE_SUBAGENT_MODEL`, which globally downgrades ALL pins (including security). Session-start emits an advisory when that env var is set.
 
 ## Context Budget Policy
 

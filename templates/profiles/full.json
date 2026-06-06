@@ -34,6 +34,7 @@
     ".claude/skills/aegis-brainstorm/SKILL.md",
     ".claude/skills/bug-diagnosis/SKILL.md",
     ".claude/skills/deploy/SKILL.md",
+    ".claude/skills/deploy/platforms.md",
     ".claude/skills/client-workflow/SKILL.md",
     ".claude/skills/session-recovery/SKILL.md",
     ".claude/skills/ship-and-docs/SKILL.md",

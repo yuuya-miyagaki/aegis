@@ -17,8 +17,10 @@ source "${SCRIPT_DIR}/lib/emit.sh"
 # Read stdin (JSON with tool_input containing the cron prompt).
 INPUT=$(cat)
 
-# Extract prompt from tool_input via python3.
+# Extract prompt from tool_input via python3. Capture the interpreter exit code
+# so a missing/broken python3 fails CLOSED, not open.
 # CronCreate's tool_input shape isn't strictly documented; we probe common keys.
+set +e
 PROMPT=$(printf '%s' "$INPUT" | python3 -c '
 import sys, json
 try:
@@ -33,9 +35,18 @@ try:
     print("\n".join(parts))
 except Exception:
     print("")
-' 2>/dev/null || true)
+' 2>/dev/null)
+PY_RC=$?
+set -e
 
-# If no prompt extractable, allow (defensive: payload shape may differ).
+# python3 unavailable/broken: cannot inspect the scheduled payload for
+# deploy/destructive content. Fail CLOSED (ask).
+if [ "$PY_RC" -ne 0 ]; then
+  emit_ask '[cron-gate] スケジュール payload を解析できませんでした（python3 が利用不可）。デプロイ/破壊的コマンドを含まないか手動で確認してから承認してください。'
+  exit 0
+fi
+
+# python3 succeeded with no extractable prompt → allow (defensive: shape differs).
 if [ -z "$PROMPT" ]; then
   emit_allow
   exit 0
