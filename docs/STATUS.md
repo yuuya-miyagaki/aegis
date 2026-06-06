@@ -1,19 +1,19 @@
 ---
 framework: aegis
-framework_version: "0.12.5"
+framework_version: "0.12.6"
 project_name: "Aegis"
 mode: Dev
-phase: plan
+phase: implement
 task_type: framework
 task_size: M
-task_size_rationale: "Phase R 最終項目: evidence 完了の TaskCompleted 強制化。brainstorm 確定方針=(B) 既存 check-task-completed.sh 拡張（Stop hook 新設は却下・毎ターン誤爆回避）。検査は check_status.py に二層実装（層1 整合性=scalar ref 全実在 / 層2 結合=approved ゲートの ref 非 null。review/qa/security/deploy+plan）。requirements 除外・バイパス無し。規模 M: check_status.py + hook(root/example IDENTICAL) + テスト + version 0.12.6。"
+task_size_rationale: "Phase R 最終項目: evidence 完了の TaskCompleted 強制化。(B) check-task-completed.sh 拡張。grill-plan 2巡で『新規二層実装』→『validate_status_file の gate-ref＋実在ロジックを evidence_integrity_violations に抽出・再利用』へ転換（gate_ref_mapping→GATE_REF_MAPPING 定数化で3重複解消）。Stop hook 却下・バイパス無し。実装完了: check_status.py + hook(root/example IDENTICAL) + テスト + v0.12.6、195 tests green。"
 iteration: 9
 ui_surface: false
 last_updated: "2026-06-06T00:00:00Z"
 gate_approvals:
   client_ready_for_dev: n/a
   brainstorm: approved
-  plan: pending
+  plan: approved
   review: pending
   qa: pending
   security: pending
@@ -21,7 +21,7 @@ gate_approvals:
   dev_ready_for_client: pending
 current_refs:
   requirements: []
-  plan: null
+  plan: "docs/plans/2026-06-06-v1-evidence-completion-hook-implementation.md"
   spec: "docs/plans/2026-06-06-v1-evidence-completion-hook-design.md"
   review: null
   qa: null
@@ -41,7 +41,7 @@ external_evidence:
     scope: "v0.12.2 実装後 4 ラウンドレビュー"
     findings: "Round 6 (P1×2, P2×1: pre-compact exit 2 / minimal-project / test rc), Round 7 (P1×1, P3×1: git add 漏れ / テスト件数表記), Round 8 (P2×1, P3×1: stale last_updated / grep 自己マッチ), Round 9 (P3×2: コメント不整合)"
     resolution: "9件全反映。tier 1/2 PASS、134 tests PASS、本体と minimal-project 完全同期確認済み。"
-next_action: "evidence 完了強制化(B案) brainstorm 完了・設計書 docs/plans/2026-06-06-v1-evidence-completion-hook-design.md 承認済み。次は writing-plans で実装計画作成 → grill-plan → 実装(TDD) → grill-code。version は 0.12.6 予定。governing doc: docs/plans/2026-06-05-v1-future-proof-rearchitecture-design.md。残: README/INTEGRATION/version 整理(v1.0.0)・context observability(YAGNI 保留)。"
+next_action: "evidence 完了強制化(B案) 実装完了（v0.12.6・195 tests green・contract/drift 0）。validate_status_file ロジック再利用＋check-task-completed.sh 配線＋CLAUDE.md 明文化。次は grill-code → review ゲート。governing doc: docs/plans/2026-06-05-v1-future-proof-rearchitecture-design.md。Phase R は本件で完了。残: README/INTEGRATION/version 整理(v1.0.0)・context observability(YAGNI 保留)。"
 blockers: []
 failure_tracking: null
 session_history:
@@ -56,7 +56,7 @@ session_history:
   - date: "2026-06-06"
     mode: Dev
     phase: "implement"
-    note: "Phase R 再配分を連続実装・origin push: routing 原則化(0.12.3)・context budget 原則化(0.12.4)・model/effort inherit ポリシー・name-hygiene・TDD backstop profile 化 + AEGIS_TDD_MODE=off escape hatch + session-start advisory(0.12.5)。186 tests green。次は evidence 完了の hook 強制化（brainstorm 入り）。"
+    note: "Phase R 再配分を連続実装・origin push: routing 原則化(0.12.3)・context budget 原則化(0.12.4)・model/effort inherit・name-hygiene・TDD profile(0.12.5)。続けて Phase R 最終 evidence 完了強制化(0.12.6): validate_status_file の gate-ref＋実在ロジックを evidence_integrity_violations に抽出・再利用し check-task-completed.sh で TaskCompleted 時に強制。2段グリル反映。195 tests green。Phase R 完了。"
 ---
 
 ## Summary
@@ -87,4 +87,4 @@ Claude Code ネイティブの Aegis 運用フレームワーク。2026-06-05、
 - 2026-04-22: v0.11.0 Hair Salon Bloom 振り返り7施策実装+コミット+プッシュ。
 - 2026-04-22: v0.12.0 MCP gate + ref check + name lint + health check。48テスト全PASS。
 - 2026-06-05: future-proof 再アーキ着手。Phase 0b 確定 + Foundation（emit.sh 単一出力源 / patterns.sh / version owner）実装。Round 1/2 セカンドオピニオン反映。183 tests PASS、main マージ（未push）。
-- 2026-06-06: Phase R 再配分を連続 ship（origin push 済み）。routing 原則化(0.12.3)・context budget 原則化(0.12.4)・model/effort inherit・name-hygiene・TDD profile + escape hatch(0.12.5)。186 tests green。次は evidence 完了の hook 強制化。
+- 2026-06-06: Phase R 再配分を連続 ship（origin push 済み）。routing 原則化(0.12.3)・context budget 原則化(0.12.4)・model/effort inherit・name-hygiene・TDD profile + escape hatch(0.12.5)。続けて Phase R 最終 evidence 完了強制化(0.12.6): validate_status_file の gate-ref＋実在ロジックを evidence_integrity_violations に抽出・再利用、check-task-completed.sh で TaskCompleted 時に強制。2段グリルで再実装→再利用へ転換。195 tests green。Phase R 完了。

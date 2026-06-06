@@ -34,7 +34,7 @@ Aegis は成熟したハーネス（v0.12.2 ship 済み、v0.13.0 が Phase 0b �
 | deploy 承認 | `check-deploy-gate.sh` / `check-deploy-mcp-gate.sh` | 維持。MCP matcher は**将来 manifest 案**だが Foundation では不採用（hook 内に保持） |
 | gate 承認→phase 遷移 | `check-gate.sh` | アウトカム強制に転換（gate approved かだけ見る） |
 | STATUS 改竄防止 | `post-status-audit.sh` | 維持 |
-| evidence 必須完了 | Completion Rule（文章のみ） | **Stop/TaskCompleted hook で強制に格上げ** |
+| evidence 必須完了 | Completion Rule（文章のみ） | **Stop/TaskCompleted hook で強制に格上げ** → **完了**（2026-06-06・v0.12.6・(B) check-task-completed.sh が check_status.py の `evidence_integrity_violations`（`validate_status_file` から抽出・再利用、`gate_ref_mapping`→`GATE_REF_MAPPING` 定数化）を完了時に強制。Stop hook 新設は却下。`2026-06-06-v1-evidence-completion-hook-design.md`） |
 | durable handover/restart | STATUS.md ledger | 維持（思想の中核） |
 | **TDD** | `check-tdd.sh`（手順の逐一監視） | **保証として維持、ただし backstop 化**（red→green を経たテストを伴う、を強制）。strictness は manifest profile 値（strict/advisory/off）、受託は既定 strict → **完了**（2026-06-06・v0.12.5・profile→strictness 明文化＋`AEGIS_TDD_MODE=off` escape hatch＋session-start advisory。red→green 自動検証は非スコープ・heuristic backstop 維持。`2026-06-06-v1-tdd-profile-design.md`） |
 
@@ -192,7 +192,7 @@ aegis/
 - [x] CLAUDE.md から固定 context 数値撤廃（2026-06-06・v0.12.4） / [x] routing 原則化（2026-06-06・v0.12.3）
 - [x] TDD backstop+profile 化（2026-06-06・v0.12.5・明文化＋escape hatch＋advisory）
 - [ ] agent model が inherit 優先、明示オーバーライドは manifest 同期
-- [ ] evidence 完了の Stop/TaskCompleted hook 強制化（旧確定案を採用）
+- [x] evidence 完了の TaskCompleted hook 強制化（2026-06-06・v0.12.6・validate_status_file ロジック再利用＋hook 配線。Stop hook 不採用）
 - [ ] 新 hook 群・スキル改名・commands frontmatter（新方式で吸収）
 - [ ] README/LEARNINGS/INTEGRATION/migration guide、version v1.0.0
 - [ ] tier 1/2 eval・check_framework_contract・check_reference_drift 全 PASS
