@@ -42,7 +42,7 @@ Aegis は成熟したハーネス（v0.12.2 ship 済み、v0.13.0 が Phase 0b �
 
 | 要素 | 現状 | 再設計後 |
 |---|---|---|
-| context 予算 L0〜L3・同時3doc | CLAUDE.md に固定数値 | **数値撤廃**。「STATUS 起点・pull-based・chat より repo 優先」は原則として残す。何をどれだけ読むかは 1M モデルに委ねる |
+| context 予算 L0〜L3・同時3doc | CLAUDE.md に固定数値 | **数値撤廃**。「STATUS 起点・pull-based・chat より repo 優先」は原則として残す。何をどれだけ読むかは 1M モデルに委ねる → **完了**（2026-06-06・v0.12.4・「max 3 docs」hard 数値のみ撤廃／L0-L3 語彙維持・`2026-06-06-v1-context-budget-principle-design.md`） |
 | routing 細則 | `routing.md` 詳細ルール | **原則だけに縮約**（分離が安全/明確/小さくする時のみ subagent）→ **完了**（2026-06-06・v0.12.3・`2026-06-06-v1-routing-principle-design.md`） |
 | effort/model 個別割当 | 12 agent にハードコード | manifest 既定＋`inherit` 優先（§5 参照） |
 | 冗長 always-on 指示 | CLAUDE.md / rules 過剰記述 | 削減 |
@@ -189,7 +189,7 @@ aegis/
 
 - [ ] manifest / emit.sh / patterns.sh / drift detector（advisory）実装
 - [ ] 既存11 hook が emit.sh 経由、出力契約テスト全 PASS、174テスト緑維持
-- [ ] CLAUDE.md から固定 context 数値撤廃 / [x] routing 原則化（2026-06-06・v0.12.3）
+- [x] CLAUDE.md から固定 context 数値撤廃（2026-06-06・v0.12.4） / [x] routing 原則化（2026-06-06・v0.12.3）
 - [ ] agent model が inherit 優先、明示オーバーライドは manifest 同期
 - [ ] evidence 完了の Stop/TaskCompleted hook 強制化（旧確定案を採用）
 - [ ] 新 hook 群・スキル改名・commands frontmatter（新方式で吸収）
