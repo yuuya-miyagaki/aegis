@@ -236,6 +236,9 @@ def compute_verdict(gate: str, claims: dict | None, facts: dict,
         # a claim says deps_clean. Blocking on a flaky signal would let a network
         # hiccup veto a release.
         yellow.append("依存監査で脆弱性の可能性（要確認・ack で承認可）")
+    # At the qa GATE the B1 drill runs first and already blocks on FAIL, so this
+    # is usually redundant there; it still matters for the read-only /judge
+    # PREVIEW (which does not run the drill) reading a recorded FAIL verdict.
     if facts.get("b1_verdict") == "FAIL":
         red.append("テスト強度ドリル(B1)が FAIL")
 
