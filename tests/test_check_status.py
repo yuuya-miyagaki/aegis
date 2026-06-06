@@ -1609,5 +1609,92 @@ class TestControlPlaneAllowlistBypass(unittest.TestCase):
             tmpdir.cleanup()
 
 
+# =============================================================================
+# --check-completion-evidence tests (reuses evidence_integrity_violations)
+# =============================================================================
+
+# Evidence-coupled gates forced pending to isolate each test (DEFAULT_APPROVALS
+# marks plan/brainstorm approved otherwise).
+ALL_PENDING = {
+    "review": "pending", "qa": "pending", "security": "pending",
+    "deploy": "pending", "plan": "pending", "client_ready_for_dev": "pending",
+}
+
+
+class TestCheckCompletionEvidence(unittest.TestCase):
+    """--check-completion-evidence: gate-ref integrity + ref existence at completion."""
+
+    def test_clean_status_no_violations(self):
+        content = make_status_md(approvals=dict(ALL_PENDING))  # gates pending, refs null
+        with TempProject(content) as root:
+            rc, out = run_check(root, "--check-completion-evidence")
+            self.assertEqual(rc, 0)
+            self.assertEqual(out, "", f"clean STATUS must yield no violations, got: {out}")
+
+    def test_approved_gate_null_ref_violates(self):
+        for gate in ("review", "qa", "security", "deploy", "plan"):
+            appr = dict(ALL_PENDING)
+            appr[gate] = "approved"
+            content = make_status_md(approvals=appr)  # matching ref stays null
+            with self.subTest(gate=gate), TempProject(content) as root:
+                rc, out = run_check(root, "--check-completion-evidence")
+                self.assertIn("EVIDENCE:", out, f"{gate} approved+null must violate")
+                self.assertIn(gate, out)
+
+    def test_approved_gate_existing_ref_ok(self):
+        content = make_status_md(approvals={**ALL_PENDING, "qa": "approved"},
+                                 refs={"qa": "docs/qa-reports/qa1.md"})
+        with TempProject(content) as root:
+            (Path(root) / "docs" / "qa-reports").mkdir(parents=True)
+            (Path(root) / "docs" / "qa-reports" / "qa1.md").write_text("ok")
+            rc, out = run_check(root, "--check-completion-evidence")
+            self.assertEqual(out, "", f"approved gate + real ref must pass, got: {out}")
+
+    def test_approved_gate_missing_file_violates(self):
+        content = make_status_md(approvals={**ALL_PENDING, "qa": "approved"},
+                                 refs={"qa": "docs/qa-reports/missing.md"})
+        with TempProject(content) as root:
+            rc, out = run_check(root, "--check-completion-evidence")
+            self.assertIn("EVIDENCE:", out, "approved gate + missing file must violate")
+            self.assertIn("missing", out)
+
+    def test_pending_gate_with_ref_is_stale_violation(self):
+        # reuse semantics: a ref present under a pending gate is a stale-ref violation
+        content = make_status_md(approvals=dict(ALL_PENDING),
+                                 refs={"qa": "docs/qa-reports/qa1.md"})
+        with TempProject(content) as root:
+            (Path(root) / "docs" / "qa-reports").mkdir(parents=True)
+            (Path(root) / "docs" / "qa-reports" / "qa1.md").write_text("ok")
+            rc, out = run_check(root, "--check-completion-evidence")
+            self.assertIn("EVIDENCE:", out, "pending gate + present ref must be stale violation")
+            self.assertIn("stale", out)
+
+    def test_requirements_missing_file_violates(self):
+        # extract_current_refs only parses a multi-line YAML list (4-space "- item")
+        # as a list; an inline "[x]" on one line is read as a scalar string and would
+        # be skipped. So write the STATUS directly with a real list (not make_status_md).
+        content = (
+            '---\nframework: aegis\nframework_version: "0.12.0"\n'
+            "project_name: test\nmode: Dev\nphase: implement\n"
+            'task_type: feature\ntask_size: L\nlast_updated: "2026-01-01"\n'
+            "gate_approvals:\n  review: pending\n  qa: pending\n  security: pending\n"
+            "  deploy: pending\n  plan: pending\n  client_ready_for_dev: pending\n"
+            "current_refs:\n  requirements:\n    - docs/requirements/r1.md\n"
+            "  plan: null\n  spec: null\n  review: null\n  qa: null\n"
+            "  security: null\n  deploy: null\n  translation: null\n"
+            "next_action: test\nblockers: []\nsession_history: []\n---\n"
+        )
+        with TempProject(content) as root:
+            rc, out = run_check(root, "--check-completion-evidence")
+            self.assertIn("EVIDENCE:", out, "missing requirements file must violate")
+            self.assertIn("requirements", out)
+
+    def test_missing_status_no_violations(self):
+        with tempfile.TemporaryDirectory() as empty_root:
+            rc, out = run_check(empty_root, "--check-completion-evidence")
+            self.assertEqual(rc, 0)
+            self.assertEqual(out, "", f"missing STATUS must be fail-safe, got: {out}")
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -32,6 +32,18 @@ OPTIONAL_TOP_LEVEL_KEYS: set[str] = {"task_size", "task_size_rationale", "iterat
 # Version where gate-ref empty warnings become hard errors.
 REF_CHECK_ERROR_VERSION = "0.13.0"
 
+# Canonical gate -> evidence-ref mapping. Single source of truth reused by
+# validate_status_file, pre_approve_gate, and evidence_integrity_violations
+# (mirrored in bash by update-gate.sh's get_ref_key).
+GATE_REF_MAPPING = {
+    "plan": "plan",
+    "review": "review",
+    "qa": "qa",
+    "security": "security",
+    "deploy": "deploy",
+    "client_ready_for_dev": "translation",
+}
+
 REQUIRED_APPROVAL_KEYS = [
     "client_ready_for_dev",
     "brainstorm",
@@ -408,6 +420,46 @@ def extract_external_evidence(frontmatter: str) -> list[dict[str, str]]:
     return entries
 
 
+def evidence_integrity_violations(
+    refs: dict[str, list[str] | str],
+    approvals: dict[str, str],
+    root: Path,
+) -> list[str]:
+    """Gate/ref consistency + ref-file existence. Returns bare violation
+    messages WITHOUT a path prefix, so validate_status_file can prepend the
+    path and --check-completion-evidence can use them directly. Never raises."""
+    violations: list[str] = []
+    try:
+        for gate_key, ref_key in GATE_REF_MAPPING.items():
+            gate_value = approvals.get(gate_key)
+            ref_value = refs.get(ref_key)
+            ref_is_empty = ref_value is None or ref_value == "null" or ref_value == []
+            if gate_value == "approved" and ref_is_empty:
+                violations.append(
+                    f"gate '{gate_key}' is approved but current_refs.{ref_key} is empty"
+                )
+            if gate_value in {"pending", "n/a"} and not ref_is_empty:
+                violations.append(
+                    f"gate '{gate_key}' is '{gate_value}' but current_refs.{ref_key} "
+                    f"still has a value (stale ref: {ref_value})"
+                )
+
+        for key in ("plan", "spec", "review", "qa", "security", "deploy", "translation"):
+            value = refs.get(key)
+            if isinstance(value, str) and value != "null":
+                if not (root / value).exists():
+                    violations.append(f"points to missing {key} ref: {value}")
+
+        requirements = refs.get("requirements")
+        if isinstance(requirements, list):
+            for rel_path in requirements:
+                if not (root / rel_path).exists():
+                    violations.append(f"points to missing requirements ref: {rel_path}")
+    except Exception:
+        return []
+    return violations
+
+
 def validate_status_file(path: Path) -> list[str]:
     failures: list[str] = []
 
@@ -543,47 +595,11 @@ def validate_status_file(path: Path) -> list[str]:
         if isinstance(sv, list):
             failures.append(f"{path} current_refs.{scalar_key} must be scalar-or-null, got list")
 
-    # Validate gate ↔ ref consistency.
-    gate_ref_mapping = {
-        "plan": "plan",
-        "review": "review",
-        "qa": "qa",
-        "security": "security",
-        "deploy": "deploy",
-        "client_ready_for_dev": "translation",
-    }
-    for gate_key, ref_key in gate_ref_mapping.items():
-        gate_value = approvals.get(gate_key)
-        ref_value = refs.get(ref_key)
-        ref_is_empty = ref_value is None or ref_value == "null" or ref_value == []
-        ref_is_present = not ref_is_empty
-        # Approved gate must have a ref.
-        if gate_value == "approved" and ref_is_empty:
-            failures.append(
-                f"{path} gate '{gate_key}' is approved but current_refs.{ref_key} is empty"
-            )
-        # Pending or n/a gate must NOT have a ref (prevents stale refs across
-        # iterations and skip-phase scenarios like bugfix/hotfix).
-        if gate_value in {"pending", "n/a"} and ref_is_present:
-            failures.append(
-                f"{path} gate '{gate_key}' is '{gate_value}' but current_refs.{ref_key} "
-                f"still has a value (stale ref: {ref_value})"
-            )
-
+    # Gate/ref consistency + ref existence (shared with --check-completion-evidence;
+    # messages identical to the previous inline form via the path prefix below).
     root = path.parent.parent
-    for key in ["plan", "spec", "review", "qa", "security", "deploy", "translation"]:
-        value = refs.get(key)
-        if isinstance(value, str) and value != "null":
-            ref_path = root / value
-            if not ref_path.exists():
-                failures.append(f"{path} points to missing {key} ref: {value}")
-
-    requirements = refs.get("requirements")
-    if isinstance(requirements, list):
-        for rel_path in requirements:
-            ref_path = root / rel_path
-            if not ref_path.exists():
-                failures.append(f"{path} points to missing requirements ref: {rel_path}")
+    for m in evidence_integrity_violations(refs, approvals, root):
+        failures.append(f"{path} {m}")
 
     history = extract_session_history(frontmatter)
     if len(history) > MAX_SESSION_HISTORY_ENTRIES:
@@ -744,16 +760,8 @@ def pre_approve_gate(gate_name: str, root: Path) -> int:
 
     # --- Gate-ref consistency (DEPRECATION WARNING — ERROR in v{REF_CHECK_ERROR_VERSION}) ---
     # Run before mode-transition gate handlers so warnings fire for all gates.
-    gate_ref_mapping = {
-        "plan": "plan",
-        "review": "review",
-        "qa": "qa",
-        "security": "security",
-        "deploy": "deploy",
-        "client_ready_for_dev": "translation",
-    }
-    if gate_name in gate_ref_mapping:
-        ref_key = gate_ref_mapping[gate_name]
+    if gate_name in GATE_REF_MAPPING:
+        ref_key = GATE_REF_MAPPING[gate_name]
         ref_value = refs.get(ref_key)
         ref_is_empty = ref_value is None or ref_value == "null" or ref_value == []
         if ref_is_empty:
@@ -1158,6 +1166,10 @@ def main() -> int:
     parser.add_argument("--check-status-health", dest="check_status_health",
                         action="store_true",
                         help="Check STATUS.md maintenance health (warnings only)")
+    parser.add_argument("--check-completion-evidence", dest="check_completion_evidence",
+                        action="store_true",
+                        help="Check STATUS.md gate-ref evidence integrity at task "
+                             "completion (used by check-task-completed.sh)")
     args = parser.parse_args()
 
     root = Path(args.root).resolve()
@@ -1180,6 +1192,17 @@ def main() -> int:
         health_warnings = check_status_health(root)
         for w in health_warnings:
             print(f"HEALTH: {w}")
+        return 0
+
+    if args.check_completion_evidence:
+        status_path = root / "docs" / "STATUS.md"
+        if status_path.exists():
+            frontmatter = extract_frontmatter(read_text(status_path))
+            if frontmatter is not None:
+                refs = extract_current_refs(frontmatter)
+                approvals = extract_approval_map(frontmatter)
+                for v in evidence_integrity_violations(refs, approvals, root):
+                    print(f"EVIDENCE: {v}")
         return 0
 
     status_path = root / "docs" / "STATUS.md"
