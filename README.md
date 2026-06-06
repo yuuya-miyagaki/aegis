@@ -79,7 +79,7 @@ How Aegis maps to Claude Code's built-in capabilities.
 | `CLAUDE.md` | Control kernel (<700 words) | — |
 | `.claude/rules/` | State machine + routing (always-loaded) | — |
 | `.claude/skills/` | Pull-based phase documents (`disable-model-invocation: true`) | — |
-| `.claude/commands/` | 7 slash commands (`/status`, `/gate`, `/tutorial`, etc.) | — |
+| `.claude/commands/` | 8 slash commands (`/status`, `/gate`, `/judge`, `/tutorial`, etc.) | — |
 | `.claude/agents/` | 12 bounded specialist roles (frontmatter enriched) | — |
 | `.claude/settings.json` / `settings.local.json` | Hook registration (PaC). Quick Start recommends `settings.local.json` | — |
 | `EnterPlanMode` | — | **Not used.** Framework phases replace it; explicitly prohibited in CLAUDE.md |
@@ -125,6 +125,7 @@ pull-based loading). Project CLAUDE.md references skills by name.
 | `/next` | Show next action and phase transition suggestions |
 | `/retro` | Generate retrospective report |
 | `/tutorial` | Phase transition walkthrough guide |
+| `/judge` | Preview the gate judge card (machine facts vs. claims; read-only) |
 
 **Hooks** (`hooks/`) enforce framework rules at runtime:
 

@@ -82,6 +82,7 @@ REQUIRED_COMMAND_FILES = [
     ROOT / ".claude/commands/next.md",
     ROOT / ".claude/commands/tutorial.md",
     ROOT / ".claude/commands/retro.md",
+    ROOT / ".claude/commands/judge.md",
 ]
 
 REQUIRED_TEMPLATE_FILES = [
@@ -157,6 +158,7 @@ REQUIRED_EXAMPLE_FILES = [
     ROOT / "examples/minimal-project/.claude/commands/validate.md",
     ROOT / "examples/minimal-project/.claude/commands/retro.md",
     ROOT / "examples/minimal-project/.claude/commands/tutorial.md",
+    ROOT / "examples/minimal-project/.claude/commands/judge.md",
     ROOT / "examples/minimal-project/.claude/agents/planner.md",
     ROOT / "examples/minimal-project/.claude/agents/implementer.md",
     ROOT / "examples/minimal-project/.claude/agents/reviewer.md",
