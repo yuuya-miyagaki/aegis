@@ -258,6 +258,40 @@ class TestMain(unittest.TestCase):
             self.assertIn("🟢", out.read_text())
 
 
+class TestRecorder(unittest.TestCase):
+    REC = Path(__file__).resolve().parent.parent / "scripts" / "record-test-result.py"
+
+    def _git(self, root, *a):
+        sp.run(["git", "-C", str(root), *a], check=True, capture_output=True)
+
+    def test_records_green(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            self._git(root, "init", "-q"); self._git(root, "config", "user.email", "t@t")
+            self._git(root, "config", "user.name", "t")
+            (root / "a.py").write_text("x=1\n", encoding="utf-8")
+            self._git(root, "add", "-A"); self._git(root, "commit", "-qm", "i")
+            (root / "a.py").write_text("x=1\ny=2\n", encoding="utf-8")
+            sp.run(["python3", str(self.REC), "--root", str(root), "true"],
+                   check=True, capture_output=True)
+            data = json.loads((root / "docs/qa-reports/test-result.json").read_text())
+            self.assertEqual(data["status"], "green")
+            self.assertEqual(data["code_fingerprint"], judge.code_fingerprint(root))
+
+    def test_records_red_on_failing_command(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            self._git(root, "init", "-q"); self._git(root, "config", "user.email", "t@t")
+            self._git(root, "config", "user.name", "t")
+            (root / "a.py").write_text("x=1\n", encoding="utf-8")
+            self._git(root, "add", "-A"); self._git(root, "commit", "-qm", "i")
+            (root / "a.py").write_text("x=1\ny=2\n", encoding="utf-8")
+            sp.run(["python3", str(self.REC), "--root", str(root), "false"],
+                   check=True, capture_output=True)
+            data = json.loads((root / "docs/qa-reports/test-result.json").read_text())
+            self.assertEqual(data["status"], "red")
+
+
 class TestAuditDeps(unittest.TestCase):
     def test_no_manifest_is_unverified(self):
         with tempfile.TemporaryDirectory() as d:
