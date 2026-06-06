@@ -85,6 +85,15 @@ if [ -z "$NEXT_ACTION_STRIPPED" ] || [ "$NEXT_ACTION_STRIPPED" = "null" ]; then
   exit 2
 fi
 
+# Evidence integrity: reuse validate_status_file's gate/ref + existence checks
+# at completion time. python3 absent -> pass-through (soft 差し戻し, not a deny).
+EVIDENCE=$(python3 "${DEFAULT_ROOT}/scripts/check_status.py" --root "$ROOT" --check-completion-evidence 2>/dev/null || true)
+if [ -n "$EVIDENCE" ]; then
+  SUBJECT_PREVIEW=$(printf '%s' "$SUBJECT" | head -c 80 | tr '\n' ' ')
+  printf '[task-completed] TaskCompleted (subject: %s) しましたが evidence 整合性に違反があります:\n%s\n完了前に STATUS.md を修正してください。\n' "$SUBJECT_PREVIEW" "$EVIDENCE" >&2
+  exit 2
+fi
+
 # Pass-through.
 emit_allow
 exit 0

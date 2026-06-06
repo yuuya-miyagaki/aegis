@@ -814,6 +814,56 @@ class TestTaskCompletedHook(HookSchemaAssertions):
         log = Path(self.tmp) / ".claude" / ".task-event-debug.log"
         self.assertTrue(log.exists())
 
+    def _write_status_full(self, *, next_action: str, approvals: dict, refs: dict):
+        gate_lines = "\n".join(f"  {k}: {v}" for k, v in approvals.items())
+        ref_lines = "\n".join(f"  {k}: {v}" for k, v in refs.items())
+        path = Path(self.tmp) / "docs" / "STATUS.md"
+        path.write_text(
+            "---\n"
+            "phase: implement\n"
+            "mode: Dev\n"
+            f"next_action: {next_action}\n"
+            "gate_approvals:\n"
+            f"{gate_lines}\n"
+            "current_refs:\n"
+            f"{ref_lines}\n"
+            "---\n"
+        )
+
+    def test_push_back_when_evidence_missing(self):
+        """qa approved but current_refs.qa null -> exit 2 with evidence reason."""
+        self._write_status_full(
+            next_action="Move to security phase",
+            approvals={"qa": "approved", "review": "pending", "security": "pending",
+                       "deploy": "pending", "plan": "pending"},
+            refs={"qa": "null", "review": "null", "security": "null",
+                  "deploy": "null", "plan": "null", "spec": "null", "translation": "null"},
+        )
+        rc, out, err = run_hook(
+            "check-task-completed.sh", self._payload("QA done"),
+            cwd=Path(self.tmp), env={"AEGIS_ROOT_OVERRIDE": str(self.tmp)},
+        )
+        self.assertEqual(rc, 2, "evidence violation must push back via exit 2")
+        self.assertEqual(out, {}, "stdout empty on push-back; stderr carries reason")
+        self.assertIn("task-completed", err)
+        self.assertIn("qa", err)
+
+    def test_pass_through_when_evidence_clean(self):
+        """All coupled gates pending, refs null, next_action set -> pass through."""
+        self._write_status_full(
+            next_action="Move to qa phase",
+            approvals={"qa": "pending", "review": "pending", "security": "pending",
+                       "deploy": "pending", "plan": "pending"},
+            refs={"qa": "null", "review": "null", "security": "null",
+                  "deploy": "null", "plan": "null", "spec": "null", "translation": "null"},
+        )
+        rc, out, err = run_hook(
+            "check-task-completed.sh", self._payload("Impl step done"),
+            cwd=Path(self.tmp), env={"AEGIS_ROOT_OVERRIDE": str(self.tmp)},
+        )
+        self.assertEqual(rc, 0, f"clean evidence must pass through, got rc={rc} err={err}")
+        self.assertEqual(out, {})
+
 
 # ---------------------------------------------------------------------------
 # extract_exit_code dual-schema support (v0.13.0 Phase 0b)
