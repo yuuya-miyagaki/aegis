@@ -8,6 +8,7 @@ Never dispatches an LLM (the second opinion is recorded by the LLM beforehand).
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 import sys
@@ -16,6 +17,38 @@ from pathlib import Path
 
 class JudgeError(Exception):
     """Unexpected internal failure => fail-closed (treated as 🔴)."""
+
+
+_DRILL = None
+
+
+def _drill():
+    """Lazy-load B1's drill module (reuse added_lines_by_file/resolve_diff_ref/
+    _execute). The filename has hyphens, so load by path."""
+    global _DRILL
+    if _DRILL is None:
+        import importlib.util
+        path = Path(__file__).resolve().parent / "run-test-strength-drill.py"
+        spec = importlib.util.spec_from_file_location("drill_mod", path)
+        _DRILL = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(_DRILL)
+    return _DRILL
+
+
+def code_fingerprint(root: Path) -> str:
+    """sha256 over the changed files' current content (sorted), binding a test
+    result to the exact code it was produced against."""
+    drill = _drill()
+    ref = drill.resolve_diff_ref(root)
+    changed = sorted(drill.added_lines_by_file(root, ref).keys())
+    h = hashlib.sha256()
+    for rel in changed:
+        h.update(rel.encode("utf-8"))
+        try:
+            h.update((root / rel).read_bytes())
+        except OSError:
+            h.update(b"<unreadable>")
+    return h.hexdigest()
 
 
 def _parse_scalar(v: str):
