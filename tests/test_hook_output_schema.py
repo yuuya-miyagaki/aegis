@@ -348,6 +348,21 @@ class TestPreToolUseHooks(HookSchemaAssertions):
         )
         self.assertEqual(out, {}, "off must emit allow ({})")
 
+    def test_check_tdd_non_exact_off_keeps_strict(self):
+        """Fail-safe: only the lowercase exact value 'off' bypasses; any other
+        value (case variant, trailing space, typo) keeps the strict ask."""
+        payload = make_pretool_payload("Edit", {"file_path": "src/app.ts"})
+        for value in ("OFF", "Off", "off ", "strict", "1", "true"):
+            with self.subTest(value=value):
+                rc, out, err = run_hook(
+                    "check-tdd.sh",
+                    payload,
+                    cwd=Path(self.tmp),
+                    env={"AEGIS_TDD_MODE": value},
+                )
+                self.assertNotEqual(out, {}, f"{value!r} must not bypass ({{}})")
+                self.assert_pretool_decision(out, "ask", hint="check-tdd fail-safe")
+
     def test_check_deploy_gate_deny_when_gate_pending(self):
         """deploy gate pending 時の vercel deploy で deny。"""
         self._write_status(

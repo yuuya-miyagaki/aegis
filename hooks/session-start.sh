@@ -206,7 +206,7 @@ fi
 # Locale hint.
 CONTEXT="${CONTEXT} / ドキュメントは日本語"
 
-# AEGIS_TDD_MODE=off のとき TDD backstop 無効を毎セッション可視化する（off 形骸化の防止）。
+# Surface the disabled TDD backstop each session when AEGIS_TDD_MODE=off (prevents off being silently left on).
 if [ "${AEGIS_TDD_MODE:-}" = "off" ]; then
   CONTEXT="${CONTEXT} | [WARNING] AEGIS_TDD_MODE=off — TDD backstop はこのセッション無効（テスト無しの本番編集でも確認なし）"
 fi
