@@ -24,6 +24,13 @@ REPO_ROOT = SCRIPTS_DIR.parent
 SETUP_SH = REPO_ROOT / "bin" / "setup.sh"
 CONTRACT_PY = SCRIPTS_DIR / "check_framework_contract.py"
 
+# Single source of truth for the intentionally-divergent scaffold-safe command
+# variants. Importing it (rather than hardcoding the list) makes the
+# command-surface check self-extending: adding a command to MIRROR_ALLOWLIST
+# automatically requires it to be wired into setup.sh resolve_source.
+sys.path.insert(0, str(SCRIPTS_DIR))
+from check_reference_drift import MIRROR_ALLOWLIST  # noqa: E402
+
 # Profiles validated by file manifest (contract). full --profile validates the
 # framework repo itself (ignores --root), so it cannot be contract-validated as a
 # scaffold; it is exercised by the hook-execution check below instead.
@@ -117,8 +124,56 @@ def verify_hooks_runnable(target: Path, profile: str) -> tuple[bool, str]:
     return True, f"{profile}: hooks runnable"
 
 
+def verify_command_surface(target: Path, profile: str) -> tuple[bool, str]:
+    """Prove setup.sh delivered the right command surface (audit F2, F3).
+
+    Two invariants:
+      - Every MIRROR_ALLOWLIST command the scaffold installs must be the EXAMPLE
+        (scaffold-safe) variant, not the framework variant — i.e. resolve_source
+        must map it. retro must additionally keep its graceful-degradation guard.
+      - full must ship /judge (its backing build-judge-card.py is delivered there).
+    Failures are collected so a single run surfaces every gap.
+    """
+    failures: list[str] = []
+    example_root = REPO_ROOT / "examples" / "minimal-project"
+
+    for rel in sorted(MIRROR_ALLOWLIST):
+        installed = target / rel
+        if not installed.is_file():
+            continue  # this profile does not install this command
+        example = example_root / rel
+        if not example.is_file():
+            failures.append(f"example variant missing for {rel}")
+            continue
+        if installed.read_bytes() != example.read_bytes():
+            failures.append(
+                f"{rel} is not the scaffold-safe example variant "
+                f"(setup.sh resolve_source must map it)"
+            )
+
+    # retro must degrade gracefully when retro_report.py is absent (no profile
+    # ships it). Match the specific guard line, not a generic word, so this stays
+    # meaningful insurance if the example variant ever silently loses the guard
+    # (byte-identity above would still pass in that case).
+    retro = target / ".claude" / "commands" / "retro.md"
+    retro_guard = "`scripts/retro_report.py` is available"
+    if retro.is_file() and retro_guard not in retro.read_text(encoding="utf-8"):
+        failures.append(
+            "installed retro.md lacks its graceful guard "
+            "(must degrade when scripts/retro_report.py is absent)"
+        )
+
+    # full delivers build-judge-card.py, so it must also deliver /judge.
+    if profile == "full" and not (target / ".claude" / "commands" / "judge.md").is_file():
+        failures.append("/judge command not installed though build-judge-card.py is")
+
+    if failures:
+        return False, f"{profile}: " + "; ".join(failures)
+    return True, f"{profile}: command surface ok"
+
+
 def run_scaffold_test(profile: str, target: Path) -> tuple[str, str]:
-    """Scaffold with profile, validate manifest, then verify hooks run."""
+    """Scaffold with profile, validate manifest, then verify hooks + commands."""
     ok, detail = _scaffold(profile, target)
     if not ok:
         return "FAIL", detail
@@ -139,7 +194,12 @@ def run_scaffold_test(profile: str, target: Path) -> tuple[str, str]:
     if not ok:
         return "FAIL", detail
 
-    return "PASS", f"{profile} scaffold validated + hooks runnable"
+    # Command-surface validation (audit F2, F3).
+    ok, detail = verify_command_surface(target, profile)
+    if not ok:
+        return "FAIL", detail
+
+    return "PASS", f"{profile} scaffold validated + hooks runnable + command surface ok"
 
 
 def run_full_hook_exec_test(target: Path) -> tuple[str, str]:
@@ -152,7 +212,10 @@ def run_full_hook_exec_test(target: Path) -> tuple[str, str]:
     ok, detail = verify_hooks_runnable(target, "full")
     if not ok:
         return "FAIL", detail
-    return "PASS", "full scaffold hooks runnable"
+    ok, detail = verify_command_surface(target, "full")
+    if not ok:
+        return "FAIL", detail
+    return "PASS", "full scaffold hooks runnable + command surface ok"
 
 
 def main() -> int:

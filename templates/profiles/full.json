@@ -16,6 +16,7 @@
     ".claude/commands/next.md",
     ".claude/commands/retro.md",
     ".claude/commands/tutorial.md",
+    ".claude/commands/judge.md",
     "hooks/session-start.sh",
     "hooks/check-gate.sh",
     "hooks/post-status-audit.sh",
