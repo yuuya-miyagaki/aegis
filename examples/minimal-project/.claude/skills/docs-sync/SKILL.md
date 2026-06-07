@@ -23,6 +23,7 @@ user-invocable: false
 - [ ] plan/spec に記載の受入条件がすべて evidence にリンクしている
 - [ ] README / CHANGELOG が変更内容を反映している（該当する場合）
 - [ ] マニュアルが該当する案件なら `docs/handover/MANUAL.md` が存在し、front-matter の宣言読者と手順章が1対1（宣言ごとに章があり、宣言の無い孤児章も無い）。該当なしなら理由が記録されている
+- [ ] 保守が該当する案件なら `docs/handover/RUNBOOK.md` が存在し、front-matter（product/environment/owners）と必須節（監視/インシデント対応/エスカレーション/インシデント履歴/用語）が埋まっている。該当なしなら理由が記録されている
 
 ## Exit Criteria
 
