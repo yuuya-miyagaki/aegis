@@ -332,7 +332,7 @@ install 経路を恒久的に契約化する。これが個別修正より効く
 | F1 | L1 | missing | P2 | check_framework_contract.py | REQUIRED_HOOK_FILES が稼働 hook 4件を欠く＝template 登録の維持保証に穴 | 未triage |
 | F2 | L1 | missing | P2 | profiles/*.json | `/judge` が全 profile に無く install されない（裏方 build-judge-card.py は full に有） | ✅修正済 |
 | F3 | L1 | dead/broken | P2 | bin/setup.sh resolve_source | retro.md の scaffold-safe 変種が install に繋がらず、非safe版が配布され `/retro` がエラー | ✅修正済 |
-| F4 | L1 | dead/broken | P2 | session-recovery SKILL | Step1.5 が status_doctor.py を無ガード実行（profile 未配布）→ `/recover` 劣化 | 未triage |
+| F4 | L1 | dead/broken | P2 | session-recovery SKILL | Step1.5 が status_doctor.py を無ガード実行（profile 未配布）→ `/recover` 劣化 | ✅修正済（案b: 配布）|
 | F5 | L1 | missing | P3 | templates/・client-workflow | テンプレ非配布なのに「artifact template を開く」指示＝install 先で空振り（hard break なし） | 未triage |
 | **F6** | **L2** | **dead/broken** | **P1** | **bin/setup.sh copy_hooks** | **emit.sh/patterns.sh を install せず、standard/full install 先で全 hook が exit 1 で死＝moat 全死・silent fail-open** | **✅修正済** |
 | F7 | L2 | redundant | P3 | check_reference_drift.py | scaffold-safe を表す集合が2つあり食い違う（`MIRROR_ALLOWLIST={validate,retro}` vs `intentional_divergence={validate}`）。現状は両 command が root 実在で無害だが latent。grill-plan(F3) 由来 | 未triage |
@@ -381,6 +381,19 @@ hook 強制込みで通る**ことを確認して締める。
 - 検証: tier0(296)/1/2・contract(full/std)・drift・--strict 全 green。実 full install で `/retro` graceful
   （guard 句あり）・`/judge` 存在を再確認。grill-code＝マージ可（guard 文字列を具体句に絞る🟡を反映済）。
 - 新 finding: F7（drift の scaffold-safe 集合の二重・食い違い・P3・latent）を記録。
+
+### F4（P2）— 修正済（採用: 案b status_doctor を配布）
+
+- 計画: `docs/plans/f4-recover-status-doctor-guard-plan.md`。grill-plan で当初案(a graceful ガード)の
+  「(b)却下＝minimal/standard 用ガードが要る」前提が**事実誤認**と判明（session-recovery は full のみ同梱・
+  status_doctor 参照は session-recovery 1箇所）。ユーザー承認のうえ **(b) status_doctor を full に配布**へ転換。
+- 北極星整合: status_doctor の健全性チェックは決定論＝harness 仕事。(a) の「LLM 手動目視」格下げより (b) が原則整合。
+- 変更: `full.json` recommended に status_doctor.py 追加／example へ byte 一致コピー＋`MIRROR_FILES`・
+  `REQUIRED_EXAMPLE_FILES` 追加／`PLACEHOLDER_ALLOWLIST` に CLI usage トークン `<project_root>` 追加（巻き込み
+  ゼロを実証）／`eval_scaffold_smoke` に `verify_status_doctor`（full で実在＋実行を検証）。session-recovery SKILL は無編集。
+- TDD: RED（full に status_doctor 不在）→ GREEN（配布で実在＋実行）。tier0(296)/1/2・contract(full/std)・
+  drift(mirror 含)・strict 全 green。実 full install で status_doctor 実在＋`--root .` が正常出力を再確認。
+  grill-code＝マージ可（Critical 0）。
 
 ## 完了サマリ（調査フェーズ）
 
