@@ -69,6 +69,13 @@ user-invocable: false
 運用 RUNBOOK 欄にリンクする。運用者がいない場合は生成せず、理由を同欄に記録する。
 （使い方・日常運用は MANUAL に集約し、RUNBOOK は異常検知と復旧に絞る。）
 
+### Step 2.7: UAT 実行（該当時）
+
+`uat` skill を読み、`docs/requirements/ACCEPTANCE.md` がある場合は各 AC をビルド済み製品に対し
+実検証し、`docs/handover/UAT-RESULTS.md` を作成して client サインオフを得る。TO-CLIENT の
+「納品サマリー」の UAT 結果欄にリンクする。ACCEPTANCE が無い場合は生成せず理由を同欄に記録する。
+（ACCEPTANCE があるのに UAT-RESULTS が無いと Step 6 の dev_ready_for_client 申請が機械ブロックされる。）
+
 ### Step 3: ユーザー確認
 
 TO-CLIENT の内容をユーザーに提示し、承認を得る。
