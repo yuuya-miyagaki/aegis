@@ -1,12 +1,12 @@
 ---
 framework: aegis
-framework_version: "1.2.0"
+framework_version: "1.3.0"
 project_name: "Aegis"
 mode: Dev
 phase: brainstorm
 task_type: framework
 task_size: M
-task_size_rationale: "B3b（⑩UAT 実行フェーズ）完了: UAT-RESULTS テンプレ＋uat skill（ship 段で ACCEPTANCE を1件ずつ実検証→合否/証拠記録→client サインオフ）＋check_status.py の dev_ready_for_client 連動（ACCEPTANCE 有り＋UAT-RESULTS 不在ならブロック・合否は client サインオフ正本・機械は存在のみ）＋ユニットテスト3本＋ship-and-docs Step2.7＋docs-sync＋TO-CLIENT＋full profile。brainstorm→grill-plan（致命3+要検討3反映）→実装8タスク（TDD）→grill-code（Critical/Should ゼロ）を完走。B3a/B3c と違い実コード＋テストを持つ（gate チェック）。contract(full/standard)・drift・mirror-identity・**296 tests**（既存293+3）・tier2・--strict 全 PASS。これで北極星後半（⑨マニュアル[B3a]・⑩UAT[B3b]・⑫保守[B3c]）が構造的に揃う。版締めは未（framework_version は 1.2.0 のまま）。残 B-series: B4（native 冗長棚卸し）。出典 docs/audit-report-2026-06-06.md §4 優先度4。"
+task_size_rationale: "v1.3.0 締め完了（v1.2.0 以降の B3c[⑫保守ライフサイクル]＋B3b[⑩UAT 実行]を SemVer minor=追加機能として集約）。FRAMEWORK_VERSION 1.2.0→1.3.0＋STATUS template/docs 同期＋README 移行節 v1.2.0→v1.3.0＋tag v1.3.0。B3c=RUNBOOK テンプレ＋maintenance skill（生成/トリアージループ・advisory）、B3b=UAT-RESULTS テンプレ＋uat skill＋dev_ready_for_client への UAT 存在チェック（ACCEPTANCE 条件付き・合否は client サインオフ）。296 tests・contract(full/standard)・drift・mirror-identity・tier2・--strict 全 PASS。公開運用契約の変更は UAT ゲート連動のみ（ACCEPTANCE がある案件に限る・非 ACCEPTANCE は無改修）。**北極星後半 ⑨⑩⑫ 完成。** 残 B-series: B4（native 冗長棚卸し）。出典 docs/audit-report-2026-06-06.md §4 優先度4。"
 iteration: 14
 ui_surface: false
 last_updated: "2026-06-07T00:00:00Z"
@@ -41,7 +41,7 @@ external_evidence:
     scope: "v0.12.2 実装後 4 ラウンドレビュー"
     findings: "Round 6 (P1×2, P2×1: pre-compact exit 2 / minimal-project / test rc), Round 7 (P1×1, P3×1: git add 漏れ / テスト件数表記), Round 8 (P2×1, P3×1: stale last_updated / grep 自己マッチ), Round 9 (P3×2: コメント不整合)"
     resolution: "9件全反映。tier 1/2 PASS、134 tests PASS、本体と minimal-project 完全同期確認済み。"
-next_action: "B3b（⑩UAT 実行フェーズ）完了・main push 済み（未版締め）。北極星後半 ⑨⑩⑫ が構造的に揃った。次は **B3c＋B3b を束ねて版締め v1.3.0**（FRAMEWORK_VERSION 1.2.0→1.3.0＋STATUS template/docs 同期＋README 移行節 v1.2.0→v1.3.0＋tag v1.3.0）。その後の残は **B4（native 冗長棚卸し）** のみ。再設計テーマは charter §6 に従い brainstorm→grill-plan→実装→grill-code。出典 docs/audit-report-2026-06-06.md §4 優先度4。"
+next_action: "v1.3.0 締め完了（FRAMEWORK_VERSION 1.3.0・STATUS template/docs 同期・README 移行節 v1.2.0→v1.3.0・tag v1.3.0）。北極星後半 ⑨⑩⑫ 完成。296 tests・contract(full/standard)・drift・mirror-identity・tier2・--strict 全 PASS。残 B-series は **B4（native 冗長棚卸し＝Checkpoints/rewind・Routines・Auto Mode への委譲可否評価・surface 削減）** のみ。B4 は brainstorm から（charter §6）。出典 docs/audit-report-2026-06-06.md §4 優先度4。"
 blockers: []
 failure_tracking: null
 session_history:

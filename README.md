@@ -164,6 +164,35 @@ python3 scripts/check_status.py --root . --strict
 
 ## Migration
 
+### From v1.2.0 to v1.3.0
+
+**Non-breaking — additive lifecycle-completion features** (audit 2026-06-06 §4
+priority-4 follow-ups B3c and B3b). With B3a (v1.2.0) these complete the
+post-delivery lifecycle: ⑨ manual, ⑩ UAT, ⑫ maintenance. Existing projects keep
+working; the one behavior change (UAT gate coupling) is conditional on having
+defined acceptance criteria.
+
+- **B3c — maintenance lifecycle (⑫).** A new `RUNBOOK.template.md` plus a single
+  `maintenance` skill: Part A generates `docs/handover/RUNBOOK.md` (monitoring,
+  triage, escalation, incident history) at ship; Part B runs the
+  monitor→triage→route→record loop for production incidents, reusing
+  `bug-diagnosis` + bugfix/hotfix for the actual fix. `ship-and-docs` (Step 2.6),
+  `docs-sync`, and `bug-diagnosis` reference it; no new mode/phase/gate.
+- **B3b — UAT execution (⑩).** A new `UAT-RESULTS.template.md` plus a `uat` skill:
+  at ship, the client verifies the built product against `ACCEPTANCE.md`, records
+  pass/fail + evidence per criterion, and signs off into
+  `docs/handover/UAT-RESULTS.md` (`ship-and-docs` Step 2.7).
+- **Gate change — `dev_ready_for_client` requires recorded UAT.** When
+  `docs/requirements/ACCEPTANCE.md` exists, approving `dev_ready_for_client` is
+  blocked unless `docs/handover/UAT-RESULTS.md` exists. Pass/fail is the client's
+  sign-off; the machine only checks the artifact exists. Projects without
+  ACCEPTANCE are unaffected (legacy behavior).
+
+**Action for existing projects**: re-run `bash bin/setup.sh --profile=full` to
+pick up the new `maintenance`/`uat` skills and `RUNBOOK`/`UAT-RESULTS` templates.
+Projects on `minimal`/`standard` get the updated `check_status.py` (the UAT gate
+check) but not the new skills (those ship only in `full`).
+
 ### From v1.1.0 to v1.2.0
 
 **Non-breaking — additive end-user manual generation** (audit 2026-06-06 §4
