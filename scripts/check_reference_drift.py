@@ -354,8 +354,13 @@ def check_example_commands(root: Path) -> tuple[list[str], list[str]]:
     failures: list[str] = []
     warnings: list[str] = []
 
-    # Intentional divergence: these commands are expected to differ.
-    intentional_divergence = {"validate"}
+    # Commands that may exist ONLY in the example (not in root). This is
+    # EXISTENCE divergence — a different concept from MIRROR_ALLOWLIST, which
+    # lists commands present in BOTH trees whose CONTENT may differ
+    # (scaffold-safe variants like validate.md / retro.md). No command is
+    # example-only today, so this is empty; do not conflate it with
+    # MIRROR_ALLOWLIST by adding content-divergent commands here.
+    intentional_divergence: set[str] = set()
 
     example_commands_dir = root / "examples" / "minimal-project" / ".claude" / "commands"
     root_commands_dir = root / ".claude" / "commands"
