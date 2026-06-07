@@ -24,6 +24,7 @@ user-invocable: false
 - [ ] README / CHANGELOG が変更内容を反映している（該当する場合）
 - [ ] マニュアルが該当する案件なら `docs/handover/MANUAL.md` が存在し、front-matter の宣言読者と手順章が1対1（宣言ごとに章があり、宣言の無い孤児章も無い）。該当なしなら理由が記録されている
 - [ ] 保守が該当する案件なら `docs/handover/RUNBOOK.md` が存在し、front-matter（product/environment/owners）と必須節（監視/インシデント対応（トリアージ）/エスカレーション/インシデント履歴/用語）が埋まっている。該当なしなら理由が記録されている
+- [ ] UAT が該当する案件（ACCEPTANCE あり）なら `docs/handover/UAT-RESULTS.md` が存在し、全 Must-AC に合否・証拠・client サインオフがある。該当なしなら理由が記録されている
 
 ## Exit Criteria
 
