@@ -62,6 +62,7 @@
     ".claude/skills/browser-assist/SKILL.md",
     ".claude/skills/user-manual/SKILL.md",
     ".claude/skills/maintenance/SKILL.md",
+    ".claude/skills/uat/SKILL.md",
     "docs/client/context.md",
     "docs/client/glossary.md",
     "docs/client/open-questions.md",
