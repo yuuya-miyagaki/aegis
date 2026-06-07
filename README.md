@@ -93,6 +93,8 @@ How Aegis maps to Claude Code's built-in capabilities.
 
 ## Quick Start
 
+> 🚀 はじめての方は **[オンボーディング教材](docs/onboarding/README.md)**（説明・ハンズオン・早見表）から。
+
 ### Automated setup (recommended)
 
 ```bash
