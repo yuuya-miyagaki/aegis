@@ -113,6 +113,7 @@ REQUIRED_TEMPLATE_FILES = [
     ROOT / "templates/DECISION.template.md",
     ROOT / "templates/MANUAL.template.md",
     ROOT / "templates/RUNBOOK.template.md",
+    ROOT / "templates/UAT-RESULTS.template.md",
     ROOT / "templates/hooks.template.json",
 ]
 
