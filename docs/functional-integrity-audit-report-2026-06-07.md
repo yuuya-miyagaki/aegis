@@ -333,9 +333,9 @@ install 経路を恒久的に契約化する。これが個別修正より効く
 | F2 | L1 | missing | P2 | profiles/*.json | `/judge` が全 profile に無く install されない（裏方 build-judge-card.py は full に有） | ✅修正済 |
 | F3 | L1 | dead/broken | P2 | bin/setup.sh resolve_source | retro.md の scaffold-safe 変種が install に繋がらず、非safe版が配布され `/retro` がエラー | ✅修正済 |
 | F4 | L1 | dead/broken | P2 | session-recovery SKILL | Step1.5 が status_doctor.py を無ガード実行（profile 未配布）→ `/recover` 劣化 | ✅修正済（案b: 配布）|
-| F5 | L1 | missing | P3 | templates/・client-workflow | テンプレ非配布なのに「artifact template を開く」指示＝install 先で空振り（hard break なし） | 未triage |
+| F5 | L1 | missing | P3 | templates/・client-workflow | テンプレ非配布なのに「artifact template を開く」指示＝install 先で空振り（hard break なし） | ✅修正済 |
 | **F6** | **L2** | **dead/broken** | **P1** | **bin/setup.sh copy_hooks** | **emit.sh/patterns.sh を install せず、standard/full install 先で全 hook が exit 1 で死＝moat 全死・silent fail-open** | **✅修正済** |
-| F7 | L2 | redundant | P3 | check_reference_drift.py | scaffold-safe を表す集合が2つあり食い違う（`MIRROR_ALLOWLIST={validate,retro}` vs `intentional_divergence={validate}`）。現状は両 command が root 実在で無害だが latent。grill-plan(F3) 由来 | 未triage |
+| F7 | L2 | redundant | P3 | check_reference_drift.py | scaffold-safe を表す集合が2つあり食い違う（`MIRROR_ALLOWLIST={validate,retro}` vs `intentional_divergence={validate}`）。現状は両 command が root 実在で無害だが latent。grill-plan(F3) 由来 | ✅修正済 |
 
 ## triage 推奨（調査→修正の橋渡し）
 
@@ -406,6 +406,16 @@ hook 強制込みで通る**ことを確認して締める。
   将来正当ケースを誤検知しないため）。
 - TDD: RED（root/example で4件不足）→ GREEN。tier0(298)/1/2・contract(full/std)・drift・strict 全 green。
   grill-code＝マージ可（Critical 0）。
+
+### F5+F7（P3）— 修正済
+
+- 計画: `docs/plans/f5-f7-p3-polish-plan.md`（grill-plan 反映済）。grill で F5 は context-budget の
+  ヒューリスティック（hard 指示でない）と判明 → 予算規律を保つ**最小1語**修正に抑制。F7 は
+  `intentional_divergence={"validate"}` が**誤り**（validate は example-only でなく root 実在＝vestigial）と判明
+  → **空集合化＋概念明示コメント**（MIRROR_ALLOWLIST=内容divergence とは別概念だと混同防止）。
+- 変更: client-workflow SKILL.md（root+example mirror byte 一致）／check_reference_drift.py（コメント＋空集合）。
+- prose/コメントのみ＝ロジック不変。drift(mirror 含)・contract・全層 green 維持。grill-code は軽量自己レビュー
+  （仕様一致・無回帰・mirror 同期を確認）。
 
 ## 完了サマリ（調査フェーズ）
 
