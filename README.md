@@ -164,6 +164,34 @@ python3 scripts/check_status.py --root . --strict
 
 ## Migration
 
+### From v1.1.0 to v1.2.0
+
+**Non-breaking — additive end-user manual generation** (audit 2026-06-06 §4
+priority-4 follow-up B3a). No public operating-contract changes; existing
+projects keep working.
+
+- **B3a — audience-parameterized operation manual at the docs phase.** A new
+  `user-manual` skill (`.claude/skills/user-manual/`) plus
+  `templates/MANUAL.template.md` generate a task-oriented operation guide for the
+  people who *use* or *operate* the delivered product, written so non-engineers
+  can follow it.
+- **`ship-and-docs` Step 2.5.** After the TO-CLIENT package is drafted,
+  `ship-and-docs` reads `user-manual` and, when the product has users/operators,
+  writes `docs/handover/MANUAL.md` (one procedure section per audience) and links
+  it from the TO-CLIENT delivery summary. When no one uses or operates the
+  product, no manual is generated and the reason is recorded in that slot.
+- **`docs-sync` parity check.** For projects that warrant a manual, `docs-sync`
+  verifies `docs/handover/MANUAL.md` exists and that its declared audiences
+  (front-matter) map one-to-one to its procedure sections — no missing sections,
+  no orphan sections — otherwise the "not applicable" reason must be recorded.
+- **Registration.** The `user-manual` skill is registered in the `full` profile
+  and the framework mirror; `templates/HANDOVER-TO-CLIENT.template.md` gains a
+  manual slot.
+
+**Action for existing projects**: re-run `bash bin/setup.sh --profile=full` to
+pick up the new `user-manual` skill and `MANUAL.template.md`. Projects on
+`minimal`/`standard` are unaffected — the skill ships only in `full`.
+
 ### From v1.0.0 to v1.1.0
 
 **Non-breaking — additive deterministic-assurance features** (audit 2026-06-06 §4
