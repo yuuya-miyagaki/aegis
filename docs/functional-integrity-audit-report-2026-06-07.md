@@ -329,7 +329,7 @@ install 経路を恒久的に契約化する。これが個別修正より効く
 
 | ID | Layer | 分類 | 重大度 | surface | 概要 | 状態 |
 |----|-------|------|--------|---------|------|------|
-| F1 | L1 | missing | P2 | check_framework_contract.py | REQUIRED_HOOK_FILES が稼働 hook 4件を欠く＝template 登録の維持保証に穴 | 未triage |
+| F1 | L1 | missing | P2 | check_framework_contract.py | REQUIRED_HOOK_FILES が稼働 hook 4件を欠く＝template 登録の維持保証に穴 | ✅修正済 |
 | F2 | L1 | missing | P2 | profiles/*.json | `/judge` が全 profile に無く install されない（裏方 build-judge-card.py は full に有） | ✅修正済 |
 | F3 | L1 | dead/broken | P2 | bin/setup.sh resolve_source | retro.md の scaffold-safe 変種が install に繋がらず、非safe版が配布され `/retro` がエラー | ✅修正済 |
 | F4 | L1 | dead/broken | P2 | session-recovery SKILL | Step1.5 が status_doctor.py を無ガード実行（profile 未配布）→ `/recover` 劣化 | ✅修正済（案b: 配布）|
@@ -393,6 +393,18 @@ hook 強制込みで通る**ことを確認して締める。
   ゼロを実証）／`eval_scaffold_smoke` に `verify_status_doctor`（full で実在＋実行を検証）。session-recovery SKILL は無編集。
 - TDD: RED（full に status_doctor 不在）→ GREEN（配布で実在＋実行）。tier0(296)/1/2・contract(full/std)・
   drift(mirror 含)・strict 全 green。実 full install で status_doctor 実在＋`--root .` が正常出力を再確認。
+  grill-code＝マージ可（Critical 0）。
+
+### F1（P2）— 修正済
+
+- 計画: `docs/plans/f1-required-hook-files-coverage-plan.md`（grill-plan 反映済）。
+- 変更: `check_framework_contract.py` の `REQUIRED_HOOK_FILES`＋`REQUIRED_EXAMPLE_FILES` に4 hook
+  （skill/cron/task-created/task-completed gate）を追加／`tests/test_hook_required_coverage.py` 新規。
+- 副次効果: 4 hook を REQUIRED に入れたことで contract 既存の「REQUIRED⊆registered」が**直接** F1 の穴
+  （4 hook が template から外れたら FAIL）を塞ぐ。新 test は逆向き「registered⊆REQUIRED」を root/example
+  両方向で守る（example も同型の穴を持っていた＝grill-plan で判明）。向きは ⊆（required-but-unregistered の
+  将来正当ケースを誤検知しないため）。
+- TDD: RED（root/example で4件不足）→ GREEN。tier0(298)/1/2・contract(full/std)・drift・strict 全 green。
   grill-code＝マージ可（Critical 0）。
 
 ## 完了サマリ（調査フェーズ）
