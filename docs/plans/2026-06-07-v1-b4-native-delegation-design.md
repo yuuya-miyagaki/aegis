@@ -42,23 +42,28 @@ claude-code-guide で確認した結果 **ほぼ成立しない**:
 節タイトル: `## Relationship to native Claude Code features`
 
 導入文（要旨）: aegis は native と一見重なる surface を意図的に保持している。何を native に委譲し
-何を保持するかを記録し、リリースごとに境界を再評価しないための一覧。
+何を保持するかを記録し、リリースごとに境界を再評価しないための一覧。**本マップは監査 B4 が挙げた
+候補（Checkpoints/rewind・Routines・Auto Mode）＋精査で判明した実重複（/resume・auto memory・
+/recover）を対象とする。網羅監査ではない。**
 
 | Native feature | What it does | Aegis surface | Decision |
 |---|---|---|---|
 | Checkpoints / `/rewind` | Undo file edits, session-local, ephemeral | `session-recovery` | **Keep** — different problem: session-recovery rebuilds framework state (phase/gates/refs/partials) from STATUS.md, not file undo. Use both. |
-| `/resume`, `--continue`, `--fork` | Replay a prior session's conversation | `/recover` + `session-recovery` | **Complement** — `/resume` restores the conversation (use first if available); session-recovery reconstructs state from STATUS.md when the conversation is gone. |
-| Auto memory (`MEMORY.md`) | Persist personal preferences across sessions | `docs/LEARNINGS.md` | **Delegate (bounded)** — auto-memory holds personal preferences only; project lessons stay in LEARNINGS (already enforced by CLAUDE.md). |
-| Auto Mode | Non-deterministic permission classifier (research preview) | PaC hooks (destructive-command deny) | **Keep** — aegis's moat is deterministic hooks-as-guarantees; do not delegate safety to a probabilistic preview classifier. |
+| `/resume`, `--continue`, `--fork` | Replay a prior session's conversation | `session-recovery` | **Complement** — `/resume` may be enough when the prior session is available; session-recovery reconstructs/verifies state from STATUS.md when the conversation is gone (or to re-check partials). |
+| (the `/recover` command) | aegis convenience trigger for the recovery protocol | `/recover` → `session-recovery` | **Keep** — a discoverable slash-command trigger; native `/resume` restores conversation but does **not** run the STATUS-based state-recovery protocol. The skill is `user-invocable`, so `/recover` is an affordance, not a dependency. |
+| Auto memory (`MEMORY.md`) | Persist personal preferences across sessions | `docs/LEARNINGS.md` | **Delegate (bounded)** — auto-memory holds personal preferences only; project lessons stay in LEARNINGS (boundary documented in CLAUDE.md, not machine-enforced). |
+| Auto Mode | Permission classifier (probabilistic; research preview) | PaC hooks (destructive-command deny) | **Keep** — aegis's moat is *deterministic* hooks-as-guarantees; a probabilistic classifier cannot provide the same guarantee (durable reason, independent of Auto Mode's preview status). |
 | Routines / scheduling | (not a native Claude Code feature) | — | **N/A** — nothing to delegate. |
 
 ## session-recovery への注記（slim 実体）
 
 `## いつ使うか` の前後に1節を追加:
 
-> **native との関係**: 前回セッションが残っていれば native `/resume` で会話を先に復元してよい。
-> 本 skill は会話復元や `/rewind`（ファイル undo）とは別で、`docs/STATUS.md` からフレームワーク状態
-> （phase/gates/refs/partial）を再構築する。会話＝`/resume`、状態台帳＝本 skill、と棲み分ける。
+> **native との関係**: 前回セッションが残っていれば native `/resume` で会話が戻り、それで足りる
+> こともある。本 skill は会話復元や `/rewind`（ファイル undo）とは別で、**会話が無いとき**（新規
+> セッション・コンテキスト圧縮・クラッシュ）や **STATUS.md に対して状態/partial を検証したいとき**に、
+> `docs/STATUS.md` からフレームワーク状態（phase/gates/refs/partial）を再構築する。会話＝`/resume`、
+> 状態台帳＝本 skill、と棲み分ける（毎回両方必要というわけではない）。
 
 ## テスト戦略
 
@@ -73,3 +78,11 @@ claude-code-guide で確認した結果 **ほぼ成立しない**:
 - **スコープ**: B4 単体に限定。surface 削除なし＝退行リスク最小。単一の小さな実装計画に収まる。
 - **曖昧性**: 「委譲/併用/保持/該当なし」の4語で各 native 機能の扱いを一意化。session-recovery と native の棲み分けを注記で明示。
 - **要確認（実装時）**: README のどの位置に節を置くか（Migration の前後どちらか、既存構成に合わせる）。session-recovery が example ミラー対象であることの再確認。
+
+## grill-plan 反映（2026-06-07）
+
+- **要検討1（/recover 明示）**: マップに `/recover` コマンド行を追加し「Keep」を根拠付きで明示（薄いラッパーだが発見可能なトリガー・native /resume は状態復帰プロトコルを起動しない・skill は user-invocable なので /recover は affordance）。削除はしない（公開コマンド削除＝SemVer 破壊変更で割に合わない）。
+- **要検討2（auto memory 文言）**: 「enforced by CLAUDE.md」→「boundary documented in CLAUDE.md, not machine-enforced」に訂正。
+- **要検討3（注記の棲み分け）**: session-recovery 注記を「/resume で足りることもある／本 skill は会話が無いとき・状態検証時」と修正し「毎回両方必要というわけではない」を明記。
+- **要検討4（Auto Mode 根拠）**: 根拠を durable な「決定論 vs 確率的」に一本化、preview は補足に降格（GA 化しても腐らない）。
+- **要検討5（評価範囲）**: マップ導入文に「監査候補＋実重複が対象・網羅監査ではない」と範囲を明記。
