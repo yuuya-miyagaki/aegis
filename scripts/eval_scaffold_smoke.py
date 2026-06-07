@@ -202,6 +202,35 @@ def run_scaffold_test(profile: str, target: Path) -> tuple[str, str]:
     return "PASS", f"{profile} scaffold validated + hooks runnable + command surface ok"
 
 
+def verify_status_doctor(target: Path) -> tuple[bool, str]:
+    """session-recovery (a full-only skill) runs status_doctor.py at Step 1.5, so
+    full must ship it and it must run — not be a missing-file break (audit F4).
+    'status doctor' in stdout only appears when the script reaches its own logic,
+    so it proves the file shipped and imported check_status cleanly. The exit==0
+    assertion assumes a clean fresh-scaffold STATUS (no FAIL diagnostics); a fresh
+    template never triggers status_doctor's only FAIL path (failure_tracking>=3)."""
+    sd = target / "scripts" / "status_doctor.py"
+    if not sd.is_file():
+        return False, (
+            "full: scripts/status_doctor.py not installed — session-recovery "
+            "Step 1.5 (/recover) would break on a missing file"
+        )
+    r = subprocess.run(
+        ["python3", "scripts/status_doctor.py", "--root", "."],
+        cwd=str(target),
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+    if "status doctor" not in r.stdout or r.returncode != 0:
+        return False, (
+            f"full: status_doctor.py did not run cleanly "
+            f"(exit={r.returncode}, stdout={r.stdout.strip()[:200]!r}, "
+            f"stderr={r.stderr.strip()[:200]!r})"
+        )
+    return True, "full: status_doctor runnable"
+
+
 def run_full_hook_exec_test(target: Path) -> tuple[str, str]:
     """full cannot be contract-validated as a scaffold (--profile=full ignores
     --root), so exercise it via hook execution only — this also proves
@@ -215,7 +244,10 @@ def run_full_hook_exec_test(target: Path) -> tuple[str, str]:
     ok, detail = verify_command_surface(target, "full")
     if not ok:
         return "FAIL", detail
-    return "PASS", "full scaffold hooks runnable + command surface ok"
+    ok, detail = verify_status_doctor(target)
+    if not ok:
+        return "FAIL", detail
+    return "PASS", "full scaffold hooks runnable + command surface ok + status_doctor runnable"
 
 
 def main() -> int:

@@ -33,6 +33,7 @@
     "scripts/run-test-strength-drill.py",
     "scripts/build-judge-card.py",
     "scripts/record-test-result.py",
+    "scripts/status_doctor.py",
     ".claude/skills/tdd/SKILL.md",
     ".claude/skills/subagent-dev/SKILL.md",
     ".claude/skills/aegis-brainstorm/SKILL.md",

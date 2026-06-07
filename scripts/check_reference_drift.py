@@ -393,6 +393,7 @@ MIRROR_FILES = [
     Path("scripts") / "run-test-strength-drill.py",
     Path("scripts") / "build-judge-card.py",
     Path("scripts") / "record-test-result.py",
+    Path("scripts") / "status_doctor.py",
 ]
 MIRROR_ALLOWLIST = {
     Path(".claude") / "commands" / "validate.md",

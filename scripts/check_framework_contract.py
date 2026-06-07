@@ -177,6 +177,7 @@ REQUIRED_EXAMPLE_FILES = [
     ROOT / "examples/minimal-project/.claude/agents/reviewer-maintainability.md",
     ROOT / "examples/minimal-project/scripts/update-gate.sh",
     ROOT / "examples/minimal-project/scripts/check_status.py",
+    ROOT / "examples/minimal-project/scripts/status_doctor.py",
     # Runtime enforcement hooks (referenced by .claude/settings.json)
     ROOT / "examples/minimal-project/hooks/session-start.sh",
     ROOT / "examples/minimal-project/hooks/check-gate.sh",
@@ -246,6 +247,8 @@ PLACEHOLDER_ALLOWLIST = {
     "<body>",
     "<key>",
     "<value>",
+    # CLI usage token in status_doctor.py docstring (`--root <project_root>`)
+    "<project_root>",
 }
 
 
