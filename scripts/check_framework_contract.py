@@ -132,6 +132,13 @@ REQUIRED_HOOK_FILES = [
     ROOT / "hooks/check-secrets.sh",
     ROOT / "hooks/check-deploy-gate.sh",
     ROOT / "hooks/check-deploy-mcp-gate.sh",
+    # v0.13.0 Phase 0b hooks (Skill/Cron gates, Task events). Tracked here so the
+    # template-registration check (REQUIRED ⊆ registered) covers them; the reverse
+    # (registered ⊆ REQUIRED) is guarded by tests/test_hook_required_coverage.py.
+    ROOT / "hooks/check-skill-gate.sh",
+    ROOT / "hooks/check-cron-gate.sh",
+    ROOT / "hooks/check-task-created.sh",
+    ROOT / "hooks/check-task-completed.sh",
 ]
 
 REQUIRED_EXAMPLE_FILES = [
@@ -196,6 +203,10 @@ REQUIRED_EXAMPLE_FILES = [
     ROOT / "examples/minimal-project/hooks/check-secrets.sh",
     ROOT / "examples/minimal-project/hooks/check-deploy-gate.sh",
     ROOT / "examples/minimal-project/hooks/check-deploy-mcp-gate.sh",
+    ROOT / "examples/minimal-project/hooks/check-skill-gate.sh",
+    ROOT / "examples/minimal-project/hooks/check-cron-gate.sh",
+    ROOT / "examples/minimal-project/hooks/check-task-created.sh",
+    ROOT / "examples/minimal-project/hooks/check-task-completed.sh",
     ROOT / "examples/minimal-project/.claude/agents/translation-specialist.md",
     ROOT / "examples/minimal-project/.claude/agents/integration-specialist.md",
 ]
