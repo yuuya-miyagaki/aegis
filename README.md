@@ -168,6 +168,17 @@ python3 scripts/check_status.py --root . --strict
 
 ## Migration
 
+### From v1.3.0 to v1.3.1
+
+**Docs-only — no action required.** Audit 2026-06-06 §4 priority-4 follow-up B4
+(native-redundancy inventory). Adds the native delegation map to the
+[Native Feature Mapping](#native-feature-mapping) table (what aegis keeps,
+complements, or delegates vs. Checkpoints/`/rewind`, `/resume`, Auto Mode,
+routines, and why) and a note in the `session-recovery` skill clarifying its
+relationship to native `/resume`. No operating-contract, template, or behavior
+changes; existing projects are unaffected. This completes the post-audit
+B-series (B1–B4).
+
 ### From v1.2.0 to v1.3.0
 
 **Non-breaking — additive lifecycle-completion features** (audit 2026-06-06 §4
