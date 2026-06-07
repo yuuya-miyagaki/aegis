@@ -417,6 +417,19 @@ hook 強制込みで通る**ことを確認して締める。
 - prose/コメントのみ＝ロジック不変。drift(mirror 含)・contract・全層 green 維持。grill-code は軽量自己レビュー
   （仕様一致・無回帰・mirror 同期を確認）。
 
+## 再検証（charter §進め方-4・修正フェーズ後）
+
+- Layer 0 全 green: tier0(298)・tier1・tier2・contract(full/standard)・drift(mirror 含)・--strict。
+- **ライブ full install で moat 実発火**（F6 修正の最終証明）: hooks/lib に emit.sh/extract-input.sh/patterns.sh
+  が配置され、check-gate=deny（plan pending）／check-destructive(rm -rf /)=ask／check-secrets(git add .env)=deny／
+  check-skill-gate(update-config)=ask／status_doctor 実行=PASS／`/retro`=graceful 変種／`/judge`=存在／
+  settings.local.json=16 hooks・7 events。**install 先で決定論 PaC enforcement が生きている**ことを実地確認。
+
+## 修正フェーズ 完了状況
+
+**全 finding（F1〜F7）修正済・全層 green・ライブ moat 実証済。** 残りは版締め（FRAMEWORK_VERSION・STATUS・
+README・tag）。
+
 ## 完了サマリ（調査フェーズ）
 
 - Layer 0-4 完了。findings 6件（**P1×1**, P2×4, P3×1）。
