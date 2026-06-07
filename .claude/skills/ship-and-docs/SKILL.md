@@ -61,6 +61,14 @@ user-invocable: false
 該当読者（利用者/運用者）ごとに操作手順を記述し、TO-CLIENT の「納品サマリー」の
 操作マニュアル欄にリンクする。使う人も運用者もいない場合は生成せず、理由を同欄に記録する。
 
+### Step 2.6: 運用 RUNBOOK 作成（該当時）
+
+`maintenance` skill（Part A）を読み、製品を運用する人がいる場合は
+`templates/RUNBOOK.template.md` をもとに `docs/handover/RUNBOOK.md` を作成する。
+監視・トリアージ・エスカレーションを記述し、TO-CLIENT の「納品サマリー」の
+運用 RUNBOOK 欄にリンクする。運用者がいない場合は生成せず、理由を同欄に記録する。
+（使い方・日常運用は MANUAL に集約し、RUNBOOK は異常検知と復旧に絞る。）
+
 ### Step 3: ユーザー確認
 
 TO-CLIENT の内容をユーザーに提示し、承認を得る。
