@@ -860,6 +860,19 @@ def check_gate_prerequisites(
                     f"gate '{req}' is '{val}' (must be approved or n/a)."
                 )
                 return 1
+        # UAT: if acceptance criteria were defined, require recorded UAT results
+        # before handback. Pass/fail is the client's sign-off; the machine only
+        # checks the artifact exists (content is not parsed).
+        acceptance = root / "docs" / "requirements" / "ACCEPTANCE.md"
+        uat_results = root / "docs" / "handover" / "UAT-RESULTS.md"
+        if acceptance.exists() and not uat_results.exists():
+            print(
+                "ERROR: docs/requirements/ACCEPTANCE.md があるのに "
+                "docs/handover/UAT-RESULTS.md が見つかりません。"
+            )
+            print("       dev_ready_for_client の前に UAT を実行してください。")
+            print("       → uat skill を使用")
+            return 1
         return 0
 
     if gate_name == "client_ready_for_dev":

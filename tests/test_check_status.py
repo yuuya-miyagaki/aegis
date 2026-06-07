@@ -1216,6 +1216,55 @@ class TestModeTransitionEnforcement(unittest.TestCase):
             rc, out = run_check(root, "--pre-approve-gate", "dev_ready_for_client")
             self.assertEqual(rc, 0, f"Should allow with review approved: {out}")
 
+    def test_dev_ready_for_client_blocks_without_uat_when_acceptance(self):
+        """ACCEPTANCE present + UAT-RESULTS missing → block."""
+        content = make_status_md(
+            phase="ship", task_type="feature", task_size="L",
+            approvals={
+                "brainstorm": "approved", "plan": "approved",
+                "review": "approved", "qa": "approved", "security": "approved",
+            },
+        )
+        with TempProject(content) as root:
+            req = Path(root) / "docs" / "requirements"
+            req.mkdir(parents=True, exist_ok=True)
+            (req / "ACCEPTANCE.md").write_text("# 受入条件\n", encoding="utf-8")
+            rc, out = run_check(root, "--pre-approve-gate", "dev_ready_for_client")
+            self.assertNotEqual(rc, 0, f"Should block without UAT-RESULTS: {out}")
+            self.assertIn("UAT-RESULTS", out, f"Error should mention UAT-RESULTS: {out}")
+
+    def test_dev_ready_for_client_allows_with_uat_results(self):
+        """ACCEPTANCE + UAT-RESULTS present → allow."""
+        content = make_status_md(
+            phase="ship", task_type="feature", task_size="L",
+            approvals={
+                "brainstorm": "approved", "plan": "approved",
+                "review": "approved", "qa": "approved", "security": "approved",
+            },
+        )
+        with TempProject(content) as root:
+            req = Path(root) / "docs" / "requirements"
+            req.mkdir(parents=True, exist_ok=True)
+            (req / "ACCEPTANCE.md").write_text("# 受入条件\n", encoding="utf-8")
+            handover = Path(root) / "docs" / "handover"
+            handover.mkdir(parents=True, exist_ok=True)
+            (handover / "UAT-RESULTS.md").write_text("# UAT\n", encoding="utf-8")
+            rc, out = run_check(root, "--pre-approve-gate", "dev_ready_for_client")
+            self.assertEqual(rc, 0, f"Should allow with UAT-RESULTS: {out}")
+
+    def test_dev_ready_for_client_no_acceptance_skips_uat(self):
+        """No ACCEPTANCE → UAT not required → allow (legacy behavior)."""
+        content = make_status_md(
+            phase="ship", task_type="feature", task_size="L",
+            approvals={
+                "brainstorm": "approved", "plan": "approved",
+                "review": "approved", "qa": "approved", "security": "approved",
+            },
+        )
+        with TempProject(content) as root:
+            rc, out = run_check(root, "--pre-approve-gate", "dev_ready_for_client")
+            self.assertEqual(rc, 0, f"Should allow without ACCEPTANCE: {out}")
+
 
 class TestModeChangeAudit(unittest.TestCase):
     """Verify post-status-audit.sh detects unauthorized mode changes."""
