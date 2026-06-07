@@ -111,6 +111,7 @@ REQUIRED_TEMPLATE_FILES = [
     ROOT / "templates/TRANSLATION-MAPPING.template.md",
     ROOT / "templates/DECISION.template.md",
     ROOT / "templates/MANUAL.template.md",
+    ROOT / "templates/RUNBOOK.template.md",
     ROOT / "templates/hooks.template.json",
 ]
 
