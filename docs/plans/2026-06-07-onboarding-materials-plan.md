@@ -127,13 +127,17 @@ git commit -m "docs(onboarding): add non-engineer explainer one-pager"
 
 1. `# はじめての aegis プロジェクト — 予約管理システム`。
 2. `## このハンズオンで体験すること` — Client→Dev→UAT→handover→保守 を1周。題材は中規模予約システムだが、**全体は設計し、実装は「会議室予約の重複チェック」1スライスに絞る**（残りは次イテレーション）と明記。
+   - **前置き（非決定的）**: 本書は Claude と協働する**意図する流れ**を示す。実際の文言は Claude の応答で多少変わる、と1行。
 3. `## 前提` — Claude Code が使えること、`aegis` repo があること。
-4. `## 0. 準備` — `bash bin/setup.sh --profile=full --target=../reserve-demo` で scaffold → そのディレクトリで Claude Code を開く → `/status` で現在地（mode=Client, phase=onboard）を確認。「full を使う理由＝全 hook/skill/judge/status_doctor が入る」を1行。
+4. `## 0. 準備` —
+   - `bash bin/setup.sh --profile=full --target=../reserve-demo` で scaffold（full の理由＝全 hook/skill/judge/status_doctor が入る）。
+   - **`cd ../reserve-demo && git init && git add -A && git commit -m "scaffold"`**（**必須**: check-tdd はテスト変更を `git diff` で検出するため、git 無しだとテスト先行でも `ask` し続け TDD 体験が成立しない）。
+   - そのディレクトリで Claude Code を開く → `/status` で現在地（mode=Client, phase=onboard）を確認。
 
 - [ ] **Step 2: Client モード節を書く**
 
 `## 1. Client モード（何を作るか固める）`。各フェーズで「Claude にこう頼む／何が起きる／どの artifact ができる」を記述:
-- onboard/discovery: `client-workflow` skill が起動。予約システムの背景・利用者（社員/受付/総務）をヒアリング。
+- onboard/discovery: `client-workflow` skill が起動。予約システムの背景・利用者（社員/受付/総務）をヒアリングし、まず `docs/client/context.md` を埋める。**体験ポイント**: context.md が無いまま要件を書こうとすると `check-client-info.sh` が要件編集を **deny** する（だから最初に背景を固める）。
 - requirements: `docs/requirements/PRD.md` に5機能領域（会議室・備品・カレンダー連携・フロアマップ・サービス依頼〔呈茶/アテンド〕）を記述。
 - scope: `docs/requirements/SCOPE.md` / `NFR.md`。**初回スコープを「会議室予約」に絞る**と宣言（aegis のタスクサイズ運用）。
 - acceptance: `docs/requirements/ACCEPTANCE.md` に受入条件（例「同一会議室・重複時間帯の予約は拒否される」）。
@@ -146,11 +150,11 @@ git commit -m "docs(onboarding): add non-engineer explainer one-pager"
 `## 2. Dev モード（品質ゲートで守りながら作る）`:
 - brainstorm: `aegis-brainstorm`。重複チェックの方針を詰め、`bash scripts/update-gate.sh brainstorm approve`。
 - plan: `docs/plans/` に実装計画（重複判定関数 `is_conflict(existing, new)` の仕様）。`update-gate.sh plan approve`。**plan 承認まではコードを書けない**（`check-gate.sh` が deny）ことを体験。
-- implement: `tdd` skill。**失敗テストを先に書く**（同一室・重複時間で True、別室や非重複で False）。`check-tdd.sh` が「テスト無し実装」を **ask** するのを体験。テスト→実装→green。
-- review: `aegis-review-gate` ＋ reviewer agent。`update-gate.sh review approve`（このとき `build-judge-card.py` が走り tri-state カードが出る。🟡 なら `approve --ack "理由"`）。
-- qa: `qa-verification`。`update-gate.sh qa approve` で **B1 テスト強度ドリル**（`run-test-strength-drill.py`）が走り、mutant をテストが捕まえないと拒否されるのを体験。
+- implement: `tdd` skill。**言語は Python に固定**＝`reservation.py` の `is_conflict(existing, new)`＋`tests/test_reservation.py`（依存ゼロ・非エンジニアでも追える・aegis 自身も Python）。**失敗テストを先に書く**（同一室・重複時間で True、別室や非重複で False）→ 実体は Python の unittest/pytest。`check-tdd.sh` が「テスト無し実装」を **ask** するが、テストを先にコミット/変更すれば（git があるので）通るのを体験。テスト→実装→green。
+- review: `aegis-review-gate` ＋ reviewer agent。`bash scripts/update-gate.sh review approve` の**承認時に `build-judge-card.py` が自動で走り** tri-state カード（`docs/qa-reports/judge-review.md`）が出る。🟡 なら `update-gate.sh review approve --ack "理由"`。
+- qa: `qa-verification`。**`.drill`（mutant 仕様 `docs/qa-reports/test-strength.drill`）は Claude（qa-verification skill）が生成し、ユーザーは内容を承認する**（手書き不要）。`update-gate.sh qa approve` の**承認時に B1 ドリル**（`run-test-strength-drill.py`）が自動で走り、mutant をテストが捕まえないと拒否されるのを体験。**qa は n/a にできない**（必ずドリルを通す）。
 - security: `aegis-security-gate`。`update-gate.sh security approve`。
-- ship: `ship-and-docs`。タスクサイズ M なら deploy は省略可（早見表参照）。
+- ship: `ship-and-docs`。スライスは小さいので **deploy は n/a**: `bash scripts/update-gate.sh deploy na`（S/M はゲート表で deploy 省略可）。
 - 体験ポイント: 各承認は前提ゲート順を強制（brainstorm 未承認で plan approve は拒否）。
 
 - [ ] **Step 4: UAT・handover・保守・次反復 節を書く**
