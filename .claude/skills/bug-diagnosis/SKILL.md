@@ -13,6 +13,7 @@ user-invocable: false
 
 - task_type = bugfix または hotfix のとき
 - brainstorm を n/a にしてよい代わりに、このスキルを実行する
+- **本番/運用起因の問題のとき（のみ）**: まず `maintenance` skill（Part B: トリアージ）を読み、重大度分類とルーティングを経てから本診断に入る。トリアージは1回で、本診断に入ったら maintenance には戻らない。解決後は `docs/handover/RUNBOOK.md` の `## インシデント履歴` に追記する。（通常の bugfix/hotfix は従来どおりで maintenance を通さない。）
 
 ## Gate 処理
 
