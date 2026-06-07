@@ -200,8 +200,17 @@ copy_hooks() {
     return 0
   fi
 
-  # Always copy lib/extract-input.sh if any hook is included
-  copy_file "$FRAMEWORK_ROOT/hooks/lib/extract-input.sh" "$target_dir/hooks/lib/extract-input.sh"
+  # Copy ALL shared hook libs when any hook is included. Every hook sources
+  # lib/emit.sh (the single output source); check-destructive also sources
+  # lib/patterns.sh. Copy the whole lib/ rather than selecting per-hook: the
+  # libs are tiny shared helpers, and a future hook sourcing a new lib must not
+  # silently ship without it. The glob's no-match case is harmless (copy_file
+  # SKIPs a non-existent source). Without this, installed hooks die at
+  # `source lib/emit.sh` and the moat fails open (audit F6, 2026-06-07).
+  for lib in "$FRAMEWORK_ROOT"/hooks/lib/*.sh; do
+    [[ -e "$lib" ]] || continue
+    copy_file "$lib" "$target_dir/hooks/lib/$(basename "$lib")"
+  done
 
   while IFS= read -r script; do
     copy_file "$FRAMEWORK_ROOT/hooks/$script" "$target_dir/hooks/$script"
