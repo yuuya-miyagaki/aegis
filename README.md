@@ -89,7 +89,7 @@ How Aegis maps to Claude Code's built-in capabilities.
 | Checkpoints / `/rewind` | (complementary) `session-recovery` | **Keep** — `/rewind` undoes file edits (ephemeral); `session-recovery` rebuilds framework state (phase/gates/refs/partials) from STATUS.md. Different problem. |
 | `/resume` / `--continue` / `--fork` | (complementary) `/recover` + `session-recovery` | **Complement** — `/resume` restores the conversation (may suffice); `session-recovery` reconstructs/verifies state from STATUS.md when the conversation is gone. `/recover` is the discoverable trigger for that protocol, which `/resume` does not run. |
 | Auto Mode | — | **Keep PaC hooks.** aegis's moat is *deterministic* hooks-as-guarantees; a probabilistic permission classifier cannot give the same guarantee (durable reason, independent of Auto Mode's preview status). |
-| Routines / scheduling | — | **N/A** — not a native Claude Code feature; nothing to delegate. |
+| Routines / scheduling | — | **N/A** — aegis ships no scheduling/cron surface, so there is nothing to delegate or retire here. |
 
 ## Quick Start
 
