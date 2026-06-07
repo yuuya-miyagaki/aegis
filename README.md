@@ -86,6 +86,10 @@ How Aegis maps to Claude Code's built-in capabilities.
 | `TodoWrite` / `TaskCreate` | Session-local subtask management only (subagent-dev skill) | Persistent state lives in STATUS.md, not task lists |
 | Auto-memory | Personal preferences only | Technical lessons belong in `docs/LEARNINGS.md` |
 | Context compaction | Controlled by PreCompact hook | Blocked when STATUS.md is stale |
+| Checkpoints / `/rewind` | (complementary) `session-recovery` | **Keep** — `/rewind` undoes file edits (ephemeral); `session-recovery` rebuilds framework state (phase/gates/refs/partials) from STATUS.md. Different problem. |
+| `/resume` / `--continue` / `--fork` | (complementary) `/recover` + `session-recovery` | **Complement** — `/resume` restores the conversation (may suffice); `session-recovery` reconstructs/verifies state from STATUS.md when the conversation is gone. `/recover` is the discoverable trigger for that protocol, which `/resume` does not run. |
+| Auto Mode | — | **Keep PaC hooks.** aegis's moat is *deterministic* hooks-as-guarantees; a probabilistic permission classifier cannot give the same guarantee (durable reason, independent of Auto Mode's preview status). |
+| Routines / scheduling | — | **N/A** — not a native Claude Code feature; nothing to delegate. |
 
 ## Quick Start
 
