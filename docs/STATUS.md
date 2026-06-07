@@ -41,7 +41,7 @@ external_evidence:
     scope: "v0.12.2 実装後 4 ラウンドレビュー"
     findings: "Round 6 (P1×2, P2×1: pre-compact exit 2 / minimal-project / test rc), Round 7 (P1×1, P3×1: git add 漏れ / テスト件数表記), Round 8 (P2×1, P3×1: stale last_updated / grep 自己マッチ), Round 9 (P3×2: コメント不整合)"
     resolution: "9件全反映。tier 1/2 PASS、134 tests PASS、本体と minimal-project 完全同期確認済み。"
-next_action: "v1.3.1 締め完了（FRAMEWORK_VERSION 1.3.1・STATUS template/docs 同期・README 移行節 v1.3.0→v1.3.1・tag v1.3.1）。**監査由来 B-series（B1/B2/B3a/B3b/B3c/B4）全完了・北極星後半 ⑨⑩⑫ 完成。** 296 tests・contract(full/standard)・drift・mirror-identity・tier2・--strict 全 PASS。次の大きな一手は新規テーマ（要 brainstorm）。監査フォローアップは一段落。出典 docs/audit-report-2026-06-06.md §4 優先度4。"
+next_action: "v1.3.1 締め完了（FRAMEWORK_VERSION 1.3.1・STATUS template/docs 同期・README 移行節 v1.3.0→v1.3.1・tag v1.3.1）。**監査由来 B-series（B1/B2/B3a/B3b/B3c/B4）全完了・北極星後半 ⑨⑩⑫ 完成。** 296 tests・contract(full/standard)・drift・mirror-identity・tier2・--strict 全 PASS。**次タスク＝機能整合性監査**（各機能が実際に走るか・配線・過不足を実証的に確認し首を直して締める）。charter `docs/functional-integrity-audit-charter-2026-06-07.md` に全手順あり。/clear 後はそれを読んで Layer 0（ベースライン green）→ Layer 1（surface 列挙）から着手。出典 docs/audit-report-2026-06-06.md §4 優先度4。"
 blockers: []
 failure_tracking: null
 session_history:
