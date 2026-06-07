@@ -27,7 +27,8 @@ skill・bugfix/hotfix task type・`session-recovery` で Dev 側のバグ修正�
 
 2. **成果物 ＝ 独立 `RUNBOOK.md`**: MANUAL.md（使い方・日常運用）とは別に、運用者向けの
    「監視・インシデント対応・エスカレーション」を担う単一ファイル `docs/handover/RUNBOOK.md` を
-   生成する。ship 時に作成し TO-CLIENT からリンク、`docs-sync` が存在＋必須節を検証。
+   生成する。ship 時に作成し TO-CLIENT からリンク、`docs-sync` の自己点検チェックリストで存在＋
+   必須節を確認（`docs-sync` は自動 validator ではなく LLM 自己点検用のチェックリスト skill）。
    **`current_refs` に新キーは追加しない**（check_status/テンプレ/テスト/example の4箇所同期を回避＝
    B3a と同じ規律）。
    - 根拠: 「壊れたときに開く文書」は読者の瞬間が「使い方」と違うため MANUAL と分離が自然。B3a の
@@ -62,6 +63,22 @@ skill・bugfix/hotfix task type・`session-recovery` で Dev 側のバグ修正�
 - 実際の監視インフラ構築・アラート自動設定を必須にしない。
 - MANUAL operator 章（使い方・日常運用＝コンテンツ更新/基本設定）と内容を重複させない。
 
+## 実行主体と到達経路
+
+保守は「運用者（非エンジニア）」と「Claude（開発者セッション）」の二層で回す。役割を取り違えると
+到達経路が空白になる（`maintenance` は `user-invocable: false` で運用者は起動できない）ため明示する。
+
+- **運用者の入口 ＝ `docs/handover/RUNBOOK.md`（人間可読文書）**: 運用者は RUNBOOK を読み、`## 監視`
+  で異常に気づき、`## インシデント対応（トリアージ）` で自己対応できる範囲を実施する。手に負えない
+  場合は `## エスカレーション` の合図（高重大度／手順で復旧しない 等）に従い開発者へ連絡する。運用者は
+  skill を起動しない（できない）。RUNBOOK が運用者向けの唯一の入口。
+- **Part B（トリアージ→ルーティング→記録）の主体 ＝ Claude**: エスカレーションを受けた開発者が
+  `task_type = bugfix`（緊急時 `hotfix`）で Dev セッションを開くと、`bug-diagnosis` が本番/運用起因
+  ケースで `maintenance` Part B を参照する。Claude が重大度分類・ルーティング・RUNBOOK インシデント
+  履歴への記録を行う。トリアージは1回で、診断本体（bug-diagnosis）に入ったら maintenance には戻らない。
+- `maintenance` skill（`user-invocable: false`・pull-based）は Claude 側の手順書であり、運用者向け
+  文書ではない。運用者に必要な情報はすべて成果物 RUNBOOK に出力する。
+
 ## コンポーネント（7）
 
 | # | 成果物 | 種別 |
@@ -84,8 +101,12 @@ skill・bugfix/hotfix task type・`session-recovery` で Dev 側のバグ修正�
 - `## 監視`: 何を見るか（監視対象）・正常値/しきい値・確認手段・頻度。プレースホルダ。
 - `## インシデント対応（トリアージ）`: 重大度の見分け方（例 サイト全停止=高 / 一部機能不調=中 / 軽微=低）・各重大度の初動・**操作者で対応できる範囲 vs 開発者へエスカレーションする線引き**。
 - `## エスカレーション`: 連絡先/連絡方法・SLA/目標復旧時間・bugfix/hotfix 起動の合図。
-- `## インシデント履歴`: 日付 / 事象 / 重大度 / 対応 / 恒久対策（追記式ログ。初期は空の表＋記入例1行）。
+- `## インシデント履歴`: 日付 / 事象 / 重大度 / 対応 / 恒久対策（追記式ログ。初期は空の表＋記入例1行。古い履歴はアーカイブ可の注記を置く）。
 - `## 用語`: 章中のエンジニア用語の平易な言い換え。
+
+> **MANUAL との境界（重複防止）**: 日常の使い方・更新手順は `MANUAL.md` に集約し、RUNBOOK には
+> 書かない。RUNBOOK は「異常の検知（監視）と復旧（トリアージ→対応→記録）」に絞る。冒頭注記で
+> 読者にこの住み分けを示す。
 
 ## maintenance skill の手順（SKILL.md 本文）
 
@@ -121,17 +142,18 @@ ship フェーズ（Step1 証拠収集 → Step2 TO-CLIENT 作成 → Step2.5 �
 
 ## docs-sync への結合
 
-整合チェックリストに1項目追加:
+整合チェックリスト（LLM 自己点検）に1項目追加。RUNBOOK には MANUAL の `audiences` のような
+宣言リストが無いため、これは parity ではなく**存在＋必須節の充足チェック**:
 
-- `[ ] 保守が該当する案件なら docs/handover/RUNBOOK.md が存在し、front-matter 宣言と監視/トリアージ/エスカレーション/履歴の必須節がある（該当なしなら理由が記録されている）`
+- `[ ] 保守が該当する案件なら docs/handover/RUNBOOK.md が存在し、front-matter（product/environment/owners）と必須節（監視/インシデント対応/エスカレーション/インシデント履歴/用語）が埋まっている（該当なしなら理由が記録されている）`
 
 ## bug-diagnosis への結合
 
 `bug-diagnosis` の「いつ使うか」付近に1節を追加（既存の診断プロセスは不変）:
 
-- **本番/運用起因の問題のとき**: まず `maintenance` skill（Part B: トリアージ＋RUNBOOK）を読み、重大度分類とルーティングを経てから本診断に入る。解決後は RUNBOOK の `## インシデント履歴` に追記する。
+- **本番/運用起因の問題のとき（のみ）**: まず `maintenance` skill（Part B: トリアージ）を読み、重大度分類とルーティングを経てから本診断に入る。トリアージは1回で、本診断に入ったら maintenance には戻らない。解決後は RUNBOOK の `## インシデント履歴` に追記する。
 
-> bug-diagnosis 本体のゲート処理・ReAct 診断ステップは変更しない。追加は「運用起因なら maintenance を先に通す」という参照1節のみ。
+> bug-diagnosis 本体のゲート処理・ReAct 診断ステップは変更しない。追加は「**本番/運用起因のときだけ** maintenance を先に通す」という参照1節のみ（通常の bugfix/hotfix は従来どおり）。
 
 ## HANDOVER-TO-CLIENT への結合
 
@@ -163,4 +185,5 @@ B3c は **実行コードを持たない**: `RUNBOOK.template.md` は静的 mark
 - **プレースホルダ/TBD**: なし（全節に具体記述）。
 - **内部整合**: 決定1-5 が各コンポーネントと一致（軽量→新 Mode/ゲートなし・bug-diagnosis 再利用、独立 RUNBOOK→新テンプレ＋ship-and-docs Step2.6、履歴記録→RUNBOOK インシデント履歴節＋skill Part B Step4、監視具体度→テンプレ プレースホルダ＋skill 非必須化、1 skill→maintenance 2パート）。
 - **スコープ**: B3c 単体（⑫）に限定。⑨⑩ は明示除外。単一の実装計画に収まる規模。
-- **曖昧性**: 「保守が該当するか」は skill Part A Step1 でユーザー確認を必須化し一意化。「運用者不在＝RUNBOOK 不要」case は理由記録を必須化。MANUAL との境界（使い方/日常運用 は MANUAL、監視/インシデント対応 は RUNBOOK）を非目標で明示。
+- **曖昧性**: 「保守が該当するか」は skill Part A Step1 でユーザー確認を必須化し一意化。「運用者不在＝RUNBOOK 不要」case は理由記録を必須化。MANUAL との境界（使い方/日常運用 は MANUAL、監視/インシデント対応 は RUNBOOK）を非目標＋RUNBOOK 構造注記で明示。
+- **grill-plan 反映（2026-06-07）**: ①実行主体と到達経路の節を追加（運用者の入口＝RUNBOOK 文書／Part B の主体＝Claude、`user-invocable:false` ゆえ運用者は skill を起動しない）。②docs-sync は parity でなく存在＋必須節の自己点検と明記（RUNBOOK に audiences 相当の宣言が無い）。③bug-diagnosis 結合は「本番/運用起因のときのみ・トリアージ1回」と限定。④RUNBOOK 履歴のアーカイブ可と MANUAL 重複防止注記を追加。詳細は実装計画の grill 反映欄参照。

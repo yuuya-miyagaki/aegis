@@ -10,7 +10,7 @@
 
 > **テスト方針（重要）:** B3c は実行コードを持たない（テンプレ＝静的 md、skill＝LLM 向け手順、各 skill 改修＝手順文）。よって Python ユニットテストは無い。各タスクの検証は **登録整合チェック（contract / drift / mirror-identity / scaffold-smoke）の green** と内容目視。spec `docs/plans/2026-06-07-v1-b3c-maintenance-lifecycle-design.md` 参照。
 
-> **依存順の注意:** `maintenance` skill を参照する ship-and-docs（Task 3）・bug-diagnosis（Task 5）は、skill 本体が存在する Task 2 より後に置く（参照 drift を避ける）。lint_names はスキルを双方向検査するため、skill 作成と lint 必須登録（`REQUIRED_SKILL_FILES`＋`REQUIRED_EXAMPLE_SKILL_DIRS`＋`CLAUDE.md ## Skills`）は Task 2 の同一コミットに畳む。`full.json` は lint 非対象なので Task 7 に分離。
+> **依存順の注意:** `maintenance` skill を参照する ship-and-docs（Task 3）・bug-diagnosis（Task 5）は、skill 本体が存在する Task 2 より後に置く。根拠は**論理的な参照先の実在＋3年後の読み手の自然さ**であって drift 回避ではない（注: `check_reference_drift` は `CLAUDE.md ## Skills` ↔ `.claude/skills/*/` の双方向のみ検査し、skill 本文中の他スキル名参照は検査しない＝順序を逆にしても drift では落ちない）。実際の強制は **lint_names の双方向検査**（`CLAUDE.md ## Skills` ↔ skill dir）なので、skill 作成と lint 必須登録（`REQUIRED_SKILL_FILES`＋`REQUIRED_EXAMPLE_SKILL_DIRS`＋`CLAUDE.md ## Skills`）は Task 2 の同一コミットに畳む。`full.json` は lint 非対象なので Task 7 に分離。
 
 ---
 
@@ -58,8 +58,9 @@ owners: "<記入: 運用担当者・エスカレーション先（氏名/連絡�
 <!-- 正本: maintenance skill -->
 <!-- exit-check: 監視/インシデント対応/エスカレーション/インシデント履歴/用語 の節あり・プレースホルダ未記入なし・用語平易化済み -->
 
-> この RUNBOOK は製品を「運用し続ける／壊れたときに直す」ための文書です。
-> 使い方・日常運用（コンテンツ更新・基本設定）は `MANUAL.md` を参照してください。
+> この RUNBOOK は製品の **異常を検知し（監視）、壊れたときに復旧する** ための文書です。
+> 日常の使い方・更新手順（コンテンツ更新・基本設定）は `MANUAL.md` に集約しています。重複させないでください。
+> あなた（運用者）はこの文書だけで、自分で対応できる範囲と、開発者へ連絡すべき合図が分かります。
 > 運用者がいない案件（閲覧専用で更新も監視もしない等）ではこの文書は不要です。
 
 ## 監視
@@ -83,7 +84,7 @@ owners: "<記入: 運用担当者・エスカレーション先（氏名/連絡�
 - 開発対応の合図: 高重大度または操作者手順で復旧しない場合、bugfix（緊急時 hotfix）として開発に依頼する。
 
 ## インシデント履歴
-<!-- 対応したインシデントを追記する。空のまま閉じない。 -->
+<!-- 対応したインシデントを追記する。空のまま閉じない。履歴が増えたら古い行は別ファイルにアーカイブしてよい。 -->
 | 日付 | 事象 | 重大度 | 対応 | 恒久対策 |
 |---|---|---|---|---|
 | <記入例 2026-01-01> | <記入例 予約ボタンが反応しない> | <中> | <記入例 キャッシュ削除で復旧> | <記入例 hotfix #123 で原因修正> |
@@ -142,10 +143,14 @@ user-invocable: false
 > 納品後の「運用・監視・インシデント対応」を担う。Part A は ship 段階で運用 RUNBOOK を生成し、
 > Part B は運用中のインシデントをトリアージして既存の修正経路へ流し、記録してループを閉じる。
 > 修正実行は新設せず `bug-diagnosis`・bugfix/hotfix を再利用する。
+>
+> **このスキルは Claude 側の手順書**（`user-invocable: false`）。運用者（非エンジニア）の入口は
+> 成果物 `docs/handover/RUNBOOK.md` であり、運用者はこのスキルを起動しない。運用者に必要な情報は
+> すべて RUNBOOK に出力する。
 
 ## いつ使うか
 - **Part A（生成）**: docs フェーズで `ship-and-docs` の ship 段階（Step 2.6）から参照される。製品を運用する人がいる納品物のとき。
-- **Part B（運用）**: 運用中にインシデント/監視シグナルが出たとき。`bug-diagnosis` の本番/運用起因ケースから参照される。
+- **Part B（運用）**: 運用者から「製品が壊れた」とエスカレーションを受けた開発者が、`task_type=bugfix`（緊急時 `hotfix`）で Dev セッションを開いたとき。`bug-diagnosis` の本番/運用起因ケースから参照される。**主体は Claude**（運用者の一次対応・エスカレーション判断は RUNBOOK が担う）。
 - 運用者がいない案件（閲覧専用で監視も更新もしない等）は RUNBOOK を生成せず理由を記録する。
 
 ## Part A: RUNBOOK 生成（ship 時）
@@ -154,7 +159,7 @@ user-invocable: false
 `docs/requirements/SCOPE.md`・`PRD.md`・TO-CLIENT の「配備と運用」・STATUS から、運用者の有無とデプロイ先/監視手段/エスカレーション先を判定し、ユーザーに確認する。運用者がいなければ生成せず理由を記録（下記「RUNBOOK が不要なとき」）。
 
 ### Step 2: RUNBOOK を記述
-`templates/RUNBOOK.template.md` をもとに `docs/handover/RUNBOOK.md` を作成する。監視・トリアージ・エスカレーションを**平易語**（非エンジニアが読める語彙）で記述する。プレースホルダ（`<記入>`）を空のまま残さない。実際の監視インフラ設定（アラート構築等）は促すが必須化しない。
+`templates/RUNBOOK.template.md` をもとに `docs/handover/RUNBOOK.md` を作成する。監視・トリアージ・エスカレーションを**平易語**（非エンジニアが読める語彙）で記述する。プレースホルダ（`<記入>`）を空のまま残さない。実際の監視インフラ設定（アラート構築等）は促すが必須化しない。**使い方・更新手順は `MANUAL.md` に集約し、RUNBOOK には書かない**（重複させない。RUNBOOK は異常検知と復旧に絞る）。
 
 ### Step 3: TO-CLIENT からリンク
 `docs/handover/TO-CLIENT.md` の納品サマリーに `docs/handover/RUNBOOK.md` へのリンクを追加する。
@@ -172,7 +177,7 @@ RUNBOOK のトリアージ基準で重大度（高/中/低）とスコープを�
 
 ### Step 3: ルーティング
 - 操作者で対応可（RUNBOOK の手順内）→ 実施する。
-- 開発が必要 → `task_type = bugfix`（緊急なら `hotfix`）として `bug-diagnosis` skill へ渡す。
+- 開発が必要 → `task_type = bugfix`（緊急なら `hotfix`）として `bug-diagnosis` skill へ渡す。**トリアージはここで完了。bug-diagnosis の診断本体に入ったら maintenance には戻らない**（読み合いループを作らない）。
 
 ### Step 4: 記録
 解決後、RUNBOOK の `## インシデント履歴` に 日付/事象/重大度/対応/恒久対策 を追記してループを閉じる。
@@ -296,10 +301,10 @@ git commit -m "feat(b3c): ship-and-docs references maintenance skill (Step 2.6)"
 ```markdown
 - [ ] マニュアルが該当する案件なら `docs/handover/MANUAL.md` が存在し、front-matter の宣言読者と手順章が1対1（宣言ごとに章があり、宣言の無い孤児章も無い）。該当なしなら理由が記録されている
 ```
-の直後に、次の1行を追加する:
+の直後に、次の1行を追加する（RUNBOOK には `audiences` 相当の宣言が無いため parity でなく存在＋節充足の自己点検）:
 
 ```markdown
-- [ ] 保守が該当する案件なら `docs/handover/RUNBOOK.md` が存在し、front-matter 宣言と監視/インシデント対応/エスカレーション/インシデント履歴/用語の必須節がある。該当なしなら理由が記録されている
+- [ ] 保守が該当する案件なら `docs/handover/RUNBOOK.md` が存在し、front-matter（product/environment/owners）と必須節（監視/インシデント対応/エスカレーション/インシデント履歴/用語）が埋まっている。該当なしなら理由が記録されている
 ```
 
 - [ ] **Step 2: example へミラー＋確認**
@@ -333,10 +338,10 @@ git commit -m "feat(b3c): docs-sync verifies RUNBOOK section parity"
 ```markdown
 - brainstorm を n/a にしてよい代わりに、このスキルを実行する
 ```
-の直後に、次の1行を追加する:
+の直後に、次の1行を追加する（通常の bugfix/hotfix は従来どおり。本番/運用起因のときだけ maintenance を先に通す）:
 
 ```markdown
-- **本番/運用起因の問題のとき**: まず `maintenance` skill（Part B: トリアージ）を読み、重大度分類とルーティングを経てから本診断に入る。解決後は `docs/handover/RUNBOOK.md` の `## インシデント履歴` に追記する。
+- **本番/運用起因の問題のとき（のみ）**: まず `maintenance` skill（Part B: トリアージ）を読み、重大度分類とルーティングを経てから本診断に入る。トリアージは1回で、本診断に入ったら maintenance には戻らない。解決後は `docs/handover/RUNBOOK.md` の `## インシデント履歴` に追記する。
 ```
 
 - [ ] **Step 2: example へミラー＋確認**
@@ -448,7 +453,18 @@ git commit -m "test(b3c): full structural verification green"
 ## Self-Review（プラン執筆者チェック・実施済み）
 
 - **spec カバレッジ**: 決定1（軽量・advisory／bug-diagnosis 再利用）=新 Mode/ゲートなし・Task5 で既存経路へルーティング / 決定2（独立 RUNBOOK）=Task1 テンプレ＋Task3 ship-and-docs Step2.6＋Task6 TO-CLIENT リンク＋Task4 docs-sync 検証・current_refs 不追加 / 決定3（履歴記録）=Task1 インシデント履歴節＋Task2 skill Part B Step4 / 決定4（監視具体度）=Task1 プレースホルダ＋Task2 skill Part A Step2 非必須化 / 決定5（1 skill 2パート）=Task2 maintenance 単一 SKILL。登録=Task1/Task2/Task7、検証=Task8。**未カバーなし**。
-- **依存順**: maintenance（Task2）→ それを参照する ship-and-docs（Task3）/bug-diagnosis（Task5）の順。lint 双方向登録は Task2 同一コミット。**赤コミットなし**。
+- **依存順**: maintenance（Task2）→ それを参照する ship-and-docs（Task3）/bug-diagnosis（Task5）の順。根拠は論理依存＋読み手の自然さ（drift は本文参照を検査しないので順序を強制しない）。lint 双方向登録は Task2 同一コミット。**赤コミットなし**。
 - **プレースホルダ**: テンプレ/skill の `<記入>`・`<専門語>` は成果物テンプレの記入欄であり計画の TBD ではない。手順自体に TBD 無し。
 - **型/名称整合**: skill 名 `maintenance`（dir/frontmatter name/参照/CLAUDE.md/contract/full.json/REQUIRED_EXAMPLE_SKILL_DIRS で一致）、テンプレ `RUNBOOK.template.md`、出力 `docs/handover/RUNBOOK.md`、参照元 `ship-and-docs` Step 2.6・`bug-diagnosis`、検証元 `docs-sync`、必須節名（監視/インシデント対応（トリアージ）/エスカレーション/インシデント履歴/用語）は全 Task で一致。
 - **コミット健全性**: 各 Task のコミット後に contract がすべて green。
+
+## grill-plan 反映（2026-06-07）
+
+- **致命1（Part B の実行主体/到達性）**: skill 冒頭注記＋「いつ使うか」に「主体は Claude・運用者の入口は RUNBOOK・`user-invocable:false` ゆえ運用者は起動しない」を明記（Task2 Step1）。design に「実行主体と到達経路」節を追加。
+- **致命2（MANUAL/RUNBOOK 境界）**: RUNBOOK テンプレ冒頭注記を「異常検知と復旧に絞る・使い方は MANUAL に集約」と強化（Task1）＋ Part A Step2 に「使い方は MANUAL・重複させない」を追加（Task2）。
+- **致命3（依存順の根拠が事実誤認）**: `check_reference_drift` は本文の他スキル参照を検査しない、と訂正（冒頭注記・本 Self-Review）。順序の真の根拠は論理依存＋lint 双方向。
+- **要検討1（docs-sync の強さ）**: parity でなく存在＋必須節の自己点検（LLM チェックリスト・自動 validator でない）と明記（Task4・design）。
+- **要検討2（履歴の肥大）**: RUNBOOK インシデント履歴に「古い行はアーカイブ可」注記を追加（Task1）。
+- **要検討3（相互参照ループ）**: 「トリアージは1回・本診断に入ったら戻らない」を Task2 Part B Step3・Task5 に明記。
+- **要検討4（bug-diagnosis クリティカルパス）**: 「本番/運用起因のときのみ・通常 bugfix は従来どおり」を Task5 に明記（grill-code でも目視）。
+- **要検討5（full.json recommended）**: B3a と同じく recommended を維持（lint 非 critical・required 化は将来判断）。
