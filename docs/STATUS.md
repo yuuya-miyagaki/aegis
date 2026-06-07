@@ -6,8 +6,8 @@ mode: Dev
 phase: brainstorm
 task_type: framework
 task_size: M
-task_size_rationale: "v1.3.0 締め完了（v1.2.0 以降の B3c[⑫保守ライフサイクル]＋B3b[⑩UAT 実行]を SemVer minor=追加機能として集約）。FRAMEWORK_VERSION 1.2.0→1.3.0＋STATUS template/docs 同期＋README 移行節 v1.2.0→v1.3.0＋tag v1.3.0。B3c=RUNBOOK テンプレ＋maintenance skill（生成/トリアージループ・advisory）、B3b=UAT-RESULTS テンプレ＋uat skill＋dev_ready_for_client への UAT 存在チェック（ACCEPTANCE 条件付き・合否は client サインオフ）。296 tests・contract(full/standard)・drift・mirror-identity・tier2・--strict 全 PASS。公開運用契約の変更は UAT ゲート連動のみ（ACCEPTANCE がある案件に限る・非 ACCEPTANCE は無改修）。**北極星後半 ⑨⑩⑫ 完成。** 残 B-series: B4（native 冗長棚卸し）。出典 docs/audit-report-2026-06-06.md §4 優先度4。"
-iteration: 14
+task_size_rationale: "B4（native 冗長棚卸し）完了: README の `## Native Feature Mapping` 表に native 委譲マップ4行（Checkpoints/rewind・/resume系・Auto Mode・Routines の Keep/Complement/N/A＋根拠）を追加＋session-recovery に native 併用注記。grill-premise の発見＝監査 B4 前提（Checkpoints/Routines/Auto Mode が aegis を冗長化）はほぼ不成立（checkpoints=ファイル undo≠状態復元／routines=aegis に scheduling surface 無し／Auto Mode=確率的分類器 vs 決定論 hooks moat）ゆえ load-bearing surface は削除せず、委譲境界の文書化＋外科的注記に倒した。brainstorm→grill-plan（要検討5反映）→実装3タスク→grill-code（🟡1反映）完走。実行コード無し。contract(full/standard)・drift・mirror-identity・296 tests・tier2・--strict 全 PASS。**これで B-series（B1/B2/B3a/B3b/B3c/B4）全完了。** 版締めは未（B4 は docs-only ＝ patch 相当）。出典 docs/audit-report-2026-06-06.md §4 優先度4。"
+iteration: 15
 ui_surface: false
 last_updated: "2026-06-07T00:00:00Z"
 gate_approvals:
@@ -41,7 +41,7 @@ external_evidence:
     scope: "v0.12.2 実装後 4 ラウンドレビュー"
     findings: "Round 6 (P1×2, P2×1: pre-compact exit 2 / minimal-project / test rc), Round 7 (P1×1, P3×1: git add 漏れ / テスト件数表記), Round 8 (P2×1, P3×1: stale last_updated / grep 自己マッチ), Round 9 (P3×2: コメント不整合)"
     resolution: "9件全反映。tier 1/2 PASS、134 tests PASS、本体と minimal-project 完全同期確認済み。"
-next_action: "v1.3.0 締め完了（FRAMEWORK_VERSION 1.3.0・STATUS template/docs 同期・README 移行節 v1.2.0→v1.3.0・tag v1.3.0）。北極星後半 ⑨⑩⑫ 完成。296 tests・contract(full/standard)・drift・mirror-identity・tier2・--strict 全 PASS。残 B-series は **B4（native 冗長棚卸し＝Checkpoints/rewind・Routines・Auto Mode への委譲可否評価・surface 削減）** のみ。B4 は brainstorm から（charter §6）。出典 docs/audit-report-2026-06-06.md §4 優先度4。"
+next_action: "B4（native 冗長棚卸し）完了・main push 済み。**監査由来 B-series（B1/B2/B3a/B3b/B3c/B4）全完了。** B4 は docs-only（README 委譲マップ＋skill 注記・運用契約に変更なし）なので版締めは patch v1.3.1 相当 or 無tag（ユーザー判断）。次の大きな一手は新規テーマ（要 brainstorm）。出典 docs/audit-report-2026-06-06.md §4 優先度4。"
 blockers: []
 failure_tracking: null
 session_history:
