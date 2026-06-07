@@ -129,7 +129,7 @@ bash scripts/update-gate.sh plan approve
 - 失敗を確認 → `reservation.py` に `is_conflict()` を実装 → テストが通る（green）。
 
 > **体験ポイント④**：テストを書かずに `reservation.py` を編集しようとすると、`check-tdd` hook が
-> **確認を求める（ask）**。先にテストを書いてコミット（git があるので差分が見える）すれば、すんなり進む。
+> **確認を求める（ask）**。先にテストファイルを**作れば**（git があるので未追跡でも差分として見える）すんなり進む。
 > これが「テスト先行（TDD）」を体で覚える瞬間。
 
 ### review — レビュー
