@@ -9,6 +9,7 @@
 - 日付: <記入>
 - 担当者: <記入>
 - 操作マニュアル: <記入: docs/handover/MANUAL.md（該当時）／不要なら理由>
+- 運用 RUNBOOK: <記入: docs/handover/RUNBOOK.md（運用者がいる場合）／不要なら理由>
 
 ## 実装範囲
 
