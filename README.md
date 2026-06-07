@@ -168,6 +168,35 @@ python3 scripts/check_status.py --root . --strict
 
 ## Migration
 
+### From v1.3.1 to v1.3.2
+
+**Non-breaking — install-delivery bug fixes** (functional-integrity audit
+2026-06-07). The operating contract is unchanged; these fixes make scaffolded
+projects actually ship and run what they were designed to. The audit found that
+static checks (contract/eval/drift/mirror) only validated the framework repo and
+the hand-maintained example — the `setup.sh` install path was never executed — so
+several install-only breaks went unnoticed.
+
+- **Hook libraries now ship (the big one).** `setup.sh` copied only
+  `hooks/lib/extract-input.sh`, omitting `hooks/lib/emit.sh` (sourced by every
+  hook) and `hooks/lib/patterns.sh`. Every hook died at `source lib/emit.sh` in
+  `standard`/`full` installs, so the deterministic PaC moat silently failed open.
+  `copy_hooks` now copies the whole `hooks/lib/*.sh`.
+- **`/judge`, graceful `/retro`, `status_doctor` now ship in `full`.** `/judge`
+  was in no profile; `/retro` shipped the non-graceful framework variant that
+  hard-runs a script no profile ships; `session-recovery`'s `status_doctor.py`
+  call had no installed script. All three are delivered now.
+- **Hardening.** The scaffold smoke now *executes* installed hooks/scripts (not
+  just checks files exist), and the contract manifest tracks all registered
+  hooks. Plus two doc/comment polish items.
+
+**Action for existing projects**: re-run `bash bin/setup.sh --profile=full`. The
+previously-missing files (`hooks/lib/emit.sh`, `hooks/lib/patterns.sh`,
+`.claude/commands/judge.md`, `scripts/status_doctor.py`) copy in automatically
+(setup skips only files that already exist). To also replace the older
+non-graceful `.claude/commands/retro.md`, pass `--force` or update that one file
+by hand (`--force` overwrites all managed files, so review local edits first).
+
 ### From v1.3.0 to v1.3.1
 
 **Docs-only — no action required.** Audit 2026-06-06 §4 priority-4 follow-up B4

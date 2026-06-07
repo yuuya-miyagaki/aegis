@@ -1,15 +1,15 @@
 ---
 framework: aegis
-framework_version: "1.3.1"
+framework_version: "1.3.2"
 project_name: "Aegis"
 mode: Dev
 phase: brainstorm
 task_type: framework
-task_size: M
-task_size_rationale: "v1.3.1 締め完了（B4 native 冗長棚卸し＝docs-only を patch として締め）。FRAMEWORK_VERSION 1.3.0→1.3.1＋STATUS template/docs 同期＋README 移行節 v1.3.0→v1.3.1（docs-only・無改修）＋tag v1.3.1。B4 実体＝README `## Native Feature Mapping` に native 委譲マップ4行＋session-recovery の native 併用注記。grill-premise で監査 B4 前提が不成立と判明（checkpoints≠状態復元／aegis に scheduling surface 無し／Auto Mode 確率的 vs 決定論 hooks moat）ゆえ load-bearing surface は削除せず文書化に倒した。contract(full/standard)・drift・mirror-identity・296 tests・tier2・--strict 全 PASS。運用契約に変更なし。**監査由来 B-series（B1/B2/B3a/B3b/B3c/B4）全完了。北極星後半 ⑨⑩⑫ 完成。** 出典 docs/audit-report-2026-06-06.md §4 優先度4。"
+task_size: L
+task_size_rationale: "機能整合性監査（charter 2026-06-07）の修正フェーズを完了し v1.3.2 patch で締め。調査 Layer 0-4 で7 finding（P1×1/P2×4/P3×2）を実証検出。核心 **F6（P1）**＝setup.sh が hooks/lib/emit.sh・patterns.sh を配布せず install 先で全 hook が source 時に死＝moat 全死を、copy_hooks の lib 全コピーで修復。F3 retro graceful 版配送／F2 judge 配布／F4 status_doctor 配布／F1 contract manifest に稼働 hook4件追跡／F5・F7 polish。各 TDD（RED→GREEN）＋2段グリル（grill-plan→grill-code）。install 経路を scaffold smoke の hook 実発火検証で契約化し静的検査の死角（setup.sh 出力が無検査だった）を恒久封鎖。FRAMEWORK_VERSION 1.3.1→1.3.2＋STATUS template/docs 同期＋README 移行節 v1.3.1→v1.3.2＋tag v1.3.2。298 tests・contract(full/standard)・drift(mirror)・tier2・--strict 全 PASS。運用契約に変更なし。出典 docs/functional-integrity-audit-report-2026-06-07.md。"
 iteration: 15
 ui_surface: false
-last_updated: "2026-06-07T00:00:00Z"
+last_updated: "2026-06-07T12:00:00Z"
 gate_approvals:
   client_ready_for_dev: n/a
   brainstorm: pending
@@ -41,14 +41,10 @@ external_evidence:
     scope: "v0.12.2 実装後 4 ラウンドレビュー"
     findings: "Round 6 (P1×2, P2×1: pre-compact exit 2 / minimal-project / test rc), Round 7 (P1×1, P3×1: git add 漏れ / テスト件数表記), Round 8 (P2×1, P3×1: stale last_updated / grep 自己マッチ), Round 9 (P3×2: コメント不整合)"
     resolution: "9件全反映。tier 1/2 PASS、134 tests PASS、本体と minimal-project 完全同期確認済み。"
-next_action: "v1.3.1 締め完了（FRAMEWORK_VERSION 1.3.1・STATUS template/docs 同期・README 移行節 v1.3.0→v1.3.1・tag v1.3.1）。**監査由来 B-series（B1/B2/B3a/B3b/B3c/B4）全完了・北極星後半 ⑨⑩⑫ 完成。** 296 tests・contract(full/standard)・drift・mirror-identity・tier2・--strict 全 PASS。**次タスク＝機能整合性監査**（各機能が実際に走るか・配線・過不足を実証的に確認し首を直して締める）。charter `docs/functional-integrity-audit-charter-2026-06-07.md` に全手順あり。/clear 後はそれを読んで Layer 0（ベースライン green）→ Layer 1（surface 列挙）から着手。出典 docs/audit-report-2026-06-06.md §4 優先度4。"
+next_action: "機能整合性監査 v1.3.2 締め完了（全 finding F1-F7 修正・install 先で moat 実発火を実地確認・298 tests／contract(full/standard)／drift(mirror)／tier2／--strict 全 PASS・tag v1.3.2）。report＝docs/functional-integrity-audit-report-2026-06-07.md。最大の収穫＝install 経路（setup.sh 出力）が無検査だった死角を scaffold smoke の hook 実発火で契約化。**次タスク未定。**"
 blockers: []
 failure_tracking: null
 session_history:
-  - date: "2026-05-15"
-    mode: Dev
-    phase: "docs"
-    note: "v0.12.2 hotfix ship 完了。Round 6-9 で 9 件追加修正（pre-compact exit 0 化、minimal-project 完全同期、コメント整合、stale last_updated 解消等）。134 tests PASS + tier 1/2 PASS。"
   - date: "2026-06-05"
     mode: Dev
     phase: "implement"
@@ -57,6 +53,10 @@ session_history:
     mode: Dev
     phase: "implement"
     note: "Phase R 再配分(0.12.3〜0.12.6: routing/context/model-effort/name-hygiene/TDD/evidence)を連続 ship。続けて Phase D（仕上げ）: migration guide(v0.12.2→v1.0.0)＋README リフレッシュ＋安定契約/SemVer 明文化＋**version 1.0.0**。各 2段グリル反映。195 tests green・tier1/2 PASS。**再アーキ F→R→A→D 全完了＝v1.0.0。**"
+  - date: "2026-06-07"
+    mode: Dev
+    phase: "docs"
+    note: "機能整合性監査（charter 2026-06-07）を実行。Layer 0-4 で7 finding 実証検出（P1×1/P2×4/P3×2）。**F6（P1）＝setup.sh が hooks/lib/emit.sh・patterns.sh を配布せず install 先で全 hook が source 時に死＝決定論 moat 全死**を copy_hooks 全 lib コピーで修復。F3 retro graceful 配送／F2 judge 配布／F4 status_doctor 配布／F1 contract hook4件追跡／F5・F7 polish。各 TDD＋2段グリル。install 経路を scaffold smoke の hook 実発火で契約化（静的検査の死角を恒久封鎖）。再検証で Layer 0 全 green＋ライブ install の moat 実発火を実証。v1.3.2 patch で締め（298 tests・contract・drift・tier2・--strict 全 PASS・tag v1.3.2）。"
 ---
 
 ## Summary
