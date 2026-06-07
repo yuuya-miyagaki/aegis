@@ -15,7 +15,7 @@ using Aegis.
 - `.claude/agents/` — bounded specialist roles (12 agents)
 - `.claude/commands/` — slash commands (`/status`, `/gate`, `/next`, `/recover`, `/validate`, `/retro`, `/tutorial`)
 - `.claude/rules/` — always-loaded state machine and routing rules
-- `.claude/skills/` — pull-based skill documents (16 skills)
+- `.claude/skills/` — pull-based skill documents (17 skills)
 - `.claude/settings.json` — hooks configuration
 - `hooks/` — runtime enforcement hooks (including `hooks/lib/`)
 - `scripts/update-gate.sh` (required by `/gate` command for gate approvals)

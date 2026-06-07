@@ -58,7 +58,7 @@ L0 `CLAUDE.md`+`STATUS.md` (always-on), L1 phase refs, L2 task files, L3 on-dema
 Skills live in `.claude/skills/`. Load for the current phase only.
 
 - aegis-brainstorm, bug-diagnosis, tdd, subagent-dev
-- deploy, client-workflow, session-recovery, ship-and-docs, user-manual
+- deploy, client-workflow, session-recovery, ship-and-docs, user-manual, maintenance
 - aegis-review-gate, aegis-security-gate, qa-verification, docs-sync, translation-mapping
 - integration-assist, browser-assist
 

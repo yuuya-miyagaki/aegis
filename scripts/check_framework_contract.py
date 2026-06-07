@@ -68,6 +68,7 @@ REQUIRED_SKILL_FILES = [
     ROOT / ".claude/skills/integration-assist/SKILL.md",
     ROOT / ".claude/skills/browser-assist/SKILL.md",
     ROOT / ".claude/skills/user-manual/SKILL.md",
+    ROOT / ".claude/skills/maintenance/SKILL.md",
 ]
 
 REQUIRED_RULES_FILES = [
@@ -206,6 +207,7 @@ REQUIRED_EXAMPLE_SKILL_DIRS = [
     "integration-assist",
     "browser-assist",
     "user-manual",
+    "maintenance",
 ]
 
 # Legacy skill files that should NOT exist (migrated to .claude/skills/ in v0.6.0).
