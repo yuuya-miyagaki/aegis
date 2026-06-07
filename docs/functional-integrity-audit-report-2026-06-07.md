@@ -330,11 +330,12 @@ install 経路を恒久的に契約化する。これが個別修正より効く
 | ID | Layer | 分類 | 重大度 | surface | 概要 | 状態 |
 |----|-------|------|--------|---------|------|------|
 | F1 | L1 | missing | P2 | check_framework_contract.py | REQUIRED_HOOK_FILES が稼働 hook 4件を欠く＝template 登録の維持保証に穴 | 未triage |
-| F2 | L1 | missing | P2 | profiles/*.json | `/judge` が全 profile に無く install されない（裏方 build-judge-card.py は full に有） | 未triage |
-| F3 | L1 | dead/broken | P2 | bin/setup.sh resolve_source | retro.md の scaffold-safe 変種が install に繋がらず、非safe版が配布され `/retro` がエラー | 未triage（L2/3で実証） |
+| F2 | L1 | missing | P2 | profiles/*.json | `/judge` が全 profile に無く install されない（裏方 build-judge-card.py は full に有） | ✅修正済 |
+| F3 | L1 | dead/broken | P2 | bin/setup.sh resolve_source | retro.md の scaffold-safe 変種が install に繋がらず、非safe版が配布され `/retro` がエラー | ✅修正済 |
 | F4 | L1 | dead/broken | P2 | session-recovery SKILL | Step1.5 が status_doctor.py を無ガード実行（profile 未配布）→ `/recover` 劣化 | 未triage |
 | F5 | L1 | missing | P3 | templates/・client-workflow | テンプレ非配布なのに「artifact template を開く」指示＝install 先で空振り（hard break なし） | 未triage |
 | **F6** | **L2** | **dead/broken** | **P1** | **bin/setup.sh copy_hooks** | **emit.sh/patterns.sh を install せず、standard/full install 先で全 hook が exit 1 で死＝moat 全死・silent fail-open** | **✅修正済** |
+| F7 | L2 | redundant | P3 | check_reference_drift.py | scaffold-safe を表す集合が2つあり食い違う（`MIRROR_ALLOWLIST={validate,retro}` vs `intentional_divergence={validate}`）。現状は両 command が root 実在で無害だが latent。grill-plan(F3) 由来 | 未triage |
 
 ## triage 推奨（調査→修正の橋渡し）
 
@@ -368,6 +369,18 @@ hook 強制込みで通る**ことを確認して締める。
   実 install（full）で check-destructive→ask / check-secrets→deny / check-gate→allow / session-start 無エラー
   を再確認＝moat 復活。grill-code＝マージ可（Critical 0）。
 - ミラー: setup.sh / eval_scaffold_smoke は MIRROR 対象外のため example 同期不要。version は版締めまで保留。
+
+### F3+F2（P2）— 修正済
+
+- 計画: `docs/plans/f3-f2-install-command-fidelity-plan.md`（grill-plan 反映済）。
+- 変更: `bin/setup.sh` resolve_source に retro.md→example 変種マップ追加（F3）／`templates/profiles/full.json`
+  required に judge.md 追加（F2）／`scripts/eval_scaffold_smoke.py` に `verify_command_surface` 追加。
+- 回帰防止: `MIRROR_ALLOWLIST` を import し「allowlist コマンド ⊆ resolve_source 配線」を自己強制（F3 と
+  同型の「足したが配線忘れ」class を封鎖）。retro は graceful guard 句、full は judge 存在も検証。
+- TDD: RED（full で retro 非example変種＋guard欠落＋judge不在の3件 collect）→ GREEN（3 profile PASS）。
+- 検証: tier0(296)/1/2・contract(full/std)・drift・--strict 全 green。実 full install で `/retro` graceful
+  （guard 句あり）・`/judge` 存在を再確認。grill-code＝マージ可（guard 文字列を具体句に絞る🟡を反映済）。
+- 新 finding: F7（drift の scaffold-safe 集合の二重・食い違い・P3・latent）を記録。
 
 ## 完了サマリ（調査フェーズ）
 
