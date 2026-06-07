@@ -6,8 +6,8 @@ mode: Dev
 phase: brainstorm
 task_type: framework
 task_size: M
-task_size_rationale: "v1.1.0 締め完了（v1.0.0 以降の26コミット＝監査 P1-P3 fix-forward＋B1 テスト強度ドリル＋B2 judge 可視化を minor bump で集約）。version bump＋STATUS 同期＋README 移行節＋tag v1.1.0。次タスク B3（ライフサイクル後半の厚み: ⑨ MANUAL テンプレ/⑩ UAT 実行フェーズ/⑫ 保守 runbook・監視・agent）は再設計テーマのため brainstorm から開始（charter §6: 監査と再設計の分離）。"
-iteration: 11
+task_size_rationale: "B3a（⑨ 操作マニュアル＝読者パラメータ化テンプレ＋user-manual skill）完了・main マージ/push 済み（v1.2.0 相当・未 tag、framework_version は 1.1.0 のまま）。brainstorm→grill-plan→executing-plans→grill-code の2段グリル通過。残: 版締め（FRAMEWORK_VERSION 1.1.0→1.2.0＋STATUS/テンプレ同期＋README 移行節＋tag v1.2.0）／B-series 残＝B3b（⑩ UAT 実行フェーズ）・B3c（⑫ 保守ライフサイクル: runbook/監視/保守 agent・北極星後半の最薄部）・B4（native 冗長棚卸し）。出典 docs/audit-report-2026-06-06.md §4 優先度4。"
+iteration: 12
 ui_surface: false
 last_updated: "2026-06-07T00:00:00Z"
 gate_approvals:
@@ -41,7 +41,7 @@ external_evidence:
     scope: "v0.12.2 実装後 4 ラウンドレビュー"
     findings: "Round 6 (P1×2, P2×1: pre-compact exit 2 / minimal-project / test rc), Round 7 (P1×1, P3×1: git add 漏れ / テスト件数表記), Round 8 (P2×1, P3×1: stale last_updated / grep 自己マッチ), Round 9 (P3×2: コメント不整合)"
     resolution: "9件全反映。tier 1/2 PASS、134 tests PASS、本体と minimal-project 完全同期確認済み。"
-next_action: "v1.1.0 締め完了（FRAMEWORK_VERSION 1.1.0・STATUS/テンプレ同期・README 移行節 v1.0.0→v1.1.0・tag v1.1.0 push 済み）。293 tests・contract(full/standard)・drift PASS。次は **B3 を brainstorm から**: ライフサイクル後半（⑨ MANUAL テンプレ/⑩ UAT 実行フェーズ/⑫ 保守 runbook・監視・保守 agent）のスコープ確定（どれから／どこまで）。出典 docs/audit-report-2026-06-06.md §4 優先度4。"
+next_action: "B3a（⑨ 操作マニュアル）完了・main マージ/push 済み。293 tests・contract(full/standard)・drift・mirror-identity・scaffold-smoke・--strict 全 PASS。**次セッションの選択肢**: (a) 版締め＝v1.2.0（FRAMEWORK_VERSION 1.1.0→1.2.0＋STATUS template/docs 同期＋README 移行節 v1.1.0→v1.2.0＋tag v1.2.0 push）、(b) B3c（⑫ 保守ライフサイクル＝北極星後半の最薄部・要 brainstorm）、(c) B3b（⑩ UAT 実行フェーズ＝state-machine に新フェーズ・要 brainstorm）、(d) B4（native 冗長棚卸し）。推奨は (a) で版を締めてから (b)。再設計テーマ(B3b/B3c/B4)は charter §6 に従い brainstorm→grill-plan→実装→grill-code。"
 blockers: []
 failure_tracking: null
 session_history:
