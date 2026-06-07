@@ -121,12 +121,24 @@ ship フェーズ（Step1 証拠収集 → Step2 TO-CLIENT → Step2.5 マニュ
 
 ## ゲート連動の仕組み（check_status.py）
 
-`check_status.py` の `dev_ready_for_client` 承認処理（既存の特別処理付近）に存在チェックを追加:
+存在チェックは `check_gate_prerequisites()`（`scripts/check_status.py:834` 付近、純 deterministic gating）の
+`dev_ready_for_client` 分岐に追加する。**evidence 層の `pre_approve_gate` ではない**。同型の先例は
+同関数内の `client_ready_for_dev` の mapping.md 存在チェック（`:866`、`root / "docs/translation/mapping.md"`）。
 
-- 承認対象が `dev_ready_for_client` のとき:
-  - `<root>/docs/requirements/ACCEPTANCE.md` が存在し、かつ `<root>/docs/handover/UAT-RESULTS.md` が**不在**なら、エラーを返し承認をブロック（メッセージ例: `Cannot approve 'dev_ready_for_client' — ACCEPTANCE.md exists but docs/handover/UAT-RESULTS.md is missing (run uat skill)`）。
-  - ACCEPTANCE.md 不在なら従来どおり承認可（UAT 不要）。
+- `dev_ready_for_client` 分岐（既存の必須ゲート [review/qa/security] チェックの後）に追加:
+  - `root / "docs/requirements/ACCEPTANCE.md"` が存在し、かつ `root / "docs/handover/UAT-RESULTS.md"` が
+    **不在**なら、エラーを print して `return 1`（ブロック）。
+  - ACCEPTANCE.md 不在なら従来どおり `return 0`（UAT 不要）。
   - UAT-RESULTS の中身（✅/❌）は検査しない（client サインオフが正本）。
+- **エラーメッセージは既存の日本語スタイルに統一**（`client_ready_for_dev` の mapping エラーに倣う）。例:
+  ```
+  ERROR: docs/requirements/ACCEPTANCE.md があるのに docs/handover/UAT-RESULTS.md が見つかりません。
+         dev_ready_for_client の前に UAT を実行してください。
+         → uat skill を使用
+  ```
+- **「❌ のまま存在させれば機械は通る」抜け道**: 機械は存在のみ検査するため、未合格のまま UAT-RESULTS を
+  置けばゲートは通る。これは「合否は client サインオフが正本」の意図通り。人手側の補完として docs-sync 自己
+  点検（全 Must-AC に合否・サインオフ）と uat skill の Red Flags（❌ のまま理由なくサインオフ禁止）で塞ぐ。
 
 ## 登録・ミラー（実装時の同期先）
 
@@ -135,7 +147,7 @@ ship フェーズ（Step1 証拠収集 → Step2 TO-CLIENT → Step2.5 マニュ
 - `templates/profiles/full.json`: `recommended` に `.claude/skills/uat/SKILL.md`。
 - `.claude/skills` 配下は MIRROR_DIRS のため、新 `uat` skill と改修した `ship-and-docs`/`docs-sync` を `examples/minimal-project` へ byte 同一ミラー。
 - example の `README.md`（スキル数 17→18）・`CLAUDE.md`（## Skills 行）も同期（B3c で取りこぼした教訓）。
-- `check_status.py` はミラー対象（scripts/ は MIRROR されるか要確認。されるなら example 側も同期）。実装時に `check_reference_drift.py` で確認。
+- **`scripts/check_status.py` は example へ byte 同一ミラー（確定・確認済み）**: `examples/minimal-project/scripts/check_status.py` が本体と byte 同一であることを確認済み。`check_status.py` の改修は **必ず example 側へ同期**する（しないと `test_mirror_identity`・`check_reference_drift` が落ちる）。一方 **`tests/` は example 非ミラー**なので `tests/test_check_status.py` の追加はミラーしない（スクリプトはミラー／テストは非ミラーの非対称に注意）。
 - 実行後 `check_reference_drift.py`／`check_framework_contract.py --profile=full/standard`／`test_mirror_identity`／`eval_scaffold_smoke.py`／`test_check_status.py` を green に。
 
 ## テスト戦略（今回は実テストあり）
@@ -146,6 +158,8 @@ B3a/B3c と違い B3b は**実コードを持つ**（`check_status.py` の gate 
    (a) ACCEPTANCE 有り＋UAT-RESULTS 無し → `dev_ready_for_client` 承認ブロック、
    (b) ACCEPTANCE 有り＋UAT-RESULTS 有り → 承認可、
    (c) ACCEPTANCE 無し → 承認可（従来どおり）。
+   - **既存テストの非回帰**: dev_ready_for_client の既存テストは `TempProject`（STATUS.md のみ・ACCEPTANCE 無し）を使うため、ACCEPTANCE 条件付き分岐で素通りし壊れない見込み（特に許可期待の `test_dev_ready_for_client_all_approved_allows`）。**実装時に実走で確認**。
+   - **fixture 拡張**: 新3ケースは temp root に `docs/requirements/ACCEPTANCE.md`・`docs/handover/UAT-RESULTS.md` を置く必要がある。`TempProject` helper が任意ファイルを置けるか確認し、不可なら最小限拡張する。
 2. **構造的検証（自動）**: `check_framework_contract`（必須ファイル/スキル数/name-lint）・`check_reference_drift`（参照名・ミラー byte 同一）・`test_mirror_identity`・`eval_scaffold_smoke`。
 3. **内容レビュー（人手）**: テンプレ/skill 本文が「client（非エンジニア）が受入検証できる」よう書けているか（grill-code 相当）。
 
@@ -155,4 +169,13 @@ B3a/B3c と違い B3b は**実コードを持つ**（`check_status.py` の gate 
 - **内部整合**: 決定1-4 が各コンポーネントと一致（advisory+連動→新フェーズなし・既存ゲート、存在チェック→check_status.py+test、client サインオフ→テンプレ サインオフ節・機械は存在のみ、条件付き→ACCEPTANCE 有無分岐）。
 - **スコープ**: B3b 単体（⑩）に限定。⑨⑫ は明示除外。単一の実装計画に収まる規模。
 - **曖昧性**: 「UAT が該当するか」は ACCEPTANCE.md の有無で機械判定。「合否」は client サインオフで一意化。qa-verification との境界を明示。
-- **要確認（実装時）**: check_status.py の `dev_ready_for_client` 既存処理（:848 付近）の構造と、scripts/ がミラー対象か。既存テストで dev_ready_for_client を承認するものが ACCEPTANCE 無し前提で壊れないこと（条件付きで回避見込みだが要実走）。
+- **要確認（実装時）**: TempProject helper が temp root に任意ファイル（ACCEPTANCE.md/UAT-RESULTS.md）を置けるか。既存 dev_ready_for_client 承認テストが ACCEPTANCE 無しで壊れないことの実走。example へ UAT-RESULTS を足すか（要検討1）。
+
+## grill-plan 反映（2026-06-07）
+
+- **致命1（ミラー確定）**: `scripts/check_status.py` は example と byte 同一ミラー（確認済み）。改修は example へ必ず同期。`tests/` は非ミラーなのでテストは同期しない（スクリプト=ミラー／テスト=非ミラーの非対称）。§登録・ミラーに確定反映。
+- **致命2（配置・言語）**: 存在チェックは `check_gate_prerequisites()` の dev_ready_for_client 分岐（`:834`）に入れる（`client_ready_for_dev` の mapping 存在チェック `:866` と同型）。`pre_approve_gate` ではない。エラーは既存に倣い**日本語＋「→ uat skill を使用」**。§ゲート連動に反映。
+- **致命3（テスト）**: 既存 dev_ready_for_client テストは TempProject（ACCEPTANCE 無し）で素通り見込み・要実走。新3ケースは fixture に ACCEPTANCE/UAT-RESULTS を置く拡張が要る。§テスト戦略に反映。
+- **要検討2（抜け道）**: 機械は存在のみ検査＝❌のまま通る。docs-sync 自己点検＋skill Red Flags で人手補完、と§ゲート連動に明記。
+- **要検討1（example）**: example は ACCEPTANCE 有り・UAT-RESULTS 無し。dev_ready_for_client=pending なので contract は通るが、ショーケース完結のため example に UAT-RESULTS.md を足すか実装時判断（任意）。
+- **要検討3（空 ACCEPTANCE）**: profiles で scaffold されない（確認済み）ため誤発火低。空 AC でも要求は立つが「定義したら検証必須」の意図通りで許容。
