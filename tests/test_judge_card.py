@@ -156,6 +156,15 @@ class TestReadTestResultFromEvidence(unittest.TestCase):
         self.log.write_text(_ev_line("pytest", "ok", "f" * 64))
         self.assertEqual(judge.read_test_result(self.root), "unverified")
 
+    def test_newest_stale_does_not_fall_back_to_older_fresh(self):
+        # grill-code 🟢: 最新エントリが decide する。最新が stale fp なら
+        # それより古い「現 fp 一致の ok」へ遡って green 化してはならない
+        # （遡ると、コード変更後に古い記録で承認できてしまう）。
+        fp = judge.current_fingerprint(self.root)
+        self.log.write_text(
+            _ev_line("pytest", "ok", fp) + _ev_line("pytest", "ok", "f" * 64))
+        self.assertEqual(judge.read_test_result(self.root), "unverified")
+
     def test_non_test_commands_ignored(self):
         fp = judge.current_fingerprint(self.root)
         self.log.write_text(_ev_line("git status", "ok", fp))
