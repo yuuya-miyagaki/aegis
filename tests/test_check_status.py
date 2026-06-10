@@ -2479,8 +2479,8 @@ class TestQaDrillGate(unittest.TestCase):
         return root
 
     def test_qa_passing_drill_then_judge_yellow_ackable(self):
-        # The B1 drill passes, but no test-result.json is recorded and the qa ref
-        # has no claims, so the B2 judge yields 🟡 (rc 2, ack-able) — not auto-0.
+        # The B1 drill passes, but no test evidence is recorded (E1 log) and the
+        # qa ref has no claims, so the B2 judge yields 🟡 (rc 2, ack-able) — not auto-0.
         # The fully-green qa path (recorded result + claims) is covered end-to-end
         # in test_judge_card.TestMain and the Task 15 integration smoke.
         with tempfile.TemporaryDirectory() as d:

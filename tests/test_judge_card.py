@@ -1,19 +1,35 @@
 import importlib.util
 import json
+import shutil
 import subprocess as sp
 import tempfile
 import unittest
 from pathlib import Path
 
-SCRIPT = Path(__file__).resolve().parent.parent / "scripts" / "build-judge-card.py"
+ROOT_DIR = Path(__file__).resolve().parent.parent
+SCRIPT = ROOT_DIR / "scripts" / "build-judge-card.py"
+RECORDER = ROOT_DIR / "scripts" / "record-test-result.py"
 
-def _load():
-    spec = importlib.util.spec_from_file_location("judge", SCRIPT)
+def _load(name, path):
+    spec = importlib.util.spec_from_file_location(name, path)
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
     return mod
 
-judge = _load()
+judge = _load("judge", SCRIPT)
+record = _load("record_mod", RECORDER)
+
+
+def _ev_line(cmd: str, status: str, fp: str) -> str:
+    return json.dumps({"v": 1, "ts": "2026-06-10T00:00:00Z", "src": "observed",
+                       "cmd": cmd, "status": status,
+                       "payload_sha": "0" * 64, "fp": fp}) + "\n"
+
+
+def _copy_lib(root: Path) -> None:
+    """E1 fixture: read_test_result/current_fingerprint delegate to
+    hooks/lib/{fingerprint,patterns}.sh, so the project root needs them."""
+    shutil.copytree(ROOT_DIR / "hooks" / "lib", root / "hooks" / "lib")
 
 
 class TestReadClaims(unittest.TestCase):
@@ -38,7 +54,11 @@ class TestReadClaims(unittest.TestCase):
         self.assertIsNone(judge.read_claims(Path("/nonexistent/x.md")))
 
 
-class TestFingerprint(unittest.TestCase):
+class TestCurrentFingerprint(unittest.TestCase):
+    """Delegation contract: current_fingerprint() shells out to
+    hooks/lib/fingerprint.sh (single owner — behavior tests live in
+    tests/test_fingerprint_lib.py). Here we test only the python boundary."""
+
     def _git(self, root, *a):
         sp.run(["git", "-C", str(root), *a], check=True, capture_output=True)
 
@@ -50,50 +70,27 @@ class TestFingerprint(unittest.TestCase):
         (root / "a.py").write_text("x = 1\n", encoding="utf-8")
         self._git(root, "add", "-A")
         self._git(root, "commit", "-qm", "i")
+        _copy_lib(root)
         return root
 
-    def test_fingerprint_changes_with_code(self):
+    def test_missing_lib_returns_nolib(self):
+        with tempfile.TemporaryDirectory() as d:
+            self.assertEqual(judge.current_fingerprint(Path(d)), "nolib")
+
+    def test_returns_hex64_and_is_stable(self):
         with tempfile.TemporaryDirectory() as d:
             root = self._repo(d)
-            (root / "a.py").write_text("x = 1\ny = 2\n", encoding="utf-8")
-            fp1 = judge.code_fingerprint(root)
+            fp1 = judge.current_fingerprint(root)
+            self.assertRegex(fp1, r"^[0-9a-f]{64}$")
+            self.assertEqual(fp1, judge.current_fingerprint(root))
+
+    def test_changes_with_code(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = self._repo(d)
+            fp1 = judge.current_fingerprint(root)
             (root / "a.py").write_text("x = 1\ny = 3\n", encoding="utf-8")
-            fp2 = judge.code_fingerprint(root)
+            fp2 = judge.current_fingerprint(root)
             self.assertNotEqual(fp1, fp2)
-
-    def test_fingerprint_stable_when_unchanged(self):
-        with tempfile.TemporaryDirectory() as d:
-            root = self._repo(d)
-            (root / "a.py").write_text("x = 1\ny = 2\n", encoding="utf-8")
-            self.assertEqual(judge.code_fingerprint(root), judge.code_fingerprint(root))
-
-    def test_fingerprint_ignores_docs_changes(self):
-        # Editing docs/ (incl. STATUS.md) must not perturb the CODE fingerprint,
-        # otherwise routine STATUS.md edits between recording tests and approval
-        # would spuriously invalidate a green test-result.
-        with tempfile.TemporaryDirectory() as d:
-            root = self._repo(d)
-            (root / "a.py").write_text("x = 1\ny = 2\n", encoding="utf-8")
-            (root / "docs").mkdir()
-            (root / "docs" / "STATUS.md").write_text("phase: review\n", encoding="utf-8")
-            fp1 = judge.code_fingerprint(root)
-            (root / "docs" / "STATUS.md").write_text("phase: qa\n", encoding="utf-8")
-            (root / "docs" / "design.md").write_text("# notes\n", encoding="utf-8")
-            fp2 = judge.code_fingerprint(root)
-            self.assertEqual(fp1, fp2, "docs changes must not change the code fingerprint")
-
-    def test_fingerprint_ignores_claude_control_plane(self):
-        # update-gate.sh writes .claude/.gate-snapshot at the first gate approval;
-        # this harness state must not perturb the code fingerprint, else recorded
-        # test results go stale at every subsequent gate (spurious 🟡).
-        with tempfile.TemporaryDirectory() as d:
-            root = self._repo(d)
-            (root / "a.py").write_text("x = 1\ny = 2\n", encoding="utf-8")
-            fp1 = judge.code_fingerprint(root)
-            (root / ".claude").mkdir()
-            (root / ".claude" / ".gate-snapshot").write_text("gate_approvals:\n", encoding="utf-8")
-            fp2 = judge.code_fingerprint(root)
-            self.assertEqual(fp1, fp2, ".claude control-plane must not change the fingerprint")
 
 
 class TestTier1(unittest.TestCase):
@@ -122,31 +119,81 @@ class TestTier1(unittest.TestCase):
             root = self._repo_with_change(d, "def f():\n    return 1\n")
             self.assertEqual(judge.scan_stubs(root), [])
 
-    def test_read_test_result_fresh_green(self):
-        with tempfile.TemporaryDirectory() as d:
-            root = self._repo_with_change(d, "def f():\n    return 1\n")
-            fp = judge.code_fingerprint(root)
-            qa = root / "docs" / "qa-reports"
-            qa.mkdir(parents=True)
-            (qa / "test-result.json").write_text(
-                json.dumps({"status": "green", "code_fingerprint": fp}),
-                encoding="utf-8")
-            self.assertEqual(judge.read_test_result(root), "green")
 
-    def test_read_test_result_stale_is_unverified(self):
-        with tempfile.TemporaryDirectory() as d:
-            root = self._repo_with_change(d, "def f():\n    return 1\n")
-            qa = root / "docs" / "qa-reports"
-            qa.mkdir(parents=True)
-            (qa / "test-result.json").write_text(
-                json.dumps({"status": "green", "code_fingerprint": "STALE"}),
-                encoding="utf-8")
-            self.assertEqual(judge.read_test_result(root), "unverified")
+class TestReadTestResultFromEvidence(unittest.TestCase):
+    """E1: the judge's test verdict comes from the OBSERVED evidence log
+    (.claude/evidence-log.jsonl), never from a self-reported file."""
 
-    def test_read_test_result_absent_is_unverified(self):
-        with tempfile.TemporaryDirectory() as d:
-            root = self._repo_with_change(d, "def f():\n    return 1\n")
-            self.assertEqual(judge.read_test_result(root), "unverified")
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self.tmp.name)
+        sp.run(["git", "-C", str(self.root), "init", "-q"],
+               check=True, capture_output=True)
+        sp.run(["git", "-C", str(self.root), "-c", "user.email=t@t",
+                "-c", "user.name=t", "commit", "-q", "--allow-empty",
+                "-m", "init"], check=True, capture_output=True)
+        _copy_lib(self.root)
+        (self.root / ".claude").mkdir()
+        self.log = self.root / ".claude" / "evidence-log.jsonl"
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def test_no_log_is_unverified(self):
+        self.assertEqual(judge.read_test_result(self.root), "unverified")
+
+    def test_ok_with_matching_fp_is_green(self):
+        fp = judge.current_fingerprint(self.root)
+        self.log.write_text(_ev_line("python3 -m unittest", "ok", fp))
+        self.assertEqual(judge.read_test_result(self.root), "green")
+
+    def test_fail_with_matching_fp_is_red(self):
+        fp = judge.current_fingerprint(self.root)
+        self.log.write_text(_ev_line("pytest", "fail", fp))
+        self.assertEqual(judge.read_test_result(self.root), "red")
+
+    def test_stale_fp_is_unverified(self):
+        self.log.write_text(_ev_line("pytest", "ok", "f" * 64))
+        self.assertEqual(judge.read_test_result(self.root), "unverified")
+
+    def test_non_test_commands_ignored(self):
+        fp = judge.current_fingerprint(self.root)
+        self.log.write_text(_ev_line("git status", "ok", fp))
+        self.assertEqual(judge.read_test_result(self.root), "unverified")
+
+    def test_latest_matching_entry_wins(self):
+        fp = judge.current_fingerprint(self.root)
+        self.log.write_text(
+            _ev_line("pytest", "ok", fp) + _ev_line("pytest", "fail", fp))
+        self.assertEqual(judge.read_test_result(self.root), "red")
+
+    def test_broken_lines_skipped(self):
+        fp = judge.current_fingerprint(self.root)
+        self.log.write_text("{{{broken\n" + _ev_line("pytest", "ok", fp))
+        self.assertEqual(judge.read_test_result(self.root), "green")
+
+    def test_rotated_dot1_is_scanned(self):
+        fp = judge.current_fingerprint(self.root)
+        (self.root / ".claude" / "evidence-log.jsonl.1").write_text(
+            _ev_line("pytest", "ok", fp))
+        self.log.write_text("")
+        self.assertEqual(judge.read_test_result(self.root), "green")
+
+    def test_manual_src_counts(self):
+        fp = judge.current_fingerprint(self.root)
+        row = json.loads(_ev_line("python3 -m unittest", "ok", fp))
+        row["src"] = "manual"
+        self.log.write_text(json.dumps(row) + "\n")
+        self.assertEqual(judge.read_test_result(self.root), "green")
+
+    def test_oversize_current_fp_is_unverified(self):
+        # AEGIS_FP_MAX_FILES=0 相当は作れないため、巨大変更を作るより
+        # current_fingerprint が hex64 以外を返す経路を直接検証する:
+        # hooks/lib/fingerprint.sh を削除 → "nolib" → unverified。
+        shutil.rmtree(self.root / "hooks")
+        fpval = judge.current_fingerprint(self.root)
+        self.assertEqual(fpval, "nolib")
+        self.assertEqual(judge.read_test_result(self.root), "unverified")
 
 
 class TestStubPrecision(unittest.TestCase):
@@ -299,8 +346,7 @@ class TestMain(unittest.TestCase):
     def _git(self, root, *a):
         sp.run(["git", "-C", str(root), *a], check=True, capture_output=True)
 
-    def _project(self, d, *, body, claims_block, review_ref="docs/qa-reports/review.md",
-                 test_result=None):
+    def _project(self, d, *, body, claims_block, review_ref="docs/qa-reports/review.md"):
         root = Path(d)
         self._git(root, "init", "-q")
         self._git(root, "config", "user.email", "t@t")
@@ -308,16 +354,22 @@ class TestMain(unittest.TestCase):
         (root / "seed.py").write_text("s = 0\n", encoding="utf-8")
         self._git(root, "add", "-A"); self._git(root, "commit", "-qm", "i")
         (root / "m.py").write_text(body, encoding="utf-8")
+        _copy_lib(root)
+        (root / ".claude").mkdir()
         docs = root / "docs"; (docs / "qa-reports").mkdir(parents=True)
         (docs / "STATUS.md").write_text(
             "---\ncurrent_refs:\n"
             f"  review: {review_ref}\n  qa: null\n---\n", encoding="utf-8")
         if review_ref != "null":
             (root / review_ref).write_text("# review\n\n" + claims_block, encoding="utf-8")
-        if test_result is not None:
-            (docs / "qa-reports" / "test-result.json").write_text(
-                json.dumps(test_result), encoding="utf-8")
         return root
+
+    def _inject_green_evidence(self, root):
+        """Observed green run bound to the CURRENT worktree fingerprint —
+        must be done after every file of the fixture is in place."""
+        fp = judge.current_fingerprint(root)
+        (root / ".claude" / "evidence-log.jsonl").write_text(
+            _ev_line("python3 -m unittest", "ok", fp), encoding="utf-8")
 
     def _run(self, root, gate="review"):
         out = root / "docs" / "qa-reports" / f"judge-{gate}.md"
@@ -339,10 +391,8 @@ class TestMain(unittest.TestCase):
             root = self._project(
                 d, body=fp_body,
                 claims_block="```claims\nno_stubs: true\ntests_pass: true\nverdict: approve\n```\n")
-            # add a fresh green test-result so tests aren't unverified
-            fp = judge.code_fingerprint(root)
-            (root / "docs" / "qa-reports" / "test-result.json").write_text(
-                json.dumps({"status": "green", "code_fingerprint": fp}), encoding="utf-8")
+            # add fresh observed green evidence so tests aren't unverified
+            self._inject_green_evidence(root)
             res, out = self._run(root)
             self.assertEqual(res.returncode, 2, res.stdout + res.stderr)
 
@@ -353,9 +403,7 @@ class TestMain(unittest.TestCase):
                 d, body=body,
                 claims_block=("```claims\nno_stubs: true\ntests_pass: true\nverdict: approve\n"
                               "second_opinion:\n  verdict: approve\n```\n"))
-            fp = judge.code_fingerprint(root)
-            (root / "docs" / "qa-reports" / "test-result.json").write_text(
-                json.dumps({"status": "green", "code_fingerprint": fp}), encoding="utf-8")
+            self._inject_green_evidence(root)
             res, out = self._run(root)
             self.assertEqual(res.returncode, 0, res.stdout + res.stderr)
             self.assertIn("🟢", out.read_text())
@@ -370,38 +418,49 @@ class TestMain(unittest.TestCase):
             self.assertEqual(res.returncode, 2, res.stdout + res.stderr)
 
 
-class TestRecorder(unittest.TestCase):
-    REC = Path(__file__).resolve().parent.parent / "scripts" / "record-test-result.py"
+class TestRecordTestResultManual(unittest.TestCase):
+    """E1: record-test-result.py is the MANUAL fallback writer — it executes
+    the test command itself (trusted runner) and appends src:"manual" to the
+    evidence log. It must no longer write test-result.json (self-report)."""
 
-    def _git(self, root, *a):
-        sp.run(["git", "-C", str(root), *a], check=True, capture_output=True)
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self.tmp.name)
+        sp.run(["git", "-C", str(self.root), "init", "-q"],
+               check=True, capture_output=True)
+        sp.run(["git", "-C", str(self.root), "config", "user.email", "t@t"],
+               check=True, capture_output=True)
+        sp.run(["git", "-C", str(self.root), "config", "user.name", "t"],
+               check=True, capture_output=True)
+        (self.root / "a.py").write_text("x=1\n", encoding="utf-8")
+        sp.run(["git", "-C", str(self.root), "add", "-A"],
+               check=True, capture_output=True)
+        sp.run(["git", "-C", str(self.root), "commit", "-qm", "i"],
+               check=True, capture_output=True)
+        _copy_lib(self.root)
 
-    def test_records_green(self):
-        with tempfile.TemporaryDirectory() as d:
-            root = Path(d)
-            self._git(root, "init", "-q"); self._git(root, "config", "user.email", "t@t")
-            self._git(root, "config", "user.name", "t")
-            (root / "a.py").write_text("x=1\n", encoding="utf-8")
-            self._git(root, "add", "-A"); self._git(root, "commit", "-qm", "i")
-            (root / "a.py").write_text("x=1\ny=2\n", encoding="utf-8")
-            sp.run(["python3", str(self.REC), "--root", str(root), "true"],
-                   check=True, capture_output=True)
-            data = json.loads((root / "docs/qa-reports/test-result.json").read_text())
-            self.assertEqual(data["status"], "green")
-            self.assertEqual(data["code_fingerprint"], judge.code_fingerprint(root))
+    def tearDown(self):
+        self.tmp.cleanup()
 
-    def test_records_red_on_failing_command(self):
-        with tempfile.TemporaryDirectory() as d:
-            root = Path(d)
-            self._git(root, "init", "-q"); self._git(root, "config", "user.email", "t@t")
-            self._git(root, "config", "user.name", "t")
-            (root / "a.py").write_text("x=1\n", encoding="utf-8")
-            self._git(root, "add", "-A"); self._git(root, "commit", "-qm", "i")
-            (root / "a.py").write_text("x=1\ny=2\n", encoding="utf-8")
-            sp.run(["python3", str(self.REC), "--root", str(root), "false"],
-                   check=True, capture_output=True)
-            data = json.loads((root / "docs/qa-reports/test-result.json").read_text())
-            self.assertEqual(data["status"], "red")
+    def test_passing_command_appends_manual_ok(self):
+        rc = record.main(["--root", str(self.root), "true"])
+        self.assertEqual(rc, 0)
+        row = json.loads((self.root / ".claude" / "evidence-log.jsonl")
+                         .read_text(encoding="utf-8").splitlines()[-1])
+        self.assertEqual(row["src"], "manual")
+        self.assertEqual(row["status"], "ok")
+        self.assertRegex(row["fp"], r"^[0-9a-f]{64}$")
+
+    def test_failing_command_appends_manual_fail(self):
+        record.main(["--root", str(self.root), "false"])
+        row = json.loads((self.root / ".claude" / "evidence-log.jsonl")
+                         .read_text(encoding="utf-8").splitlines()[-1])
+        self.assertEqual(row["status"], "fail")
+
+    def test_no_test_result_json_written(self):
+        record.main(["--root", str(self.root), "true"])
+        self.assertFalse(
+            (self.root / "docs" / "qa-reports" / "test-result.json").exists())
 
 
 class TestAuditDeps(unittest.TestCase):

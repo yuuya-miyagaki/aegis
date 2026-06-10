@@ -8,7 +8,6 @@ Never dispatches an LLM (the second opinion is recorded by the LLM beforehand).
 """
 from __future__ import annotations
 
-import hashlib
 import json
 import re
 import subprocess
@@ -55,19 +54,21 @@ def _changed_code_files(root: Path) -> dict:
             if not rel.startswith(NONCODE_PREFIXES)}
 
 
-def code_fingerprint(root: Path) -> str:
-    """sha256 over the changed CODE files' current content (sorted), binding a
-    test result to the exact code it was produced against. Documentation is
-    excluded so editing docs/STATUS.md does not invalidate a recorded result."""
-    changed = sorted(_changed_code_files(root).keys())
-    h = hashlib.sha256()
-    for rel in changed:
-        h.update(rel.encode("utf-8"))
-        try:
-            h.update((root / rel).read_bytes())
-        except OSError:
-            h.update(b"<unreadable>")
-    return h.hexdigest()
+def current_fingerprint(root: Path) -> str:
+    """Delegate to hooks/lib/fingerprint.sh — the SINGLE OWNER of the
+    fingerprint definition (a python reimplementation would drift). Returns the
+    token verbatim; callers must require 64-hex before trusting equality."""
+    fp_lib = root / "hooks" / "lib" / "fingerprint.sh"
+    if not fp_lib.is_file():
+        return "nolib"
+    try:
+        proc = subprocess.run(["bash", str(fp_lib), str(root)],
+                              capture_output=True, text=True, timeout=60)
+    except (OSError, subprocess.TimeoutExpired):
+        return "error"
+    if proc.returncode != 0:
+        return "error"
+    return proc.stdout.strip()
 
 
 # Conventional unfinished-code markers. Case-SENSITIVE with word boundaries so
@@ -94,21 +95,86 @@ def scan_stubs(root: Path) -> list[str]:
     return hits
 
 
-def read_test_result(root: Path) -> str:
-    """Read docs/qa-reports/test-result.json and verify freshness against the
-    current code fingerprint. Returns 'green' / 'red' / 'unverified'
-    (absent/stale/unreadable => unverified, never silent-green)."""
-    p = root / "docs" / "qa-reports" / "test-result.json"
-    if not p.is_file():
-        return "unverified"
+EVIDENCE_LOG_REL = Path(".claude") / "evidence-log.jsonl"
+_HEX64 = re.compile(r"^[0-9a-f]{64}$")
+
+
+def _test_runner_patterns(root: Path) -> list:
+    """Load AEGIS_TEST_RUNNER_REGEX from patterns.sh (single source). The
+    patterns are contract-bound to the grep-E/python-re common subset
+    (tests/test_patterns_parity.py)."""
+    lib = root / "hooks" / "lib" / "patterns.sh"
+    if not lib.is_file():
+        return []
     try:
-        data = json.loads(p.read_text(encoding="utf-8"))
-    except (ValueError, OSError):
+        out = subprocess.run(
+            ["bash", "-c",
+             'source "$1"; printf "%s\\n" "${AEGIS_TEST_RUNNER_REGEX[@]}"',
+             "_", str(lib)],
+            capture_output=True, text=True, timeout=10)
+    except (OSError, subprocess.TimeoutExpired):
+        return []
+    pats = []
+    for raw in out.stdout.splitlines():
+        raw = raw.strip()
+        if not raw:
+            continue
+        try:
+            pats.append(re.compile(raw))
+        except re.error:
+            continue
+    return pats
+
+
+def _evidence_entries(root: Path) -> list:
+    """Parse evidence-log (rotated .1 first, then current = oldest->newest).
+    Broken lines are skipped — the judge must degrade to 'unverified', never
+    crash (silent-green is the only forbidden failure mode)."""
+    entries = []
+    for name in (str(EVIDENCE_LOG_REL) + ".1", str(EVIDENCE_LOG_REL)):
+        p = root / name
+        if not p.is_file():
+            continue
+        try:
+            text = p.read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            continue
+        for line in text.splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                d = json.loads(line)
+            except ValueError:
+                continue
+            if isinstance(d, dict):
+                entries.append(d)
+    return entries
+
+
+def read_test_result(root: Path) -> str:
+    """'green' / 'red' / 'unverified' from the OBSERVED evidence log (E1).
+
+    The newest test-runner entry decides; its fp must equal the CURRENT
+    worktree fingerprint (both 64-hex). Anything else — no log, no matching
+    entry, stale/oversize/nogit fingerprint, unreadable patterns — is
+    'unverified' (🟡 ack-able), never silent-green."""
+    pats = _test_runner_patterns(root)
+    if not pats:
         return "unverified"
-    if data.get("code_fingerprint") != code_fingerprint(root):
+    current = current_fingerprint(root)
+    if not _HEX64.match(current):
         return "unverified"
-    status = data.get("status")
-    return status if status in ("green", "red") else "unverified"
+    for d in reversed(_evidence_entries(root)):
+        if d.get("status") not in ("ok", "fail"):
+            continue
+        cmd = d.get("cmd") or ""
+        if not any(p.search(cmd) for p in pats):
+            continue
+        if (d.get("fp") or "") != current:
+            return "unverified"
+        return "green" if d.get("status") == "ok" else "red"
+    return "unverified"
 
 
 SECRET_PATTERN = re.compile(
