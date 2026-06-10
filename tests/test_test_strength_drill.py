@@ -132,6 +132,23 @@ class TestAddedLines(unittest.TestCase):
             added = drill.added_lines_by_file(root, "HEAD")
             self.assertNotIn("docs/qa-reports/test-strength.drill", added)
 
+    def test_docs_hunks_excluded_from_added_lines(self):
+        # B1 恒久修正: docs/ 配下の簿記ファイルは mutant 対象に入らない。
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            _git_init(root)
+            (root / "seed.txt").write_text("seed\n", encoding="utf-8")
+            _git(root, "add", "-A")
+            _git(root, "commit", "-qm", "init")
+            docs = root / "docs"
+            docs.mkdir()
+            (docs / "STATUS.md").write_text("phase: implement\n", encoding="utf-8")
+            (root / "src").mkdir()
+            (root / "src" / "x.py").write_text("a = 1\n", encoding="utf-8")
+            added = drill.added_lines_by_file(root, "HEAD")
+            self.assertNotIn("docs/STATUS.md", added)
+            self.assertIn("src/x.py", added)
+
     def test_no_changes_empty(self):
         with tempfile.TemporaryDirectory() as d:
             root = Path(d)
@@ -336,6 +353,34 @@ class TestMainEndToEnd(unittest.TestCase):
             report = root / "r.md"
             res = self._run(root, spec, report)
             self.assertEqual(res.returncode, 0, res.stdout + res.stderr)
+            self.assertIn("verdict: PASS", report.read_text())
+
+    def test_docs_tracked_changes_excluded_from_coverage_floor(self):
+        # B1 恒久修正: docs/ の tracked 簿記ハンクは coverage floor に
+        # 「mutant を要求するハンク」として現れない（framework 混在 diff 対策）。
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            _git_init(root)
+            (root / "src").mkdir()
+            (root / "src" / "m.py").write_text("a = 1\n", encoding="utf-8")
+            docs = root / "docs"
+            docs.mkdir()
+            (docs / "LEARNINGS.md").write_text("# L\n", encoding="utf-8")
+            _git(root, "add", "-A")
+            _git(root, "commit", "-qm", "i")
+            (root / "src" / "m.py").write_text("a = 1\nb = 2\n", encoding="utf-8")
+            (docs / "LEARNINGS.md").write_text("# L\n- note\n", encoding="utf-8")
+            spec = root / "s.drill"
+            spec.write_text(json.dumps({
+                "test_command": "grep -q 'b = 2' src/m.py",
+                "timeout_seconds": 10,
+                "mutants": [{"file": "src/m.py", "line": 2,
+                             "original": "b = 2", "mutated": "b = 3"}],
+            }), encoding="utf-8")
+            report = root / "r.md"
+            res = self._run(root, spec, report)
+            self.assertEqual(res.returncode, 0,
+                             f"docs hunk must not demand a mutant: {res.stdout}{res.stderr}")
             self.assertIn("verdict: PASS", report.read_text())
 
     def test_survived_exit1(self):
