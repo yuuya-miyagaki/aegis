@@ -127,7 +127,12 @@ REQUIRED_HOOK_FILES = [
     ROOT / "hooks/post-status-audit.sh",
     ROOT / "hooks/pre-compact.sh",
     ROOT / "hooks/check-control-plane.sh",
+    # lib/ helpers: F6 (functional-integrity audit) showed these are the hooks'
+    # life support — a missing lib silently fail-opens every sourcing hook.
     ROOT / "hooks/lib/extract-input.sh",
+    ROOT / "hooks/lib/emit.sh",
+    ROOT / "hooks/lib/patterns.sh",
+    ROOT / "hooks/lib/frontmatter.sh",
     ROOT / "hooks/check-client-info.sh",
     ROOT / "hooks/check-secrets.sh",
     ROOT / "hooks/check-deploy-gate.sh",
@@ -836,6 +841,22 @@ def main() -> int:
                 )
         else:
             failures.append("templates/STATUS.template.md missing framework_version")
+
+    # Version sync: example STATUS.md must match FRAMEWORK_VERSION (P2-6).
+    # The example is the non-engineer's copy source; drift there ships stale
+    # contracts invisibly (no other drift detector covers it).
+    example_status_path = ROOT / "examples/minimal-project/docs/STATUS.md"
+    if example_status_path.exists():
+        ex_match = re.search(
+            r'^framework_version:\s*"([^"]+)"',
+            read_text(example_status_path), re.M,
+        )
+        if not ex_match or ex_match.group(1) != FRAMEWORK_VERSION:
+            found = ex_match.group(1) if ex_match else "(missing)"
+            failures.append(
+                f"examples/minimal-project/docs/STATUS.md framework_version "
+                f"({found}) != FRAMEWORK_VERSION ({FRAMEWORK_VERSION})"
+            )
 
     # LEARNINGS.md lint: check format and multiline for high-confidence entries.
     # Only applied to framework repo and example (not enforced on general projects).
