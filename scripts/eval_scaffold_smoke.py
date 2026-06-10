@@ -179,6 +179,29 @@ def verify_hooks_runnable(target: Path, profile: str) -> tuple[bool, str]:
                 f"edit (exit={r.returncode}, stdout={r.stdout.strip()!r})"
             )
 
+    # E1: the observer must RECORD a Bash execution into the evidence log.
+    # F6 lesson: install-path artifacts are verified by FIRING them, not by
+    # static listing — a distributed-but-dead observer is the silent
+    # fail-open class this feature exists to close.
+    if profile in ("standard", "full"):
+        r = _fire_hook(target, "hooks/post-bash-observe.sh",
+                       _hook_stdin(target, "Bash", {"command": "echo smoke-e1"}))
+        if r.returncode != 0:
+            return False, (
+                f"{profile}: post-bash-observe.sh rc={r.returncode} "
+                f"(stderr={r.stderr.strip()[:200]!r})"
+            )
+        if r.stdout.strip() != "{}":
+            return False, (
+                f"{profile}: post-bash-observe.sh unexpected output: "
+                f"{r.stdout!r}"
+            )
+        ev = target / ".claude" / "evidence-log.jsonl"
+        if not ev.is_file():
+            return False, f"{profile}: post-bash-observe.sh did not create evidence-log"
+        if '"cmd":"echo smoke-e1"' not in ev.read_text(encoding="utf-8"):
+            return False, f"{profile}: post-bash-observe.sh did not append the execution"
+
     # (B-5) check-gate.sh must not classify a project's src/hooks/ file as a
     # framework control file (P1-2). A fresh scaffold is in Client mode, so a
     # "[gate]" deny is expected — an "[integrity]" deny means the root-anchored
