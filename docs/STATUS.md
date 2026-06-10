@@ -46,10 +46,6 @@ next_action: "T0〜T16 実装完了＋grill-code 完了（マージ可・🟡2�
 blockers: []
 failure_tracking: null
 session_history:
-  - date: "2026-06-06"
-    mode: Dev
-    phase: "implement"
-    note: "Phase R 再配分(0.12.3〜0.12.6: routing/context/model-effort/name-hygiene/TDD/evidence)を連続 ship。続けて Phase D（仕上げ）: migration guide(v0.12.2→v1.0.0)＋README リフレッシュ＋安定契約/SemVer 明文化＋**version 1.0.0**。各 2段グリル反映。195 tests green・tier1/2 PASS。**再アーキ F→R→A→D 全完了＝v1.0.0。**"
   - date: "2026-06-07"
     mode: Dev
     phase: "docs"
