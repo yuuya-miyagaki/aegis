@@ -158,7 +158,7 @@ Profile-based validation for scaffold projects:
 python3 scripts/check_framework_contract.py --profile=standard --root examples/minimal-project
 ```
 
-Available profiles: `minimal` (4 core files), `standard` (14 required + 7 recommended). `full` is framework repo root only (do not use with `--root`).
+Available profiles: `minimal` (4 core files), `standard` (15 required + 8 recommended). `full` is framework repo root only (do not use with `--root`).
 Profile definitions: `templates/profiles/*.json`.
 
 Optional strict YAML validation (requires PyYAML):
@@ -169,6 +169,33 @@ python3 scripts/check_status.py --root . --strict
 ```
 
 ## Migration
+
+### From v1.3.3 to v1.4.0
+
+**Mostly non-breaking — evolution-review fix batch** (P2-1 … P3-6, B1, K-2;
+review 2026-06-10). What changes for existing projects:
+
+- **`standard` now ships the Bash guard moat (P2-1).** `check-destructive.sh`,
+  `check-secrets.sh`, `check-deploy-gate.sh`, and `check-control-plane.sh` are
+  registered in the `standard` profile's generated settings. Existing
+  `standard` installs: re-run `bash bin/setup.sh --profile=standard` (or add
+  the four PreToolUse Bash entries to `.claude/settings.local.json` by hand).
+- **Deploy gate widened + size-skip now asks (P2-2, P2-3).** Flag-form
+  `vercel --prod` and `wrangler deploy|publish` are now gated. S/M tasks
+  (which skip the deploy phase) no longer deploy silently: the gate emits an
+  `ask` so a human confirms the ungated deploy. RC contract:
+  0=allow / 2 with a leading `ASK:`=ask / anything else=deny.
+- **`ULTRA_PRECOMPACT_INTERVAL` renamed to `AEGIS_PRECOMPACT_INTERVAL`
+  (P3-2).** The old name still works as a fallback for THIS release only and
+  will be removed in the next one.
+- **Generated settings reference hooks via `$CLAUDE_PROJECT_DIR` (P3-6).**
+  cwd-relative `bash hooks/x.sh` silently disabled every hook when Claude Code
+  was launched from a subdirectory. Existing installs: regenerate settings by
+  re-running setup.sh, or rewrite each command to
+  `bash "$CLAUDE_PROJECT_DIR"/hooks/<name>.sh`.
+- **New: `docs/hook-failure-policy.md`** — the declared fail-open/fail-closed
+  policy per hook, with a table-driven test keeping it honest. Read it before
+  changing any hook's error handling.
 
 ### From v1.3.2 to v1.3.3
 
