@@ -52,12 +52,21 @@ AEGIS_DESTRUCTIVE_CMD_WARN=(
 # `grep -E` AND Python `re` — no [[:space:]], no \b. Use ( |^|$) style
 # boundaries instead. tests/test_patterns_parity.py enforces parity with
 # shared fixtures; add a fixture line whenever you add a pattern.
+#
+# Command-position anchor (v1.5.1): a runner name matches only at the start of
+# a (sub)command — string start, after ; & | (, across env assignments
+# (FOO=bar ), or through known wrappers (npx/bunx, uv/poetry/pipenv run).
+# Mentions as arguments (grep vitest package.json) do not match. Consumers
+# normalize newlines to ';' BEFORE matching (grep '^' is per-line, python re
+# '^' is string-start — normalization keeps the two engines in parity).
+_AEGIS_TR_PRE='(^|[;&|(] *)([A-Za-z_][A-Za-z0-9_]*=[^ ]* +)*((npx|bunx) +|(uv|poetry|pipenv) +run +)?'
 AEGIS_TEST_RUNNER_REGEX=(
-  '(^|[^a-zA-Z0-9_])(npx +)?vitest($|[^a-zA-Z0-9_])'
-  '(^|[^a-zA-Z0-9_])(npx +)?jest($|[^a-zA-Z0-9_])'
-  '(^|[^a-zA-Z0-9_])pytest($|[^a-zA-Z0-9_])'
-  '(^|[^a-zA-Z0-9_])python3? +-m +unittest($|[^a-zA-Z0-9_])'
-  '(^|[^a-zA-Z0-9_])cargo +test($|[^a-zA-Z0-9_])'
-  '(^|[^a-zA-Z0-9_])go +test($|[^a-zA-Z0-9_])'
-  '(^|[^a-zA-Z0-9_])(npm|pnpm|bun|yarn) +(run +)?test(:[-a-zA-Z0-9_]+)?($|[^a-zA-Z0-9_])'
+  "${_AEGIS_TR_PRE}vitest($|[^a-zA-Z0-9_])"
+  "${_AEGIS_TR_PRE}jest($|[^a-zA-Z0-9_])"
+  "${_AEGIS_TR_PRE}pytest($|[^a-zA-Z0-9_])"
+  "${_AEGIS_TR_PRE}python3? +-m +pytest($|[^a-zA-Z0-9_])"
+  "${_AEGIS_TR_PRE}python3? +-m +unittest($|[^a-zA-Z0-9_])"
+  "${_AEGIS_TR_PRE}cargo +test($|[^a-zA-Z0-9_])"
+  "${_AEGIS_TR_PRE}go +test($|[^a-zA-Z0-9_])"
+  "${_AEGIS_TR_PRE}(npm|pnpm|bun|yarn) +(run +)?test(:[-a-zA-Z0-9_]+)?($|[^a-zA-Z0-9_])"
 )

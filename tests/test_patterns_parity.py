@@ -16,12 +16,17 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 PATTERNS = ROOT / "hooks" / "lib" / "patterns.sh"
 
-# (command, is_test_runner)
+# (command, is_test_runner) — 消費者は照合前に改行を ';' に正規化する
+# （post-bash.sh: tr '\n' ';' ／ build-judge-card.py: cmd.replace("\n", ";")）。
+# 本テストも同じ正規化を適用してから両エンジンで照合する。
 FIXTURES = [
     ("python3 -m unittest discover -s tests", True),
     ("python -m unittest tests.test_x -v", True),
     ("pytest tests/ -v", True),
+    ("python3 -m pytest -x", True),
+    ("python -m pytest", True),
     ("npx vitest run", True),
+    ("bunx vitest run", True),
     ("vitest", True),
     ("npx jest --ci", True),
     ("cargo test --all", True),
@@ -32,7 +37,20 @@ FIXTURES = [
     ("pnpm test", True),
     ("bun test", True),
     ("yarn test", True),
-    ("echo pytest", True),   # 文字列一致は許容（記録側は全実行を保存済み）
+    ("cd app && vitest", True),
+    ("CI=1 pytest -x", True),
+    ("FOO=bar BAZ=qux jest", True),
+    ("uv run pytest", True),
+    ("poetry run pytest tests/", True),
+    ("echo build done\nvitest run", True),   # 正規化後の ';' 境界で一致
+    # v1.5.1 で意図的に反転（コマンド位置アンカー）: 引数・echo 言及は分類しない
+    ("echo pytest", False),
+    ("grep vitest package.json", False),
+    ("cat jest.config.js", False),
+    ("echo done\ngrep pytest log.txt", False),
+    # 受容済みの取りこぼし（fail-closed 方向）: ラッパー形は分類されない
+    ("time pytest", False),
+    ('bash -c "pytest"', False),
     ("git status", False),
     ("ls -la", False),
     ("npm run build", False),
@@ -42,6 +60,11 @@ FIXTURES = [
     ("attest something", False),
     ("protest --loud", False),
 ]
+
+
+def normalize(cmd: str) -> str:
+    """消費者と同一の改行→';' 正規化（grep の行単位 ^ と re の文字列先頭 ^ の差を吸収）。"""
+    return cmd.replace("\n", ";")
 
 
 def bash_patterns() -> list[str]:
@@ -82,12 +105,12 @@ class TestTestRunnerParity(unittest.TestCase):
     def test_fixtures_python(self):
         compiled = [re.compile(p) for p in self.patterns]
         for cmd, expected in FIXTURES:
-            got = any(c.search(cmd) for c in compiled)
+            got = any(c.search(normalize(cmd)) for c in compiled)
             self.assertEqual(got, expected, f"python re: {cmd!r}")
 
     def test_fixtures_grep(self):
         for cmd, expected in FIXTURES:
-            got = grep_match(cmd, self.patterns)
+            got = grep_match(normalize(cmd), self.patterns)
             self.assertEqual(got, expected, f"grep -E: {cmd!r}")
 
 
