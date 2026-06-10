@@ -388,6 +388,81 @@ class TestPreToolUseHooks(HookSchemaAssertions):
 # ---------------------------------------------------------------------------
 
 
+class TestDeployGateStderrSeparation(HookSchemaAssertions):
+    """T2 (v1.5.1): check-deploy-gate は判定文面を stdout のみから作る。
+    stderr は「RC≠0 かつ stdout 空」の deny 時だけ診断として併合する。
+    check_status.py をスタブ化した一時 root + AEGIS_ROOT_OVERRIDE で発火する。"""
+
+    STUB_DENY = (
+        "#!/usr/bin/env python3\n"
+        "import sys\n"
+        "sys.stderr.write('STDERR_NOISE_MARKER\\n')\n"
+        "sys.stdout.write('gate pending: deploy\\n')\n"
+        "sys.exit(3)\n"
+    )
+    STUB_ASK = (
+        "#!/usr/bin/env python3\n"
+        "import sys\n"
+        "sys.stderr.write('STDERR_NOISE_MARKER\\n')\n"
+        "sys.stdout.write('ASK: size-skip deploy confirm\\n')\n"
+        "sys.exit(2)\n"
+    )
+    STUB_SILENT_DENY = (
+        "#!/usr/bin/env python3\n"
+        "import sys\n"
+        "sys.stderr.write('TRACEBACK_MARKER\\n')\n"
+        "sys.exit(3)\n"
+    )
+
+    def _root_with_stub(self, stub: str) -> str:
+        tmp = tempfile.mkdtemp(prefix="aegis-deploygate-t2-")
+        self.addCleanup(shutil.rmtree, tmp, ignore_errors=True)
+        (Path(tmp) / "docs").mkdir()
+        (Path(tmp) / "docs" / "STATUS.md").write_text(
+            "---\ntask_type: feature\nphase: implement\nmode: Dev\n"
+            "gate_approvals:\n  deploy: pending\n---\n", encoding="utf-8")
+        (Path(tmp) / "scripts").mkdir()
+        (Path(tmp) / "scripts" / "check_status.py").write_text(
+            stub, encoding="utf-8")
+        return tmp
+
+    def _fire(self, tmp: str, env_extra: dict | None = None):
+        payload = make_pretool_payload("Bash", {"command": "vercel deploy --prod"})
+        env = {"AEGIS_ROOT_OVERRIDE": tmp}
+        if env_extra:
+            env.update(env_extra)
+        return run_hook("check-deploy-gate.sh", payload, env=env)
+
+    def test_deny_reason_excludes_stderr(self):
+        tmp = self._root_with_stub(self.STUB_DENY)
+        rc, out, err = self._fire(tmp)
+        self.assert_pretool_decision(out, "deny", hint="T2 deny stdout-only")
+        reason = out["hookSpecificOutput"]["permissionDecisionReason"]
+        self.assertIn("gate pending: deploy", reason)
+        self.assertNotIn("STDERR_NOISE_MARKER", reason)
+
+    def test_ask_reason_excludes_stderr(self):
+        tmp = self._root_with_stub(self.STUB_ASK)
+        rc, out, err = self._fire(tmp)
+        self.assert_pretool_decision(out, "ask", hint="T2 ask stdout-only")
+        reason = out["hookSpecificOutput"]["permissionDecisionReason"]
+        self.assertIn("size-skip deploy confirm", reason)
+        self.assertNotIn("STDERR_NOISE_MARKER", reason)
+
+    def test_empty_stdout_deny_merges_stderr_diagnostic(self):
+        tmp = self._root_with_stub(self.STUB_SILENT_DENY)
+        rc, out, err = self._fire(tmp)
+        self.assert_pretool_decision(out, "deny", hint="T2 diagnostic merge")
+        reason = out["hookSpecificOutput"]["permissionDecisionReason"]
+        self.assertIn("TRACEBACK_MARKER", reason)
+
+    def test_mktemp_failure_does_not_fail_open(self):
+        """TMPDIR 不在で mktemp が死んでも判定経路は維持される（🔴-4）。"""
+        tmp = self._root_with_stub(self.STUB_DENY)
+        rc, out, err = self._fire(tmp, {"TMPDIR": "/nonexistent-aegis-tmp"})
+        self.assert_pretool_decision(out, "deny", hint="T2 mktemp fail-closed")
+
+
 class TestPostToolUseHook(HookSchemaAssertions):
     """post-status-audit.sh must use top-level decision/reason (PostToolUse spec)."""
 

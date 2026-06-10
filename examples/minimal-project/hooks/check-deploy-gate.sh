@@ -54,16 +54,29 @@ fi
 # human confirm) / anything else=deny. RC=2 WITHOUT the ASK: marker falls
 # through to deny so interpreter failures are never mistaken for ask.
 # set +e: python returning non-zero is expected (deny/ask) — must not abort before emitting JSON.
+# stdout/stderr are separated (T2 v1.5.1): decision text comes from stdout
+# only; stderr is merged into the deny reason ONLY when stdout is empty
+# (interpreter-failure diagnostics). mktemp failure must not kill the hook
+# under set -e — fall back to /dev/null (diagnostics lost, gate path intact).
+ERR_FILE=$(mktemp 2>/dev/null) || ERR_FILE=/dev/null
 set +e
-RESULT=$(python3 "${ROOT}/scripts/check_status.py" --root "$ROOT" --check-deploy-ready 2>&1)
+RESULT=$(python3 "${ROOT}/scripts/check_status.py" --root "$ROOT" --check-deploy-ready 2>"$ERR_FILE")
 RC=$?
 set -e
+ERR_CONTENT=""
+if [ "$ERR_FILE" != "/dev/null" ]; then
+  ERR_CONTENT=$(cat "$ERR_FILE" 2>/dev/null || true)
+  rm -f "$ERR_FILE" 2>/dev/null || true
+fi
 if [ $RC -eq 2 ] && printf '%s' "$RESULT" | grep -q '^ASK:'; then
   MSG=$(printf '%s' "$RESULT" | sed 's/^ASK:[[:space:]]*//' | tr '\n' ' ')
   emit_ask "[deploy-gate] $MSG"
   exit 0
 fi
 if [ $RC -ne 0 ]; then
+  if [ -z "$RESULT" ] && [ -n "$ERR_CONTENT" ]; then
+    RESULT="$ERR_CONTENT"
+  fi
   MSG=$(printf '%s' "$RESULT" | tr '\n' ' ')
   REASON=$(printf '[deploy-gate] %s' "$MSG")
   emit_deny "$REASON"
