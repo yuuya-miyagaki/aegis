@@ -202,6 +202,23 @@ def verify_hooks_runnable(target: Path, profile: str) -> tuple[bool, str]:
         if '"cmd":"echo smoke-e1"' not in ev.read_text(encoding="utf-8"):
             return False, f"{profile}: post-bash-observe.sh did not append the execution"
 
+        # E1 fail side: a dead failure recorder is the FALSE-GREEN direction —
+        # with no fresh fail entry, an older same-fingerprint ok would keep
+        # certifying green. Same F6 rule: fire it, don't list it.
+        r = _fire_hook(target, "hooks/post-bash.sh",
+                       _hook_stdin(target, "Bash",
+                                   {"command": "false smoke-e1-fail"}))
+        if r.returncode != 0:
+            return False, (
+                f"{profile}: post-bash.sh rc={r.returncode} "
+                f"(stderr={r.stderr.strip()[:200]!r})"
+            )
+        ev_text = ev.read_text(encoding="utf-8")
+        if '"cmd":"false smoke-e1-fail"' not in ev_text:
+            return False, f"{profile}: post-bash.sh did not append the failed execution"
+        if '"status":"fail"' not in ev_text:
+            return False, f"{profile}: post-bash.sh did not record status:fail"
+
     # (B-5) check-gate.sh must not classify a project's src/hooks/ file as a
     # framework control file (P1-2). A fresh scaffold is in Client mode, so a
     # "[gate]" deny is expected — an "[integrity]" deny means the root-anchored
