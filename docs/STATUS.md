@@ -3,13 +3,13 @@ framework: aegis
 framework_version: "1.5.0"
 project_name: "Aegis"
 mode: Dev
-phase: plan
+phase: implement
 task_type: framework
 task_size: L
 task_size_rationale: "確定（brainstorm）: grill 🟢残余 5 件の小修正バッチ（v1.5.1 patch）。T1 false-RED アンカー（patterns.sh）/ T2 deploy-gate stderr 分離 / T3 update-gate ロック前倒し / T4 stale lock PID 回収 / T5 WRITE_INDICATORS 左境界＋find -exec 族封鎖。hooks×2・lib×1・scripts×1＋ミラー×4＋テスト 4 本前後＝12 ファイル前後で L。"
 iteration: 19
 ui_surface: false
-last_updated: "2026-06-10T23:16:00Z"
+last_updated: "2026-06-10T23:21:42Z"
 gate_approvals:
   client_ready_for_dev: n/a
   brainstorm: approved
@@ -43,7 +43,7 @@ external_evidence:
     scope: "v0.12.2 実装後 4 ラウンドレビュー"
     findings: "Round 6 (P1×2, P2×1: pre-compact exit 2 / minimal-project / test rc), Round 7 (P1×1, P3×1: git add 漏れ / テスト件数表記), Round 8 (P2×1, P3×1: stale last_updated / grep 自己マッチ), Round 9 (P3×2: コメント不整合)"
     resolution: "9件全反映。tier 1/2 PASS、134 tests PASS、本体と minimal-project 完全同期確認済み。"
-next_action: "iteration 19（grill 🟢残余バッチ v1.5.1）: 設計書＋実装計画（Task 1〜7、regex は両エンジン実機検証済み）コミット済み・plan ゲート承認済み。次: コンテキストクリア→新セッションで TDD 実装（docs/plans/2026-06-11-grill-residual-fixes-implementation-plan.md を順に実行、各タスクでミラー同期コミット）→grill-code（独立2サブエージェント）→4 ゲート --ack 承認→v1.5.1 tag。"
+next_action: "iteration 19（grill 🟢残余バッチ v1.5.1）: TDD 実装中（docs/plans/2026-06-11-grill-residual-fixes-implementation-plan.md の Task 1〜7 を順に実行、各タスクでミラー同期コミット）→grill-code（独立2サブエージェント）→4 ゲート --ack 承認→v1.5.1 tag。"
 blockers: []
 failure_tracking: null
 session_history:
