@@ -15,13 +15,16 @@
     "hooks/session-start.sh",
     "hooks/check-gate.sh",
     "hooks/post-status-audit.sh",
-    "hooks/lib/extract-input.sh"
+    "hooks/lib/extract-input.sh",
+    "hooks/lib/frontmatter.sh"
   ],
   "recommended": [
     "hooks/post-bash.sh",
     "hooks/check-destructive.sh",
     "hooks/pre-compact.sh",
     "hooks/check-control-plane.sh",
+    "hooks/check-secrets.sh",
+    "hooks/check-deploy-gate.sh",
     ".claude/skills/tdd/SKILL.md",
     ".claude/skills/subagent-dev/SKILL.md"
   ],
@@ -34,6 +37,10 @@
     "session-start.sh",
     "check-gate.sh",
     "post-status-audit.sh",
-    "pre-compact.sh"
+    "pre-compact.sh",
+    "check-control-plane.sh",
+    "check-destructive.sh",
+    "check-secrets.sh",
+    "check-deploy-gate.sh"
   ]
 }
