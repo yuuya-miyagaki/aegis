@@ -7,6 +7,7 @@ mkdir ロック（POSIX でアトミック・macOS に flock(1) が無い）で�
 """
 from __future__ import annotations
 
+import os
 import shutil
 import subprocess
 import tempfile
@@ -118,6 +119,54 @@ class TestUpdateGateLock(unittest.TestCase):
             self.assertNotEqual(r.returncode, 0,
                                 "lock held → must fail before CURRENT read")
             self.assertIn("lock", (r.stdout + r.stderr).lower())
+
+    def _dead_pid(self) -> int:
+        """確実に死んでいる PID を得る（直近終了の子プロセス）。"""
+        p = subprocess.Popen(["true"])
+        p.wait()
+        return p.pid
+
+    def test_stale_lock_with_dead_pid_is_reclaimed(self):
+        """死んだ PID の pid ファイルを持つ stale lock は自動回収され、
+        後続の承認が成功する（T4 v1.5.1）。"""
+        with tempfile.TemporaryDirectory() as d:
+            root = self._scaffold(Path(d))
+            lock = root / ".claude" / ".gate-update.lock.d"
+            lock.mkdir(parents=True)
+            (lock / "pid").write_text(str(self._dead_pid()), encoding="utf-8")
+            r = self._run(root, "brainstorm", "approve")
+            self.assertEqual(r.returncode, 0,
+                             f"dead-pid stale lock must be reclaimed: {r.stdout}{r.stderr}")
+            self.assertIn("brainstorm: approved",
+                          (root / "docs" / "STATUS.md").read_text())
+            self.assertFalse(lock.exists(), "reclaimed lock must be released after run")
+
+    def test_lock_with_live_pid_is_not_reclaimed(self):
+        """生きた PID（テストランナー自身）を持つロックは回収されず、
+        文言が pid を含む「並行実行中」系になる（🟡-4）。"""
+        with tempfile.TemporaryDirectory() as d:
+            root = self._scaffold(Path(d))
+            lock = root / ".claude" / ".gate-update.lock.d"
+            lock.mkdir(parents=True)
+            (lock / "pid").write_text(str(os.getpid()), encoding="utf-8")
+            before = (root / "docs" / "STATUS.md").read_text()
+            r = self._run(root, "brainstorm", "approve")
+            self.assertNotEqual(r.returncode, 0, "live-pid lock must not be reclaimed")
+            self.assertIn(str(os.getpid()), r.stdout + r.stderr,
+                          "error must mention the live holder pid")
+            self.assertTrue(lock.exists(), "live lock must be left intact")
+            self.assertEqual(before, (root / "docs" / "STATUS.md").read_text())
+
+    def test_lock_with_garbage_pid_is_not_reclaimed(self):
+        """数字以外の pid 内容は判別不能 → 回収しない（fail-closed）。"""
+        with tempfile.TemporaryDirectory() as d:
+            root = self._scaffold(Path(d))
+            lock = root / ".claude" / ".gate-update.lock.d"
+            lock.mkdir(parents=True)
+            (lock / "pid").write_text("not-a-pid", encoding="utf-8")
+            r = self._run(root, "brainstorm", "approve")
+            self.assertNotEqual(r.returncode, 0, "garbage pid must not be reclaimed")
+            self.assertTrue(lock.exists())
 
 
 if __name__ == "__main__":

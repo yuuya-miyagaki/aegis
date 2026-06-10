@@ -81,18 +81,50 @@ fi
 LOCK_DIR="${SNAPSHOT_DIR}/.gate-update.lock.d"
 mkdir -p "$SNAPSHOT_DIR"
 LOCK_OK=false
+LOCK_HOLDER_PID=""
 for _ in 1 2 3 4 5 6 7 8 9 10; do
   if mkdir "$LOCK_DIR" 2>/dev/null; then
     LOCK_OK=true
-    # rm pid first: rmdir alone would always fail once T4's pid file exists.
+    # rm pid first: rmdir alone would always fail once the pid file exists.
     trap 'rm -f "$LOCK_DIR/pid" 2>/dev/null; rmdir "$LOCK_DIR" 2>/dev/null || true' EXIT
+    printf '%s' "$$" > "$LOCK_DIR/pid"
     break
   fi
+  # Stale-lock reclaim (T4 v1.5.1): atomic-mv claim protocol. Only a purely
+  # numeric pid of a DEAD process is reclaimed; missing/empty/garbage pid or a
+  # live holder falls through to wait (fail-closed). mv of the pid file is an
+  # atomic rename, so at most one contender wins the claim — a slow loser can
+  # never delete a lock that a faster winner has already re-acquired.
+  pid1=$(cat "$LOCK_DIR/pid" 2>/dev/null || true)
+  case "$pid1" in
+    ''|*[!0-9]*) ;;  # no/garbage pid → do not reclaim
+    *)
+      LOCK_HOLDER_PID="$pid1"
+      if ! kill -0 "$pid1" 2>/dev/null; then
+        CLAIM="$LOCK_DIR/pid.claim.$$"
+        if mv "$LOCK_DIR/pid" "$CLAIM" 2>/dev/null; then
+          pid2=$(cat "$CLAIM" 2>/dev/null || true)
+          if [ "$pid2" = "$pid1" ]; then
+            rm -f "$CLAIM" 2>/dev/null || true
+            rmdir "$LOCK_DIR" 2>/dev/null || true
+          else
+            # A faster reclaimer re-acquired between our read and mv — undo.
+            mv "$CLAIM" "$LOCK_DIR/pid" 2>/dev/null || true
+          fi
+        fi
+      fi
+      ;;
+  esac
   sleep 0.2
 done
 if [ "$LOCK_OK" != "true" ]; then
-  echo "ERROR: another gate update holds the lock (${LOCK_DIR})."
-  echo "Retry shortly. If no other session is running, remove the stale directory."
+  if [ -n "$LOCK_HOLDER_PID" ] && kill -0 "$LOCK_HOLDER_PID" 2>/dev/null; then
+    echo "ERROR: another live gate update (pid ${LOCK_HOLDER_PID}) holds the lock (${LOCK_DIR})."
+    echo "Retry shortly."
+  else
+    echo "ERROR: a stale gate-update lock blocks this run (${LOCK_DIR})."
+    echo "Retry shortly. If no other session is running, remove the stale directory."
+  fi
   exit 1
 fi
 
