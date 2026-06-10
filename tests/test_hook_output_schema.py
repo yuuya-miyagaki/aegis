@@ -540,6 +540,53 @@ class TestPreCompactHook(HookSchemaAssertions):
         self.assertTrue(out, "pre-compact.sh must emit JSON when current (got empty)")
         self.assert_precompact_allow(out, rc=rc, hint="pre-compact allow")
 
+    # --- P3-2: AEGIS_PRECOMPACT_INTERVAL 改名（旧 ULTRA_ は 1 リリース fallback） ---
+
+    def _run_with_interval_env(self, age_seconds: int, env: dict):
+        """repo STATUS.md の mtime を「現在−age_seconds」に設定し、interval
+        環境変数つきで実発火する。mtime・環境変数とも必ず原状回復する。"""
+        import time
+        aegis_status = ROOT / "docs" / "STATUS.md"
+        original_mtime = aegis_status.stat().st_mtime
+        stale_at = time.time() - age_seconds
+        os.utime(aegis_status, (stale_at, stale_at))
+        saved = {k: os.environ.get(k) for k in
+                 ("AEGIS_PRECOMPACT_INTERVAL", "ULTRA_PRECOMPACT_INTERVAL")}
+        for k in saved:
+            os.environ.pop(k, None)
+        os.environ.update(env)
+        try:
+            return run_hook("pre-compact.sh", {"hook_event_name": "PreCompact"})
+        finally:
+            os.utime(aegis_status, (original_mtime, original_mtime))
+            for k, v in saved.items():
+                if v is None:
+                    os.environ.pop(k, None)
+                else:
+                    os.environ[k] = v
+
+    def test_precompact_aegis_env_name_blocks(self):
+        """新名 AEGIS_=1 で 60 秒経過 → block（既定 300 なら allow になる差で検証）。"""
+        rc, out, err = self._run_with_interval_env(
+            60, {"AEGIS_PRECOMPACT_INTERVAL": "1"})
+        self.assertTrue(out, "pre-compact.sh must emit JSON (got empty)")
+        self.assert_precompact_block(out, rc=rc, hint="AEGIS_ interval=1")
+
+    def test_precompact_legacy_ultra_env_still_blocks(self):
+        """旧名 ULTRA_ のみでも fallback で効く（1 リリース互換）。"""
+        rc, out, err = self._run_with_interval_env(
+            60, {"ULTRA_PRECOMPACT_INTERVAL": "1"})
+        self.assertTrue(out, "pre-compact.sh must emit JSON (got empty)")
+        self.assert_precompact_block(out, rc=rc, hint="legacy ULTRA_ interval=1")
+
+    def test_precompact_aegis_env_takes_precedence(self):
+        """両方設定時は AEGIS_ 優先（AEGIS_=999999999 / ULTRA_=1 → allow）。"""
+        rc, out, err = self._run_with_interval_env(
+            3600, {"AEGIS_PRECOMPACT_INTERVAL": "999999999",
+                   "ULTRA_PRECOMPACT_INTERVAL": "1"})
+        self.assertTrue(out, "pre-compact.sh must emit JSON (got empty)")
+        self.assert_precompact_allow(out, rc=rc, hint="AEGIS_ wins over ULTRA_")
+
 
 # ---------------------------------------------------------------------------
 # Skill PreToolUse hook (check-skill-gate.sh, v0.13.0 Phase 0b)

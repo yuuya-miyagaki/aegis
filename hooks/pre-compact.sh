@@ -41,8 +41,9 @@ PHASE=$(extract_value "phase")
 NEXT_ACTION=$(extract_value "next_action")
 
 # Staleness check: block compaction if STATUS.md was not recently updated.
-# Default: 5 minutes (300 seconds). Override with ULTRA_PRECOMPACT_INTERVAL.
-STALE_THRESHOLD="${ULTRA_PRECOMPACT_INTERVAL:-300}"
+# Default: 5 minutes (300 seconds). Override with AEGIS_PRECOMPACT_INTERVAL
+# (legacy ULTRA_PRECOMPACT_INTERVAL is honored as fallback for one release).
+STALE_THRESHOLD="${AEGIS_PRECOMPACT_INTERVAL:-${ULTRA_PRECOMPACT_INTERVAL:-300}}"
 # Validate: fall back to default if non-numeric, zero, or negative.
 case "$STALE_THRESHOLD" in
   ''|*[!0-9]*|0) STALE_THRESHOLD=300 ;;
