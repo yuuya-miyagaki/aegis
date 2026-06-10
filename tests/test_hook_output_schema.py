@@ -1287,6 +1287,84 @@ class TestDeployGateWordBoundary(HookSchemaAssertions):
         self.assertEqual(out, {}, f"read-only command must pass through, got: {out}")
 
 
+class TestDeployGateFlagForms(HookSchemaAssertions):
+    """P2-2: flag-form vercel (`vercel --prod` = default deploy) と
+    wrangler deploy|publish を捕捉。サブコマンド形 (`vercel env ...`) は allow。"""
+
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp(prefix="aegis-deploy-flag-test-")
+        self.addCleanup(shutil.rmtree, self.tmp, ignore_errors=True)
+        (Path(self.tmp) / "docs").mkdir()
+        (Path(self.tmp) / "docs" / "STATUS.md").write_text(
+            "---\ntask_type: feature\nphase: deploy\nmode: Dev\ntask_size: L\n"
+            "gate_approvals:\n  plan: approved\n  review: approved\n  qa: approved\n"
+            "  security: approved\n  deploy: pending\n---\n"
+        )
+
+    def _run(self, command: str):
+        return run_hook(
+            "check-deploy-gate.sh",
+            make_pretool_payload("Bash", {"command": command}),
+            cwd=Path(self.tmp),
+            env={"AEGIS_ROOT_OVERRIDE": str(self.tmp)},
+        )
+
+    def _expect_deny(self, command: str, hint: str):
+        rc, out, err = self._run(command)
+        self.assertNotEqual(out, {}, f"{hint}: must deny, got allow {{}}")
+        self.assert_pretool_decision(out, "deny", hint=hint)
+
+    def _expect_allow(self, command: str, hint: str):
+        rc, out, err = self._run(command)
+        self.assertEqual(out, {}, f"{hint}: must pass through, got: {out}")
+
+    # --- deny: flag-form vercel ---
+
+    def test_vercel_prod_denies(self):
+        self._expect_deny("vercel --prod", "vercel --prod")
+
+    def test_npx_vercel_prod_denies(self):
+        self._expect_deny("npx vercel --prod", "npx vercel --prod")
+
+    def test_vercel_prod_yes_denies(self):
+        self._expect_deny("vercel --prod --yes", "vercel --prod --yes")
+
+    def test_vercel_prod_chained_denies(self):
+        self._expect_deny("vercel --prod && echo ok", "vercel --prod && chain")
+
+    def test_vercel_prod_redirect_denies(self):
+        # グリル穴3: リダイレクト終端でもバイパス不可。
+        self._expect_deny("vercel --prod > deploy.log", "vercel --prod > redirect")
+
+    def test_wrangler_deploy_denies(self):
+        self._expect_deny("wrangler deploy", "wrangler deploy")
+
+    def test_wrangler_publish_denies(self):
+        self._expect_deny("wrangler publish", "wrangler publish")
+
+    # --- allow: non-deploy forms ---
+
+    def test_my_vercel_allowed(self):
+        self._expect_allow("my-vercel --prod", "my-vercel prefix")
+
+    def test_vercel_env_ls_allowed(self):
+        self._expect_allow("vercel env ls", "vercel env ls")
+
+    def test_vercel_env_pull_prod_allowed(self):
+        # グリル穴3: サブコマンド後置 flag は deploy ではない。
+        self._expect_allow("vercel env pull --prod", "vercel env pull --prod")
+
+    def test_vercel_dev_allowed(self):
+        self._expect_allow("vercel dev", "vercel dev")
+
+    def test_rg_deploy_allowed(self):
+        self._expect_allow("rg deploy", "rg deploy")
+
+    def test_cat_checklist_allowed(self):
+        self._expect_allow("cat templates/DEPLOY-CHECKLIST.template.md",
+                           "cat checklist template")
+
+
 # ---------------------------------------------------------------------------
 # Entry
 # ---------------------------------------------------------------------------

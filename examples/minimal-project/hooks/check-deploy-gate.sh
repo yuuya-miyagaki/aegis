@@ -39,9 +39,11 @@ fi
 # read-only false matches (rg deploy, cat DEPLOY-CHECKLIST.template.md) because
 # they contain no tool-name+deploy bigram. A leading non-boundary char (e.g. the
 # '-' in my-vercel) does not match.
-# Patterns: vercel deploy [flags], bare vercel (default=deploy), firebase deploy,
-#           netlify deploy, npm/pnpm/yarn/bun [run] deploy, flyctl/railway/gcloud deploy.
-DEPLOY_RE='(^|[[:space:];&|])(vercel +deploy|vercel[[:space:]]*$|firebase +deploy|netlify +deploy|(npm|pnpm|yarn|bun) +(run +)?deploy|flyctl +deploy|railway +deploy|gcloud +app +deploy)'
+# Patterns: vercel deploy [flags], vercel with ONLY flags (default=deploy, incl.
+#           --prod; subcommands like `vercel env` do NOT match), firebase/netlify
+#           deploy, npm/pnpm/yarn/bun [run] deploy, flyctl/railway/gcloud deploy,
+#           wrangler deploy|publish.
+DEPLOY_RE='(^|[[:space:];&|])(vercel +deploy|vercel( +--[A-Za-z][A-Za-z0-9-]*(=[^[:space:];&|]*)?)*[[:space:]]*($|[;&|>])|firebase +deploy|netlify +deploy|(npm|pnpm|yarn|bun) +(run +)?deploy|flyctl +deploy|railway +deploy|gcloud +app +deploy|wrangler +(deploy|publish))'
 if ! printf '%s' "$CMD" | grep -qEi "$DEPLOY_RE"; then
   emit_allow
   exit 0
