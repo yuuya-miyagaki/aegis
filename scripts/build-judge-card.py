@@ -168,7 +168,9 @@ def read_test_result(root: Path) -> str:
     for d in reversed(_evidence_entries(root)):
         if d.get("status") not in ("ok", "fail"):
             continue
-        cmd = d.get("cmd") or ""
+        # Newlines normalized to ';' before matching — patterns are anchored at
+        # command position and the grep consumer does the same (T1 v1.5.1).
+        cmd = (d.get("cmd") or "").replace("\n", ";")
         if not any(p.search(cmd) for p in pats):
             continue
         if (d.get("fp") or "") != current:

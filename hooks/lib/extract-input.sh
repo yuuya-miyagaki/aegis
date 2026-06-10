@@ -36,7 +36,13 @@ extract_command() {
   # internal quote, which previously hid a dangerous token placed after it
   # (destructive/secrets bypass). Use python3 for fidelity when an escaped quote
   # is present; otherwise keep the grep fast-path (no python3 on the hot path).
-  if printf '%s' "$input" | grep -q '\\"'; then
+  # Same fidelity routing for backslash escapes (\n, \t, ...): the grep path
+  # returns them as literal two-char sequences, so a multiline command would
+  # never re-gain its real newlines — breaking the ';' normalization contract
+  # of the test-runner classifier (T1 v1.5.1) for both the evidence log and
+  # post-bash.sh. python3 failure still falls through to the grep path
+  # (degraded text beats no text for the downstream fail-closed checks).
+  if printf '%s' "$input" | grep -q '\\[\\nrtbfu"]'; then
     result=$(printf '%s' "$input" | python3 -c 'import sys,json; print(json.loads(sys.stdin.read()).get("tool_input",{}).get("command",""))' 2>/dev/null || true)
     if [ -n "$result" ]; then
       printf '%s' "$result"

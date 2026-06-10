@@ -470,6 +470,24 @@ class TestPostToolUseFailureHook(HookSchemaAssertions):
         if out:
             self.assert_posttoolfailure_notification(out, hint="post-bash.sh vitest fail")
 
+    def test_multiline_test_command_emits_react_guidance(self):
+        """改行入りテストコマンドも正規化後に分類される（T1 v1.5.1 回帰ガード。
+        grep は行単位 ^ で正規化前も一致するため RED にはならない — judge 側と
+        同一の正規化規約を hook にも固定するのが目的）。"""
+        tmp = tempfile.mkdtemp(prefix="aegis-postbash-ml-")
+        self.addCleanup(shutil.rmtree, tmp, ignore_errors=True)
+        payload = {
+            "session_id": "t",
+            "hook_event_name": "PostToolUseFailure",
+            "tool_name": "Bash",
+            "tool_input": {"command": "echo build done\nvitest run"},
+            "tool_response": {"exitCode": 1, "stdout": "", "stderr": "FAIL"},
+        }
+        rc, out, err = run_hook(
+            "post-bash.sh", payload, env={"AEGIS_ROOT_OVERRIDE": tmp})
+        self.assertNotEqual(out, {}, "multiline test command must emit ReAct hint")
+        self.assert_posttoolfailure_notification(out, hint="post-bash.sh multiline")
+
 
 # ---------------------------------------------------------------------------
 # PreCompact hook (pre-compact.sh)

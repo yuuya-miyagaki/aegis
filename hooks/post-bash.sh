@@ -27,9 +27,13 @@ CMD=$(extract_command "$INPUT")
 
 # Only act on test runner commands (single source: patterns.sh).
 source "${SCRIPT_DIR}/lib/patterns.sh"
+# Normalize newlines to ';' before matching: grep '^' is per-line while the
+# judge's python re '^' is string-start — normalization keeps both consumers
+# of patterns.sh in parity (T1 v1.5.1, tests/test_patterns_parity.py).
+CMD_NORM=$(printf '%s' "$CMD" | tr '\n' ';')
 IS_TEST=false
 for _re in "${AEGIS_TEST_RUNNER_REGEX[@]}"; do
-  if printf '%s' "$CMD" | grep -Eq "$_re"; then
+  if printf '%s' "$CMD_NORM" | grep -Eq "$_re"; then
     IS_TEST=true
     break
   fi

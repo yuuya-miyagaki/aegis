@@ -204,6 +204,21 @@ class TestReadTestResultFromEvidence(unittest.TestCase):
         self.assertEqual(fpval, "nolib")
         self.assertEqual(judge.read_test_result(self.root), "unverified")
 
+    def test_multiline_command_classified(self):
+        """改行入りコマンドは ';' 正規化後に分類される（grep/re パリティ、T1 v1.5.1）。"""
+        fp = judge.current_fingerprint(self.root)
+        self.log.write_text(_ev_line("echo build done\nvitest run", "fail", fp))
+        self.assertEqual(judge.read_test_result(self.root), "red")
+
+    def test_mention_in_args_not_classified(self):
+        """引数位置のランナー名言及（grep vitest package.json）は分類されず、
+        その失敗が直前の実テスト green を覆さない（false-RED 解消の e2e）。"""
+        fp = judge.current_fingerprint(self.root)
+        self.log.write_text(
+            _ev_line("vitest run", "ok", fp)
+            + _ev_line("grep vitest package.json", "fail", fp))
+        self.assertEqual(judge.read_test_result(self.root), "green")
+
 
 class TestStubPrecision(unittest.TestCase):
     """Regression: stub scan must not hard-block legitimate code (#grill-code)."""
