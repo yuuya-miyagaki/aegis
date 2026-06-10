@@ -138,7 +138,9 @@ if [ -n "$CHECK_CMD" ]; then
   # Must not contain chain operators.
   if ! printf '%s' "$CHECK_CMD" | grep -qE "$CHAIN_OPS"; then
     READ_ONLY_STARTS='^(cat|head|tail|less|more|grep|egrep|fgrep|rg|find|ls|wc|diff|file|stat|md5sum|sha256sum) '
-    WRITE_INDICATORS='sed\s+-i|>\s*[^&]|>>\s|tee\s|cp\s|mv\s|chmod\s|rm\s|mkdir\s|touch\s|install\s|ln\s|write_text|write_bytes|open\(.*[wax]|\.write\(|truncate|Path\(.*\.write|unlink|remove|rename'
+    # unlink/remove/rename/truncate require a call form `(` — bare substrings
+    # false-positived on read-only greps like `grep -r "remove" hooks/` (P3-4).
+    WRITE_INDICATORS='sed\s+-i|>\s*[^&]|>>\s|tee\s|cp\s|mv\s|chmod\s|rm\s|mkdir\s|touch\s|install\s|ln\s|write_text|write_bytes|open\(.*[wax]|\.write\(|Path\(.*\.write|(unlink|remove|rename|truncate)[[:space:]]*\('
     if printf '%s' "$CHECK_CMD" | grep -qE "$READ_ONLY_STARTS" && \
        ! printf '%s' "$CHECK_CMD" | grep -qE "$WRITE_INDICATORS"; then
       emit_allow

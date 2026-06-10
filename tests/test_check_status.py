@@ -1856,6 +1856,53 @@ class TestControlPlaneRealisticInput(unittest.TestCase):
         finally:
             tmpdir.cleanup()
 
+    # --- P3-4: WRITE_INDICATORS word-bounding ---
+
+    def test_readonly_grep_for_remove_allowed(self):
+        """grep -r "remove" hooks/ は読み取り専用 → allow（裸 substring 偽陽性の解消）。"""
+        tmpdir, root = self._setup_project(task_type="feature")
+        try:
+            rc, out = self._run_hook(root, 'grep -r "remove" hooks/')
+            self.assertEqual(rc, 0)
+            self.assertEqual(out, "{}",
+                             f"read-only grep for 'remove' must be allowed: {out}")
+        finally:
+            tmpdir.cleanup()
+
+    def test_readonly_grep_for_rename_allowed(self):
+        tmpdir, root = self._setup_project(task_type="feature")
+        try:
+            rc, out = self._run_hook(root, "grep -rn rename hooks/lib/")
+            self.assertEqual(rc, 0)
+            self.assertEqual(out, "{}",
+                             f"read-only grep for 'rename' must be allowed: {out}")
+        finally:
+            tmpdir.cleanup()
+
+    def test_find_exec_rm_still_denied(self):
+        """真陽性維持: read-only 始まりでも rm 実行を含めば deny。"""
+        tmpdir, root = self._setup_project(task_type="feature")
+        try:
+            rc, out = self._run_hook(
+                root, 'find hooks/ -name "*.sh" -exec rm {} +')
+            self.assertEqual(rc, 0)
+            self.assertIn('"permissionDecision":"deny"', out,
+                          f"find -exec rm must stay denied: {out}")
+        finally:
+            tmpdir.cleanup()
+
+    def test_remove_call_form_still_denied(self):
+        """真陽性維持: 関数呼び出し形 remove( は write indicator のまま。"""
+        tmpdir, root = self._setup_project(task_type="feature")
+        try:
+            rc, out = self._run_hook(
+                root, 'grep -rn "os.remove(" hooks/')
+            self.assertEqual(rc, 0)
+            self.assertIn('"permissionDecision":"deny"', out,
+                          f"call-form remove( must stay denied: {out}")
+        finally:
+            tmpdir.cleanup()
+
     def test_framework_task_allows_control_plane_write(self):
         tmpdir, root = self._setup_project(task_type="framework")
         try:
