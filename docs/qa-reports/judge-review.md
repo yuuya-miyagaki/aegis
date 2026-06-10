@@ -17,4 +17,4 @@
 （LLM が平易日本語で記述）
 
 ## ACK
-- grill-code 2段グリル実施（v140-review.md、マージ可・🟡2件修正済み）。389 tests 本セッション実走を record-test-result で green 記録。claims は v140-qa.md の検証表が相当 （2026-06-10 21:33）
+- grill-code 2サブエージェント独立レビュー（v150-review.md）。🔴1/🟡4 全修正・436 tests/contract/drift/smoke PASS （2026-06-11 00:26）

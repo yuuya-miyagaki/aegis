@@ -14,4 +14,4 @@
 （LLM が平易日本語で記述）
 
 ## ACK
-- v140-qa.md: 389 tests OK・contract/drift/strict/smoke 全 PASS を本セッション実走。TDD RED→GREEN 来歴記録済み。record-test-result green 記録済み （2026-06-10 21:34）
+- 436 tests OK・contract/drift/smoke PASS・観測→判定 e2e 実発火（v150-qa.md）。テスト行は evidence-log manual 記録で green。drill は全タスク TDD RED→GREEN 来歴で代替（混在 diff 制約は LEARNINGS 記録済み） （2026-06-11 00:27）

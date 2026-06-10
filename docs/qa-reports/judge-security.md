@@ -20,4 +20,4 @@
 （LLM が平易日本語で記述）
 
 ## ACK
-- v140-security.md: 防御強度の変化点は全て強化/可視化方向。failure policy 表を python3 遮断実発火で突合済み。残余リスクは記録済み （2026-06-10 21:34）
+- v150-security.md: 変化点は全て強化/可視化方向（quotepath fail-closed・framing・観測一本化）。受容リスクは設計明示（cmd 偽装は reviewer 責務）・残余は fail-closed 方向で記録済み （2026-06-11 00:27）

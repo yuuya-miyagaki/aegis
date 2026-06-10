@@ -13,4 +13,4 @@
 （LLM が平易日本語で記述）
 
 ## ACK
-- v140-deploy-checklist.md: ローカル tag のみ・外部インフラなし・SemVer minor 判定。バンプ後最終検証 全 PASS （2026-06-10 21:34）
+- v150-deploy-checklist.md: ローカル minor リリース（tag のみ・push はユーザー判断）。バンプ後 436 tests/contract/drift/smoke 全 PASS 実走済み （2026-06-11 00:27）

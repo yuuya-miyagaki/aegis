@@ -3,21 +3,21 @@ framework: aegis
 framework_version: "1.5.0"
 project_name: "Aegis"
 mode: Dev
-phase: review
+phase: deploy
 task_type: framework
 task_size: L
 task_size_rationale: "確定（brainstorm Step D）: E1 activity verification（進化レビュー §5 E1・§6 ロードマップ 5 番）。観測一本化＝PostToolUse/PostToolUseFailure(Bash)→evidence-log.jsonl 記録、judge card テスト行を観測ログ読みに置換、fingerprint.sh 単一所有、record-test-result.py 手動フォールバック化。hooks×4・lib×3・scripts×2・setup/smoke/templates/gitignore/docs 横断 14+ ファイル＝L。"
 iteration: 18
 ui_surface: false
-last_updated: "2026-06-10T17:00:00Z"
+last_updated: "2026-06-11T03:30:00Z"
 gate_approvals:
   client_ready_for_dev: n/a
   brainstorm: approved
   plan: approved
-  review: pending
-  qa: pending
-  security: pending
-  deploy: pending
+  review: approved
+  qa: approved
+  security: approved
+  deploy: approved
   dev_ready_for_client: pending
 current_refs:
   requirements:
@@ -42,14 +42,10 @@ external_evidence:
     scope: "v0.12.2 実装後 4 ラウンドレビュー"
     findings: "Round 6 (P1×2, P2×1: pre-compact exit 2 / minimal-project / test rc), Round 7 (P1×1, P3×1: git add 漏れ / テスト件数表記), Round 8 (P2×1, P3×1: stale last_updated / grep 自己マッチ), Round 9 (P3×2: コメント不整合)"
     resolution: "9件全反映。tier 1/2 PASS、134 tests PASS、本体と minimal-project 完全同期確認済み。"
-next_action: "E1 実装 13 タスク完走＋grill-code（🔴1/🟡4 同セッション修正・436 tests/contract/drift/smoke 全 PASS）。次: review→qa→security→deploy をゲート承認（テスト行は record-test-result.py 手動記録）→ v1.5.0 タグ。origin push は別途ユーザー判断。grill 🟢残余（false-RED・ホットパスコスト等）は v150-security.md 記録済み・別バッチ。"
+next_action: "v1.5.0 リリース完了（E1 activity verification・全ゲート承認・tag 済み）。origin push は別途ユーザー判断。次タスク候補: grill 🟢残余の小修正バッチ（false-RED 緩和・check-deploy-gate stderr・update-gate TOCTOU・stale lock 回収・WRITE_INDICATORS 残穴、v140/v150-security.md 記録済み）または進化レビュー E2〜E6。"
 blockers: []
 failure_tracking: null
 session_history:
-  - date: "2026-06-07"
-    mode: Dev
-    phase: "docs"
-    note: "機能整合性監査（charter 2026-06-07）を実行。Layer 0-4 で7 finding 実証検出（P1×1/P2×4/P3×2）。**F6（P1）＝setup.sh が hooks/lib/emit.sh・patterns.sh を配布せず install 先で全 hook が source 時に死＝決定論 moat 全死**を copy_hooks 全 lib コピーで修復。F3 retro graceful 配送／F2 judge 配布／F4 status_doctor 配布／F1 contract hook4件追跡／F5・F7 polish。各 TDD＋2段グリル。install 経路を scaffold smoke の hook 実発火で契約化（静的検査の死角を恒久封鎖）。再検証で Layer 0 全 green＋ライブ install の moat 実発火を実証。v1.3.2 patch で締め（298 tests・contract・drift・tier2・--strict 全 PASS・tag v1.3.2）。"
   - date: "2026-06-10"
     mode: Dev
     phase: "deploy"
@@ -58,6 +54,10 @@ session_history:
     mode: Dev
     phase: "deploy"
     note: "iteration 17（v1.4.0 fix batch）: T0〜T16 を TDD で完走（frontmatter.sh 新設、failure policy 表＋実発火突合テスト、check-task-completed closed 化、check-secrets 鍵種追加、WRITE_INDICATORS 語境界化、pre-compact env 改名、deploy gate RC 契約＋size-skip ask 化、update-gate mkdir ロック＋単一パス書込、contract lib 追跡＋版数同期、B1 ドリル docs/** 除外、standard Bash ガード4種、hooks $CLAUDE_PROJECT_DIR 化、K-2、v1.4.0 版数）。grill-code=マージ可（Critical 0）、🟡2件（実リポジトリミラーテスト不在／CLAUDE_PROJECT_DIR 未設定で moat silent fail-open）を同セッション修正。389 tests OK・contract・drift・smoke・--strict 全 PASS。証跡 v140-review/qa/security/deploy-checklist.md。review→qa→security→deploy を tri-state judge --ack で承認（current_refs 無傷＝update-gate 単一パス書込の実証、LEARNINGS の旧バグ記録を解消注記）。v1.4.0 minor で締め・tag v1.4.0。origin push は別途ユーザー判断。"
+  - date: "2026-06-11"
+    mode: Dev
+    phase: "deploy"
+    note: "iteration 18（v1.5.0 E1 activity verification）: 検証の実行ベース化を 13 タスク TDD で完走。hook 観測の Bash 実行記録 .claude/evidence-log.jsonl を judge card テスト判定の唯一ソース化（自己申告 test-result.json 廃止）、fingerprint.sh 単一所有（HEAD sha 混入）、記録=fail-open／判定=fail-closed、observer 生存チェック（TaskCompleted 差し戻し）、smoke の観測系実発火。設計逸脱2件（payload_sha／HEAD 比 fingerprint）はユーザー事前承認・spec 同期済み。grill-code（独立2サブエージェント）が 🔴1（quotepath で非ASCII名の fp 不感＝silent green・実証付き）＋🟡4（無区切り連結衝突／example observer 未登録＋presence 穴／smoke 失敗側未発火／観測→判定 e2e 不在）を検出し全て同セッション修正。436 tests OK・contract・drift・smoke 全 PASS。テスト行は record-test-result.py の手動記録（manual ok・fp 一致）で green、4 ゲートを --ack 承認。v1.5.0 minor で締め・tag v1.5.0。origin push は別途ユーザー判断。"
 ---
 
 ## Summary
@@ -89,3 +89,4 @@ Claude Code ネイティブの Aegis 運用フレームワーク。2026-06-05、
 - 2026-04-22: v0.12.0 MCP gate + ref check + name lint + health check。48テスト全PASS。
 - 2026-06-05: future-proof 再アーキ着手。Phase 0b 確定 + Foundation（emit.sh 単一出力源 / patterns.sh / version owner）実装。Round 1/2 セカンドオピニオン反映。183 tests PASS、main マージ（未push）。
 - 2026-06-06: Phase R 再配分を連続 ship（routing 0.12.3／context 0.12.4／model-effort／name-hygiene／TDD 0.12.5／evidence 完了強制 0.12.6）。続けて Phase D（仕上げ）: migration guide(v0.12.2→v1.0.0)＋README リフレッシュ＋安定契約/SemVer 明文化＋version **1.0.0**。各タスクで brainstorm→2段グリル→実装→grill-code を完走。195 tests green・tier1/2 PASS。**再アーキ F→R→A→D 全完了＝v1.0.0「トレッドミルから降りる」看板を掲示。**
+- 2026-06-07: 機能整合性監査（charter 2026-06-07）。Layer 0-4 で 7 finding（P1×1/P2×4/P3×2）全修復。核心 F6（P1）＝setup.sh が hooks/lib を配布せず install 先で moat 全死→copy_hooks 修復＋scaffold smoke の hook 実発火で install 経路を契約化。v1.3.2 patch（298 tests・tag v1.3.2）。
