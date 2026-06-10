@@ -980,6 +980,17 @@ class TestCheckSecretsHighRisk(HookSchemaAssertions):
         self.assertEqual(rc, 0)
         self.assert_pretool_decision(out, "deny", hint="git add id_rsa")
 
+    def test_git_add_id_ed25519_denies(self):
+        # P2-4: 現代 ssh-keygen 既定の鍵種も検出する。
+        rc, out, err = self._run("git add ~/.ssh/id_ed25519")
+        self.assertEqual(rc, 0)
+        self.assert_pretool_decision(out, "deny", hint="git add id_ed25519")
+
+    def test_git_add_id_ecdsa_pub_denies(self):
+        rc, out, err = self._run("git add id_ecdsa.pub")
+        self.assertEqual(rc, 0)
+        self.assert_pretool_decision(out, "deny", hint="git add id_ecdsa.pub")
+
     def test_git_add_credentials_json_denies(self):
         rc, out, err = self._run("git add my-credentials.json")
         self.assertEqual(rc, 0)
@@ -1053,6 +1064,22 @@ class TestCheckSecretsBroadStaging(HookSchemaAssertions):
         rc, out, err = run_hook("check-secrets.sh", self._payload("git commit -m feat"), cwd=Path(self.tmp))
         self.assertEqual(rc, 0)
         self.assert_pretool_decision(out, "deny", hint="git commit with staged id_rsa")
+
+    def test_git_add_dot_with_id_ed25519_denies(self):
+        # P2-4: broad staging でも ed25519 鍵を検出する。
+        (Path(self.tmp) / "id_ed25519").write_text("-----PRIVATE-----")
+        rc, out, err = run_hook("check-secrets.sh", self._payload("git add ."), cwd=Path(self.tmp))
+        self.assertEqual(rc, 0)
+        self.assert_pretool_decision(out, "deny", hint="git add . with id_ed25519")
+
+    def test_git_commit_with_id_ecdsa_staged_denies(self):
+        # P2-4: staged commit でも ecdsa 鍵を検出する。
+        key = Path(self.tmp) / "id_ecdsa"
+        key.write_text("-----PRIVATE-----")
+        subprocess.run(["git", "-C", self.tmp, "add", "id_ecdsa"], check=True, capture_output=True)
+        rc, out, err = run_hook("check-secrets.sh", self._payload("git commit -m feat"), cwd=Path(self.tmp))
+        self.assertEqual(rc, 0)
+        self.assert_pretool_decision(out, "deny", hint="git commit with staged id_ecdsa")
 
     def test_git_commit_clean_passes_through(self):
         """git commit without high-risk staged → empty {} pass-through."""
