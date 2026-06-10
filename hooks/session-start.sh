@@ -25,6 +25,11 @@ grep -m1 "^phase:" "$STATUS_FILE" >> "$SNAPSHOT_FILE" 2>/dev/null || true
 # Save mode to snapshot (used by post-status-audit.sh for mode change monitoring).
 grep -m1 "^mode:" "$STATUS_FILE" >> "$SNAPSHOT_FILE" 2>/dev/null || true
 
+# E1: rotate + touch the evidence log. The (possibly empty) file is the
+# "observer layer alive" liveness signal consumed by check-task-completed.sh.
+source "${SCRIPT_DIR}/lib/evidence.sh"
+rotate_evidence_log "$ROOT" || true
+
 # Extract a scalar value from YAML frontmatter.
 extract_value() {
   local key="$1"

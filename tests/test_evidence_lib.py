@@ -136,5 +136,28 @@ class TestRotate(unittest.TestCase):
         self.assertEqual(self.log.read_text(encoding="utf-8"), "")
 
 
+class TestSessionStartRotates(unittest.TestCase):
+    def test_session_start_touches_evidence_log(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            make_repo(root)
+            (root / "docs").mkdir()
+            (root / "docs" / "STATUS.md").write_text(
+                "---\nmode: Dev\nphase: plan\nnext_action: x\n---\n")
+            (root / "hooks").mkdir()
+            (root / "hooks" / "lib").mkdir()
+            for f in ("emit.sh", "frontmatter.sh", "extract-input.sh",
+                      "fingerprint.sh", "evidence.sh", "patterns.sh"):
+                (root / "hooks" / "lib" / f).write_bytes(
+                    (ROOT / "hooks" / "lib" / f).read_bytes())
+            (root / "hooks" / "session-start.sh").write_bytes(
+                (ROOT / "hooks" / "session-start.sh").read_bytes())
+            proc = subprocess.run(
+                ["bash", str(root / "hooks" / "session-start.sh")],
+                input="{}", capture_output=True, text=True, timeout=60)
+            self.assertEqual(proc.returncode, 0)
+            self.assertTrue((root / LOG_REL).is_file())
+
+
 if __name__ == "__main__":
     unittest.main()
