@@ -224,6 +224,25 @@ copy_hooks() {
   done <<< "$hooks_include"
 }
 
+# --- Ensure runtime artifacts are gitignored in the install target ---
+# Idempotent: each entry is appended only when not already present verbatim.
+ensure_target_gitignore() {
+  local target="$1"
+  local entries=".claude/evidence-log.jsonl
+.claude/evidence-log.jsonl.1
+.claude/.gate-snapshot
+.claude/.task-event-debug.log"
+  local entry
+  while IFS= read -r entry; do
+    [ -n "$entry" ] || continue
+    if [ ! -f "$target/.gitignore" ] || ! grep -qxF "$entry" "$target/.gitignore"; then
+      printf '%s\n' "$entry" >> "$target/.gitignore"
+    fi
+  done <<EOF_GI
+$entries
+EOF_GI
+}
+
 # --- Main ---
 echo "Aegis Setup"
 echo "  Profile: $PROFILE"
@@ -254,6 +273,7 @@ fi
 echo ""
 echo "--- Hook files ---"
 copy_hooks "$PROFILE_JSON" "$TARGET"
+ensure_target_gitignore "$TARGET"
 
 # 4. Generate settings.local.json
 echo ""
