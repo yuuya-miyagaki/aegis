@@ -151,35 +151,44 @@ class TestCheckDeployReady(unittest.TestCase):
             self.assertEqual(rc, 1, f"Expected deny, got: {out}")
             self.assertIn("qa", out, f"Deny reason should mention 'qa': {out}")
 
-    def test_feature_S_allows_without_deploy_gates(self):
-        """feature/S — deploy phase not in SIZE_ALLOWED_PHASES["S"] → allow."""
+    def test_feature_S_asks_without_deploy_gates(self):
+        """feature/S — deploy phase skipped → RC 2 + ASK: marker (P2-3 観察4)。
+
+        size-skip は「deploy が検査済み」ではなく「フェーズが無い」だけなので、
+        無検査許可ではなく人間確認（ask）に倒す。"""
         content = make_status_md(
             task_type="feature", task_size="S",
             approvals={},  # all default (pending)
         )
         with TempProject(content) as root:
             rc, out = run_check(root, "--check-deploy-ready")
-            self.assertEqual(rc, 0, f"Expected allow (S skips deploy), got: {out}")
+            self.assertEqual(rc, 2, f"Expected ask RC=2 (S skips deploy), got: {out}")
+            self.assertTrue(out.startswith("ASK:"),
+                            f"stdout must start with ASK: marker: {out}")
 
-    def test_feature_M_allows_without_deploy_gates(self):
-        """feature/M — deploy phase not in SIZE_ALLOWED_PHASES["M"] → allow."""
+    def test_feature_M_asks_without_deploy_gates(self):
+        """feature/M — deploy phase skipped → RC 2 + ASK: marker (P2-3)。"""
         content = make_status_md(
             task_type="feature", task_size="M",
             approvals={},
         )
         with TempProject(content) as root:
             rc, out = run_check(root, "--check-deploy-ready")
-            self.assertEqual(rc, 0, f"Expected allow (M skips deploy), got: {out}")
+            self.assertEqual(rc, 2, f"Expected ask RC=2 (M skips deploy), got: {out}")
+            self.assertTrue(out.startswith("ASK:"),
+                            f"stdout must start with ASK: marker: {out}")
 
-    def test_bugfix_M_review_approved_allows(self):
-        """bugfix/M — review is the only required gate → allow when approved."""
+    def test_bugfix_M_review_approved_asks(self):
+        """bugfix/M — deploy フェーズなしのため approve 済みでも ask (P2-3)。"""
         content = make_status_md(
             task_type="bugfix", task_size="M",
             approvals={"review": "approved"},
         )
         with TempProject(content) as root:
             rc, out = run_check(root, "--check-deploy-ready")
-            self.assertEqual(rc, 0, f"Expected allow, got: {out}")
+            self.assertEqual(rc, 2, f"Expected ask RC=2, got: {out}")
+            self.assertTrue(out.startswith("ASK:"),
+                            f"stdout must start with ASK: marker: {out}")
 
     def test_feature_L_review_na_denies_strict(self):
         """feature/L with review=n/a → deny (strict enforcement)."""
@@ -202,15 +211,17 @@ class TestCheckDeployReady(unittest.TestCase):
             rc, out = run_check(root, "--check-deploy-ready")
             self.assertEqual(rc, 0, f"Expected allow, got: {out}")
 
-    def test_hotfix_S_allows_even_pending(self):
-        """hotfix/S — S size skips deploy → allow regardless of gates."""
+    def test_hotfix_S_asks_even_pending(self):
+        """hotfix/S — S size skips deploy → ask（無検査許可にしない, P2-3）。"""
         content = make_status_md(
             task_type="hotfix", task_size="S",
             approvals={},
         )
         with TempProject(content) as root:
             rc, out = run_check(root, "--check-deploy-ready")
-            self.assertEqual(rc, 0, f"Expected allow, got: {out}")
+            self.assertEqual(rc, 2, f"Expected ask RC=2, got: {out}")
+            self.assertTrue(out.startswith("ASK:"),
+                            f"stdout must start with ASK: marker: {out}")
 
 
 # =============================================================================
@@ -469,8 +480,8 @@ class TestMCPDeployGateHook(unittest.TestCase):
             self.assertEqual(rc, 0)
             self.assertEqual(out, "{}")
 
-    def test_mcp_deploy_small_task_allows(self):
-        """MCP deploy with task_size=S → allow (deploy phase skipped)."""
+    def test_mcp_deploy_small_task_asks(self):
+        """MCP deploy with task_size=S → ask（無検査許可にしない, P2-3 観察4）。"""
         content = make_status_md(
             task_type="feature", task_size="S", phase="review",
             approvals={},
@@ -478,7 +489,25 @@ class TestMCPDeployGateHook(unittest.TestCase):
         with TempProjectWithHooks(content) as root:
             rc, out = run_hook(self.HOOK_NAME, root, self.VERCEL_DEPLOY_INPUT)
             self.assertEqual(rc, 0)
-            self.assertEqual(out, "{}")
+            self.assertIn('"permissionDecision":"ask"', out,
+                          f"size-skip deploy must ask, got: {out}")
+
+    def test_mcp_rc2_without_ask_marker_denies(self):
+        """RC=2 でも ASK: マーカーが無い出力は deny（interpreter 異常系の混同防止）。"""
+        content = make_status_md(
+            task_type="feature", task_size="S", phase="review",
+            approvals={},
+        )
+        with TempProjectWithHooks(content) as root:
+            scripts_link = Path(root) / "scripts"
+            scripts_link.unlink()  # replace real-scripts symlink with a stub
+            scripts_link.mkdir()
+            (scripts_link / "check_status.py").write_text(
+                "import sys; print('boom'); sys.exit(2)\n", encoding="utf-8")
+            rc, out = run_hook(self.HOOK_NAME, root, self.VERCEL_DEPLOY_INPUT)
+            self.assertEqual(rc, 0)
+            self.assertIn('"permissionDecision":"deny"', out,
+                          f"RC=2 without ASK marker must deny, got: {out}")
 
     # NOTE: the old broad-regex tests (mcp__.*__deploy.*) were removed in the
     # Round 3 P3 cleanup — that regex is NOT the registered matcher. The actual

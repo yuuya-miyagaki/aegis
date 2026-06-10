@@ -1295,6 +1295,9 @@ class TestDeployGateFlagForms(HookSchemaAssertions):
         self.tmp = tempfile.mkdtemp(prefix="aegis-deploy-flag-test-")
         self.addCleanup(shutil.rmtree, self.tmp, ignore_errors=True)
         (Path(self.tmp) / "docs").mkdir()
+        # 実 scripts を配線（無いと python3 が file-not-found RC=2 で deny に
+        # 偶然倒れ、ゲートロジック自体を検査しないテストになる）。
+        (Path(self.tmp) / "scripts").symlink_to(ROOT / "scripts")
         (Path(self.tmp) / "docs" / "STATUS.md").write_text(
             "---\ntask_type: feature\nphase: deploy\nmode: Dev\ntask_size: L\n"
             "gate_approvals:\n  plan: approved\n  review: approved\n  qa: approved\n"
@@ -1363,6 +1366,61 @@ class TestDeployGateFlagForms(HookSchemaAssertions):
     def test_cat_checklist_allowed(self):
         self._expect_allow("cat templates/DEPLOY-CHECKLIST.template.md",
                            "cat checklist template")
+
+
+class TestDeployGateSizeSkipAsk(HookSchemaAssertions):
+    """P2-3 (観察4): size-skip (S/M) の deploy は無検査許可ではなく ask。
+    RC=2 でも ASK: マーカーが無い出力は deny に倒す。"""
+
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp(prefix="aegis-deploy-sizeskip-test-")
+        self.addCleanup(shutil.rmtree, self.tmp, ignore_errors=True)
+        (Path(self.tmp) / "docs").mkdir()
+        (Path(self.tmp) / "scripts").symlink_to(ROOT / "scripts")
+
+    def _write_status(self, task_size: str):
+        (Path(self.tmp) / "docs" / "STATUS.md").write_text(
+            f"---\ntask_type: feature\nphase: review\nmode: Dev\ntask_size: {task_size}\n"
+            "gate_approvals:\n  plan: approved\n---\n"
+        )
+
+    def _run(self, command: str = "vercel deploy"):
+        return run_hook(
+            "check-deploy-gate.sh",
+            make_pretool_payload("Bash", {"command": command}),
+            cwd=Path(self.tmp),
+            env={"AEGIS_ROOT_OVERRIDE": str(self.tmp)},
+        )
+
+    def test_size_S_deploy_asks(self):
+        self._write_status("S")
+        rc, out, err = self._run()
+        self.assertNotEqual(out, {}, "size-skip deploy must ask, got allow {}")
+        self.assert_pretool_decision(out, "ask", hint="S size-skip → ask")
+
+    def test_size_M_deploy_asks(self):
+        self._write_status("M")
+        rc, out, err = self._run()
+        self.assertNotEqual(out, {}, "size-skip deploy must ask, got allow {}")
+        self.assert_pretool_decision(out, "ask", hint="M size-skip → ask")
+
+    def test_size_L_pending_still_denies(self):
+        self._write_status("L")
+        rc, out, err = self._run()
+        self.assertNotEqual(out, {}, "L pending gates must deny, got allow {}")
+        self.assert_pretool_decision(out, "deny", hint="L pending → deny unchanged")
+
+    def test_rc2_without_ask_marker_denies(self):
+        """ASK: マーカーの無い RC=2（interpreter 異常等）は deny に倒す。"""
+        self._write_status("S")
+        scripts = Path(self.tmp) / "scripts"
+        scripts.unlink()
+        scripts.mkdir()
+        (scripts / "check_status.py").write_text(
+            "import sys; print('boom'); sys.exit(2)\n", encoding="utf-8")
+        rc, out, err = self._run()
+        self.assertNotEqual(out, {}, "RC2 w/o marker must deny, got allow {}")
+        self.assert_pretool_decision(out, "deny", hint="RC2 without ASK marker → deny")
 
 
 # ---------------------------------------------------------------------------

@@ -50,11 +50,19 @@ if ! printf '%s' "$CMD" | grep -qEi "$DEPLOY_RE"; then
 fi
 
 # Delegate gate check to check_status.py (sole source of truth).
-# set +e: python returning non-zero is expected (deny) — must not abort before emitting JSON.
+# RC contract (P2-3): 0=allow / 2+leading "ASK:"=ask (size-skip deploy needs
+# human confirm) / anything else=deny. RC=2 WITHOUT the ASK: marker falls
+# through to deny so interpreter failures are never mistaken for ask.
+# set +e: python returning non-zero is expected (deny/ask) — must not abort before emitting JSON.
 set +e
 RESULT=$(python3 "${ROOT}/scripts/check_status.py" --root "$ROOT" --check-deploy-ready 2>&1)
 RC=$?
 set -e
+if [ $RC -eq 2 ] && printf '%s' "$RESULT" | grep -q '^ASK:'; then
+  MSG=$(printf '%s' "$RESULT" | sed 's/^ASK:[[:space:]]*//' | tr '\n' ' ')
+  emit_ask "[deploy-gate] $MSG"
+  exit 0
+fi
 if [ $RC -ne 0 ]; then
   MSG=$(printf '%s' "$RESULT" | tr '\n' ' ')
   REASON=$(printf '[deploy-gate] %s' "$MSG")
