@@ -116,7 +116,7 @@ aegis/
 │   ├── update-gate.sh                # ゲート更新スクリプト
 │   ├── run-test-strength-drill.py    # テスト強度ドリル（B1・qa 承認時に実走）
 │   ├── build-judge-card.py           # judge カードビルダー（B2・承認時に実走）
-│   ├── record-test-result.py         # テスト結果記録（judge が指紋照合で read）
+│   ├── record-test-result.py         # テスト結果の手動記録（E1 evidence-log への fallback 書き手）
 │   ├── learnings_search.py           # LEARNINGS 検索
 │   ├── retro_report.py               # レトロスペクティブ生成
 │   └── status_doctor.py              # STATUS 運用健全性チェック
@@ -215,10 +215,14 @@ CLAUDE.md はフレームワークの中核であり、常時コンテキスト�
 判定カードを生成する。ティア1の機械事実（変更行のスタブ scan・secret scan・指紋検証
 済みテスト結果・B1 verdict）が記録済み `claims:` と決定論的に矛盾すれば🔴ブロック。
 第2意見（self-attested）の相違・claims/証拠の不足・依存監査は🟡（`update-gate.sh
-<gate> approve --ack "理由"` で承認可、理由はカードに記録）。テスト結果は純 read を
-保つため別スクリプト `scripts/record-test-result.py` が
-`docs/qa-reports/test-result.json`（status＋コード指紋）に記録する。`/judge` で同じ
-カードを読み取り専用でプレビューできる。
+<gate> approve --ack "理由"` で承認可、理由はカードに記録）。テスト判定は
+**evidence-log（hook 観測・E1）由来**: PostToolUse/PostToolUseFailure(Bash) が
+全 Bash 実行のメタ（コマンド・成否・worktree fingerprint）を
+`.claude/evidence-log.jsonl` に記録し、judge が現コードと一致する最新のテスト
+実行を照合する。Claude Code 外でテストした場合のみ
+`python3 scripts/record-test-result.py --root . "<test command>"` で手動記録する
+（同一スキーマ・`src:"manual"`・スクリプト自身がコマンドを実行するため自己申告
+ではない）。`/judge` で同じカードを読み取り専用でプレビューできる。
 
 ### 4.3 タスクサイズによるフェーズ省略
 
@@ -408,7 +412,7 @@ TaskCreated / TaskCompleted
 | `update-gate.sh` | ゲート値の更新（STATUS.md の sed 置換・tri-state 解釈と `--ack` 記録・prereq 強制） |
 | `run-test-strength-drill.py` | テスト強度ドリル（B1・qa 承認時に実走） |
 | `build-judge-card.py` | judge カードビルダー（B2・review/qa/security/deploy 承認時に実走・tri-state） |
-| `record-test-result.py` | テスト結果記録（test-result.json・judge が指紋照合で read） |
+| `record-test-result.py` | テスト結果の手動記録（E1 evidence-log への fallback 書き手・`src:"manual"`） |
 | `learnings_search.py` | LEARNINGS.md 検索（retro_report が利用） |
 | `retro_report.py` | レトロスペクティブレポート生成 |
 | `status_doctor.py` | STATUS.md の運用健全性チェック（鮮度・gate/ref 整合・second-opinion 有無。/recover が利用） |

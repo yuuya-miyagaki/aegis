@@ -25,7 +25,7 @@
   - `hooks/observe-bash.sh`（新規・PostToolUse/Bash）: 成功実行を evidence.sh 経由で記録。観測専用＝常に emit_allow
   - `hooks/post-bash.sh`（改修・PostToolUseFailure/Bash）: 既存の ReAct 提案に加え、失敗実行を `status:fail` で記録
   - `hooks/lib/evidence.sh`(新規): スキーマ組立・JSON エスケープ・追記。壊れた入力は dump & continue（`.task-event-debug.log` と同パターン）
-  - `hooks/lib/fingerprint.sh`(新規・**単一所有**): worktree fingerprint 計算。merge-base 比の変更コードファイル（docs/** 等 NONCODE 除外）の現内容 sha256。サイズ上限超過は `oversize` を返す
+  - `hooks/lib/fingerprint.sh`(新規・**単一所有**): worktree fingerprint 計算。HEAD（無ければ empty-tree 定数）比の変更コードファイル＋未追跡ファイル（docs/**・.claude/** 等 NONCODE 除外）の現内容に **HEAD コミット sha を混入**した sha256。HEAD sha 混入が無いとクリーンツリー同士の fp が常に一致し、未テストの新コミットが green 認証される（grill-plan 🔴1）。トークンは `64-hex | oversize | nogit | error`、常に rc=0
   - `hooks/lib/patterns.sh`（改修）: テストランナー分類パターン `TEST_RUNNER_PATTERNS` を追加（揮発値の隔離）
   - `scripts/build-judge-card.py`（改修）: `read_test_result()` を evidence-log リーダーに置換。分類は patterns.sh を `source` 出力経由で取得、fingerprint 比較は fingerprint.sh をサブプロセス呼出し（**bash/python 二重実装によるハッシュ drift を構造的に排除**）
   - `scripts/record-test-result.py`（改修）: テストを信頼実行し evidence-log へ `src:"manual"` で追記。`test-result.json` 書込は廃止
@@ -55,11 +55,13 @@ graph TD
   ```json
   {"v":1, "ts":"2026-06-10T12:00:00Z", "src":"observed|manual",
    "cmd":"<先頭500字>", "status":"ok|fail",
-   "out_sha":"<出力先頭64KBのsha256>", "fp":"<fingerprint|oversize>"}
+   "payload_sha":"<hook 生入力 JSON 先頭64KBのsha256>",
+   "fp":"<64-hex|oversize|nogit|error>"}
   ```
 
-- `fingerprint.sh`: 引数 `<root>` → stdout に fingerprint 文字列（または `oversize`）、rc=0。計算不能は rc≠0（読み手は unverified に倒す）
-- `evidence.sh::append_evidence <status> <input-json>`: hook stdin の tool_input/tool_response からメタを抽出し追記。失敗しても rc=0（観測専用・本体を止めない）
+  - 実装注記（設計逸脱・承認済み）: pure-bash 制約により JSON 内出力本文の抽出は行わず、生ペイロード（コマンド＋応答を含む）をハッシュする（旧称 out_sha → payload_sha）
+- `fingerprint.sh`: 引数 `<root>` → stdout にトークン `64-hex | oversize | nogit | error`、常に rc=0（読み手は 64-hex 以外を unverified に倒す）
+- `evidence.sh::append_evidence <root> <ok|fail> <input-json>`: hook stdin の tool_input からメタを抽出し追記。失敗しても rc=0（観測専用・本体を止めない）
 - judge card テスト行の判定関数: evidence-log（current＋直近 `.1`）を新しい順に走査し、`TEST_RUNNER_PATTERNS` 一致の最新エントリで判定
 
 ## データフロー / 構造

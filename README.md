@@ -170,6 +170,28 @@ python3 scripts/check_status.py --root . --strict
 
 ## Migration
 
+### From v1.4.0 to v1.5.0
+
+**Non-breaking — E1 activity verification (観測ベースのテスト検証).**
+
+ゲート承認時のテスト判定は、エージェントの自己申告ではなく hook が観測した
+実行記録（`.claude/evidence-log.jsonl`）に基づく。PostToolUse/PostToolUseFailure
+(Bash) が全実行のメタ（コマンド・成否・worktree fingerprint）を記録し、judge card
+が現在のコードと一致する最新のテスト実行を照合する。記録が無い・コード変更後の
+場合は 🟡 unverified（`--ack` で承認可）、観測された red は 🔴 ブロック。
+Claude Code 外でテストを実行した場合は `scripts/record-test-result.py` で
+手動記録できる（同一スキーマ・`src:"manual"`）。
+
+- **`docs/qa-reports/test-result.json`（自己申告ファイル）は廃止。**
+  `record-test-result.py` は evidence-log への手動フォールバック書き手に変わった。
+- **新規配布物**: `hooks/post-bash-observe.sh`（PostToolUse Bash 観測）、
+  `hooks/lib/evidence.sh` / `hooks/lib/fingerprint.sh`（記録・指紋の単一所有）。
+  既存インストールは `bash bin/setup.sh --profile=<profile>` を再実行して
+  hooks と settings を更新する。
+- **完了時の生存チェック**: evidence-log ファイル不在（観測系が一度も発火して
+  いない）を TaskCompleted が差し戻す。session-start がログを touch/ローテーション
+  する（空ファイルは正常）。
+
 ### From v1.3.3 to v1.4.0
 
 **Mostly non-breaking — evolution-review fix batch** (P2-1 … P3-6, B1, K-2;
