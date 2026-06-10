@@ -41,6 +41,8 @@
     "check-control-plane.sh",
     "check-destructive.sh",
     "check-secrets.sh",
-    "check-deploy-gate.sh"
+    "check-deploy-gate.sh",
+    "post-bash-observe.sh",
+    "post-bash.sh"
   ]
 }

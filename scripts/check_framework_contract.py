@@ -144,6 +144,10 @@ REQUIRED_HOOK_FILES = [
     ROOT / "hooks/check-cron-gate.sh",
     ROOT / "hooks/check-task-created.sh",
     ROOT / "hooks/check-task-completed.sh",
+    # E1 activity verification (v1.5.0): observer hook + its lib life support.
+    ROOT / "hooks/post-bash-observe.sh",
+    ROOT / "hooks/lib/evidence.sh",
+    ROOT / "hooks/lib/fingerprint.sh",
 ]
 
 REQUIRED_EXAMPLE_FILES = [

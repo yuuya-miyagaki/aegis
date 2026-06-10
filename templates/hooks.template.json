@@ -87,6 +87,15 @@
             "command": "bash \"${CLAUDE_PROJECT_DIR:-.}\"/hooks/post-status-audit.sh"
           }
         ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PROJECT_DIR:-.}\"/hooks/post-bash-observe.sh"
+          }
+        ]
       }
     ],
     "PostToolUseFailure": [

@@ -79,6 +79,7 @@
     "check-deploy-gate.sh",
     "check-deploy-mcp-gate.sh",
     "post-bash.sh",
+    "post-bash-observe.sh",
     "post-status-audit.sh",
     "pre-compact.sh",
     "check-client-info.sh",
