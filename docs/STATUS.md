@@ -3,31 +3,32 @@ framework: aegis
 framework_version: "1.5.0"
 project_name: "Aegis"
 mode: Dev
-phase: deploy
+phase: brainstorm
 task_type: framework
 task_size: L
-task_size_rationale: "確定（brainstorm Step D）: E1 activity verification（進化レビュー §5 E1・§6 ロードマップ 5 番）。観測一本化＝PostToolUse/PostToolUseFailure(Bash)→evidence-log.jsonl 記録、judge card テスト行を観測ログ読みに置換、fingerprint.sh 単一所有、record-test-result.py 手動フォールバック化。hooks×4・lib×3・scripts×2・setup/smoke/templates/gitignore/docs 横断 14+ ファイル＝L。"
-iteration: 18
+task_size_rationale: "確定（brainstorm）: grill 🟢残余 5 件の小修正バッチ（v1.5.1 patch）。T1 false-RED アンカー（patterns.sh）/ T2 deploy-gate stderr 分離 / T3 update-gate ロック前倒し / T4 stale lock PID 回収 / T5 WRITE_INDICATORS 左境界＋find -exec 族封鎖。hooks×2・lib×1・scripts×1＋ミラー×4＋テスト 4 本前後＝12 ファイル前後で L。"
+iteration: 19
 ui_surface: false
-last_updated: "2026-06-11T03:30:00Z"
+last_updated: "2026-06-11T04:30:00Z"
 gate_approvals:
   client_ready_for_dev: n/a
-  brainstorm: approved
-  plan: approved
-  review: approved
-  qa: approved
-  security: approved
-  deploy: approved
+  brainstorm: pending
+  plan: pending
+  review: pending
+  qa: pending
+  security: pending
+  deploy: pending
   dev_ready_for_client: pending
 current_refs:
   requirements:
-    - docs/evolution-review-2026-06-10.md
-  plan: docs/plans/2026-06-10-e1-activity-verification-implementation-plan.md
-  spec: docs/specs/2026-06-10-e1-activity-verification-design.md
-  review: docs/qa-reports/v150-review.md
-  qa: docs/qa-reports/v150-qa.md
-  security: docs/qa-reports/v150-security.md
-  deploy: docs/qa-reports/v150-deploy-checklist.md
+    - docs/qa-reports/v140-security.md
+    - docs/qa-reports/v150-security.md
+  plan: null
+  spec: docs/specs/2026-06-11-grill-residual-fixes-design.md
+  review: null
+  qa: null
+  security: null
+  deploy: null
   translation: null
 external_evidence:
   - type: "second-opinion-v1-foundation-r1-r2"
@@ -42,7 +43,7 @@ external_evidence:
     scope: "v0.12.2 実装後 4 ラウンドレビュー"
     findings: "Round 6 (P1×2, P2×1: pre-compact exit 2 / minimal-project / test rc), Round 7 (P1×1, P3×1: git add 漏れ / テスト件数表記), Round 8 (P2×1, P3×1: stale last_updated / grep 自己マッチ), Round 9 (P3×2: コメント不整合)"
     resolution: "9件全反映。tier 1/2 PASS、134 tests PASS、本体と minimal-project 完全同期確認済み。"
-next_action: "v1.5.0 リリース完了（E1 activity verification・全ゲート承認・tag 済み）。origin push は別途ユーザー判断。次タスク候補: grill 🟢残余の小修正バッチ（false-RED 緩和・check-deploy-gate stderr・update-gate TOCTOU・stale lock 回収・WRITE_INDICATORS 残穴、v140/v150-security.md 記録済み）または進化レビュー E2〜E6。"
+next_action: "iteration 19（grill 🟢残余バッチ v1.5.1）: 設計ノート作成済み（ユーザー承認済みアプローチ）。次: grill-plan（独立サブエージェント）→所見反映→brainstorm ゲート承認→実装計画（writing-plans）→plan ゲート承認→コンテキストクリア後に TDD 実装。"
 blockers: []
 failure_tracking: null
 session_history:
