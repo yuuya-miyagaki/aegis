@@ -3,16 +3,16 @@ framework: aegis
 framework_version: "1.3.3"
 project_name: "Aegis"
 mode: Dev
-phase: brainstorm
+phase: plan
 task_type: framework
 task_size: L
-task_size_rationale: "暫定（brainstorm 中、Step D で確定）: 進化レビュー（docs/evolution-review-2026-06-10.md §4/§6 ロードマップ 2〜3 番）の P2-1〜P2-6・P3-1〜P3-6・K-2 を一括 fix-forward し、fail-open/closed ポリシー表（構造的観察3）を新設、B1 ドリル恒久修正（coverage floor の docs/** 除外）も同梱。hooks/templates/scripts/examples/docs 横断で対象 6+ ファイル確実＝L。"
+task_size_rationale: "確定（brainstorm Step D）: 進化レビュー（docs/evolution-review-2026-06-10.md §4/§6 ロードマップ 2〜3 番）の P2-1〜P2-6・P3-1〜P3-6・K-2 を一括 fix-forward し、fail-open/closed ポリシー表（構造的観察3）を新設、B1 ドリル恒久修正（coverage floor の docs/** 除外）も同梱。設計ノート U1〜U6 で hooks/lib/scripts/templates/docs 横断・対象 15+ ファイル＝L。"
 iteration: 17
 ui_surface: false
-last_updated: "2026-06-10T05:50:48Z"
+last_updated: "2026-06-10T08:17:31Z"
 gate_approvals:
   client_ready_for_dev: n/a
-  brainstorm: pending
+  brainstorm: approved
   plan: pending
   review: pending
   qa: pending
@@ -23,7 +23,7 @@ current_refs:
   requirements:
     - docs/evolution-review-2026-06-10.md
   plan: null
-  spec: null
+  spec: docs/specs/2026-06-10-v140-fix-batch-design.md
   review: null
   qa: null
   security: null
@@ -42,7 +42,7 @@ external_evidence:
     scope: "v0.12.2 実装後 4 ラウンドレビュー"
     findings: "Round 6 (P1×2, P2×1: pre-compact exit 2 / minimal-project / test rc), Round 7 (P1×1, P3×1: git add 漏れ / テスト件数表記), Round 8 (P2×1, P3×1: stale last_updated / grep 自己マッチ), Round 9 (P3×2: コメント不整合)"
     resolution: "9件全反映。tier 1/2 PASS、134 tests PASS、本体と minimal-project 完全同期確認済み。"
-next_action: "iteration 17 brainstorm 中: P2 バッチ（P2-1〜P2-6＋P3 群＋K-2）＋fail-open/closed ポリシー表＋B1 恒久修正（coverage floor の docs/** 除外）を一括 fix-forward。v1.3.3 は origin push 済み（main b815d22・tag）。E1 活動検証 brainstorm と K-1（LEARNINGS 解決済みマーク機構）は次々回候補。"
+next_action: "iteration 17 plan フェーズ: 設計ノート docs/specs/2026-06-10-v140-fix-batch-design.md（brainstorm gate 承認済み）から実装計画書 docs/plans/2026-06-10-v140-fix-batch-implementation-plan.md を PLAN.template.md で作成 → grill-plan → plan gate 承認 → TDD 実装（U1 ポリシー表＋テーブル駆動テストを先行し、U2〜U6 をその執行として修正）。v1.4.0 minor で締め。E1 活動検証と K-1 は次々回候補。"
 blockers: []
 failure_tracking: null
 session_history:
