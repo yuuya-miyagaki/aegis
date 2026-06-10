@@ -79,6 +79,22 @@ class TestHookRequiredCoverage(unittest.TestCase):
             f"REQUIRED_EXAMPLE_FILES: {sorted(missing)}",
         )
 
+    def test_template_registered_hooks_are_registered_in_example(self):
+        """grill-code 🟡2: example は full 相当の参照インストール。template に
+        登録された hook が example settings.json に欠けると参照実装で観測系が
+        死ぬ（E1 observer 欠落＝判定が常時 unverified）。"""
+        template = _registered_hooks(ROOT / "templates" / "hooks.template.json")
+        example = _registered_hooks(
+            ROOT / "examples" / "minimal-project" / ".claude" / "settings.json"
+        )
+        missing = template - example
+        self.assertEqual(
+            missing,
+            set(),
+            f"hooks registered in hooks.template.json but missing from "
+            f"example settings.json: {sorted(missing)}",
+        )
+
 
 def _hook_commands(settings_path: Path) -> list[str]:
     data = json.loads(settings_path.read_text(encoding="utf-8"))

@@ -216,6 +216,12 @@ REQUIRED_EXAMPLE_FILES = [
     ROOT / "examples/minimal-project/hooks/check-cron-gate.sh",
     ROOT / "examples/minimal-project/hooks/check-task-created.sh",
     ROOT / "examples/minimal-project/hooks/check-task-completed.sh",
+    # E1 activity verification (v1.5.0): presence here is what lets drift's
+    # byte-identity check see the files at all — without it the example copy
+    # can be deleted and contract/drift still pass (grill-code 🟡2).
+    ROOT / "examples/minimal-project/hooks/post-bash-observe.sh",
+    ROOT / "examples/minimal-project/hooks/lib/evidence.sh",
+    ROOT / "examples/minimal-project/hooks/lib/fingerprint.sh",
     ROOT / "examples/minimal-project/.claude/agents/translation-specialist.md",
     ROOT / "examples/minimal-project/.claude/agents/integration-specialist.md",
 ]
@@ -908,8 +914,11 @@ def main() -> int:
                         )
 
     # Check example project files for leftover template placeholders.
+    # Shell files are exempt: they are never fill-in templates — drift's
+    # byte-identity mirror is their real contract — and their comments
+    # legitimately use angle-bracket notation (<root>, <utc>, ...).
     for path in REQUIRED_EXAMPLE_FILES:
-        if not path.exists():
+        if not path.exists() or path.suffix == ".sh":
             continue
         text = read_text(path)
         for match in PLACEHOLDER_PATTERN.finditer(text):
