@@ -3,7 +3,7 @@ framework: aegis
 framework_version: "1.5.0"
 project_name: "Aegis"
 mode: Dev
-phase: implement
+phase: review
 task_type: framework
 task_size: L
 task_size_rationale: "確定（brainstorm Step D）: E1 activity verification（進化レビュー §5 E1・§6 ロードマップ 5 番）。観測一本化＝PostToolUse/PostToolUseFailure(Bash)→evidence-log.jsonl 記録、judge card テスト行を観測ログ読みに置換、fingerprint.sh 単一所有、record-test-result.py 手動フォールバック化。hooks×4・lib×3・scripts×2・setup/smoke/templates/gitignore/docs 横断 14+ ファイル＝L。"
@@ -24,10 +24,10 @@ current_refs:
     - docs/evolution-review-2026-06-10.md
   plan: docs/plans/2026-06-10-e1-activity-verification-implementation-plan.md
   spec: docs/specs/2026-06-10-e1-activity-verification-design.md
-  review: null
-  qa: null
-  security: null
-  deploy: null
+  review: docs/qa-reports/v150-review.md
+  qa: docs/qa-reports/v150-qa.md
+  security: docs/qa-reports/v150-security.md
+  deploy: docs/qa-reports/v150-deploy-checklist.md
   translation: null
 external_evidence:
   - type: "second-opinion-v1-foundation-r1-r2"
@@ -42,7 +42,7 @@ external_evidence:
     scope: "v0.12.2 実装後 4 ラウンドレビュー"
     findings: "Round 6 (P1×2, P2×1: pre-compact exit 2 / minimal-project / test rc), Round 7 (P1×1, P3×1: git add 漏れ / テスト件数表記), Round 8 (P2×1, P3×1: stale last_updated / grep 自己マッチ), Round 9 (P3×2: コメント不整合)"
     resolution: "9件全反映。tier 1/2 PASS、134 tests PASS、本体と minimal-project 完全同期確認済み。"
-next_action: "E1 実装計画を grill-plan（条件付き GO→🔴3/🟡4 全反映）後に plan ゲート承認。設計逸脱2件（payload_sha / HEAD 比＋HEAD sha 混入 fingerprint）ユーザー承認済み。次: implement フェーズで Task 1（fingerprint.sh）から TDD インライン実行（全13タスク・各タスクでコミット）。grill 🟢4件は別バッチ（計画スコープ外で確定）。"
+next_action: "E1 実装 13 タスク完走＋grill-code（🔴1/🟡4 同セッション修正・436 tests/contract/drift/smoke 全 PASS）。次: review→qa→security→deploy をゲート承認（テスト行は record-test-result.py 手動記録）→ v1.5.0 タグ。origin push は別途ユーザー判断。grill 🟢残余（false-RED・ホットパスコスト等）は v150-security.md 記録済み・別バッチ。"
 blockers: []
 failure_tracking: null
 session_history:

@@ -1,7 +1,7 @@
 # Aegis — アーキテクチャ概観
 
-> 作成日: 2026-04-17（最終更新: 2026-06-10）
-> バージョン: v1.4.0
+> 作成日: 2026-04-17（最終更新: 2026-06-11）
+> バージョン: v1.5.0
 > 対象: フレームワーク全体の構造・設計思想・構成要素の解説
 
 ---
@@ -569,3 +569,4 @@ python3 scripts/check_framework_contract.py --profile=standard --root <your-proj
 | v1.3.2 | 機能整合性監査の install 配送修正（emit.sh/patterns.sh 配布で moat 復活、/judge・graceful retro・status_doctor 配布、contract の hook 追跡、scaffold smoke の実行検証化） |
 | v1.3.3 | integrity hook の可用性修正（進化レビュー P1×2: control-plane の transcript_path 衝突で install 先のほぼ全 Bash deny／check-gate glob の src/hooks/ 等衝突）。防御強度維持（バイパス形は全 deny 固定）、smoke の検証入力を実運用スキーマ化 |
 | v1.4.0 | 進化レビュー P2×6/P3×6/K-2 の一括 fix。fail-open/closed ポリシー表（実発火突合テスト付き）、frontmatter.sh 共通化、deploy gate RC 契約＋size-skip ask 化、update-gate 排他ロック、B1 ドリル docs/** 除外、standard プロファイル Bash ガード4種、hooks 参照の `"${CLAUDE_PROJECT_DIR:-.}"` 化（未設定でも fail-open しない）、実リポジトリミラー同一性の unittest 化 |
+| v1.5.0 | E1 activity verification（検証の実行ベース化）。hook 観測の Bash 実行記録 `.claude/evidence-log.jsonl` を judge card テスト判定の唯一ソースに（自己申告 `test-result.json` 廃止）。fingerprint.sh 単一所有（HEAD sha 混入・quotepath/読取不能は error に fail-closed）、記録=fail-open／判定=fail-closed の二段構え、observer 生存チェック（TaskCompleted 差し戻し）、scaffold smoke の観測系実発火（成功側＋失敗側） |
