@@ -155,10 +155,11 @@ for event_name, entries in template.get('hooks', {}).items():
     for entry in entries:
         for hook in entry.get('hooks', []):
             cmd = hook.get('command', '')
-            # Extract script name from 'bash hooks/script-name.sh'
+            # Extract script name from 'bash \"\$CLAUDE_PROJECT_DIR\"/hooks/script-name.sh'
+            # (strip('\"') tolerates a quote landing on the last segment).
             parts = cmd.split('/')
             if len(parts) >= 2:
-                all_hooks.add(parts[-1])
+                all_hooks.add(parts[-1].strip('\"'))
 
 if include >= all_hooks:
     # Full profile: copy template as-is
@@ -177,7 +178,7 @@ for event_name, entries in template.get('hooks', {}).items():
             cmd = hook.get('command', '')
             parts = cmd.split('/')
             if len(parts) >= 2:
-                script = parts[-1]
+                script = parts[-1].strip('\"')
                 if script in include:
                     filtered_hooks.append(hook)
         if filtered_hooks:
