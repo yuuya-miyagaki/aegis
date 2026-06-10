@@ -39,7 +39,7 @@ PROFILES = ["minimal", "standard"]
 # Every profile that installs ANY hook installs session-start.sh, which sources
 # hooks/lib/emit.sh. So even `minimal` is in scope for the lib-presence check —
 # do not assume minimal ships no hooks.
-REQUIRED_HOOK_LIBS = ["emit.sh", "patterns.sh"]
+REQUIRED_HOOK_LIBS = ["emit.sh", "patterns.sh", "frontmatter.sh"]
 
 
 def _scaffold(profile: str, target: Path) -> tuple[bool, str]:
@@ -134,8 +134,16 @@ def verify_hooks_runnable(target: Path, profile: str) -> tuple[bool, str]:
                 f"stderr={r.stderr.strip()[:200]!r})"
             )
 
-    # (B-2) check-destructive.sh execution (installed by full). Proves patterns.sh
-    # sourced cleanly. check-destructive falls back to pwd when not in a git repo.
+    # (B-2) check-destructive.sh execution. Proves patterns.sh sourced cleanly.
+    # check-destructive falls back to pwd when not in a git repo. Since P2-1
+    # (v1.4.0) standard also ships the Bash guards, so for standard/full its
+    # absence is itself a FAIL — existence-gated firing would silently skip.
+    if profile in ("standard", "full"):
+        if not (hooks_dir / "check-destructive.sh").exists():
+            return False, (
+                f"{profile}: check-destructive.sh not installed (P2-1: "
+                f"standard must ship the Bash guard moat)"
+            )
     if (hooks_dir / "check-destructive.sh").exists():
         r = _fire_hook(target, "hooks/check-destructive.sh",
                        _hook_stdin(target, "Bash", {"command": "rm -rf /"}))
@@ -188,6 +196,28 @@ def verify_hooks_runnable(target: Path, profile: str) -> tuple[bool, str]:
             )
 
     return True, f"{profile}: hooks runnable"
+
+
+def verify_settings_project_dir(target: Path, profile: str) -> tuple[bool, str]:
+    """Generated settings must reference hooks via $CLAUDE_PROJECT_DIR (P3-6).
+
+    cwd-relative `bash hooks/x.sh` silently disables every hook when Claude
+    Code is launched from a subdirectory — the moat vanishes without a trace.
+    """
+    settings_path = target / ".claude" / "settings.local.json"
+    if not settings_path.exists():
+        return True, f"{profile}: no settings.local.json (nothing to verify)"
+    data = json.loads(settings_path.read_text(encoding="utf-8"))
+    bad = []
+    for entries in data.get("hooks", {}).values():
+        for entry in entries:
+            for hook in entry.get("hooks", []):
+                cmd = hook.get("command", "")
+                if "hooks/" in cmd and "$CLAUDE_PROJECT_DIR" not in cmd:
+                    bad.append(cmd)
+    if bad:
+        return False, f"{profile}: cwd-relative hook commands: {bad}"
+    return True, f"{profile}: all hook commands use $CLAUDE_PROJECT_DIR"
 
 
 def verify_command_surface(target: Path, profile: str) -> tuple[bool, str]:
@@ -265,6 +295,11 @@ def run_scaffold_test(profile: str, target: Path) -> tuple[str, str]:
     if not ok:
         return "FAIL", detail
 
+    # Generated-settings reference-form validation (P3-6).
+    ok, detail = verify_settings_project_dir(target, profile)
+    if not ok:
+        return "FAIL", detail
+
     return "PASS", f"{profile} scaffold validated + hooks runnable + command surface ok"
 
 
@@ -311,6 +346,9 @@ def run_full_hook_exec_test(target: Path) -> tuple[str, str]:
     if not ok:
         return "FAIL", detail
     ok, detail = verify_status_doctor(target)
+    if not ok:
+        return "FAIL", detail
+    ok, detail = verify_settings_project_dir(target, "full")
     if not ok:
         return "FAIL", detail
     return "PASS", "full scaffold hooks runnable + command surface ok + status_doctor runnable"
