@@ -3,31 +3,31 @@ framework: aegis
 framework_version: "1.4.0"
 project_name: "Aegis"
 mode: Dev
-phase: deploy
+phase: implement
 task_type: framework
 task_size: L
-task_size_rationale: "確定（brainstorm Step D）: 進化レビュー（docs/evolution-review-2026-06-10.md §4/§6 ロードマップ 2〜3 番）の P2-1〜P2-6・P3-1〜P3-6・K-2 を一括 fix-forward し、fail-open/closed ポリシー表（構造的観察3）を新設、B1 ドリル恒久修正（coverage floor の docs/** 除外）も同梱。設計ノート U1〜U6 で hooks/lib/scripts/templates/docs 横断・対象 15+ ファイル＝L。"
-iteration: 17
+task_size_rationale: "確定（brainstorm Step D）: E1 activity verification（進化レビュー §5 E1・§6 ロードマップ 5 番）。観測一本化＝PostToolUse/PostToolUseFailure(Bash)→evidence-log.jsonl 記録、judge card テスト行を観測ログ読みに置換、fingerprint.sh 単一所有、record-test-result.py 手動フォールバック化。hooks×4・lib×3・scripts×2・setup/smoke/templates/gitignore/docs 横断 14+ ファイル＝L。"
+iteration: 18
 ui_surface: false
-last_updated: "2026-06-10T14:30:00Z"
+last_updated: "2026-06-10T17:00:00Z"
 gate_approvals:
   client_ready_for_dev: n/a
   brainstorm: approved
   plan: approved
-  review: approved
-  qa: approved
-  security: approved
-  deploy: approved
+  review: pending
+  qa: pending
+  security: pending
+  deploy: pending
   dev_ready_for_client: pending
 current_refs:
   requirements:
     - docs/evolution-review-2026-06-10.md
-  plan: docs/plans/2026-06-10-v140-fix-batch-implementation-plan.md
-  spec: docs/specs/2026-06-10-v140-fix-batch-design.md
-  review: docs/qa-reports/v140-review.md
-  qa: docs/qa-reports/v140-qa.md
-  security: docs/qa-reports/v140-security.md
-  deploy: docs/qa-reports/v140-deploy-checklist.md
+  plan: docs/plans/2026-06-10-e1-activity-verification-implementation-plan.md
+  spec: docs/specs/2026-06-10-e1-activity-verification-design.md
+  review: null
+  qa: null
+  security: null
+  deploy: null
   translation: null
 external_evidence:
   - type: "second-opinion-v1-foundation-r1-r2"
@@ -42,7 +42,7 @@ external_evidence:
     scope: "v0.12.2 実装後 4 ラウンドレビュー"
     findings: "Round 6 (P1×2, P2×1: pre-compact exit 2 / minimal-project / test rc), Round 7 (P1×1, P3×1: git add 漏れ / テスト件数表記), Round 8 (P2×1, P3×1: stale last_updated / grep 自己マッチ), Round 9 (P3×2: コメント不整合)"
     resolution: "9件全反映。tier 1/2 PASS、134 tests PASS、本体と minimal-project 完全同期確認済み。"
-next_action: "v1.4.0 リリース締め完了（4 ゲート --ack 承認・tag v1.4.0・389 tests/contract/drift/strict/smoke 全 PASS）。origin push 済み（main＋tag v1.4.0）。次タスク未定（候補: 進化レビュー E1 活動検証 brainstorm、grill 🟢4件の小修正バッチ）。"
+next_action: "E1 実装計画を grill-plan（条件付き GO→🔴3/🟡4 全反映）後に plan ゲート承認。設計逸脱2件（payload_sha / HEAD 比＋HEAD sha 混入 fingerprint）ユーザー承認済み。次: implement フェーズで Task 1（fingerprint.sh）から TDD インライン実行（全13タスク・各タスクでコミット）。grill 🟢4件は別バッチ（計画スコープ外で確定）。"
 blockers: []
 failure_tracking: null
 session_history:
