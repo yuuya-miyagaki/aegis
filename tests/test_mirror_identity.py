@@ -70,6 +70,14 @@ class TestMirrorIdentity(unittest.TestCase):
             failures, _ = check_mirror_identity(root)
             self.assertEqual(failures, [], f"one-sided file must be skipped, got: {failures}")
 
+    def test_real_repository_mirrors_are_identical(self):
+        # Fixture tests above validate the function logic only; without this
+        # real-repo check, mirror drift passes the unittest suite and is first
+        # caught at release-evidence time (v1.4.0 T16 incident: 2 stale
+        # scripts/ mirrors survived 383 green tests).
+        failures, _ = check_mirror_identity(ROOT)
+        self.assertEqual(failures, [], f"real repo mirrors drifted: {failures}")
+
     def test_drill_runner_registered_in_mirror_files(self):
         from check_reference_drift import MIRROR_FILES
         self.assertIn(Path("scripts") / "run-test-strength-drill.py", MIRROR_FILES)
