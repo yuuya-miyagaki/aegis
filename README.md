@@ -170,6 +170,38 @@ python3 scripts/check_status.py --root . --strict
 
 ## Migration
 
+### From v1.3.2 to v1.3.3
+
+**Non-breaking — integrity-hook availability fixes** (evolution review
+2026-06-10). The operating contract is unchanged and defense strength is
+preserved (every probed bypass form stays denied); these fixes remove two
+over-blocking defects that crippled scaffolded projects:
+
+- **`check-control-plane` denied nearly every Bash command during project
+  work.** The hook matched control-plane patterns against the RAW hook input,
+  and real input always carries `transcript_path` under `~/.claude/projects/`
+  (which contains `.claude/`), so the early-allow never fired. The hook now
+  extracts the command (python3 first, bash fast-path, raw fallback stays
+  fail-closed) and matches patterns against the command only, with root-anchored
+  directory boundaries plus fixed-string absolute-path checks (logical and
+  physical root forms).
+- **`check-gate` blocked ordinary project paths.** Its `*/hooks/*`,
+  `*/scripts/*`, `*CLAUDE.md` globs collided with project-owned paths such as
+  `src/hooks/`, `src/templates/`, vendored `.claude/`, and nested `CLAUDE.md`.
+  Protected paths are now anchored to the project root, dot-segments are
+  lexically normalized, and root-escaping relative paths stay conservatively
+  denied.
+- **Hardening.** The scaffold smoke now drives hooks with a realistic input
+  envelope (`transcript_path` included) and seals both fixes with live-fire
+  checks, closing the same blind-spot family as v1.3.2's F6 (inspection inputs
+  must match the real runtime schema).
+
+**Action for existing projects**: replace the two hooks —
+`hooks/check-control-plane.sh` and `hooks/check-gate.sh` — with the v1.3.3
+versions (copy by hand, or re-run `bash bin/setup.sh` with `--force`; `--force`
+overwrites all managed files, so review local edits first). Without this,
+project-work sessions remain heavily over-blocked.
+
 ### From v1.3.1 to v1.3.2
 
 **Non-breaking — install-delivery bug fixes** (functional-integrity audit

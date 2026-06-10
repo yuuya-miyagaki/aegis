@@ -3,8 +3,10 @@
 # during non-framework tasks.
 #
 # Strategy: ALLOWLIST, not blacklist.
-# If the raw hook input mentions any control plane path, the command is denied
-# UNLESS it matches the allowlist or task_type is "framework".
+# If the extracted command mentions any control plane path, it is denied
+# UNLESS it matches the allowlist or task_type is "framework". The raw hook
+# input is only consulted when command extraction fails (fail-closed), because
+# it always carries transcript_path under ~/.claude/projects/.
 #
 # Allowlist rules:
 # - The command must be SOLELY an allowlisted script invocation (no chaining).
@@ -34,19 +36,64 @@ if [ ! -f "$STATUS_FILE" ]; then
   exit 0
 fi
 
-# Control plane path patterns.
-CONTROL_PLANE='STATUS\.md|CLAUDE\.md|\.claude/|\.claude[^A-Za-z0-9_/]|hooks/|scripts/|templates/'
+# Control plane path patterns. Directory names are boundary-anchored so a
+# project's own src/hooks/ etc. does not match, but non-canonical re-entry
+# forms (../hooks/, foo/../hooks/, /./hooks/) and unresolvable dynamic forms
+# ($(pwd)/hooks/, $VAR/hooks/, ")/hooks/") stay deny-eligible (fail-closed:
+# we cannot statically resolve them, so we treat them as control plane).
+ROOT_REAL="$(cd "$ROOT" && pwd -P)"
+CP_DIRS='hooks|scripts|templates'
+CONTROL_PLANE='STATUS\.md|CLAUDE\.md|\.claude/|\.claude[^A-Za-z0-9_/]'
+CONTROL_PLANE="${CONTROL_PLANE}|(^|[^A-Za-z0-9_./-])(\\./)*(${CP_DIRS})/"
+CONTROL_PLANE="${CONTROL_PLANE}|(\\.\\./)+(${CP_DIRS})/"
+CONTROL_PLANE="${CONTROL_PLANE}|/\\./(${CP_DIRS})/"
+CONTROL_PLANE="${CONTROL_PLANE}|[)\`'\"]/(${CP_DIRS})/"
+CONTROL_PLANE="${CONTROL_PLANE}|\\\$[A-Za-z_{][A-Za-z0-9_}]*/(${CP_DIRS})/"
 
-# Check the RAW input for control plane paths. This avoids extract_command
-# truncation on commands with internal quotes (e.g. python3 -c "...STATUS.md...").
-if ! printf '%s' "$INPUT" | grep -qE "$CONTROL_PLANE"; then
-  # No control plane path in entire input — allow.
-  emit_allow
-  exit 0
+# True when the command references this project's control plane, including
+# literal absolute paths under the project root (logical and physical forms —
+# the boundary regex intentionally skips /-preceded names, so absolute paths
+# need the fixed-string pass).
+cmd_mentions_control_plane() {
+  local cmd="$1" base
+  if printf '%s' "$cmd" | grep -qE "$CONTROL_PLANE"; then
+    return 0
+  fi
+  for base in "$ROOT" "$ROOT_REAL"; do
+    if printf '%s' "$cmd" | grep -qF \
+        -e "${base}/hooks/" -e "${base}/scripts/" -e "${base}/templates/"; then
+      return 0
+    fi
+  done
+  return 1
+}
+
+# Extract the command with full fidelity: python3 first, bash fast-path next.
+# When the input carries embedded escaped quotes and python3 is unavailable,
+# the bash fast-path would truncate at the first inner quote and could hide a
+# control plane mention placed after it — treat that as extraction failure.
+CMD=$(printf '%s' "$INPUT" | python3 -c 'import sys,json; print(json.loads(sys.stdin.read()).get("tool_input",{}).get("command",""))' 2>/dev/null || true)
+if [ -z "$CMD" ] && ! printf '%s' "$INPUT" | grep -q '\\"'; then
+  CMD=$(extract_command "$INPUT")
 fi
 
-# Input references a control plane path. Extract the command for further checks.
-CMD=$(extract_command "$INPUT")
+# Match control plane against the extracted command, NOT the raw input: real
+# hook input always carries transcript_path under ~/.claude/projects/, so a
+# raw-input match made this early-allow unreachable and denied nearly every
+# Bash command at install targets (P1-1, evolution review 2026-06-10).
+if [ -n "$CMD" ]; then
+  if ! cmd_mentions_control_plane "$CMD"; then
+    emit_allow
+    exit 0
+  fi
+else
+  # Extraction failed — fall back to the raw input. A control plane mention
+  # anywhere then keeps the deny path active (fail-closed).
+  if ! printf '%s' "$INPUT" | grep -qE "$CONTROL_PLANE"; then
+    emit_allow
+    exit 0
+  fi
+fi
 
 # Chain/redirect operators that indicate compound or write commands. If present,
 # the command is never eligible for allowlist or read-only pass-through.
@@ -71,16 +118,8 @@ is_allowlisted() {
   return 1
 }
 
-# Check extracted command.
+# Check extracted command (already full fidelity).
 if [ -n "$CMD" ] && is_allowlisted "$CMD"; then
-  emit_allow
-  exit 0
-fi
-
-# Fallback: check raw input for allowlist (extract_command may have truncated).
-# Extract command via python3 for full fidelity.
-FULL_CMD=$(printf '%s' "$INPUT" | python3 -c 'import sys,json; print(json.loads(sys.stdin.read()).get("tool_input",{}).get("command",""))' 2>/dev/null || true)
-if [ -n "$FULL_CMD" ] && is_allowlisted "$FULL_CMD"; then
   emit_allow
   exit 0
 fi
@@ -94,8 +133,7 @@ fi
 
 # --- Read-only simple command check ---
 # Allow purely read-only commands with no chaining and no write indicators.
-# Use FULL_CMD for accuracy (falls back to CMD if python3 extraction failed).
-CHECK_CMD="${FULL_CMD:-$CMD}"
+CHECK_CMD="$CMD"
 if [ -n "$CHECK_CMD" ]; then
   # Must not contain chain operators.
   if ! printf '%s' "$CHECK_CMD" | grep -qE "$CHAIN_OPS"; then

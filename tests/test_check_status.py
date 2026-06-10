@@ -1669,6 +1669,522 @@ class TestControlPlaneAllowlistBypass(unittest.TestCase):
 
 
 # =============================================================================
+# P1-1 (evolution review 2026-06-10): control-plane match must use the
+# extracted command, not the raw hook input
+# =============================================================================
+
+
+class TestControlPlaneRealisticInput(unittest.TestCase):
+    """check-control-plane.sh fired with the REAL hook input envelope.
+
+    Real Claude Code hook input always carries transcript_path under
+    ~/.claude/projects/ (contains ".claude/"), so matching CONTROL_PLANE
+    against the raw input made the early-allow unreachable: at install
+    targets (task_type != framework) nearly every Bash command was denied.
+    """
+
+    HOOK_SRC = ROOT / "hooks" / "check-control-plane.sh"
+
+    def _setup_project(self, task_type: str = "feature") -> tuple[
+        tempfile.TemporaryDirectory, str
+    ]:
+        import shutil
+        tmpdir = tempfile.TemporaryDirectory()
+        root = tmpdir.name
+        root_path = Path(root)
+
+        content = make_status_md(
+            phase="implement", task_type=task_type,
+            approvals={"brainstorm": "approved", "plan": "approved",
+                        "client_ready_for_dev": "approved"},
+        )
+        docs = root_path / "docs"
+        docs.mkdir(exist_ok=True)
+        (docs / "STATUS.md").write_text(content, encoding="utf-8")
+
+        hooks_dir = root_path / "hooks"
+        hooks_dir.mkdir(exist_ok=True)
+        shutil.copy2(self.HOOK_SRC, hooks_dir / "check-control-plane.sh")
+        lib_dir = hooks_dir / "lib"
+        lib_dir.mkdir()
+        (lib_dir / "extract-input.sh").symlink_to(
+            ROOT / "hooks" / "lib" / "extract-input.sh"
+        )
+        (lib_dir / "emit.sh").symlink_to(
+            ROOT / "hooks" / "lib" / "emit.sh"
+        )
+        return tmpdir, root
+
+    def _run_hook(self, root: str, cmd: str) -> tuple[int, str]:
+        """Fire the hook with the full realistic input envelope."""
+        import json
+        stdin = json.dumps({
+            "session_id": "test-session-0001",
+            "transcript_path": f"{root}/.claude/projects/test/session.jsonl",
+            "cwd": root,
+            "hook_event_name": "PreToolUse",
+            "tool_name": "Bash",
+            "tool_input": {"command": cmd},
+        })
+        hook_path = Path(root) / "hooks" / "check-control-plane.sh"
+        result = subprocess.run(
+            ["bash", str(hook_path)],
+            input=stdin,
+            capture_output=True,
+            text=True,
+            env={**os.environ, "HOME": root},
+            cwd=root,
+        )
+        return result.returncode, result.stdout.strip()
+
+    def test_git_status_allowed(self):
+        """`git status` with realistic input → allow (P1-1 core repro)."""
+        tmpdir, root = self._setup_project(task_type="feature")
+        try:
+            rc, out = self._run_hook(root, "git status")
+            self.assertEqual(rc, 0)
+            self.assertEqual(out, "{}",
+                             f"git status must not be denied: {out}")
+        finally:
+            tmpdir.cleanup()
+
+    def test_npm_test_allowed(self):
+        tmpdir, root = self._setup_project(task_type="feature")
+        try:
+            rc, out = self._run_hook(root, "npm test")
+            self.assertEqual(rc, 0)
+            self.assertEqual(out, "{}", f"npm test must not be denied: {out}")
+        finally:
+            tmpdir.cleanup()
+
+    def test_pytest_allowed(self):
+        tmpdir, root = self._setup_project(task_type="feature")
+        try:
+            rc, out = self._run_hook(root, "python3 -m pytest")
+            self.assertEqual(rc, 0)
+            self.assertEqual(out, "{}", f"pytest must not be denied: {out}")
+        finally:
+            tmpdir.cleanup()
+
+    def test_project_hooks_subdir_command_allowed(self):
+        """Command touching the project's own src/hooks/ → allow."""
+        tmpdir, root = self._setup_project(task_type="feature")
+        try:
+            rc, out = self._run_hook(
+                root, "npx vitest run src/hooks/useAuth.test.ts")
+            self.assertEqual(rc, 0)
+            self.assertEqual(out, "{}",
+                             f"src/hooks/ test run must not be denied: {out}")
+        finally:
+            tmpdir.cleanup()
+
+    def test_control_plane_write_still_denied(self):
+        """sed -i on a root hooks/ file → deny (no fail-open regression)."""
+        tmpdir, root = self._setup_project(task_type="feature")
+        try:
+            rc, out = self._run_hook(
+                root, "sed -i 's/a/b/' hooks/check-gate.sh")
+            self.assertEqual(rc, 0)
+            self.assertIn('"permissionDecision":"deny"', out,
+                          f"control-plane write must stay denied: {out}")
+        finally:
+            tmpdir.cleanup()
+
+    def test_dot_slash_hook_invocation_still_denied(self):
+        """bash ./hooks/... → deny (./ prefix must not dodge the pattern)."""
+        tmpdir, root = self._setup_project(task_type="feature")
+        try:
+            rc, out = self._run_hook(root, "bash ./hooks/session-start.sh")
+            self.assertEqual(rc, 0)
+            self.assertIn('"permissionDecision":"deny"', out,
+                          f"./hooks/ invocation must stay denied: {out}")
+        finally:
+            tmpdir.cleanup()
+
+    def test_status_md_write_still_denied(self):
+        """Embedded-quote python write to STATUS.md → deny (full-fidelity path)."""
+        tmpdir, root = self._setup_project(task_type="feature")
+        try:
+            rc, out = self._run_hook(
+                root,
+                'python3 -c \'open("docs/STATUS.md","w").write("x")\'')
+            self.assertEqual(rc, 0)
+            self.assertIn('"permissionDecision":"deny"', out,
+                          f"STATUS.md write must stay denied: {out}")
+        finally:
+            tmpdir.cleanup()
+
+    def test_read_only_status_allowed(self):
+        tmpdir, root = self._setup_project(task_type="feature")
+        try:
+            rc, out = self._run_hook(root, "cat docs/STATUS.md")
+            self.assertEqual(rc, 0)
+            self.assertEqual(out, "{}",
+                             f"read-only STATUS access must be allowed: {out}")
+        finally:
+            tmpdir.cleanup()
+
+    def test_allowlisted_script_allowed(self):
+        tmpdir, root = self._setup_project(task_type="feature")
+        try:
+            rc, out = self._run_hook(
+                root, "python3 scripts/check_status.py --root .")
+            self.assertEqual(rc, 0)
+            self.assertEqual(out, "{}",
+                             f"allowlisted script must be allowed: {out}")
+        finally:
+            tmpdir.cleanup()
+
+    def test_framework_task_allows_control_plane_write(self):
+        tmpdir, root = self._setup_project(task_type="framework")
+        try:
+            rc, out = self._run_hook(
+                root, "sed -i 's/a/b/' hooks/check-gate.sh")
+            self.assertEqual(rc, 0)
+            self.assertEqual(out, "{}",
+                             f"framework task must allow hook edits: {out}")
+        finally:
+            tmpdir.cleanup()
+
+    # --- non-canonical path forms must NOT dodge the deny (grill P1-A) ---
+
+    def test_dotdot_hook_write_denied(self):
+        """../hooks/ may resolve to root hooks/ when cwd is a subdir → deny."""
+        tmpdir, root = self._setup_project(task_type="feature")
+        try:
+            rc, out = self._run_hook(
+                root, "sed -i 's/a/b/' ../hooks/check-gate.sh")
+            self.assertEqual(rc, 0)
+            self.assertIn('"permissionDecision":"deny"', out,
+                          f"../hooks/ write must stay denied: {out}")
+        finally:
+            tmpdir.cleanup()
+
+    def test_inner_dotdot_hook_write_denied(self):
+        """foo/../hooks/ resolves to root hooks/ → deny."""
+        tmpdir, root = self._setup_project(task_type="feature")
+        try:
+            rc, out = self._run_hook(
+                root, "sed -i 's/a/b/' foo/../hooks/check-gate.sh")
+            self.assertEqual(rc, 0)
+            self.assertIn('"permissionDecision":"deny"', out,
+                          f"foo/../hooks/ write must stay denied: {out}")
+        finally:
+            tmpdir.cleanup()
+
+    def test_absolute_root_hook_write_denied(self):
+        """Literal absolute path to THIS project's hooks/ → deny."""
+        tmpdir, root = self._setup_project(task_type="feature")
+        try:
+            rc, out = self._run_hook(
+                root, f"sed -i 's/a/b/' {root}/hooks/check-gate.sh")
+            self.assertEqual(rc, 0)
+            self.assertIn('"permissionDecision":"deny"', out,
+                          f"absolute hooks/ write must stay denied: {out}")
+        finally:
+            tmpdir.cleanup()
+
+    def test_absolute_physical_root_hook_write_denied(self):
+        """Physical-path variant (/private/tmp vs /tmp on macOS) → deny."""
+        tmpdir, root = self._setup_project(task_type="feature")
+        try:
+            real = os.path.realpath(root)
+            rc, out = self._run_hook(
+                root, f"sed -i 's/a/b/' {real}/hooks/check-gate.sh")
+            self.assertEqual(rc, 0)
+            self.assertIn('"permissionDecision":"deny"', out,
+                          f"physical-path hooks/ write must stay denied: {out}")
+        finally:
+            tmpdir.cleanup()
+
+    def test_command_substitution_hook_write_denied(self):
+        """$(pwd)/hooks/ → deny (unresolvable at inspection → fail-closed)."""
+        tmpdir, root = self._setup_project(task_type="feature")
+        try:
+            rc, out = self._run_hook(
+                root, "cat x.txt > $(pwd)/hooks/check-gate.sh")
+            self.assertEqual(rc, 0)
+            self.assertIn('"permissionDecision":"deny"', out,
+                          f"$(pwd)/hooks/ write must stay denied: {out}")
+        finally:
+            tmpdir.cleanup()
+
+    def test_variable_expansion_hook_write_denied(self):
+        """$DIR/hooks/ (unexpanded variable) → deny (fail-closed)."""
+        tmpdir, root = self._setup_project(task_type="feature")
+        try:
+            rc, out = self._run_hook(
+                root, "sed -i 's/a/b/' $DIR/hooks/check-gate.sh")
+            self.assertEqual(rc, 0)
+            self.assertIn('"permissionDecision":"deny"', out,
+                          f"$DIR/hooks/ write must stay denied: {out}")
+        finally:
+            tmpdir.cleanup()
+
+    def test_other_project_hooks_path_allowed(self):
+        """Absolute path to ANOTHER project's hooks/ is not our control plane."""
+        tmpdir, root = self._setup_project(task_type="feature")
+        try:
+            rc, out = self._run_hook(
+                root, "npx eslint /some/other/project/hooks/x.js")
+            self.assertEqual(rc, 0)
+            self.assertEqual(out, "{}",
+                             f"other project's hooks/ must be allowed: {out}")
+        finally:
+            tmpdir.cleanup()
+
+
+# =============================================================================
+# P1-2 (evolution review 2026-06-10): check-gate.sh framework-control globs
+# must be root-anchored, not match-anywhere
+# =============================================================================
+
+
+class TestGateProjectPathCollision(unittest.TestCase):
+    """check-gate.sh must protect only the framework's own root-level
+    hooks/ scripts/ templates/ .claude/ CLAUDE.md — not a project's
+    src/hooks/, src/templates/, nested CLAUDE.md, etc."""
+
+    HOOK_SRC = ROOT / "hooks" / "check-gate.sh"
+
+    def _setup_project(self, task_type: str = "feature") -> tuple[
+        tempfile.TemporaryDirectory, str
+    ]:
+        import shutil
+        tmpdir = tempfile.TemporaryDirectory()
+        root = tmpdir.name
+        root_path = Path(root)
+
+        content = make_status_md(
+            phase="implement", task_type=task_type,
+            approvals={"brainstorm": "approved", "plan": "approved"},
+        )
+        docs = root_path / "docs"
+        docs.mkdir()
+        (docs / "STATUS.md").write_text(content, encoding="utf-8")
+
+        hooks_dir = root_path / "hooks"
+        hooks_dir.mkdir()
+        shutil.copy2(self.HOOK_SRC, hooks_dir / "check-gate.sh")
+        lib_dir = hooks_dir / "lib"
+        lib_dir.mkdir()
+        (lib_dir / "extract-input.sh").symlink_to(
+            ROOT / "hooks" / "lib" / "extract-input.sh"
+        )
+        (lib_dir / "emit.sh").symlink_to(
+            ROOT / "hooks" / "lib" / "emit.sh"
+        )
+        return tmpdir, root
+
+    def _run_hook(self, root: str, file_path: str) -> tuple[int, str]:
+        """Fire the hook with the full realistic input envelope."""
+        import json
+        stdin = json.dumps({
+            "session_id": "test-session-0001",
+            "transcript_path": f"{root}/.claude/projects/test/session.jsonl",
+            "cwd": root,
+            "hook_event_name": "PreToolUse",
+            "tool_name": "Edit",
+            "tool_input": {"file_path": file_path},
+        })
+        hook_path = Path(root) / "hooks" / "check-gate.sh"
+        result = subprocess.run(
+            ["bash", str(hook_path)],
+            input=stdin,
+            capture_output=True,
+            text=True,
+            env={**os.environ, "HOME": root},
+            cwd=root,
+        )
+        return result.returncode, result.stdout.strip()
+
+    # --- project files that must be ALLOWED ---
+
+    def test_src_hooks_relative_allowed(self):
+        tmpdir, root = self._setup_project()
+        try:
+            rc, out = self._run_hook(root, "src/hooks/useAuth.ts")
+            self.assertEqual(rc, 0)
+            self.assertEqual(out, "{}",
+                             f"project src/hooks/ edit must be allowed: {out}")
+        finally:
+            tmpdir.cleanup()
+
+    def test_src_hooks_absolute_allowed(self):
+        tmpdir, root = self._setup_project()
+        try:
+            rc, out = self._run_hook(root, f"{root}/src/hooks/useAuth.ts")
+            self.assertEqual(rc, 0)
+            self.assertEqual(out, "{}",
+                             f"absolute src/hooks/ edit must be allowed: {out}")
+        finally:
+            tmpdir.cleanup()
+
+    def test_nested_claude_md_allowed(self):
+        tmpdir, root = self._setup_project()
+        try:
+            rc, out = self._run_hook(root, "src/CLAUDE.md")
+            self.assertEqual(rc, 0)
+            self.assertEqual(out, "{}",
+                             f"nested CLAUDE.md edit must be allowed: {out}")
+        finally:
+            tmpdir.cleanup()
+
+    def test_project_templates_subdir_allowed(self):
+        tmpdir, root = self._setup_project()
+        try:
+            rc, out = self._run_hook(root, "src/templates/email.html")
+            self.assertEqual(rc, 0)
+            self.assertEqual(out, "{}",
+                             f"project templates subdir must be allowed: {out}")
+        finally:
+            tmpdir.cleanup()
+
+    def test_nested_dotclaude_allowed(self):
+        tmpdir, root = self._setup_project()
+        try:
+            rc, out = self._run_hook(root, "vendor/pkg/.claude/settings.json")
+            self.assertEqual(rc, 0)
+            self.assertEqual(out, "{}",
+                             f"nested .claude/ edit must be allowed: {out}")
+        finally:
+            tmpdir.cleanup()
+
+    # --- framework control files that must stay DENIED ---
+
+    def test_root_hooks_relative_denied(self):
+        tmpdir, root = self._setup_project()
+        try:
+            rc, out = self._run_hook(root, "hooks/check-gate.sh")
+            self.assertEqual(rc, 0)
+            self.assertIn('"permissionDecision":"deny"', out,
+                          f"root hooks/ edit must stay denied: {out}")
+            self.assertIn("integrity", out)
+        finally:
+            tmpdir.cleanup()
+
+    def test_root_hooks_absolute_denied(self):
+        tmpdir, root = self._setup_project()
+        try:
+            rc, out = self._run_hook(root, f"{root}/hooks/check-gate.sh")
+            self.assertEqual(rc, 0)
+            self.assertIn('"permissionDecision":"deny"', out,
+                          f"absolute root hooks/ edit must stay denied: {out}")
+        finally:
+            tmpdir.cleanup()
+
+    def test_root_scripts_absolute_denied(self):
+        tmpdir, root = self._setup_project()
+        try:
+            rc, out = self._run_hook(root, f"{root}/scripts/update-gate.sh")
+            self.assertEqual(rc, 0)
+            self.assertIn('"permissionDecision":"deny"', out,
+                          f"absolute root scripts/ edit must stay denied: {out}")
+        finally:
+            tmpdir.cleanup()
+
+    def test_root_claude_md_denied(self):
+        tmpdir, root = self._setup_project()
+        try:
+            for fp in ("CLAUDE.md", f"{root}/CLAUDE.md"):
+                rc, out = self._run_hook(root, fp)
+                self.assertEqual(rc, 0)
+                self.assertIn('"permissionDecision":"deny"', out,
+                              f"root CLAUDE.md ({fp}) must stay denied: {out}")
+        finally:
+            tmpdir.cleanup()
+
+    def test_dot_slash_root_hooks_denied(self):
+        tmpdir, root = self._setup_project()
+        try:
+            rc, out = self._run_hook(root, "./hooks/check-gate.sh")
+            self.assertEqual(rc, 0)
+            self.assertIn('"permissionDecision":"deny"', out,
+                          f"./hooks/ edit must stay denied: {out}")
+        finally:
+            tmpdir.cleanup()
+
+    def test_root_templates_denied(self):
+        tmpdir, root = self._setup_project()
+        try:
+            rc, out = self._run_hook(root, "templates/STATUS.template.md")
+            self.assertEqual(rc, 0)
+            self.assertIn('"permissionDecision":"deny"', out,
+                          f"root templates/ edit must stay denied: {out}")
+        finally:
+            tmpdir.cleanup()
+
+    def test_docs_always_allowed(self):
+        tmpdir, root = self._setup_project()
+        try:
+            rc, out = self._run_hook(root, "docs/notes.md")
+            self.assertEqual(rc, 0)
+            self.assertEqual(out, "{}",
+                             f"docs/ edit must be allowed: {out}")
+        finally:
+            tmpdir.cleanup()
+
+    # --- non-canonical path forms must NOT dodge the deny (grill P1-A/P2-A) ---
+
+    def test_inner_dotdot_root_hooks_denied(self):
+        """foo/../hooks/ normalizes to root hooks/ → deny."""
+        tmpdir, root = self._setup_project()
+        try:
+            rc, out = self._run_hook(root, "foo/../hooks/check-gate.sh")
+            self.assertEqual(rc, 0)
+            self.assertIn('"permissionDecision":"deny"', out,
+                          f"foo/../hooks/ edit must stay denied: {out}")
+        finally:
+            tmpdir.cleanup()
+
+    def test_double_dot_slash_root_hooks_denied(self):
+        """././hooks/ normalizes to root hooks/ → deny."""
+        tmpdir, root = self._setup_project()
+        try:
+            rc, out = self._run_hook(root, "././hooks/check-gate.sh")
+            self.assertEqual(rc, 0)
+            self.assertIn('"permissionDecision":"deny"', out,
+                          f"././hooks/ edit must stay denied: {out}")
+        finally:
+            tmpdir.cleanup()
+
+    def test_absolute_dot_segment_root_hooks_denied(self):
+        """$ROOT/./hooks/ normalizes to $ROOT/hooks/ → deny."""
+        tmpdir, root = self._setup_project()
+        try:
+            rc, out = self._run_hook(root, f"{root}/./hooks/check-gate.sh")
+            self.assertEqual(rc, 0)
+            self.assertIn('"permissionDecision":"deny"', out,
+                          f"$ROOT/./hooks/ edit must stay denied: {out}")
+        finally:
+            tmpdir.cleanup()
+
+    def test_physical_path_root_hooks_denied(self):
+        """Physical-path variant (/private/tmp vs /tmp on macOS) → deny."""
+        tmpdir, root = self._setup_project()
+        try:
+            real = os.path.realpath(root)
+            rc, out = self._run_hook(root, f"{real}/hooks/check-gate.sh")
+            self.assertEqual(rc, 0)
+            self.assertIn('"permissionDecision":"deny"', out,
+                          f"physical-path hooks/ edit must stay denied: {out}")
+        finally:
+            tmpdir.cleanup()
+
+    def test_escaping_relative_hooks_denied(self):
+        """../hooks/ may resolve to root hooks/ when cwd is a subdir →
+        conservative deny (cwd-relative resolution is unknowable here)."""
+        tmpdir, root = self._setup_project()
+        try:
+            rc, out = self._run_hook(root, "../hooks/check-gate.sh")
+            self.assertEqual(rc, 0)
+            self.assertIn('"permissionDecision":"deny"', out,
+                          f"../hooks/ edit must stay denied: {out}")
+        finally:
+            tmpdir.cleanup()
+
+
+# =============================================================================
 # --check-completion-evidence tests (reuses evidence_integrity_violations)
 # =============================================================================
 

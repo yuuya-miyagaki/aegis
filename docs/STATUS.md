@@ -1,15 +1,15 @@
 ---
 framework: aegis
-framework_version: "1.3.2"
+framework_version: "1.3.3"
 project_name: "Aegis"
 mode: Dev
 phase: brainstorm
 task_type: framework
 task_size: L
-task_size_rationale: "機能整合性監査（charter 2026-06-07）の修正フェーズを完了し v1.3.2 patch で締め。調査 Layer 0-4 で7 finding（P1×1/P2×4/P3×2）を実証検出。核心 **F6（P1）**＝setup.sh が hooks/lib/emit.sh・patterns.sh を配布せず install 先で全 hook が source 時に死＝moat 全死を、copy_hooks の lib 全コピーで修復。F3 retro graceful 版配送／F2 judge 配布／F4 status_doctor 配布／F1 contract manifest に稼働 hook4件追跡／F5・F7 polish。各 TDD（RED→GREEN）＋2段グリル（grill-plan→grill-code）。install 経路を scaffold smoke の hook 実発火検証で契約化し静的検査の死角（setup.sh 出力が無検査だった）を恒久封鎖。FRAMEWORK_VERSION 1.3.1→1.3.2＋STATUS template/docs 同期＋README 移行節 v1.3.1→v1.3.2＋tag v1.3.2。298 tests・contract(full/standard)・drift(mirror)・tier2・--strict 全 PASS。運用契約に変更なし。出典 docs/functional-integrity-audit-report-2026-06-07.md。"
-iteration: 15
+task_size_rationale: "進化レビュー（docs/evolution-review-2026-06-10.md）の新規 P1×2 を fix-forward。P1-1: check-control-plane.sh が RAW hook 入力（常に transcript_path=~/.claude/... を含む）を CONTROL_PLANE で照合するため early-allow が install 先で決して発火せず、task_type≠framework でほぼ全 Bash が deny。P1-2: check-gate.sh の */hooks/*・*/scripts/* glob が src/hooks/ 等の一般プロジェクトパスと衝突し正当編集を deny。対象 6 ファイル（hooks×2＋example mirror×2＋eval_scaffold_smoke.py＋tests）＝L。smoke の検証 stdin を実運用スキーマ（transcript_path 込み）に揃え F6 同型の死角（検査入力の現実度）を契約化。"
+iteration: 16
 ui_surface: false
-last_updated: "2026-06-07T12:00:00Z"
+last_updated: "2026-06-10T00:00:00Z"
 gate_approvals:
   client_ready_for_dev: n/a
   brainstorm: pending
@@ -41,14 +41,10 @@ external_evidence:
     scope: "v0.12.2 実装後 4 ラウンドレビュー"
     findings: "Round 6 (P1×2, P2×1: pre-compact exit 2 / minimal-project / test rc), Round 7 (P1×1, P3×1: git add 漏れ / テスト件数表記), Round 8 (P2×1, P3×1: stale last_updated / grep 自己マッチ), Round 9 (P3×2: コメント不整合)"
     resolution: "9件全反映。tier 1/2 PASS、134 tests PASS、本体と minimal-project 完全同期確認済み。"
-next_action: "機能整合性監査 v1.3.2 締め完了（全 finding F1-F7 修正・install 先で moat 実発火を実地確認・298 tests／contract(full/standard)／drift(mirror)／tier2／--strict 全 PASS・tag v1.3.2）。report＝docs/functional-integrity-audit-report-2026-06-07.md。最大の収穫＝install 経路（setup.sh 出力）が無検査だった死角を scaffold smoke の hook 実発火で契約化。**次タスク未定。**"
+next_action: "v1.3.3 リリース済み（全ゲート承認・tag v1.3.3・origin 未 push）。次タスク候補（docs/evolution-review-2026-06-10.md §4/§6）: ①P2 バッチ（P2-1〜P2-6）＋fail-open/closed ポリシー表（P3 系）②B1 ドリルの coverage floor から docs/** 除外（v1.3.3 で実証した構造的制約、LEARNINGS 記録済み）③E1 活動検証の brainstorm。着手時に iteration 17 へ。"
 blockers: []
 failure_tracking: null
 session_history:
-  - date: "2026-06-05"
-    mode: Dev
-    phase: "implement"
-    note: "future-proof 再アーキ着手。Phase 0b WIP を確定コミット後、Foundation 実装（F0 棚卸し+version owner / F1 pure-bash emit.sh 単一出力源+全16hook置換 / F2 patterns.sh）。Round 1/2 セカンドオピニオン反映。183 tests PASS、main にマージ（origin 未push）。"
   - date: "2026-06-06"
     mode: Dev
     phase: "implement"
@@ -57,6 +53,10 @@ session_history:
     mode: Dev
     phase: "docs"
     note: "機能整合性監査（charter 2026-06-07）を実行。Layer 0-4 で7 finding 実証検出（P1×1/P2×4/P3×2）。**F6（P1）＝setup.sh が hooks/lib/emit.sh・patterns.sh を配布せず install 先で全 hook が source 時に死＝決定論 moat 全死**を copy_hooks 全 lib コピーで修復。F3 retro graceful 配送／F2 judge 配布／F4 status_doctor 配布／F1 contract hook4件追跡／F5・F7 polish。各 TDD＋2段グリル。install 経路を scaffold smoke の hook 実発火で契約化（静的検査の死角を恒久封鎖）。再検証で Layer 0 全 green＋ライブ install の moat 実発火を実証。v1.3.2 patch で締め（298 tests・contract・drift・tier2・--strict 全 PASS・tag v1.3.2）。"
+  - date: "2026-06-10"
+    mode: Dev
+    phase: "deploy"
+    note: "進化レビュー（哲学×Web比較×欠陥監査の3軸、docs/evolution-review-2026-06-10.md）で新規 P1×2/P2×6/P3×6 を検出し、P1-1（control-plane の transcript_path 衝突で install 先のほぼ全 Bash deny）・P1-2（check-gate glob の src/hooks/ 等衝突)を fix-forward。TDD 2ラウンド（RED9→GREEN、grill 指摘のバイパス形 RED11→GREEN）＋grill-code（条件付き GO→条件充足で GO）。バイパス 13 形は全 deny 維持（v133-security.md）。**B1 ドリルが framework 混在 diff に構造的適用不能（38 ハンク>25・STATUS 簿記ハンク捕獲不能）と判明→§11 スキップ宣言＋LEARNINGS 所見化**。全ゲート承認後 v1.3.3 patch で締め（332 tests・contract full/standard・drift・smoke 全 PASS・README 移行節・tag v1.3.3）。"
 ---
 
 ## Summary

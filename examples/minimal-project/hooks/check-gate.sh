@@ -30,6 +30,35 @@ if [ -z "$TARGET_FILE" ]; then
   exit 0
 fi
 
+# Physical form of the project root (macOS: /tmp vs /private/tmp; symlinked
+# workdirs). Absolute targets may arrive in either form.
+ROOT_REAL="$(cd "$ROOT" && pwd -P)"
+
+# Lexically resolve ./ and ../ segments so non-canonical forms (././hooks/,
+# foo/../hooks/, $ROOT/./hooks/) cannot dodge the root-anchored patterns.
+# No filesystem access; unresolvable leading ..s are preserved.
+normalize_target() {
+  local p="$1" out="" seg abs=""
+  case "$p" in /*) abs="/" ;; esac
+  local IFS='/'
+  for seg in $p; do
+    case "$seg" in
+      ""|".") ;;
+      "..")
+        case "$out" in
+          ""|..|*/..) [ -z "$abs" ] && out="${out:+$out/}.." ;;
+          */*) out="${out%/*}" ;;
+          *) out="" ;;
+        esac
+        ;;
+      *) out="${out:+$out/}$seg" ;;
+    esac
+  done
+  printf '%s%s' "$abs" "$out"
+}
+
+TARGET_FILE="$(normalize_target "$TARGET_FILE")"
+
 # --- Allowlist: project work files (always allowed) ---
 case "$TARGET_FILE" in
   */docs/*|docs/*|*.gitkeep)
@@ -38,34 +67,60 @@ case "$TARGET_FILE" in
     ;;
 esac
 
+# Framework-controlled paths are anchored to the project root ($ROOT or its
+# physical form for absolute paths, bare prefix for relative ones): the
+# framework delivers hooks/ scripts/ templates/ .claude/ CLAUDE.md at the
+# root, while paths like src/hooks/ or a nested CLAUDE.md belong to the
+# project (P1-2, evolution review 2026-06-10). Relative paths that still
+# escape the root (../) may resolve into the root when the session cwd is a
+# subdirectory — classification is unknowable here, so they stay protected
+# (conservative deny).
+is_protected_dir() {
+  local path="$1" name="$2"
+  case "$path" in
+    "$ROOT"/$name/*|"$ROOT_REAL"/$name/*|$name/*|../$name/*|../*/$name/*)
+      return 0 ;;
+  esac
+  return 1
+}
+
 # --- Templates: framework-controlled files ---
-case "$TARGET_FILE" in
-  */templates/*|templates/*)
-    TASK_TYPE=$(grep -m1 "^task_type:" "$STATUS_FILE" | sed "s/^task_type:[[:space:]]*//" | sed 's/^"//;s/"$//' || true)
-    if [ "$TASK_TYPE" = "framework" ]; then
-      emit_allow
-      exit 0
-    fi
-    REASON=$(printf '[integrity] Template edit blocked during project work (task_type=%s). Templates are framework-controlled files.' "$TASK_TYPE")
-    emit_deny "$REASON"
+if is_protected_dir "$TARGET_FILE" templates; then
+  TASK_TYPE=$(grep -m1 "^task_type:" "$STATUS_FILE" | sed "s/^task_type:[[:space:]]*//" | sed 's/^"//;s/"$//' || true)
+  if [ "$TASK_TYPE" = "framework" ]; then
+    emit_allow
     exit 0
-    ;;
-esac
+  fi
+  REASON=$(printf '[integrity] Template edit blocked during project work (task_type=%s). Templates are framework-controlled files.' "$TASK_TYPE")
+  emit_deny "$REASON"
+  exit 0
+fi
 
 # --- Framework control files: protected during project work ---
-case "$TARGET_FILE" in
-  */hooks/*|hooks/*|*/scripts/*|scripts/*|*/.claude/*|.claude/*|*CLAUDE.md)
-    # Allow only when task_type is "framework".
-    TASK_TYPE=$(grep -m1 "^task_type:" "$STATUS_FILE" | sed "s/^task_type:[[:space:]]*//" | sed 's/^"//;s/"$//' || true)
-    if [ "$TASK_TYPE" = "framework" ]; then
-      emit_allow
-      exit 0
-    fi
-    REASON=$(printf '[integrity] Framework control file edit blocked during project work (task_type=%s). Only framework tasks may edit hooks/scripts/.claude/CLAUDE.md.' "$TASK_TYPE")
-    emit_deny "$REASON"
+is_control_file() {
+  local path="$1"
+  if is_protected_dir "$path" hooks || is_protected_dir "$path" scripts || \
+     is_protected_dir "$path" .claude; then
+    return 0
+  fi
+  case "$path" in
+    "$ROOT"/CLAUDE.md|"$ROOT_REAL"/CLAUDE.md|CLAUDE.md|../CLAUDE.md|../*/CLAUDE.md)
+      return 0 ;;
+  esac
+  return 1
+}
+
+if is_control_file "$TARGET_FILE"; then
+  # Allow only when task_type is "framework".
+  TASK_TYPE=$(grep -m1 "^task_type:" "$STATUS_FILE" | sed "s/^task_type:[[:space:]]*//" | sed 's/^"//;s/"$//' || true)
+  if [ "$TASK_TYPE" = "framework" ]; then
+    emit_allow
     exit 0
-    ;;
-esac
+  fi
+  REASON=$(printf '[integrity] Framework control file edit blocked during project work (task_type=%s). Only framework tasks may edit hooks/scripts/.claude/CLAUDE.md.' "$TASK_TYPE")
+  emit_deny "$REASON"
+  exit 0
+fi
 
 # Extract mode and plan gate from STATUS.md frontmatter.
 MODE=$(grep -m1 "^mode:" "$STATUS_FILE" | sed "s/^mode:[[:space:]]*//" | sed 's/^"//;s/"$//' || true)

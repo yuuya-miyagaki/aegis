@@ -1,7 +1,7 @@
 # Aegis — アーキテクチャ概観
 
-> 作成日: 2026-04-17（最終更新: 2026-06-07）
-> バージョン: v1.3.2
+> 作成日: 2026-04-17（最終更新: 2026-06-10）
+> バージョン: v1.3.3
 > 対象: フレームワーク全体の構造・設計思想・構成要素の解説
 
 ---
@@ -563,3 +563,4 @@ python3 scripts/check_framework_contract.py --profile=standard --root <your-proj
 | v1.3.0 | B3b UAT（uat スキル）+ B3c maintenance（maintenance スキル + RUNBOOK）+ UAT ゲート結合 |
 | v1.3.1 | B4 native 委譲マップ（docs-only） |
 | v1.3.2 | 機能整合性監査の install 配送修正（emit.sh/patterns.sh 配布で moat 復活、/judge・graceful retro・status_doctor 配布、contract の hook 追跡、scaffold smoke の実行検証化） |
+| v1.3.3 | integrity hook の可用性修正（進化レビュー P1×2: control-plane の transcript_path 衝突で install 先のほぼ全 Bash deny／check-gate glob の src/hooks/ 等衝突）。防御強度維持（バイパス形は全 deny 固定）、smoke の検証入力を実運用スキーマ化 |

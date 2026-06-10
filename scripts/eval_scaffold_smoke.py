@@ -56,6 +56,27 @@ def _scaffold(profile: str, target: Path) -> tuple[bool, str]:
     return True, "scaffolded"
 
 
+def _hook_stdin(target: Path, tool_name: str, tool_input: dict) -> str:
+    """Build the REAL hook input envelope, not a minimal synthetic one.
+
+    Real Claude Code hook input always carries transcript_path under
+    ~/.claude/projects/ (i.e. contains ".claude/"). Audit P1-1 (2026-06-10)
+    showed a minimal {"tool_input": ...} stdin masked a control-plane
+    false-deny that only manifests with the full envelope — the realism of
+    the inspection input is itself part of the contract (audit F6 family).
+    """
+    return json.dumps({
+        "session_id": "eval-scaffold-smoke",
+        "transcript_path": str(
+            Path.home() / ".claude" / "projects" / "eval" / "smoke.jsonl"
+        ),
+        "cwd": str(target),
+        "hook_event_name": "PreToolUse",
+        "tool_name": tool_name,
+        "tool_input": tool_input,
+    })
+
+
 def _fire_hook(target: Path, hook_rel: str, stdin: str) -> subprocess.CompletedProcess:
     """Fire an installed hook from the scaffold root with *stdin* on its stdin."""
     return subprocess.run(
@@ -66,6 +87,16 @@ def _fire_hook(target: Path, hook_rel: str, stdin: str) -> subprocess.CompletedP
         text=True,
         timeout=30,
     )
+
+
+def _decision(stdout: str) -> str:
+    """Extract permissionDecision from hook stdout ('' if none/unparseable)."""
+    try:
+        return json.loads(stdout or "{}").get(
+            "hookSpecificOutput", {}
+        ).get("permissionDecision", "")
+    except json.JSONDecodeError:
+        return ""
 
 
 def verify_hooks_runnable(target: Path, profile: str) -> tuple[bool, str]:
@@ -94,7 +125,8 @@ def verify_hooks_runnable(target: Path, profile: str) -> tuple[bool, str]:
     # on STATUS contents or git — proving emit.sh sourced cleanly.
     if (hooks_dir / "check-gate.sh").exists():
         r = _fire_hook(target, "hooks/check-gate.sh",
-                       '{"tool_input":{"file_path":"docs/notes.md"}}')
+                       _hook_stdin(target, "Edit",
+                                   {"file_path": "docs/notes.md"}))
         if r.returncode != 0 or r.stdout.strip() != "{}":
             return False, (
                 f"{profile}: check-gate.sh did not run cleanly "
@@ -106,19 +138,53 @@ def verify_hooks_runnable(target: Path, profile: str) -> tuple[bool, str]:
     # sourced cleanly. check-destructive falls back to pwd when not in a git repo.
     if (hooks_dir / "check-destructive.sh").exists():
         r = _fire_hook(target, "hooks/check-destructive.sh",
-                       '{"tool_input":{"command":"rm -rf /"}}')
-        ask = False
-        try:
-            ask = json.loads(r.stdout or "{}").get(
-                "hookSpecificOutput", {}
-            ).get("permissionDecision") == "ask"
-        except json.JSONDecodeError:
-            ask = False
-        if r.returncode != 0 or not ask:
+                       _hook_stdin(target, "Bash", {"command": "rm -rf /"}))
+        if r.returncode != 0 or _decision(r.stdout) != "ask":
             return False, (
                 f"{profile}: check-destructive.sh did not run cleanly "
                 f"(exit={r.returncode}, stdout={r.stdout.strip()!r}, "
                 f"stderr={r.stderr.strip()[:200]!r})"
+            )
+
+    # (B-4) check-control-plane.sh must not deny everyday project commands at
+    # an install target (fresh scaffold STATUS has task_type=feature). P1-1:
+    # a raw-input control-plane match always hit transcript_path and denied
+    # nearly every Bash command — only the realistic envelope catches this.
+    if (hooks_dir / "check-control-plane.sh").exists():
+        r = _fire_hook(target, "hooks/check-control-plane.sh",
+                       _hook_stdin(target, "Bash", {"command": "git status"}))
+        if r.returncode != 0 or r.stdout.strip() != "{}":
+            return False, (
+                f"{profile}: check-control-plane.sh denied 'git status' at an "
+                f"install target (exit={r.returncode}, "
+                f"stdout={r.stdout.strip()!r}, "
+                f"stderr={r.stderr.strip()[:200]!r})"
+            )
+        # And a control-plane write must STAY denied (no fail-open trade).
+        r = _fire_hook(target, "hooks/check-control-plane.sh",
+                       _hook_stdin(target, "Bash",
+                                   {"command":
+                                    "sed -i 's/a/b/' hooks/check-gate.sh"}))
+        if r.returncode != 0 or _decision(r.stdout) != "deny":
+            return False, (
+                f"{profile}: check-control-plane.sh failed to deny a hook "
+                f"edit (exit={r.returncode}, stdout={r.stdout.strip()!r})"
+            )
+
+    # (B-5) check-gate.sh must not classify a project's src/hooks/ file as a
+    # framework control file (P1-2). A fresh scaffold is in Client mode, so a
+    # "[gate]" deny is expected — an "[integrity]" deny means the root-anchored
+    # path classification regressed.
+    if (hooks_dir / "check-gate.sh").exists():
+        r = _fire_hook(target, "hooks/check-gate.sh",
+                       _hook_stdin(target, "Edit",
+                                   {"file_path":
+                                    str(target / "src" / "hooks" / "useAuth.ts")}))
+        if r.returncode != 0 or "[integrity]" in r.stdout:
+            return False, (
+                f"{profile}: check-gate.sh classified src/hooks/ as a "
+                f"framework control file (exit={r.returncode}, "
+                f"stdout={r.stdout.strip()!r})"
             )
 
     return True, f"{profile}: hooks runnable"
