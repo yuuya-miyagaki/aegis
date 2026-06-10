@@ -75,6 +75,27 @@ if [ ! -f "$STATUS_FILE" ]; then
   exit 1
 fi
 
+# --- Exclusive lock (P3-3): mkdir is atomic on POSIX; flock(1) absent on macOS ---
+# Acquired BEFORE reading CURRENT (T3 v1.5.1): read→validate→write all happen
+# inside the lock, so a concurrent update cannot invalidate the read (TOCTOU).
+LOCK_DIR="${SNAPSHOT_DIR}/.gate-update.lock.d"
+mkdir -p "$SNAPSHOT_DIR"
+LOCK_OK=false
+for _ in 1 2 3 4 5 6 7 8 9 10; do
+  if mkdir "$LOCK_DIR" 2>/dev/null; then
+    LOCK_OK=true
+    # rm pid first: rmdir alone would always fail once T4's pid file exists.
+    trap 'rm -f "$LOCK_DIR/pid" 2>/dev/null; rmdir "$LOCK_DIR" 2>/dev/null || true' EXIT
+    break
+  fi
+  sleep 0.2
+done
+if [ "$LOCK_OK" != "true" ]; then
+  echo "ERROR: another gate update holds the lock (${LOCK_DIR})."
+  echo "Retry shortly. If no other session is running, remove the stale directory."
+  exit 1
+fi
+
 # --- Read current value ---
 # Escape GATE_NAME for use in sed/grep patterns (defensive; current valid gates
 # are all [a-z_] but this guards against future additions).
@@ -182,24 +203,6 @@ get_ref_key() {
     *) echo "" ;;
   esac
 }
-
-# --- Exclusive lock (P3-3): mkdir is atomic on POSIX; flock(1) absent on macOS ---
-LOCK_DIR="${SNAPSHOT_DIR}/.gate-update.lock.d"
-mkdir -p "$SNAPSHOT_DIR"
-LOCK_OK=false
-for _ in 1 2 3 4 5 6 7 8 9 10; do
-  if mkdir "$LOCK_DIR" 2>/dev/null; then
-    LOCK_OK=true
-    trap 'rmdir "$LOCK_DIR" 2>/dev/null || true' EXIT
-    break
-  fi
-  sleep 0.2
-done
-if [ "$LOCK_OK" != "true" ]; then
-  echo "ERROR: another gate update holds the lock (${LOCK_DIR})."
-  echo "Retry shortly. If no other session is running, remove the stale directory."
-  exit 1
-fi
 
 # --- Update STATUS.md ---
 

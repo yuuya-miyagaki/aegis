@@ -101,6 +101,24 @@ class TestUpdateGateLock(unittest.TestCase):
             self.assertNotIn("docs/qa-reports/security.md", status,
                              "reset must null current_refs.security")
 
+    def test_lock_acquired_before_current_read_structure(self):
+        """構造固定（T3 v1.5.1）: ロック取得（mkdir）が CURRENT 読込より前。"""
+        text = (ROOT / "scripts" / "update-gate.sh").read_text(encoding="utf-8")
+        self.assertLess(
+            text.index('mkdir "$LOCK_DIR"'), text.index("CURRENT=$("),
+            "lock must be acquired before reading CURRENT (TOCTOU)")
+
+    def test_lock_held_blocks_noop_approve(self):
+        """ロック保持中は already-approved の no-op 承認も読込前に失敗する
+        （旧実装は CURRENT を先に読んで exit 0 していた）。"""
+        with tempfile.TemporaryDirectory() as d:
+            root = self._scaffold(Path(d))
+            (root / ".claude" / ".gate-update.lock.d").mkdir(parents=True)
+            r = self._run(root, "security", "approve")
+            self.assertNotEqual(r.returncode, 0,
+                                "lock held → must fail before CURRENT read")
+            self.assertIn("lock", (r.stdout + r.stderr).lower())
+
 
 if __name__ == "__main__":
     unittest.main()
