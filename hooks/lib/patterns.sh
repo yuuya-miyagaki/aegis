@@ -45,3 +45,19 @@ AEGIS_DESTRUCTIVE_CMD_WARN=(
   "Destructive: npx rimraf bulk-deletes files recursively."
   "Destructive: find -delete bulk-deletes matching files."
 )
+
+# Test-runner classification patterns (E1 activity verification).
+# Consumed by post-bash.sh (grep -E) and build-judge-card.py (python re).
+# CONSTRAINT: stay within the regex subset that behaves identically in BSD/GNU
+# `grep -E` AND Python `re` — no [[:space:]], no \b. Use ( |^|$) style
+# boundaries instead. tests/test_patterns_parity.py enforces parity with
+# shared fixtures; add a fixture line whenever you add a pattern.
+AEGIS_TEST_RUNNER_REGEX=(
+  '(^|[^a-zA-Z0-9_])(npx +)?vitest($|[^a-zA-Z0-9_])'
+  '(^|[^a-zA-Z0-9_])(npx +)?jest($|[^a-zA-Z0-9_])'
+  '(^|[^a-zA-Z0-9_])pytest($|[^a-zA-Z0-9_])'
+  '(^|[^a-zA-Z0-9_])python3? +-m +unittest($|[^a-zA-Z0-9_])'
+  '(^|[^a-zA-Z0-9_])cargo +test($|[^a-zA-Z0-9_])'
+  '(^|[^a-zA-Z0-9_])go +test($|[^a-zA-Z0-9_])'
+  '(^|[^a-zA-Z0-9_])(npm|pnpm|bun|yarn) +(run +)?test(:[-a-zA-Z0-9_]+)?($|[^a-zA-Z0-9_])'
+)
