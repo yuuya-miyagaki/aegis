@@ -20,6 +20,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 source "${SCRIPT_DIR}/lib/emit.sh"
+source "${SCRIPT_DIR}/lib/frontmatter.sh"
 DEFAULT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 # Allow ROOT override via env (test fixtures use this to isolate from real aegis state).
 ROOT="${AEGIS_ROOT_OVERRIDE:-${DEFAULT_ROOT}}"
@@ -87,7 +88,7 @@ if [ ! -f "$STATUS_FILE" ]; then
 fi
 
 # Extract plan gate and current phase.
-PLAN_GATE=$(grep -A20 "^gate_approvals:" "$STATUS_FILE" | grep -m1 "plan:" | sed "s/.*plan:[[:space:]]*//" | sed 's/^"//;s/"$//' || true)
+PLAN_GATE=$(frontmatter_section "$STATUS_FILE" gate_approvals | grep -m1 "plan:" | sed "s/.*plan:[[:space:]]*//" | sed 's/^"//;s/"$//' || true)
 PHASE=$(grep -m1 "^phase:" "$STATUS_FILE" | sed "s/^phase:[[:space:]]*//" | sed 's/^"//;s/"$//' || true)
 
 # Hard-stop condition: phase=implement AND plan gate is not approved/n/a.

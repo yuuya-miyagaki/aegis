@@ -358,6 +358,9 @@ class TempProjectWithHooks(TempProject):
         (lib_dir / "emit.sh").symlink_to(
             ROOT / "hooks" / "lib" / "emit.sh"
         )
+        (lib_dir / "frontmatter.sh").symlink_to(
+            ROOT / "hooks" / "lib" / "frontmatter.sh"
+        )
         # Copy each hook script (not symlink — so dirname resolves to temp).
         import shutil
         for hook_name in [
@@ -839,6 +842,12 @@ class TestUpdateGateActions(unittest.TestCase):
         # Symlink check_status.py so it's available in the same dir.
         (scripts_dir / "check_status.py").symlink_to(
             ROOT / "scripts" / "check_status.py"
+        )
+        # update-gate.sh sources hooks/lib/frontmatter.sh relative to ROOT.
+        lib_dir = Path(root) / "hooks" / "lib"
+        lib_dir.mkdir(parents=True, exist_ok=True)
+        (lib_dir / "frontmatter.sh").symlink_to(
+            ROOT / "hooks" / "lib" / "frontmatter.sh"
         )
 
     def test_default_action_is_approve(self):
@@ -1417,6 +1426,9 @@ class TestSecretsHookMonorepo(unittest.TestCase):
         (lib_dir / "emit.sh").symlink_to(
             ROOT / "hooks" / "lib" / "emit.sh"
         )
+        (lib_dir / "frontmatter.sh").symlink_to(
+            ROOT / "hooks" / "lib" / "frontmatter.sh"
+        )
         return tmpdir, root
 
     def _run_hook(self, root: str, cmd: str) -> tuple[int, str]:
@@ -1513,6 +1525,9 @@ class TestTemplateProtection(unittest.TestCase):
         (lib_dir / "emit.sh").symlink_to(
             ROOT / "hooks" / "lib" / "emit.sh"
         )
+        (lib_dir / "frontmatter.sh").symlink_to(
+            ROOT / "hooks" / "lib" / "frontmatter.sh"
+        )
         return tmpdir, root
 
     def _run_hook(self, root: str, file_path: str) -> tuple[int, str]:
@@ -1590,6 +1605,9 @@ class TestControlPlaneAllowlistBypass(unittest.TestCase):
         )
         (lib_dir / "emit.sh").symlink_to(
             ROOT / "hooks" / "lib" / "emit.sh"
+        )
+        (lib_dir / "frontmatter.sh").symlink_to(
+            ROOT / "hooks" / "lib" / "frontmatter.sh"
         )
         return tmpdir, root
 
@@ -1712,6 +1730,9 @@ class TestControlPlaneRealisticInput(unittest.TestCase):
         )
         (lib_dir / "emit.sh").symlink_to(
             ROOT / "hooks" / "lib" / "emit.sh"
+        )
+        (lib_dir / "frontmatter.sh").symlink_to(
+            ROOT / "hooks" / "lib" / "frontmatter.sh"
         )
         return tmpdir, root
 
@@ -1973,6 +1994,9 @@ class TestGateProjectPathCollision(unittest.TestCase):
         )
         (lib_dir / "emit.sh").symlink_to(
             ROOT / "hooks" / "lib" / "emit.sh"
+        )
+        (lib_dir / "frontmatter.sh").symlink_to(
+            ROOT / "hooks" / "lib" / "frontmatter.sh"
         )
         return tmpdir, root
 

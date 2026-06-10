@@ -7,6 +7,7 @@ ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 STATUS_FILE="${ROOT}/docs/STATUS.md"
 
 source "${SCRIPT_DIR}/lib/emit.sh"
+source "${SCRIPT_DIR}/lib/frontmatter.sh"
 
 # If STATUS.md doesn't exist, allow silently.
 if [ ! -f "$STATUS_FILE" ]; then
@@ -45,7 +46,7 @@ fi
 
 # Extract gate approvals.
 GATES=""
-GATE_SECTION=$(grep -A20 "^gate_approvals:" "$STATUS_FILE" || true)
+GATE_SECTION=$(frontmatter_section "$STATUS_FILE" gate_approvals || true)
 if [ -n "$GATE_SECTION" ]; then
   for gate_key in client_ready_for_dev brainstorm plan review qa security deploy dev_ready_for_client; do
     gate_val=$(printf '%s' "$GATE_SECTION" | grep -m1 "${gate_key}:" | sed "s/.*${gate_key}:[[:space:]]*//" | sed 's/^"//;s/"$//' || true)

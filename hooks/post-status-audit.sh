@@ -22,6 +22,7 @@ SNAPSHOT_FILE="${ROOT}/.claude/.gate-snapshot"
 # Load shared input extraction.
 source "${SCRIPT_DIR}/lib/extract-input.sh"
 source "${SCRIPT_DIR}/lib/emit.sh"
+source "${SCRIPT_DIR}/lib/frontmatter.sh"
 
 # Read stdin (JSON with tool_input/tool_result).
 INPUT=$(cat)
@@ -46,11 +47,12 @@ if [ ! -f "$SNAPSHOT_FILE" ] || [ ! -f "$STATUS_FILE" ]; then
   exit 0
 fi
 
-# Extract gate value from a file.
+# Extract gate value from a file. Falls back to raw_section because
+# .gate-snapshot stores the section without --- frontmatter delimiters.
 extract_gate() {
   local file="$1"
   local gate="$2"
-  grep -A20 "^gate_approvals:" "$file" | grep -m1 "${gate}:" | sed "s/.*${gate}:[[:space:]]*//" | sed 's/^"//;s/"$//' || true
+  { frontmatter_section "$file" gate_approvals 2>/dev/null || raw_section "$file" gate_approvals; } | grep -m1 "${gate}:" | sed "s/.*${gate}:[[:space:]]*//" | sed 's/^"//;s/"$//' || true
 }
 
 # Check ALL gates for unauthorized value changes.
@@ -93,7 +95,7 @@ if [ -n "$OLD_MODE" ] && [ -n "$NEW_MODE" ] && [ "$OLD_MODE" != "$NEW_MODE" ]; t
   # Mode changed — verify boundary gate.
   extract_gate_from_status() {
     local gate="$1"
-    grep -A20 "^gate_approvals:" "$STATUS_FILE" | grep -m1 "${gate}:" | sed "s/.*${gate}:[[:space:]]*//" | sed 's/^"//;s/"$//' || true
+    frontmatter_section "$STATUS_FILE" gate_approvals | grep -m1 "${gate}:" | sed "s/.*${gate}:[[:space:]]*//" | sed 's/^"//;s/"$//' || true
   }
 
   if [ "$OLD_MODE" = "Client" ] && [ "$NEW_MODE" = "Dev" ]; then

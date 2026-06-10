@@ -11,6 +11,7 @@ STATUS_FILE="${ROOT}/docs/STATUS.md"
 # Load shared input extraction.
 source "${SCRIPT_DIR}/lib/extract-input.sh"
 source "${SCRIPT_DIR}/lib/emit.sh"
+source "${SCRIPT_DIR}/lib/frontmatter.sh"
 
 # Read stdin (JSON with tool_input).
 INPUT=$(cat)
@@ -124,7 +125,7 @@ fi
 
 # Extract mode and plan gate from STATUS.md frontmatter.
 MODE=$(grep -m1 "^mode:" "$STATUS_FILE" | sed "s/^mode:[[:space:]]*//" | sed 's/^"//;s/"$//' || true)
-PLAN_GATE=$(grep -A20 "^gate_approvals:" "$STATUS_FILE" | grep -m1 "plan:" | sed "s/.*plan:[[:space:]]*//" | sed 's/^"//;s/"$//' || true)
+PLAN_GATE=$(frontmatter_section "$STATUS_FILE" gate_approvals | grep -m1 "plan:" | sed "s/.*plan:[[:space:]]*//" | sed 's/^"//;s/"$//' || true)
 
 # Block code edits in Client mode.
 if [ "$MODE" = "Client" ]; then

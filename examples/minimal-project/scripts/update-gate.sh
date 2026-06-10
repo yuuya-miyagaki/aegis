@@ -16,6 +16,8 @@ STATUS_FILE="${ROOT}/docs/STATUS.md"
 SNAPSHOT_DIR="${ROOT}/.claude"
 SNAPSHOT_FILE="${SNAPSHOT_DIR}/.gate-snapshot"
 
+source "${ROOT}/hooks/lib/frontmatter.sh"
+
 GATE_NAME="${1:-}"
 ACTION="${2:-approve}"
 ACK_FLAG="${3:-}"
@@ -35,7 +37,7 @@ if [ -z "$GATE_NAME" ]; then
   # Show current gate status if STATUS.md exists.
   if [ -f "$STATUS_FILE" ]; then
     echo "Current gate status:"
-    grep -A20 "^gate_approvals:" "$STATUS_FILE" | grep "^  " | sed 's/^  /  /' || true
+    frontmatter_section "$STATUS_FILE" gate_approvals | grep "^  " | sed 's/^  /  /' || true
   fi
   exit 1
 fi
@@ -78,7 +80,7 @@ fi
 # are all [a-z_] but this guards against future additions).
 GATE_NAME_SED=$(printf '%s\n' "$GATE_NAME" | sed 's/[.[\/*^$&]/\\&/g')
 
-CURRENT=$(grep -A20 "^gate_approvals:" "$STATUS_FILE" | grep -m1 "  ${GATE_NAME}:" | sed "s/.*${GATE_NAME_SED}:[[:space:]]*//" | sed 's/^"//;s/"$//' || true)
+CURRENT=$(frontmatter_section "$STATUS_FILE" gate_approvals | grep -m1 "  ${GATE_NAME}:" | sed "s/.*${GATE_NAME_SED}:[[:space:]]*//" | sed 's/^"//;s/"$//' || true)
 
 if [ -z "$CURRENT" ]; then
   echo "ERROR: Gate '$GATE_NAME' not found in STATUS.md gate_approvals"
@@ -217,4 +219,4 @@ echo "[${ACTION_TAG}] STATUS.md and .gate-snapshot updated."
 
 echo ""
 echo "Current gate status:"
-grep -A20 "^gate_approvals:" "$STATUS_FILE" | grep "^  " | sed 's/^  /  /' || true
+frontmatter_section "$STATUS_FILE" gate_approvals | grep "^  " | sed 's/^  /  /' || true
