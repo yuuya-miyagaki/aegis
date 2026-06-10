@@ -272,6 +272,18 @@ def read_text(path: Path) -> str:
     return path.read_text(encoding="utf-8")
 
 
+def script_rel_from_command(cmd: str) -> str:
+    """Resolve a hook command to its project-relative script path.
+
+    Handles bare `bash hooks/x.sh` and the unset-safe
+    `bash "${CLAUDE_PROJECT_DIR:-.}"/hooks/x.sh` forms alike.
+    """
+    parts = cmd.split()
+    rel = parts[1] if len(parts) >= 2 and parts[0] == "bash" else parts[0]
+    m = re.search(r"hooks/[A-Za-z0-9_.-]+\.sh$", rel)
+    return m.group(0) if m else rel.strip('"')
+
+
 # --- Model/Effort policy (design: 2026-06-05-v1-model-effort-policy-design.md) ---
 # frontmatter が唯一の真実。ここは検証器（逸脱=FAIL）。値は系統エイリアスか inherit のみ。
 MODEL_EFFORT_POLICY = {
@@ -817,9 +829,7 @@ def main() -> int:
                     cmd = hook.get("command", "")
                     if not isinstance(cmd, str) or not cmd:
                         continue
-                    # Extract script path from command (e.g. "bash hooks/foo.sh" → "hooks/foo.sh")
-                    parts = cmd.split()
-                    script_rel = parts[1] if len(parts) >= 2 and parts[0] == "bash" else parts[0]
+                    script_rel = script_rel_from_command(cmd)
                     script_path = ROOT / "examples/minimal-project" / script_rel
                     if not script_path.exists():
                         failures.append(

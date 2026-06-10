@@ -93,6 +93,32 @@ def _hook_commands(settings_path: Path) -> list[str]:
     return cmds
 
 
+class TestScriptRelFromCommand(unittest.TestCase):
+    """Contract validator must resolve both command forms to hooks/<name>.sh."""
+
+    def test_fallback_form_resolves_to_hooks_path(self):
+        self.assertEqual(
+            contract.script_rel_from_command(
+                'bash "${CLAUDE_PROJECT_DIR:-.}"/hooks/check-gate.sh'
+            ),
+            "hooks/check-gate.sh",
+        )
+
+    def test_plain_project_dir_form_resolves_to_hooks_path(self):
+        self.assertEqual(
+            contract.script_rel_from_command(
+                'bash "$CLAUDE_PROJECT_DIR"/hooks/check-gate.sh'
+            ),
+            "hooks/check-gate.sh",
+        )
+
+    def test_bare_cwd_relative_form_resolves_to_hooks_path(self):
+        self.assertEqual(
+            contract.script_rel_from_command("bash hooks/check-gate.sh"),
+            "hooks/check-gate.sh",
+        )
+
+
 class TestHookCommandForm(unittest.TestCase):
     """Hook commands must survive an unset CLAUDE_PROJECT_DIR (grill 🟡-2).
 
