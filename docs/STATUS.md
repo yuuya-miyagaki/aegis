@@ -3,13 +3,13 @@ framework: aegis
 framework_version: "1.3.3"
 project_name: "Aegis"
 mode: Dev
-phase: implement
+phase: review
 task_type: framework
 task_size: L
 task_size_rationale: "確定（brainstorm Step D）: 進化レビュー（docs/evolution-review-2026-06-10.md §4/§6 ロードマップ 2〜3 番）の P2-1〜P2-6・P3-1〜P3-6・K-2 を一括 fix-forward し、fail-open/closed ポリシー表（構造的観察3）を新設、B1 ドリル恒久修正（coverage floor の docs/** 除外）も同梱。設計ノート U1〜U6 で hooks/lib/scripts/templates/docs 横断・対象 15+ ファイル＝L。"
 iteration: 17
 ui_surface: false
-last_updated: "2026-06-10T09:26:47Z"
+last_updated: "2026-06-10T12:30:00Z"
 gate_approvals:
   client_ready_for_dev: n/a
   brainstorm: approved
@@ -42,7 +42,7 @@ external_evidence:
     scope: "v0.12.2 実装後 4 ラウンドレビュー"
     findings: "Round 6 (P1×2, P2×1: pre-compact exit 2 / minimal-project / test rc), Round 7 (P1×1, P3×1: git add 漏れ / テスト件数表記), Round 8 (P2×1, P3×1: stale last_updated / grep 自己マッチ), Round 9 (P3×2: コメント不整合)"
     resolution: "9件全反映。tier 1/2 PASS、134 tests PASS、本体と minimal-project 完全同期確認済み。"
-next_action: "iteration 17 implement フェーズ: 計画書（grill-plan 反映済み・plan gate 承認済み）の T0〜T16 を TDD で順次実装。T0 frontmatter.sh → T1+T2 ポリシー表（合流コミット）→ T3〜T14 個別 fix → T15 docs → T16 v1.4.0 版数＋全証跡。完了後 grill-code → review/qa/security/deploy ゲート。"
+next_action: "T0〜T16 実装完了＋grill-code 完了（マージ可・🟡2件は修正済み）。証跡: v140-review/qa/security.md。review→qa→security→deploy ゲートのユーザー承認を待ち、承認後 v1.4.0 タグ。"
 blockers: []
 failure_tracking: null
 session_history:
@@ -58,6 +58,10 @@ session_history:
     mode: Dev
     phase: "deploy"
     note: "進化レビュー（哲学×Web比較×欠陥監査の3軸、docs/evolution-review-2026-06-10.md）で新規 P1×2/P2×6/P3×6 を検出し、P1-1（control-plane の transcript_path 衝突で install 先のほぼ全 Bash deny）・P1-2（check-gate glob の src/hooks/ 等衝突)を fix-forward。TDD 2ラウンド（RED9→GREEN、grill 指摘のバイパス形 RED11→GREEN）＋grill-code（条件付き GO→条件充足で GO）。バイパス 13 形は全 deny 維持（v133-security.md）。**B1 ドリルが framework 混在 diff に構造的適用不能（38 ハンク>25・STATUS 簿記ハンク捕獲不能）と判明→§11 スキップ宣言＋LEARNINGS 所見化**。全ゲート承認後 v1.3.3 patch で締め（332 tests・contract full/standard・drift・smoke 全 PASS・README 移行節・tag v1.3.3）。"
+  - date: "2026-06-10"
+    mode: Dev
+    phase: "review"
+    note: "iteration 17（v1.4.0 fix batch）: T0〜T16 を TDD で完走（frontmatter.sh 新設、failure policy 表＋実発火突合テスト、check-task-completed closed 化、check-secrets 鍵種追加、WRITE_INDICATORS 語境界化、pre-compact env 改名、deploy gate RC 契約＋size-skip ask 化、update-gate mkdir ロック＋単一パス書込、contract lib 追跡＋版数同期、B1 ドリル docs/** 除外、standard Bash ガード4種、hooks $CLAUDE_PROJECT_DIR 化、K-2、v1.4.0 版数）。grill-code=マージ可（Critical 0）、🟡2件（実リポジトリミラーテスト不在／CLAUDE_PROJECT_DIR 未設定で moat silent fail-open）を同セッション修正。389 tests OK・contract・drift・smoke・--strict 全 PASS。証跡 v140-review/qa/security.md。"
 ---
 
 ## Summary
