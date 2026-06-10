@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash \"$CLAUDE_PROJECT_DIR\"/hooks/session-start.sh"
+            "command": "bash \"${CLAUDE_PROJECT_DIR:-.}\"/hooks/session-start.sh"
           }
         ]
       }
@@ -17,15 +17,15 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash \"$CLAUDE_PROJECT_DIR\"/hooks/check-gate.sh"
+            "command": "bash \"${CLAUDE_PROJECT_DIR:-.}\"/hooks/check-gate.sh"
           },
           {
             "type": "command",
-            "command": "bash \"$CLAUDE_PROJECT_DIR\"/hooks/check-tdd.sh"
+            "command": "bash \"${CLAUDE_PROJECT_DIR:-.}\"/hooks/check-tdd.sh"
           },
           {
             "type": "command",
-            "command": "bash \"$CLAUDE_PROJECT_DIR\"/hooks/check-client-info.sh"
+            "command": "bash \"${CLAUDE_PROJECT_DIR:-.}\"/hooks/check-client-info.sh"
           }
         ]
       },
@@ -34,19 +34,19 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash \"$CLAUDE_PROJECT_DIR\"/hooks/check-control-plane.sh"
+            "command": "bash \"${CLAUDE_PROJECT_DIR:-.}\"/hooks/check-control-plane.sh"
           },
           {
             "type": "command",
-            "command": "bash \"$CLAUDE_PROJECT_DIR\"/hooks/check-destructive.sh"
+            "command": "bash \"${CLAUDE_PROJECT_DIR:-.}\"/hooks/check-destructive.sh"
           },
           {
             "type": "command",
-            "command": "bash \"$CLAUDE_PROJECT_DIR\"/hooks/check-secrets.sh"
+            "command": "bash \"${CLAUDE_PROJECT_DIR:-.}\"/hooks/check-secrets.sh"
           },
           {
             "type": "command",
-            "command": "bash \"$CLAUDE_PROJECT_DIR\"/hooks/check-deploy-gate.sh"
+            "command": "bash \"${CLAUDE_PROJECT_DIR:-.}\"/hooks/check-deploy-gate.sh"
           }
         ]
       },
@@ -55,7 +55,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash \"$CLAUDE_PROJECT_DIR\"/hooks/check-deploy-mcp-gate.sh"
+            "command": "bash \"${CLAUDE_PROJECT_DIR:-.}\"/hooks/check-deploy-mcp-gate.sh"
           }
         ]
       },
@@ -64,7 +64,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash \"$CLAUDE_PROJECT_DIR\"/hooks/check-skill-gate.sh"
+            "command": "bash \"${CLAUDE_PROJECT_DIR:-.}\"/hooks/check-skill-gate.sh"
           }
         ]
       },
@@ -73,7 +73,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash \"$CLAUDE_PROJECT_DIR\"/hooks/check-cron-gate.sh"
+            "command": "bash \"${CLAUDE_PROJECT_DIR:-.}\"/hooks/check-cron-gate.sh"
           }
         ]
       }
@@ -84,7 +84,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash \"$CLAUDE_PROJECT_DIR\"/hooks/post-status-audit.sh"
+            "command": "bash \"${CLAUDE_PROJECT_DIR:-.}\"/hooks/post-status-audit.sh"
           }
         ]
       }
@@ -95,7 +95,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash \"$CLAUDE_PROJECT_DIR\"/hooks/post-bash.sh"
+            "command": "bash \"${CLAUDE_PROJECT_DIR:-.}\"/hooks/post-bash.sh"
           }
         ]
       }
@@ -105,7 +105,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash \"$CLAUDE_PROJECT_DIR\"/hooks/pre-compact.sh"
+            "command": "bash \"${CLAUDE_PROJECT_DIR:-.}\"/hooks/pre-compact.sh"
           }
         ]
       }
@@ -115,7 +115,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash \"$CLAUDE_PROJECT_DIR\"/hooks/check-task-created.sh"
+            "command": "bash \"${CLAUDE_PROJECT_DIR:-.}\"/hooks/check-task-created.sh"
           }
         ]
       }
@@ -125,7 +125,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash \"$CLAUDE_PROJECT_DIR\"/hooks/check-task-completed.sh"
+            "command": "bash \"${CLAUDE_PROJECT_DIR:-.}\"/hooks/check-task-completed.sh"
           }
         ]
       }

@@ -192,7 +192,8 @@ review 2026-06-10). What changes for existing projects:
   cwd-relative `bash hooks/x.sh` silently disabled every hook when Claude Code
   was launched from a subdirectory. Existing installs: regenerate settings by
   re-running setup.sh, or rewrite each command to
-  `bash "$CLAUDE_PROJECT_DIR"/hooks/<name>.sh`.
+  `bash "${CLAUDE_PROJECT_DIR:-.}"/hooks/<name>.sh` (the `:-.` fallback keeps
+  hooks alive even where the variable is unset).
 - **New: `docs/hook-failure-policy.md`** — the declared fail-open/fail-closed
   policy per hook, with a table-driven test keeping it honest. Read it before
   changing any hook's error handling.

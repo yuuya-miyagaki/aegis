@@ -80,5 +80,49 @@ class TestHookRequiredCoverage(unittest.TestCase):
         )
 
 
+def _hook_commands(settings_path: Path) -> list[str]:
+    data = json.loads(settings_path.read_text(encoding="utf-8"))
+    cmds: list[str] = []
+    for entries in data.get("hooks", {}).values():
+        if not isinstance(entries, list):
+            continue
+        for entry in entries:
+            for hook in entry.get("hooks", []):
+                if isinstance(hook, dict) and "hooks/" in hook.get("command", ""):
+                    cmds.append(hook["command"])
+    return cmds
+
+
+class TestHookCommandForm(unittest.TestCase):
+    """Hook commands must survive an unset CLAUDE_PROJECT_DIR (grill 🟡-2).
+
+    Plain "$CLAUDE_PROJECT_DIR"/hooks/x.sh expands to ""/hooks/x.sh when the
+    variable is unset → bash exits 127 → the runtime treats it as a
+    non-blocking hook error → every moat hook silently fails open (same
+    failure mode as audit F6). The ${CLAUDE_PROJECT_DIR:-.} form falls back
+    to cwd-relative (pre-v1.4.0 behavior) instead.
+    """
+
+    FALLBACK = '"${CLAUDE_PROJECT_DIR:-.}"/hooks/'
+
+    def _assert_fallback_form(self, settings_path: Path) -> None:
+        cmds = _hook_commands(settings_path)
+        self.assertTrue(cmds, f"no hook commands found in {settings_path}")
+        bad = [c for c in cmds if self.FALLBACK not in c]
+        self.assertEqual(
+            bad, [],
+            f"{settings_path} hook commands lack the unset-safe "
+            f"{self.FALLBACK} form: {bad}",
+        )
+
+    def test_template_commands_use_fallback_form(self):
+        self._assert_fallback_form(ROOT / "templates" / "hooks.template.json")
+
+    def test_example_settings_commands_use_fallback_form(self):
+        self._assert_fallback_form(
+            ROOT / "examples" / "minimal-project" / ".claude" / "settings.json"
+        )
+
+
 if __name__ == "__main__":
     unittest.main()

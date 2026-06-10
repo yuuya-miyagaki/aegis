@@ -199,10 +199,12 @@ def verify_hooks_runnable(target: Path, profile: str) -> tuple[bool, str]:
 
 
 def verify_settings_project_dir(target: Path, profile: str) -> tuple[bool, str]:
-    """Generated settings must reference hooks via $CLAUDE_PROJECT_DIR (P3-6).
+    """Generated settings must reference hooks via CLAUDE_PROJECT_DIR (P3-6).
 
     cwd-relative `bash hooks/x.sh` silently disables every hook when Claude
     Code is launched from a subdirectory — the moat vanishes without a trace.
+    Substring check (no `$` prefix) so the unset-safe ${CLAUDE_PROJECT_DIR:-.}
+    form also passes; the exact form is pinned by test_hook_required_coverage.
     """
     settings_path = target / ".claude" / "settings.local.json"
     if not settings_path.exists():
@@ -213,11 +215,11 @@ def verify_settings_project_dir(target: Path, profile: str) -> tuple[bool, str]:
         for entry in entries:
             for hook in entry.get("hooks", []):
                 cmd = hook.get("command", "")
-                if "hooks/" in cmd and "$CLAUDE_PROJECT_DIR" not in cmd:
+                if "hooks/" in cmd and "CLAUDE_PROJECT_DIR" not in cmd:
                     bad.append(cmd)
     if bad:
         return False, f"{profile}: cwd-relative hook commands: {bad}"
-    return True, f"{profile}: all hook commands use $CLAUDE_PROJECT_DIR"
+    return True, f"{profile}: all hook commands use CLAUDE_PROJECT_DIR"
 
 
 def verify_command_surface(target: Path, profile: str) -> tuple[bool, str]:

@@ -155,7 +155,7 @@ for event_name, entries in template.get('hooks', {}).items():
     for entry in entries:
         for hook in entry.get('hooks', []):
             cmd = hook.get('command', '')
-            # Extract script name from 'bash \"\$CLAUDE_PROJECT_DIR\"/hooks/script-name.sh'
+            # Extract script name from 'bash \"\${CLAUDE_PROJECT_DIR:-.}\"/hooks/script-name.sh'
             # (strip('\"') tolerates a quote landing on the last segment).
             parts = cmd.split('/')
             if len(parts) >= 2:
