@@ -224,11 +224,21 @@ class TestPython3AbsentBehavior(unittest.TestCase):
             f"out={r.stdout[:160]} stderr={r.stderr[:160]}")
 
     def test_python3_absent_advisory_hooks_do_not_crash(self):
-        """advisory 4 hook: python3 遮断でも RC0（セッションを止めない）。"""
+        """advisory hooks: python3 遮断でも RC0（セッションを止めない）。"""
         broken = _python3_broken_env(self)
+        # E1 observer hooks write the evidence log; isolate via
+        # AEGIS_ROOT_OVERRIDE so the framework repo's own .claude/ is not
+        # polluted by test firings.
+        ev_tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(ev_tmp.cleanup)
+        ev_root = {"AEGIS_ROOT_OVERRIDE": ev_tmp.name}
         cases = [
             ("post-bash.sh",
-             json.dumps(make_posttool_payload("Bash", {"command": "ls"})), {}),
+             json.dumps(make_posttool_payload("Bash", {"command": "ls"})),
+             ev_root),
+            ("post-bash-observe.sh",
+             json.dumps(make_posttool_payload("Bash", {"command": "ls"})),
+             ev_root),
             ("post-status-audit.sh",
              json.dumps(make_posttool_payload(
                  "Edit", {"file_path": str(ROOT / "docs" / "STATUS.md")})), {}),

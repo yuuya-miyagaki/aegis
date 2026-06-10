@@ -23,6 +23,7 @@
 | check-task-created.sh | moat | あり | hard stop（placeholder subject で判定続行） | allow |
 | check-task-completed.sh | moat | あり | 差し戻し（exit 2） | allow |
 | post-bash.sh | advisory | なし | 通常動作 | allow |
+| post-bash-observe.sh | advisory | なし | 通常動作 | allow |
 | post-status-audit.sh | advisory | あり | allow | allow |
 | pre-compact.sh | advisory | なし | 通常動作 | allow（※3） |
 | session-start.sh | advisory | あり | allow（劣化表示） | allow |

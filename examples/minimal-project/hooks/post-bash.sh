@@ -15,16 +15,25 @@ source "${SCRIPT_DIR}/lib/emit.sh"
 
 INPUT=$(cat)
 
+# E1: record the failed execution into the evidence log (success path is
+# recorded by post-bash-observe.sh). Observation is fail-open.
+source "${SCRIPT_DIR}/lib/evidence.sh"
+DEFAULT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+ROOT="${AEGIS_ROOT_OVERRIDE:-${DEFAULT_ROOT}}"
+append_evidence "$ROOT" fail "$INPUT" || true
+
 # Extract command from hook input.
 CMD=$(extract_command "$INPUT")
 
-# Only act on test runner commands.
+# Only act on test runner commands (single source: patterns.sh).
+source "${SCRIPT_DIR}/lib/patterns.sh"
 IS_TEST=false
-case "$CMD" in
-  *vitest*|*jest*|*pytest*|*cargo\ test*|*go\ test*|*npm\ test*|*pnpm\ test*|*bun\ test*)
+for _re in "${AEGIS_TEST_RUNNER_REGEX[@]}"; do
+  if printf '%s' "$CMD" | grep -Eq "$_re"; then
     IS_TEST=true
-    ;;
-esac
+    break
+  fi
+done
 
 if [ "$IS_TEST" = true ]; then
   emit_context PostToolUseFailure "[ReAct] テスト失敗。Observe: エラー出力を読む → Think: 原因仮説1つ → Act: 最小変更1つ。複数変更を同時にしない。"
