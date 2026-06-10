@@ -30,6 +30,9 @@ INPUT=$(cat)
 # Per Claude Code Hooks reference, TaskCompleted input uses `task_subject` and
 # `task_description` (v0.13.0 Phase 0b NO-GO fix). Official keys probed first,
 # legacy keys kept as forward-compat fallback.
+# Capture the interpreter exit code so a missing/broken python3 does NOT fail
+# open (P3-1, policy: moat → 差し戻し). Same shape as check-task-created.sh.
+set +e
 SUBJECT=$(printf '%s' "$INPUT" | python3 -c '
 import sys, json
 try:
@@ -50,10 +53,17 @@ try:
     print("")
 except Exception:
     print("")
-' 2>/dev/null || true)
+' 2>/dev/null)
+PY_RC=$?
+set -e
 
-# fail-safe dump.
-if [ -z "$SUBJECT" ]; then
+if [ "$PY_RC" -ne 0 ]; then
+  # python3 unavailable/broken: do NOT fail open. The next_action check below
+  # is python3-free; the evidence check failure path also closes (policy: moat).
+  SUBJECT="(subject unavailable: python3)"
+elif [ -z "$SUBJECT" ]; then
+  # python3 ran but found no recognizable subject = unrecognized payload shape.
+  # Deliberate fail-safe: dump and pass through (parse failure ≠ dependency loss).
   mkdir -p "$(dirname "$DUMP_LOG")"
   {
     printf '%s\n' "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] check-task-completed: unparseable payload"
@@ -86,8 +96,16 @@ if [ -z "$NEXT_ACTION_STRIPPED" ] || [ "$NEXT_ACTION_STRIPPED" = "null" ]; then
 fi
 
 # Evidence integrity: reuse validate_status_file's gate/ref + existence checks
-# at completion time. python3 absent -> pass-through (soft 差し戻し, not a deny).
-EVIDENCE=$(python3 "${DEFAULT_ROOT}/scripts/check_status.py" --root "$ROOT" --check-completion-evidence 2>/dev/null || true)
+# at completion time. python3 absent -> 差し戻し (exit 2): completion evidence
+# cannot be verified, so do not certify the completion (P3-1, policy: moat).
+set +e
+EVIDENCE=$(python3 "${DEFAULT_ROOT}/scripts/check_status.py" --root "$ROOT" --check-completion-evidence 2>/dev/null)
+EV_RC=$?
+set -e
+if [ "$EV_RC" -ne 0 ] && [ -z "$EVIDENCE" ]; then
+  printf '[task-completed] evidence 整合性を検証できません（python3 実行不能, rc=%s）。環境を復旧してから完了してください。\n' "$EV_RC" >&2
+  exit 2
+fi
 if [ -n "$EVIDENCE" ]; then
   SUBJECT_PREVIEW=$(printf '%s' "$SUBJECT" | head -c 80 | tr '\n' ' ')
   printf '[task-completed] TaskCompleted (subject: %s) しましたが evidence 整合性に違反があります:\n%s\n完了前に STATUS.md を修正してください。\n' "$SUBJECT_PREVIEW" "$EVIDENCE" >&2
