@@ -20,6 +20,14 @@ REQUIRED_SPEC_KEYS = ("test_command", "timeout_seconds", "mutants")
 MAX_MUTANTS = 25  # bound approval wall-time; keep ~one mutant per changed hunk
 # The harness writes its own input/output here; never treat these as task code.
 DRILL_ARTIFACT_PREFIX = "docs/qa-reports/"
+# B1 permanent fix (evolution review 2026-06-10): bookkeeping hunks under docs/
+# are not task code — they pollute both mutant generation and the coverage
+# floor on framework-mixed diffs (38-hunk case, LEARNINGS:37).
+DRILL_EXCLUDED_PREFIXES = ("docs/",)  # superset of DRILL_ARTIFACT_PREFIX
+
+
+def _drill_excluded(rel: str) -> bool:
+    return rel.startswith(DRILL_EXCLUDED_PREFIXES)
 # git's well-known empty-tree object; diffing against it makes a not-yet-
 # committed project treat all its current code as added.
 EMPTY_TREE = "4b825dc642cb6eb9a060e54bf8d69288fbee4904"
@@ -148,7 +156,7 @@ def added_lines_by_file(root: Path, ref: str = "HEAD",
     git diff."""
     result = dict(_tracked_added_lines(root, ref) if tracked is None else tracked)
     for rel in _untracked_files(root):
-        if rel.startswith(DRILL_ARTIFACT_PREFIX):
+        if _drill_excluded(rel):
             continue
         f = root / rel
         try:
@@ -161,7 +169,7 @@ def added_lines_by_file(root: Path, ref: str = "HEAD",
         if line_count >= 1:
             result.setdefault(rel, set()).update(range(1, line_count + 1))
     return {f: lines for f, lines in result.items()
-            if lines and not f.startswith(DRILL_ARTIFACT_PREFIX)}
+            if lines and not _drill_excluded(f)}
 
 
 def _contiguous_runs(sorted_lines: list[int]) -> list[list[int]]:
@@ -364,7 +372,7 @@ def run_drill(root: Path, spec_path: Path, report_path: Path) -> int:
         # untracked file the agent actually mutated; untouched untracked files
         # (scratch/noise) are not force-covered.
         tracked = {f for f in tracked_map
-                   if not f.startswith(DRILL_ARTIFACT_PREFIX)}
+                   if not _drill_excluded(f)}
         mutant_files = {m["file"] for m in spec["mutants"]}
         coverage_files = tracked | (mutant_files & set(added))
         ag = anti_gaming_violations(added, spec["mutants"],

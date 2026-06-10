@@ -1,6 +1,6 @@
 ---
 framework: aegis
-framework_version: "1.3.3"
+framework_version: "1.4.0"
 project_name: ""
 mode: Client
 phase: onboard

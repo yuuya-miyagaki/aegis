@@ -1047,11 +1047,14 @@ def check_deploy_ready(root: Path) -> int:
     task_size = extract_scalar_value(frontmatter, "task_size")
     approvals = extract_approval_map(frontmatter)
 
-    # If deploy phase is not in the allowed phases for this task size, allow.
-    # (e.g. S skips deploy, M skips deploy.)
+    # If deploy phase is not in the allowed phases for this task size, the gate
+    # has no inspection to run — surface that as ASK (human confirm), not a
+    # silent allow (P2-3: size-skip means "phase skipped", not "deploy vetted").
     if task_size and task_size in SIZE_ALLOWED_PHASES:
         if "deploy" not in SIZE_ALLOWED_PHASES[task_size]:
-            return 0
+            print(f"ASK: task_size '{task_size}' は deploy フェーズをスキップする設定のため、"
+                  "ゲート検査なしのデプロイになります。意図したデプロイであることを確認してください。")
+            return 2
 
     # Check prerequisite gates for deploy phase.
     required_prior = list(PHASE_REQUIRES_GATES.get("deploy", []))
