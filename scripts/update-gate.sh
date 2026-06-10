@@ -183,6 +183,24 @@ get_ref_key() {
   esac
 }
 
+# --- Exclusive lock (P3-3): mkdir is atomic on POSIX; flock(1) absent on macOS ---
+LOCK_DIR="${SNAPSHOT_DIR}/.gate-update.lock.d"
+mkdir -p "$SNAPSHOT_DIR"
+LOCK_OK=false
+for _ in 1 2 3 4 5 6 7 8 9 10; do
+  if mkdir "$LOCK_DIR" 2>/dev/null; then
+    LOCK_OK=true
+    trap 'rmdir "$LOCK_DIR" 2>/dev/null || true' EXIT
+    break
+  fi
+  sleep 0.2
+done
+if [ "$LOCK_OK" != "true" ]; then
+  echo "ERROR: another gate update holds the lock (${LOCK_DIR})."
+  echo "Retry shortly. If no other session is running, remove the stale directory."
+  exit 1
+fi
+
 # --- Update STATUS.md ---
 
 echo "[${ACTION_TAG}] $GATE_NAME: $CURRENT → $TARGET_VALUE"
@@ -191,17 +209,19 @@ TMP="${STATUS_FILE}.tmp.$$"
 # Scope sed to gate_approvals section only — prevents matching same key names
 # in other sections (e.g., current_refs also has review, qa, security, deploy).
 # Use | delimiter in substitution to avoid conflict with n/a value containing /.
-sed "/^gate_approvals:/,/^[a-z]/ s|\(  ${GATE_NAME_SED}:\).*|\1 ${TARGET_VALUE}|" "$STATUS_FILE" > "$TMP" && mv "$TMP" "$STATUS_FILE"
-
-# --- Reset: also null the corresponding ref ---
+# Single pass: gate value and (for reset) ref null-ing land in one write so a
+# concurrent reader never observes the intermediate state.
+SED_ARGS=(-e "/^gate_approvals:/,/^[a-z]/ s|\(  ${GATE_NAME_SED}:\).*|\1 ${TARGET_VALUE}|")
 if [ "$ACTION" = "reset" ]; then
   REF_KEY=$(get_ref_key "$GATE_NAME")
   if [ -n "$REF_KEY" ]; then
     REF_KEY_SED=$(printf '%s\n' "$REF_KEY" | sed 's/[.[\/*^$&]/\\&/g')
-    TMP2="${STATUS_FILE}.tmp2.$$"
-    sed "/^current_refs:/,/^[a-z]/ s|\(  ${REF_KEY_SED}:\).*|\1 null|" "$STATUS_FILE" > "$TMP2" && mv "$TMP2" "$STATUS_FILE"
-    echo "[${ACTION_TAG}] current_refs.${REF_KEY} → null"
+    SED_ARGS+=(-e "/^current_refs:/,/^[a-z]/ s|\(  ${REF_KEY_SED}:\).*|\1 null|")
   fi
+fi
+sed "${SED_ARGS[@]}" "$STATUS_FILE" > "$TMP" && mv "$TMP" "$STATUS_FILE"
+if [ "$ACTION" = "reset" ] && [ -n "${REF_KEY:-}" ]; then
+  echo "[${ACTION_TAG}] current_refs.${REF_KEY} → null"
 fi
 
 # --- Update snapshot atomically ---
