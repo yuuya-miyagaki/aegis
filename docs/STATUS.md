@@ -6,10 +6,10 @@ mode: Dev
 phase: brainstorm
 task_type: framework
 task_size: L
-task_size_rationale: "進化レビュー（docs/evolution-review-2026-06-10.md）の新規 P1×2 を fix-forward。P1-1: check-control-plane.sh が RAW hook 入力（常に transcript_path=~/.claude/... を含む）を CONTROL_PLANE で照合するため early-allow が install 先で決して発火せず、task_type≠framework でほぼ全 Bash が deny。P1-2: check-gate.sh の */hooks/*・*/scripts/* glob が src/hooks/ 等の一般プロジェクトパスと衝突し正当編集を deny。対象 6 ファイル（hooks×2＋example mirror×2＋eval_scaffold_smoke.py＋tests）＝L。smoke の検証 stdin を実運用スキーマ（transcript_path 込み）に揃え F6 同型の死角（検査入力の現実度）を契約化。"
-iteration: 16
+task_size_rationale: "暫定（brainstorm 中、Step D で確定）: 進化レビュー（docs/evolution-review-2026-06-10.md §4/§6 ロードマップ 2〜3 番）の P2-1〜P2-6・P3-1〜P3-6・K-2 を一括 fix-forward し、fail-open/closed ポリシー表（構造的観察3）を新設、B1 ドリル恒久修正（coverage floor の docs/** 除外）も同梱。hooks/templates/scripts/examples/docs 横断で対象 6+ ファイル確実＝L。"
+iteration: 17
 ui_surface: false
-last_updated: "2026-06-10T00:00:00Z"
+last_updated: "2026-06-10T05:50:48Z"
 gate_approvals:
   client_ready_for_dev: n/a
   brainstorm: pending
@@ -20,7 +20,8 @@ gate_approvals:
   deploy: pending
   dev_ready_for_client: pending
 current_refs:
-  requirements: []
+  requirements:
+    - docs/evolution-review-2026-06-10.md
   plan: null
   spec: null
   review: null
@@ -41,7 +42,7 @@ external_evidence:
     scope: "v0.12.2 実装後 4 ラウンドレビュー"
     findings: "Round 6 (P1×2, P2×1: pre-compact exit 2 / minimal-project / test rc), Round 7 (P1×1, P3×1: git add 漏れ / テスト件数表記), Round 8 (P2×1, P3×1: stale last_updated / grep 自己マッチ), Round 9 (P3×2: コメント不整合)"
     resolution: "9件全反映。tier 1/2 PASS、134 tests PASS、本体と minimal-project 完全同期確認済み。"
-next_action: "v1.3.3 リリース済み（全ゲート承認・tag v1.3.3・origin 未 push）。次タスク候補（docs/evolution-review-2026-06-10.md §4/§6）: ①P2 バッチ（P2-1〜P2-6）＋fail-open/closed ポリシー表（P3 系）②B1 ドリルの coverage floor から docs/** 除外（v1.3.3 で実証した構造的制約、LEARNINGS 記録済み）③E1 活動検証の brainstorm。着手時に iteration 17 へ。"
+next_action: "iteration 17 brainstorm 中: P2 バッチ（P2-1〜P2-6＋P3 群＋K-2）＋fail-open/closed ポリシー表＋B1 恒久修正（coverage floor の docs/** 除外）を一括 fix-forward。v1.3.3 は origin push 済み（main b815d22・tag）。E1 活動検証 brainstorm と K-1（LEARNINGS 解決済みマーク機構）は次々回候補。"
 blockers: []
 failure_tracking: null
 session_history:
