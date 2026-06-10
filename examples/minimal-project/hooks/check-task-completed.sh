@@ -95,6 +95,16 @@ if [ -z "$NEXT_ACTION_STRIPPED" ] || [ "$NEXT_ACTION_STRIPPED" = "null" ]; then
   exit 2
 fi
 
+# E1: observer liveness. The evidence log file is created/touched by
+# session-start (rotate_evidence_log) on EVERY session, so its absence means
+# the hook layer never ran in this workspace (the silent fail-open class found
+# in v1.4.0 grill: CLAUDE_PROJECT_DIR unset). An empty file passes — only
+# total absence pushes back. Policy: moat → 差し戻し.
+if [ ! -f "${ROOT}/.claude/evidence-log.jsonl" ]; then
+  printf '[task-completed] evidence-log が存在しません（hook 観測系が未稼働の可能性）。hooks 配線と session-start の発火を確認してから完了してください。\n' >&2
+  exit 2
+fi
+
 # Evidence integrity: reuse validate_status_file's gate/ref + existence checks
 # at completion time. python3 absent -> 差し戻し (exit 2): completion evidence
 # cannot be verified, so do not certify the completion (P3-1, policy: moat).

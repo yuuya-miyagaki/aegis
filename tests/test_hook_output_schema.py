@@ -803,6 +803,9 @@ class TestTaskCompletedHook(HookSchemaAssertions):
         self.addCleanup(shutil.rmtree, self.tmp, ignore_errors=True)
         (Path(self.tmp) / "docs").mkdir()
         (Path(self.tmp) / ".claude").mkdir()
+        # E1 liveness signal: session-start touches the (possibly empty) log on
+        # every session, so its presence is the baseline for completion.
+        (Path(self.tmp) / ".claude" / "evidence-log.jsonl").touch()
 
     def _write_status(self, *, next_action: str):
         path = Path(self.tmp) / "docs" / "STATUS.md"
@@ -902,6 +905,32 @@ class TestTaskCompletedHook(HookSchemaAssertions):
         self.assertEqual(out, {}, "stdout empty on push-back; stderr carries reason")
         self.assertIn("task-completed", err)
         self.assertIn("qa", err)
+
+    def test_missing_evidence_log_pushes_back(self):
+        """E1: no evidence log at all = observer layer never ran -> push back."""
+        self._write_status(next_action="Move to qa phase")
+        (Path(self.tmp) / ".claude" / "evidence-log.jsonl").unlink()
+        rc, out, err = run_hook(
+            "check-task-completed.sh",
+            self._payload("Task foo done"),
+            cwd=Path(self.tmp),
+            env={"AEGIS_ROOT_OVERRIDE": str(self.tmp)},
+        )
+        self.assertEqual(rc, 2)
+        self.assertEqual(out, {})
+        self.assertIn("evidence-log", err)
+
+    def test_empty_evidence_log_passes(self):
+        """E1: an EMPTY log is fine (liveness, not activity) -> pass through."""
+        self._write_status(next_action="Move to qa phase")
+        rc, out, err = run_hook(
+            "check-task-completed.sh",
+            self._payload("Task foo done"),
+            cwd=Path(self.tmp),
+            env={"AEGIS_ROOT_OVERRIDE": str(self.tmp)},
+        )
+        self.assertEqual(rc, 0)
+        self.assertEqual(out, {})
 
     def test_pass_through_when_evidence_clean(self):
         """All coupled gates pending, refs null, next_action set -> pass through."""
