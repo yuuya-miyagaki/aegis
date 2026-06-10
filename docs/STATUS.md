@@ -42,7 +42,7 @@ external_evidence:
     scope: "v0.12.2 実装後 4 ラウンドレビュー"
     findings: "Round 6 (P1×2, P2×1: pre-compact exit 2 / minimal-project / test rc), Round 7 (P1×1, P3×1: git add 漏れ / テスト件数表記), Round 8 (P2×1, P3×1: stale last_updated / grep 自己マッチ), Round 9 (P3×2: コメント不整合)"
     resolution: "9件全反映。tier 1/2 PASS、134 tests PASS、本体と minimal-project 完全同期確認済み。"
-next_action: "v1.4.0 リリース締め完了（4 ゲート --ack 承認・tag v1.4.0・389 tests/contract/drift/strict/smoke 全 PASS）。次タスク未定。origin push（v1.3.2 以降のコミット）は別途ユーザー判断。"
+next_action: "v1.4.0 リリース締め完了（4 ゲート --ack 承認・tag v1.4.0・389 tests/contract/drift/strict/smoke 全 PASS）。origin push 済み（main＋tag v1.4.0）。次タスク未定（候補: 進化レビュー E1 活動検証 brainstorm、grill 🟢4件の小修正バッチ）。"
 blockers: []
 failure_tracking: null
 session_history:
