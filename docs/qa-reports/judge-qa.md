@@ -3,16 +3,15 @@
 ## 総合: 🟡 要確認
 
 ## ティア1: 機械事実（✅検証済・高信頼）
-- テスト: unverified
+- テスト: green
 - 未完成マーカー(変更行): なし
 - テスト強度ドリル(B1): SKIP
 
 ## 🟡 要確認
-- テスト結果が未検証（記録なし/コード変更後）
 - claims 未提出（要確認）
 
 ## あなたが取るアクション
 （LLM が平易日本語で記述）
 
 ## ACK
-- 332 tests OK・contract(full/standard)・drift・tier2 smoke 全 PASS をコード変更後に本セッションで実行（v133-qa.md に記録）。B1 ドリルは構造的制約（38 ハンク>25・STATUS.md 簿記ハンク捕獲不能）によりスキップ宣言＝.drill に理由明記、代替として TDD 2ラウンド RED 実証あり。ユーザー承認 2026-06-10 （2026-06-10 14:23）
+- v140-qa.md: 389 tests OK・contract/drift/strict/smoke 全 PASS を本セッション実走。TDD RED→GREEN 来歴記録済み。record-test-result green 記録済み （2026-06-10 21:34）

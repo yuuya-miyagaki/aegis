@@ -29,8 +29,9 @@
 - [confidence:7] specialist を増やす前に、token と routing の実利があるかを確認する。
 - [confidence:8] agent の skills preload を追加する際は profile 定義（templates/profiles/*.json）も同時に更新しないと scaffold drift が起きる。
 - [confidence:8] MCP テンプレートは npx に `-y` フラグを付けないと初回起動時の対話プロンプトで止まる。ワークスペース内の既存例に合わせること。
+- [confidence:8] settings の hook コマンド形式を変えるときは、それを解析する全消費者（bin/setup.sh の抽出、check_framework_contract の参照解決、eval_scaffold_smoke の判定、test_hook_required_coverage の regex）を同時に更新する。v1.4.0 の `"${CLAUDE_PROJECT_DIR:-.}"` 化で contract の参照解決が 16 件 FAIL し、共有ヘルパー（script_rel_from_command）で恒久対応した。
 - [confidence:7] extensions/ に配置する設定テンプレートは、実サーバー接続検証まではスコープに含めにくい。構造検証と実接続検証を明示的に分けて記録すべき。
-- [confidence:9] `update-gate.sh` は `current_refs.<gate>` を "approved" 文字列で上書きする。ゲート承認後に手動で正しいファイルパスを復元する必要がある。将来のバージョンで修正すべきバグ。
+- [confidence:9] `update-gate.sh` は `current_refs.<gate>` を "approved" 文字列で上書きする。ゲート承認後に手動で正しいファイルパスを復元する必要がある。将来のバージョンで修正すべきバグ。**→ v1.4.0 で解消**: 単一パス書込（P3-3）により approve は current_refs に触れなくなった（reset の null 化は仕様）。v1.4.0 の 4 ゲート承認で refs 無傷を実証。
 - [confidence:8] contract validator のエージェント構造チェック（hallucination guard, turn limit）は大文字小文字を区別する。"Do not" ではなく "do not"、"Complete" ではなく "complete" で書く必要がある。
 - [confidence:8] standard profile は Dev-lean に保つべき。Client 専用 artifact（docs/client/, docs/translation/）を standard に含めると、対応する skill/agent なしでは不整合になる。Client 機能は full profile に集約する。
 - [confidence:7] 大規模変更（L サイズ）の実装は Phase 分割+並列サブエージェントが効果的。v0.8.0 では 18 タスクを 6 フェーズに分割し、各フェーズ内で最大 5 並列実行した。

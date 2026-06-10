@@ -1,33 +1,33 @@
 ---
 framework: aegis
-framework_version: "1.3.3"
+framework_version: "1.4.0"
 project_name: "Aegis"
 mode: Dev
-phase: review
+phase: deploy
 task_type: framework
 task_size: L
 task_size_rationale: "確定（brainstorm Step D）: 進化レビュー（docs/evolution-review-2026-06-10.md §4/§6 ロードマップ 2〜3 番）の P2-1〜P2-6・P3-1〜P3-6・K-2 を一括 fix-forward し、fail-open/closed ポリシー表（構造的観察3）を新設、B1 ドリル恒久修正（coverage floor の docs/** 除外）も同梱。設計ノート U1〜U6 で hooks/lib/scripts/templates/docs 横断・対象 15+ ファイル＝L。"
 iteration: 17
 ui_surface: false
-last_updated: "2026-06-10T12:30:00Z"
+last_updated: "2026-06-10T14:30:00Z"
 gate_approvals:
   client_ready_for_dev: n/a
   brainstorm: approved
   plan: approved
-  review: pending
-  qa: pending
-  security: pending
-  deploy: pending
+  review: approved
+  qa: approved
+  security: approved
+  deploy: approved
   dev_ready_for_client: pending
 current_refs:
   requirements:
     - docs/evolution-review-2026-06-10.md
   plan: docs/plans/2026-06-10-v140-fix-batch-implementation-plan.md
   spec: docs/specs/2026-06-10-v140-fix-batch-design.md
-  review: null
-  qa: null
-  security: null
-  deploy: null
+  review: docs/qa-reports/v140-review.md
+  qa: docs/qa-reports/v140-qa.md
+  security: docs/qa-reports/v140-security.md
+  deploy: docs/qa-reports/v140-deploy-checklist.md
   translation: null
 external_evidence:
   - type: "second-opinion-v1-foundation-r1-r2"
@@ -42,7 +42,7 @@ external_evidence:
     scope: "v0.12.2 実装後 4 ラウンドレビュー"
     findings: "Round 6 (P1×2, P2×1: pre-compact exit 2 / minimal-project / test rc), Round 7 (P1×1, P3×1: git add 漏れ / テスト件数表記), Round 8 (P2×1, P3×1: stale last_updated / grep 自己マッチ), Round 9 (P3×2: コメント不整合)"
     resolution: "9件全反映。tier 1/2 PASS、134 tests PASS、本体と minimal-project 完全同期確認済み。"
-next_action: "T0〜T16 実装完了＋grill-code 完了（マージ可・🟡2件は修正済み）。証跡: v140-review/qa/security.md。review→qa→security→deploy ゲートのユーザー承認を待ち、承認後 v1.4.0 タグ。"
+next_action: "v1.4.0 リリース締め完了（4 ゲート --ack 承認・tag v1.4.0・389 tests/contract/drift/strict/smoke 全 PASS）。次タスク未定。origin push（v1.3.2 以降のコミット）は別途ユーザー判断。"
 blockers: []
 failure_tracking: null
 session_history:
@@ -56,8 +56,8 @@ session_history:
     note: "進化レビュー（哲学×Web比較×欠陥監査の3軸、docs/evolution-review-2026-06-10.md）で新規 P1×2/P2×6/P3×6 を検出し、P1-1（control-plane の transcript_path 衝突で install 先のほぼ全 Bash deny）・P1-2（check-gate glob の src/hooks/ 等衝突)を fix-forward。TDD 2ラウンド（RED9→GREEN、grill 指摘のバイパス形 RED11→GREEN）＋grill-code（条件付き GO→条件充足で GO）。バイパス 13 形は全 deny 維持（v133-security.md）。**B1 ドリルが framework 混在 diff に構造的適用不能（38 ハンク>25・STATUS 簿記ハンク捕獲不能）と判明→§11 スキップ宣言＋LEARNINGS 所見化**。全ゲート承認後 v1.3.3 patch で締め（332 tests・contract full/standard・drift・smoke 全 PASS・README 移行節・tag v1.3.3）。"
   - date: "2026-06-10"
     mode: Dev
-    phase: "review"
-    note: "iteration 17（v1.4.0 fix batch）: T0〜T16 を TDD で完走（frontmatter.sh 新設、failure policy 表＋実発火突合テスト、check-task-completed closed 化、check-secrets 鍵種追加、WRITE_INDICATORS 語境界化、pre-compact env 改名、deploy gate RC 契約＋size-skip ask 化、update-gate mkdir ロック＋単一パス書込、contract lib 追跡＋版数同期、B1 ドリル docs/** 除外、standard Bash ガード4種、hooks $CLAUDE_PROJECT_DIR 化、K-2、v1.4.0 版数）。grill-code=マージ可（Critical 0）、🟡2件（実リポジトリミラーテスト不在／CLAUDE_PROJECT_DIR 未設定で moat silent fail-open）を同セッション修正。389 tests OK・contract・drift・smoke・--strict 全 PASS。証跡 v140-review/qa/security.md。"
+    phase: "deploy"
+    note: "iteration 17（v1.4.0 fix batch）: T0〜T16 を TDD で完走（frontmatter.sh 新設、failure policy 表＋実発火突合テスト、check-task-completed closed 化、check-secrets 鍵種追加、WRITE_INDICATORS 語境界化、pre-compact env 改名、deploy gate RC 契約＋size-skip ask 化、update-gate mkdir ロック＋単一パス書込、contract lib 追跡＋版数同期、B1 ドリル docs/** 除外、standard Bash ガード4種、hooks $CLAUDE_PROJECT_DIR 化、K-2、v1.4.0 版数）。grill-code=マージ可（Critical 0）、🟡2件（実リポジトリミラーテスト不在／CLAUDE_PROJECT_DIR 未設定で moat silent fail-open）を同セッション修正。389 tests OK・contract・drift・smoke・--strict 全 PASS。証跡 v140-review/qa/security/deploy-checklist.md。review→qa→security→deploy を tri-state judge --ack で承認（current_refs 無傷＝update-gate 単一パス書込の実証、LEARNINGS の旧バグ記録を解消注記）。v1.4.0 minor で締め・tag v1.4.0。origin push は別途ユーザー判断。"
 ---
 
 ## Summary
