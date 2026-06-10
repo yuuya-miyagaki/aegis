@@ -114,5 +114,76 @@ class TestFingerprint(unittest.TestCase):
         self.assertNotEqual(a, b)
 
 
+class TestFingerprintHardening(unittest.TestCase):
+    """grill-code 所見: 非ASCII名・無区切り連結・読取不能の silent-green 封鎖。"""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self.tmp.name)
+        make_repo(self.root)
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def test_nonascii_filename_content_change_changes_fp(self):
+        # grill-code 🔴1: core.quotepath 既定 on だと git が非ASCII名を
+        # octal-quote し cat が失敗、内容を変えても fp が不変（silent green）。
+        (self.root / "テスト.py").write_text("print(1)\n", encoding="utf-8")
+        a = run_fp(self.root)
+        (self.root / "テスト.py").write_text("print(2)\n", encoding="utf-8")
+        b = run_fp(self.root)
+        self.assertRegex(a, HEX64)
+        self.assertRegex(b, HEX64)
+        self.assertNotEqual(a, b)
+
+    def test_nonascii_docs_file_still_excluded(self):
+        (self.root / "app.py").write_text("print(1)\n")
+        base = run_fp(self.root)
+        (self.root / "docs").mkdir()
+        (self.root / "docs" / "メモ.md").write_text("x\n", encoding="utf-8")
+        self.assertEqual(run_fp(self.root), base)
+
+    def test_boundary_concat_collision_resistant(self):
+        # grill-code 🟡1: rel＋content の無区切り連結だと {B:"bfoo"} と
+        # {B:"b", f:"oo"} が同一ハッシュ入力になる（同一 HEAD 下で衝突）。
+        (self.root / "B").write_text("bfoo")
+        a = run_fp(self.root)
+        (self.root / "B").write_text("b")
+        (self.root / "f").write_text("oo")
+        b = run_fp(self.root)
+        self.assertNotEqual(a, b)
+
+    def test_unreadable_file_yields_error_token(self):
+        import os
+        if os.geteuid() == 0:
+            self.skipTest("root はパーミッションを無視する")
+        p = self.root / "secret.py"
+        p.write_text("x\n")
+        p.chmod(0o000)
+        try:
+            self.assertEqual(run_fp(self.root), "error")
+        finally:
+            p.chmod(0o644)
+
+    def test_quoted_filename_yields_error_token(self):
+        # quotepath=off でも quote/制御文字入りの名前は git が quote する。
+        # cat 失敗で定数を混ぜる（fp 不感）のではなく error に倒す（fail-closed）。
+        (self.root / 'a"b.py').write_text("print(1)\n")
+        self.assertEqual(run_fp(self.root), "error")
+
+    def test_deleted_tracked_file_changes_fp(self):
+        (self.root / "src.py").write_text("print(1)\n")
+        subprocess.run(["git", "-C", str(self.root), "add", "src.py"],
+                       check=True)
+        subprocess.run(["git", "-C", str(self.root), "-c", "user.email=t@t",
+                        "-c", "user.name=t", "commit", "-q", "-m", "x"],
+                       check=True)
+        clean = run_fp(self.root)
+        (self.root / "src.py").unlink()
+        deleted = run_fp(self.root)
+        self.assertRegex(deleted, HEX64)
+        self.assertNotEqual(clean, deleted)
+
+
 if __name__ == "__main__":
     unittest.main()

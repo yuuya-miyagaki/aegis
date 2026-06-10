@@ -15,6 +15,14 @@
 # harness bookkeeping never invalidate a recording. A failing git diff returns
 # "error", never an empty list (an empty list would alias the clean-tree hash).
 #
+# Hardening (grill-code 2026-06-10): git runs with core.quotepath=off so
+# non-ASCII names arrive raw (the quoted form made cat fail into a constant,
+# leaving the fp blind to content changes — silent green). Names git still
+# quotes (control chars / quotes / backslashes) and unreadable files fail
+# closed to "error". Each file is framed as `f:<bytes>:<rel>\n<content>\n`
+# (deleted: `d::<rel>\n`) so distinct trees can never concatenate into the
+# same hash input.
+#
 # Source: source "$(dirname "$0")/lib/fingerprint.sh"
 # Exec:   bash hooks/lib/fingerprint.sh <root>
 
@@ -43,9 +51,9 @@ fingerprint_worktree() {
     ref="HEAD"
   fi
   local diff_files untracked_files
-  diff_files=$(git -C "$root" diff --name-only "$ref" -- 2>/dev/null) \
+  diff_files=$(git -C "$root" -c core.quotepath=off diff --name-only "$ref" -- 2>/dev/null) \
     || { printf 'error\n'; return 0; }
-  untracked_files=$(git -C "$root" ls-files --others --exclude-standard 2>/dev/null) \
+  untracked_files=$(git -C "$root" -c core.quotepath=off ls-files --others --exclude-standard 2>/dev/null) \
     || { printf 'error\n'; return 0; }
   local files
   files=$(printf '%s\n%s\n' "$diff_files" "$untracked_files" \
@@ -53,8 +61,18 @@ fingerprint_worktree() {
   local count=0 bytes=0 rel size
   while IFS= read -r rel; do
     [ -n "$rel" ] || continue
+    case "$rel" in
+      '"'*)
+        # Still quoted under quotepath=off (control chars / quotes /
+        # backslashes): the on-disk path is unknowable here, so fail closed
+        # instead of hashing a constant that masks content changes.
+        printf 'error\n'; return 0 ;;
+    esac
     count=$((count + 1))
-    if [ -f "$root/$rel" ]; then
+    if [ -e "$root/$rel" ]; then
+      if [ ! -f "$root/$rel" ] || [ ! -r "$root/$rel" ]; then
+        printf 'error\n'; return 0
+      fi
       size=$(wc -c < "$root/$rel" 2>/dev/null | tr -d '[:space:]') || size=0
       bytes=$((bytes + ${size:-0}))
     fi
@@ -69,8 +87,14 @@ EOF_COUNT
     printf 'head:%s\n' "$head"
     while IFS= read -r rel; do
       [ -n "$rel" ] || continue
-      printf '%s' "$rel"
-      cat "$root/$rel" 2>/dev/null || printf '<unreadable>'
+      if [ -f "$root/$rel" ]; then
+        size=$(wc -c < "$root/$rel" 2>/dev/null | tr -d '[:space:]') || size=0
+        printf 'f:%s:%s\n' "${size:-0}" "$rel"
+        cat "$root/$rel" 2>/dev/null
+        printf '\n'
+      else
+        printf 'd::%s\n' "$rel"
+      fi
     done <<EOF_HASH
 $files
 EOF_HASH
