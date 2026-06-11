@@ -42,11 +42,12 @@ extract_command() {
   # of the test-runner classifier (T1 v1.5.1) for both the evidence log and
   # post-bash.sh. python3 failure still falls through to the grep path
   # (degraded text beats no text for the downstream fail-closed checks).
-  # The class covers \\ via its leading backslash member; \/ is deliberately
-  # absent — standard encoders (json.dumps, JSON.stringify) never emit it,
-  # and the deny-side hook (check-control-plane) routes python3-first
-  # independently of this fast-path (grill-code v1.5.1 🟢-1).
-  if printf '%s' "$input" | grep -q '\\[\\nrtbfu"]'; then
+  # The class covers \\ via its leading backslash member; \/ is included for
+  # completeness (v1.5.2 T3) — standard encoders (json.dumps, JSON.stringify)
+  # never emit it, but a hand-built or third-party payload may, and the grep
+  # path would record it as a literal two-char sequence. The deny-side hook
+  # (check-control-plane) routes python3-first independently of this fast-path.
+  if printf '%s' "$input" | grep -q '\\[\\nrtbfu"/]'; then
     result=$(printf '%s' "$input" | python3 -c 'import sys,json; print(json.loads(sys.stdin.read()).get("tool_input",{}).get("command",""))' 2>/dev/null || true)
     if [ -n "$result" ]; then
       printf '%s' "$result"

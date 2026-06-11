@@ -123,6 +123,32 @@ class TestPostBashQuoteMask(unittest.TestCase):
         self.assertIn("ReAct", ctx)
 
 
+class TestExtractCommandSlashEscapeFidelity(unittest.TestCase):
+    """`\\/` のみを含むペイロードも python3 fidelity 経路に乗り、記録される
+    コマンドがリテラル 2 文字 `\\/` ではなく `/` になる（T3 v1.5.2）。"""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self.tmp.name)
+        make_repo(self.root)
+        self.log = self.root / LOG_REL
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def test_slash_escape_payload_recorded_decoded(self):
+        raw = ('{"tool_name":"Bash","tool_input":{"command":"ls tests\\/unit"},'
+               '"tool_response":{"exitCode":0}}')
+        env = os.environ.copy()
+        env["AEGIS_ROOT_OVERRIDE"] = str(self.root)
+        proc = subprocess.run(
+            ["bash", str(ROOT / "hooks" / "post-bash-observe.sh")],
+            input=raw, capture_output=True, text=True, timeout=60, env=env)
+        self.assertEqual(proc.returncode, 0)
+        row = json.loads(self.log.read_text(encoding="utf-8").splitlines()[0])
+        self.assertEqual(row["cmd"], "ls tests/unit")
+
+
 class TestObserveToJudgeEndToEnd(unittest.TestCase):
     """grill-code 🟡1: 「観測した ok が green になる」主契約の結合固定。
 
