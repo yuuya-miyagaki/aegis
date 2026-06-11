@@ -90,6 +90,23 @@ for _ in 1 2 3 4 5 6 7 8 9 10; do
     printf '%s' "$$" > "$LOCK_DIR/pid"
     break
   fi
+  # Orphan-claim restore (T4a v1.5.2): per the claim protocol below, pid and
+  # pid.claim.* never coexist (a claim is created only by atomically mv-ing the
+  # pid file away). A lingering claim whose claimer is DEAD therefore means the
+  # claimer crashed between mv and rm/undo — restore it to pid and let the
+  # dead-pid reclaim below decide on the ORIGINAL holder pid it contains.
+  # Live claimer or non-numeric suffix: leave alone (fail-closed). mv failure
+  # is ignored — a concurrent restorer winning the race is equivalent.
+  for _claim in "$LOCK_DIR"/pid.claim.*; do
+    [ -e "$_claim" ] || continue
+    _claimer="${_claim##*.}"
+    case "$_claimer" in
+      ''|*[!0-9]*) continue ;;
+    esac
+    if ! kill -0 "$_claimer" 2>/dev/null && [ ! -e "$LOCK_DIR/pid" ]; then
+      mv "$_claim" "$LOCK_DIR/pid" 2>/dev/null || true
+    fi
+  done
   # Stale-lock reclaim (T4 v1.5.1): atomic-mv claim protocol. Only a purely
   # numeric pid of a DEAD process is reclaimed; missing/empty/garbage pid or a
   # live holder falls through to wait (fail-closed). mv of the pid file is an

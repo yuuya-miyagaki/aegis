@@ -168,6 +168,39 @@ class TestUpdateGateLock(unittest.TestCase):
             self.assertNotEqual(r.returncode, 0, "garbage pid must not be reclaimed")
             self.assertTrue(lock.exists())
 
+    def test_orphan_claim_dead_claimer_restored_and_reclaimed(self):
+        """claimer 死亡の孤児 claim は pid に復元され、既存 dead-pid 回収路に
+        合流して後続承認が成功する（T4a v1.5.2、claim-mv クラッシュ窓の根治）。"""
+        with tempfile.TemporaryDirectory() as d:
+            root = self._scaffold(Path(d))
+            lock = root / ".claude" / ".gate-update.lock.d"
+            lock.mkdir(parents=True)
+            claimer = self._dead_pid()
+            holder = self._dead_pid()
+            (lock / f"pid.claim.{claimer}").write_text(str(holder),
+                                                       encoding="utf-8")
+            r = self._run(root, "brainstorm", "approve")
+            self.assertEqual(r.returncode, 0,
+                             f"orphan claim must be restored+reclaimed: "
+                             f"{r.stdout}{r.stderr}")
+            self.assertIn("brainstorm: approved",
+                          (root / "docs" / "STATUS.md").read_text())
+            self.assertFalse(lock.exists(),
+                             "restored lock must be released after run")
+
+    def test_orphan_claim_live_claimer_left_alone(self):
+        """claimer 生存中の claim は復元しない（fail-closed・guard、約10s 待機）。"""
+        with tempfile.TemporaryDirectory() as d:
+            root = self._scaffold(Path(d))
+            lock = root / ".claude" / ".gate-update.lock.d"
+            lock.mkdir(parents=True)
+            claim = lock / f"pid.claim.{os.getpid()}"
+            claim.write_text(str(self._dead_pid()), encoding="utf-8")
+            r = self._run(root, "brainstorm", "approve")
+            self.assertNotEqual(r.returncode, 0,
+                                "live claimer must not be disturbed")
+            self.assertTrue(claim.exists(), "live claim must be left intact")
+
 
 if __name__ == "__main__":
     unittest.main()
