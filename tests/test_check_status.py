@@ -1715,6 +1715,107 @@ class TestControlPlaneAllowlistBypass(unittest.TestCase):
             tmpdir.cleanup()
 
 
+class TestControlPlaneWriteIndicators(TestControlPlaneAllowlistBypass):
+    """T5 (v1.5.1): WRITE_INDICATORS の左境界化と find 実行系フラグ封鎖。
+    _setup_project/_run_hook は親クラス（allowlist bypass）の fixture を再利用。"""
+
+    # --- (a) 左境界: 正当読取りの誤 deny 解消 ---
+
+    def test_grep_for_confirm_string_allowed(self):
+        """`grep "confirm " hooks/x.sh` — confir「m␣」が rm\\s に誤一致していた。"""
+        tmpdir, root = self._setup_project(task_type="feature")
+        try:
+            rc, out = self._run_hook(root, 'grep "confirm " hooks/check-gate.sh')
+            self.assertEqual(out, "{}",
+                             f"read-only grep must be allowed: {out}")
+        finally:
+            tmpdir.cleanup()
+
+    def test_cat_pre_exec_log_allowed(self):
+        """ファイル名中の -exec（pre-exec.log）は左境界（直前が英数）で不一致。"""
+        tmpdir, root = self._setup_project(task_type="feature")
+        try:
+            rc, out = self._run_hook(root, "cat hooks/pre-exec.log")
+            self.assertEqual(out, "{}",
+                             f"filename mention must be allowed: {out}")
+        finally:
+            tmpdir.cleanup()
+
+    def test_grep_truncate_dash_s_allowed(self):
+        """truncate は call 形のみ検知（P3-4 維持）— シェル語の検索は allow。"""
+        tmpdir, root = self._setup_project(task_type="feature")
+        try:
+            rc, out = self._run_hook(root, 'grep "truncate -s" hooks/check-gate.sh')
+            self.assertEqual(out, "{}",
+                             f"string search must be allowed: {out}")
+        finally:
+            tmpdir.cleanup()
+
+    # --- (b) find 実行系フラグ: 実バイパスの封鎖 ---
+
+    def test_find_exec_dd_denied(self):
+        """`find hooks/ -exec dd of={} +` — v150-security 記録の実バイパス。"""
+        tmpdir, root = self._setup_project(task_type="feature")
+        try:
+            rc, out = self._run_hook(
+                root, 'find hooks/ -name "*.sh" -exec dd of={} +')
+            self.assertIn('"permissionDecision":"deny"', out,
+                          f"find -exec write bypass must be denied: {out}")
+        finally:
+            tmpdir.cleanup()
+
+    def test_find_exec_truncate_denied(self):
+        tmpdir, root = self._setup_project(task_type="feature")
+        try:
+            rc, out = self._run_hook(
+                root, 'find hooks/ -name "*.sh" -exec truncate -s 0 {} +')
+            self.assertIn('"permissionDecision":"deny"', out,
+                          f"find -exec truncate must be denied: {out}")
+        finally:
+            tmpdir.cleanup()
+
+    def test_find_quoted_delete_denied(self):
+        """クォートバイパス `find hooks/ "-delete"` — `\"` が左境界になり一致。"""
+        tmpdir, root = self._setup_project(task_type="feature")
+        try:
+            rc, out = self._run_hook(root, 'find hooks/ "-delete"')
+            self.assertIn('"permissionDecision":"deny"', out,
+                          f"quoted -delete must be denied: {out}")
+        finally:
+            tmpdir.cleanup()
+
+    def test_find_delete_denied(self):
+        tmpdir, root = self._setup_project(task_type="feature")
+        try:
+            rc, out = self._run_hook(root, 'find hooks/ -name "*.bak" -delete')
+            self.assertIn('"permissionDecision":"deny"', out,
+                          f"find -delete must be denied: {out}")
+        finally:
+            tmpdir.cleanup()
+
+    # --- 不変条件: 既存の検知が残る ---
+
+    def test_chain_tee_still_denied(self):
+        tmpdir, root = self._setup_project(task_type="feature")
+        try:
+            rc, out = self._run_hook(root, "cat /tmp/evil.sh | tee hooks/x.sh")
+            self.assertIn('"permissionDecision":"deny"', out,
+                          f"chained tee write must stay denied: {out}")
+        finally:
+            tmpdir.cleanup()
+
+    def test_readonly_with_bare_tee_still_denied(self):
+        """read-only 先頭でも裸の tee␣（左境界=空白）は書込指標のまま。"""
+        tmpdir, root = self._setup_project(task_type="feature")
+        try:
+            rc, out = self._run_hook(root, "find hooks/ -name tee x.txt")
+            # `-name tee x.txt` 中の ` tee ` が一致（fail-closed 容認）
+            self.assertIn('"permissionDecision":"deny"', out,
+                          f"bare tee indicator must stay active: {out}")
+        finally:
+            tmpdir.cleanup()
+
+
 # =============================================================================
 # P1-1 (evolution review 2026-06-10): control-plane match must use the
 # extracted command, not the raw hook input

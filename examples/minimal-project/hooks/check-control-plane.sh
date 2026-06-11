@@ -140,7 +140,15 @@ if [ -n "$CHECK_CMD" ]; then
     READ_ONLY_STARTS='^(cat|head|tail|less|more|grep|egrep|fgrep|rg|find|ls|wc|diff|file|stat|md5sum|sha256sum) '
     # unlink/remove/rename/truncate require a call form `(` — bare substrings
     # false-positived on read-only greps like `grep -r "remove" hooks/` (P3-4).
-    WRITE_INDICATORS='sed\s+-i|>\s*[^&]|>>\s|tee\s|cp\s|mv\s|chmod\s|rm\s|mkdir\s|touch\s|install\s|ln\s|write_text|write_bytes|open\(.*[wax]|\.write\(|Path\(.*\.write|(unlink|remove|rename|truncate)[[:space:]]*\('
+    # Word-form indicators carry a left boundary (T5a v1.5.1): without it,
+    # `grep "confirm " hooks/x.sh` matched rm\s inside "confirm ". find's
+    # write-capable action flags are listed with the same boundary (T5b):
+    # `find hooks/ -exec dd of={} +` passed READ_ONLY_STARTS and (no `;`)
+    # CHAIN_OPS — a real write bypass. The boundary also keeps filename
+    # mentions (pre-exec.log) allowed, and concatenating after `|` avoids a
+    # leading `-` pattern, which BSD grep would parse as an option (rc=2 →
+    # the `!` negation would turn that crash into fail-open).
+    WRITE_INDICATORS='(^|[^A-Za-z0-9_])sed\s+-i|>\s*[^&]|>>\s|(^|[^A-Za-z0-9_])(tee|cp|mv|chmod|rm|mkdir|touch|install|ln)\s|write_text|write_bytes|open\(.*[wax]|\.write\(|Path\(.*\.write|(unlink|remove|rename|truncate)[[:space:]]*\(|(^|[^A-Za-z0-9_])-(exec|execdir|ok|okdir|delete|fprint0?|fprintf|fls)($|[^A-Za-z0-9_])'
     if printf '%s' "$CHECK_CMD" | grep -qE "$READ_ONLY_STARTS" && \
        ! printf '%s' "$CHECK_CMD" | grep -qE "$WRITE_INDICATORS"; then
       emit_allow
