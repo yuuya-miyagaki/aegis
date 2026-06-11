@@ -13,4 +13,4 @@
 （LLM が平易日本語で記述）
 
 ## ACK
-- v150-deploy-checklist.md: ローカル minor リリース（tag のみ・push はユーザー判断）。バンプ後 436 tests/contract/drift/smoke 全 PASS 実走済み （2026-06-11 00:27）
+- patch リリース（ローカル commit + tag v1.5.1、外部インフラなし）。バンプ後の最終検証 461 tests OK・contract/drift/smoke/--strict 全 PASS。チェックリスト docs/qa-reports/v151-deploy-checklist.md 全項目確認。origin push はユーザー判断 （2026-06-11 10:44）

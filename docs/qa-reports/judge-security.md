@@ -20,4 +20,4 @@
 （LLM が平易日本語で記述）
 
 ## ACK
-- v150-security.md: 変化点は全て強化/可視化方向（quotepath fail-closed・framing・観測一本化）。受容リスクは設計明示（cmd 偽装は reviewer 責務）・残余は fail-closed 方向で記録済み （2026-06-11 00:27）
+- v140/v150 記録の残余5系統を本バッチで解消（find 書込形 deny・左境界・TOCTOU・stale lock・stderr 分離）。受容/残余リスクは docs/qa-reports/v151-security.md に明示記録。バイパス回帰は既存テストで deny 維持 （2026-06-11 10:43）

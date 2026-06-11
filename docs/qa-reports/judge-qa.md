@@ -14,4 +14,4 @@
 （LLM が平易日本語で記述）
 
 ## ACK
-- 436 tests OK・contract/drift/smoke PASS・観測→判定 e2e 実発火（v150-qa.md）。テスト行は evidence-log manual 記録で green。drill は全タスク TDD RED→GREEN 来歴で代替（混在 diff 制約は LEARNINGS 記録済み） （2026-06-11 00:27）
+- 461 tests OK・contract full/standard・drift・smoke・--strict 全 PASS。TDD 来歴と実地検証は docs/qa-reports/v151-qa.md。テスト記録 manual green・fp 一致 （2026-06-11 10:43）

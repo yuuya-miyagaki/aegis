@@ -3,21 +3,21 @@ framework: aegis
 framework_version: "1.5.1"
 project_name: "Aegis"
 mode: Dev
-phase: review
+phase: deploy
 task_type: framework
 task_size: L
 task_size_rationale: "確定（brainstorm）: grill 🟢残余 5 件の小修正バッチ（v1.5.1 patch）。T1 false-RED アンカー（patterns.sh）/ T2 deploy-gate stderr 分離 / T3 update-gate ロック前倒し / T4 stale lock PID 回収 / T5 WRITE_INDICATORS 左境界＋find -exec 族封鎖。hooks×2・lib×1・scripts×1＋ミラー×4＋テスト 4 本前後＝12 ファイル前後で L。"
 iteration: 19
 ui_surface: false
-last_updated: "2026-06-11T01:40:15Z"
+last_updated: "2026-06-11T01:45:10Z"
 gate_approvals:
   client_ready_for_dev: n/a
   brainstorm: approved
   plan: approved
-  review: pending
-  qa: pending
-  security: pending
-  deploy: pending
+  review: approved
+  qa: approved
+  security: approved
+  deploy: approved
   dev_ready_for_client: pending
 current_refs:
   requirements:
@@ -25,10 +25,10 @@ current_refs:
     - docs/qa-reports/v150-security.md
   plan: docs/plans/2026-06-11-grill-residual-fixes-implementation-plan.md
   spec: docs/specs/2026-06-11-grill-residual-fixes-design.md
-  review: null
-  qa: null
-  security: null
-  deploy: null
+  review: docs/qa-reports/v151-review.md
+  qa: docs/qa-reports/v151-qa.md
+  security: docs/qa-reports/v151-security.md
+  deploy: docs/qa-reports/v151-deploy-checklist.md
   translation: null
 external_evidence:
   - type: "second-opinion-v1-foundation-r1-r2"
@@ -43,14 +43,10 @@ external_evidence:
     scope: "v0.12.2 実装後 4 ラウンドレビュー"
     findings: "Round 6 (P1×2, P2×1: pre-compact exit 2 / minimal-project / test rc), Round 7 (P1×1, P3×1: git add 漏れ / テスト件数表記), Round 8 (P2×1, P3×1: stale last_updated / grep 自己マッチ), Round 9 (P3×2: コメント不整合)"
     resolution: "9件全反映。tier 1/2 PASS、134 tests PASS、本体と minimal-project 完全同期確認済み。"
-next_action: "iteration 19（grill 🟢残余バッチ v1.5.1）: 実装＋grill-code 完了（A 🟡-1 修正済み）。テスト記録（record-test-result.py）→review/qa/security/deploy を --ack 承認（証跡 docs/qa-reports/v151-*.md）→session_history 追記→git tag v1.5.1→origin push はユーザー判断で停止報告。"
+next_action: "iteration 19（v1.5.1）完了・tag 済み。origin push はユーザー判断。次タスク未定（v140/v150 記録の grill 残余は本バッチで全消化、新規残余は v151-security.md に記録済み）。"
 blockers: []
 failure_tracking: null
 session_history:
-  - date: "2026-06-10"
-    mode: Dev
-    phase: "deploy"
-    note: "進化レビュー（哲学×Web比較×欠陥監査の3軸、docs/evolution-review-2026-06-10.md）で新規 P1×2/P2×6/P3×6 を検出し、P1-1（control-plane の transcript_path 衝突で install 先のほぼ全 Bash deny）・P1-2（check-gate glob の src/hooks/ 等衝突)を fix-forward。TDD 2ラウンド（RED9→GREEN、grill 指摘のバイパス形 RED11→GREEN）＋grill-code（条件付き GO→条件充足で GO）。バイパス 13 形は全 deny 維持（v133-security.md）。**B1 ドリルが framework 混在 diff に構造的適用不能（38 ハンク>25・STATUS 簿記ハンク捕獲不能）と判明→§11 スキップ宣言＋LEARNINGS 所見化**。全ゲート承認後 v1.3.3 patch で締め（332 tests・contract full/standard・drift・smoke 全 PASS・README 移行節・tag v1.3.3）。"
   - date: "2026-06-10"
     mode: Dev
     phase: "deploy"
@@ -59,6 +55,10 @@ session_history:
     mode: Dev
     phase: "deploy"
     note: "iteration 18（v1.5.0 E1 activity verification）: 検証の実行ベース化を 13 タスク TDD で完走。hook 観測の Bash 実行記録 .claude/evidence-log.jsonl を judge card テスト判定の唯一ソース化（自己申告 test-result.json 廃止）、fingerprint.sh 単一所有（HEAD sha 混入）、記録=fail-open／判定=fail-closed、observer 生存チェック（TaskCompleted 差し戻し）、smoke の観測系実発火。設計逸脱2件（payload_sha／HEAD 比 fingerprint）はユーザー事前承認・spec 同期済み。grill-code（独立2サブエージェント）が 🔴1（quotepath で非ASCII名の fp 不感＝silent green・実証付き）＋🟡4（無区切り連結衝突／example observer 未登録＋presence 穴／smoke 失敗側未発火／観測→判定 e2e 不在）を検出し全て同セッション修正。436 tests OK・contract・drift・smoke 全 PASS。テスト行は record-test-result.py の手動記録（manual ok・fp 一致）で green、4 ゲートを --ack 承認。v1.5.0 minor で締め・tag v1.5.0。origin push は別途ユーザー判断。"
+  - date: "2026-06-11"
+    mode: Dev
+    phase: "deploy"
+    note: "iteration 19（v1.5.1 grill 残余バッチ）: T1〜T5＋版数を Task 1〜7 TDD で完走（436→461 tests）。T1=テストランナー分類のコマンド位置アンカー＋消費者 2 系統の改行正規化（実装中に extract-input.sh の grep 経路が JSON \\n エスケープをリテラル 2 文字で返す計画前提の誤りを検出→python3 fidelity ルーティングを計画逸脱として実装・記録）、T2=deploy-gate stderr 分離、T3=ロック前倒し TOCTOU 封鎖、T4=dead-pid 限定 stale lock 自動回収（atomic-mv claim・15 回レース実証）、T5=WRITE_INDICATORS 左境界＋find -exec 族封鎖（実書込バイパスの封鎖）。grill-code 独立 2 本（B は API フィルタ誤反応 2 回→sonnet 再実行で完走）が 🟡1（'(' アンカーのクォート内グループ衝突 false-RED・judge 直呼び実証）＋🟢6 を検出し全対応（4c52528）。両レビューが extract-input 逸脱を「正当かつ必要」と判定。461 tests・contract full/standard・drift・smoke・--strict 全 PASS。テスト記録 manual green・4 ゲート --ack 承認（証跡 v151-*.md）。v140/v150 記録の grill 残余 5 系統を全消化、v1.5.1 patch で締め・tag v1.5.1。origin push は別途ユーザー判断。"
 ---
 
 ## Summary
