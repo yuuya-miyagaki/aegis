@@ -96,6 +96,33 @@ class TestPostBashFailureRecords(unittest.TestCase):
         self.assertEqual(row["cmd"], "pytest tests/")
 
 
+class TestPostBashQuoteMask(unittest.TestCase):
+    """post-bash.sh（grep 消費者）のクォートマスク（T1 v1.5.2）:
+    クォート内ランナー言及の失敗では ReAct ヒントを出さず（emit_allow {}）、
+    実ランナー失敗では従来どおり出す。"""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self.tmp.name)
+        make_repo(self.root)
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def test_quoted_mention_failure_emits_no_react_hint(self):
+        rc, out = fire("post-bash.sh",
+                       bash_payload('grep -E "(unittest|pytest)" missing.txt'),
+                       self.root)
+        self.assertEqual(rc, 0)
+        self.assertEqual(json.loads(out), {})
+
+    def test_real_runner_failure_still_emits_react_hint(self):
+        rc, out = fire("post-bash.sh", bash_payload("pytest tests/"), self.root)
+        self.assertEqual(rc, 0)
+        ctx = json.loads(out)["hookSpecificOutput"]["additionalContext"]
+        self.assertIn("ReAct", ctx)
+
+
 class TestObserveToJudgeEndToEnd(unittest.TestCase):
     """grill-code 🟡1: 「観測した ok が green になる」主契約の結合固定。
 

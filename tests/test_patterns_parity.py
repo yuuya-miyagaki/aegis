@@ -175,5 +175,15 @@ class TestTestRunnerParity(unittest.TestCase):
                              f"mask parity: {cmd!r}")
 
 
+class TestMaskScopeBoundary(unittest.TestCase):
+    """マスクは分類専用 — deny 系 hook に波及していないこと（fail-open 防止）。"""
+
+    def test_deny_hooks_do_not_reference_strip_patterns(self):
+        for h in ("check-destructive.sh", "check-control-plane.sh",
+                  "check-secrets.sh"):
+            text = (ROOT / "hooks" / h).read_text(encoding="utf-8")
+            self.assertNotIn("AEGIS_TR_STRIP", text, h)
+
+
 if __name__ == "__main__":
     unittest.main()

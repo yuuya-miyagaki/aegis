@@ -126,6 +126,36 @@ def _test_runner_patterns(root: Path) -> list:
     return pats
 
 
+def _tr_strip_patterns(root: Path) -> list:
+    """Load AEGIS_TR_STRIP_DQ/SQ from patterns.sh (single source; same
+    bash-source printf route as _test_runner_patterns). DQ-then-SQ order is
+    the convention pinned by tests/test_patterns_parity.py. Anything short of
+    exactly two compilable patterns makes the caller degrade to 'unverified'
+    (fail-closed)."""
+    lib = root / "hooks" / "lib" / "patterns.sh"
+    if not lib.is_file():
+        return []
+    try:
+        out = subprocess.run(
+            ["bash", "-c",
+             'source "$1"; printf "%s\\n%s\\n" '
+             '"$AEGIS_TR_STRIP_DQ" "$AEGIS_TR_STRIP_SQ"',
+             "_", str(lib)],
+            capture_output=True, text=True, timeout=10)
+    except (OSError, subprocess.TimeoutExpired):
+        return []
+    pats = []
+    for raw in out.stdout.splitlines():
+        raw = raw.strip()
+        if not raw:
+            continue
+        try:
+            pats.append(re.compile(raw))
+        except re.error:
+            continue
+    return pats
+
+
 def _evidence_entries(root: Path) -> list:
     """Parse evidence-log (rotated .1 first, then current = oldest->newest).
     Broken lines are skipped — the judge must degrade to 'unverified', never
@@ -162,15 +192,21 @@ def read_test_result(root: Path) -> str:
     pats = _test_runner_patterns(root)
     if not pats:
         return "unverified"
+    strips = _tr_strip_patterns(root)
+    if len(strips) != 2:
+        return "unverified"
     current = current_fingerprint(root)
     if not _HEX64.match(current):
         return "unverified"
     for d in reversed(_evidence_entries(root)):
         if d.get("status") not in ("ok", "fail"):
             continue
-        # Newlines normalized to ';' before matching — patterns are anchored at
-        # command position and the grep consumer does the same (T1 v1.5.1).
+        # Newlines normalized to ';' and quoted spans masked to the inert token
+        # Q before matching — the same pipeline as the grep consumer
+        # (T1 v1.5.1 + v1.5.2, tests/test_patterns_parity.py).
         cmd = (d.get("cmd") or "").replace("\n", ";")
+        for sp in strips:
+            cmd = sp.sub("Q", cmd)
         if not any(p.search(cmd) for p in pats):
             continue
         if (d.get("fp") or "") != current:

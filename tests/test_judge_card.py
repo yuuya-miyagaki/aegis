@@ -219,6 +219,27 @@ class TestReadTestResultFromEvidence(unittest.TestCase):
             + _ev_line("grep vitest package.json", "fail", fp))
         self.assertEqual(judge.read_test_result(self.root), "green")
 
+    def test_quoted_runner_mention_failure_does_not_red(self):
+        """クォート内ランナー言及の失敗（grep -E "(unittest|pytest)" f, rc≠0）は
+        分類されず、直前の実 green を覆さない（T1 v1.5.2 false-RED 根治 e2e）。"""
+        fp = judge.current_fingerprint(self.root)
+        self.log.write_text(
+            _ev_line("vitest run", "ok", fp)
+            + _ev_line('grep -E "(unittest|pytest)" missing.txt', "fail", fp))
+        self.assertEqual(judge.read_test_result(self.root), "green")
+
+    def test_missing_strip_patterns_is_unverified(self):
+        """patterns.sh に STRIP 変数が無い（破損・旧版）場合、判定は
+        fail-closed（unverified）に倒れる。"""
+        lib = self.root / "hooks" / "lib" / "patterns.sh"
+        text = lib.read_text(encoding="utf-8")
+        lib.write_text(text.replace("AEGIS_TR_STRIP_DQ", "X_DQ")
+                           .replace("AEGIS_TR_STRIP_SQ", "X_SQ"),
+                       encoding="utf-8")
+        fp = judge.current_fingerprint(self.root)
+        self.log.write_text(_ev_line("pytest", "ok", fp))
+        self.assertEqual(judge.read_test_result(self.root), "unverified")
+
 
 class TestStubPrecision(unittest.TestCase):
     """Regression: stub scan must not hard-block legitimate code (#grill-code)."""

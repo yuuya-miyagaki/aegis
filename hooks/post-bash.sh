@@ -27,10 +27,15 @@ CMD=$(extract_command "$INPUT")
 
 # Only act on test runner commands (single source: patterns.sh).
 source "${SCRIPT_DIR}/lib/patterns.sh"
-# Normalize newlines to ';' before matching: grep '^' is per-line while the
-# judge's python re '^' is string-start — normalization keeps both consumers
-# of patterns.sh in parity (T1 v1.5.1, tests/test_patterns_parity.py).
-CMD_NORM=$(printf '%s' "$CMD" | tr '\n' ';')
+# Normalize before matching (T1 v1.5.1 + v1.5.2, tests/test_patterns_parity.py):
+# newlines -> ';' (grep '^' is per-line, the judge's python re '^' is
+# string-start), then quoted spans -> inert token Q so quote-blind false-RED
+# forms never reach the classifier. Substitution, NOT deletion — deletion would
+# promote trailing arguments to command position ('"echo" pytest' = green
+# forgery). DQ then SQ, order pinned by the parity fixtures. The patterns
+# contain no '/', so they are safe inside the s/// delimiters.
+CMD_NORM=$(printf '%s' "$CMD" | tr '\n' ';' \
+  | sed -E "s/${AEGIS_TR_STRIP_DQ}/Q/g" | sed -E "s/${AEGIS_TR_STRIP_SQ}/Q/g")
 IS_TEST=false
 for _re in "${AEGIS_TEST_RUNNER_REGEX[@]}"; do
   if printf '%s' "$CMD_NORM" | grep -Eq "$_re"; then
