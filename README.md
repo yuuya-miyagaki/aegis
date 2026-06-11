@@ -170,6 +170,23 @@ python3 scripts/check_status.py --root . --strict
 
 ## Migration
 
+### From v1.5.0 to v1.5.1
+
+**Non-breaking — grill 残余修正バッチ（防御強化・誤判定緩和）。**
+
+- **テストランナー分類がコマンド位置アンカーになった（T1）。**
+  `grep vitest package.json` や `echo pytest` のような「引数・文字列としての
+  言及」はテスト実行と分類されなくなり、その失敗が judge の 🔴 を誘発しない。
+  分類から外れたコマンドは unverified 方向に倒れる（fail-open しない）。
+  `time pytest` 等のラッパー形は分類されないため、ゲート承認前は実テストを
+  直接実行（または `scripts/record-test-result.py` で手動記録）すること。
+- deploy ゲートの ask/deny 文面に python の警告や traceback が混入しなくなった（T2）。
+- `update-gate.sh` の排他ロックが読み取り前に取得され（T3）、kill 等で残った
+  stale lock は保持プロセスの死亡を確認して自動回収される（T4）。生きた並行
+  実行がある場合は pid 付きのエラーで待機を案内する。
+- `check-control-plane.sh` が `find ... -exec/-delete` 系の書込形を deny する
+  ようになり、`grep "confirm " hooks/x.sh` 等の正当読取りの誤 deny が解消（T5）。
+
 ### From v1.4.0 to v1.5.0
 
 **Non-breaking — E1 activity verification (観測ベースのテスト検証).**
