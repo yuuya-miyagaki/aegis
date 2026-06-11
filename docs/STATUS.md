@@ -1,9 +1,9 @@
 ---
 framework: aegis
-framework_version: "1.5.1"
+framework_version: "1.5.2"
 project_name: "Aegis"
 mode: Dev
-phase: brainstorm
+phase: implement
 task_type: framework
 task_size: L
 task_size_rationale: "確定（brainstorm）: v151-security.md 記録の残余リスク全消化バッチ（v1.5.2 patch）。T1 クォートマスク正規化（false-RED 根治、Q 置換）/ T2 入れ子 ( アンカー拡張 / T3 \\/ fidelity ルーティング / T4 ロック自己修復（孤児 claim 復元＋O_EXCL 採用）/ T5 待機窓 10s。lib×2・hook×1・scripts×2＋ミラー×5＋テスト 4 本前後＝12 ファイル前後で L。"
@@ -13,7 +13,7 @@ last_updated: "2026-06-11T05:02:57Z"
 gate_approvals:
   client_ready_for_dev: n/a
   brainstorm: approved
-  plan: pending
+  plan: approved
   review: pending
   qa: pending
   security: pending
@@ -22,7 +22,7 @@ gate_approvals:
 current_refs:
   requirements:
     - docs/qa-reports/v151-security.md
-  plan: null
+  plan: docs/plans/2026-06-11-v152-residual-elimination-implementation-plan.md
   spec: docs/specs/2026-06-11-v152-residual-elimination-design.md
   review: null
   qa: null

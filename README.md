@@ -170,6 +170,28 @@ python3 scripts/check_status.py --root . --strict
 
 ## Migration
 
+### From v1.5.1 to v1.5.2
+
+**Non-breaking — v1.5.1 記録残余の全消化バッチ（誤判定根治・可用性向上）。**
+
+- **テストランナー分類にクォートマスク正規化が入った（T1）。** 照合前に
+  `"…"`/`'…'` span を不活性トークン `Q` に置換するため、
+  `grep -E "(unittest|pytest)" f` や `grep "foo; pytest" f` のような
+  クォート内ランナー言及の失敗が judge の 🔴 を誘発しない（false-RED 根治）。
+  逆方向の変化として、`npx "vitest"`・`"pytest" -x` などクォートで包んだ
+  ランナー起動は分類されず unverified（🟡 ack 可）に倒れる。マスクは分類専用で、
+  deny 系 hook と evidence-log の記録（raw コマンド・payload_sha）には適用されない。
+- 入れ子サブシェル `((pytest))` がコマンド位置として分類されるようになった（T2）。
+- `\/` エスケープを含むペイロードも python3 fidelity 経路で抽出される（T3）。
+- `update-gate.sh` のロックが自己修復するようになった（T4）: クラッシュで残った
+  孤児 claim（claimer 死亡）は pid に復元して回収し、pid なしロック（実効 2 分超）
+  は O_EXCL（noclobber）で原子的に採用する。空/garbage pid は従来どおり
+  手動削除案内（fail-closed）。
+- ロック待機窓が 2s → 10s に拡大した（T5）。軽量ゲート（reset・brainstorm approve
+  等）の実競合は敗者も勝者完了後に自力取得できる。qa/security の pre-approve
+  （B1 ドリル・audit_deps をロック内で実行、分オーダー）の競合は引き続き
+  rc=1 → 再実行を案内する。
+
 ### From v1.5.0 to v1.5.1
 
 **Non-breaking — grill 残余修正バッチ（防御強化・誤判定緩和）。**
