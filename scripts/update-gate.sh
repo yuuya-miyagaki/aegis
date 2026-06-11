@@ -140,8 +140,10 @@ for _ in {1..50}; do
   # picks at most one winner in a single syscall; losers observe a live pid
   # and wait. Age gate: POSIX -mmin +1 compares floor(age/60) > 1, i.e.
   # effectively >2 min (BSD/GNU common; avoids a stat -f/-c fork). Dir mtime
-  # refreshes on any entry add/remove, so a freshly acquired or actively
-  # contested lock is always young; find of a vanished dir is silenced. An
+  # refreshes on any entry add/remove — mkdir itself, the pid write, and every
+  # claim create/remove each reset it — so a freshly acquired or actively
+  # contested lock is always young and never passes the age gate (tests fake
+  # age via touch -t AFTER adding entries). Find of a vanished dir is silenced. An
   # EXISTING empty/garbage pid structurally defeats O_EXCL and stays
   # manual-removal (fail-closed). SIGSTOP >2 min inside the original holder's
   # mkdir->write window can still cross with an adopter — accepted residual

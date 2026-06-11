@@ -228,6 +228,16 @@ class TestReadTestResultFromEvidence(unittest.TestCase):
             + _ev_line('grep -E "(unittest|pytest)" missing.txt', "fail", fp))
         self.assertEqual(judge.read_test_result(self.root), "green")
 
+    def test_mask_is_substitution_not_deletion(self):
+        """grill-code v1.5.2 J1: マスクは「Q 置換」であり「削除」ではないことを
+        production 消費者（read_test_result）で直接ピン留めする。
+        '"echo" pytest' (ok) は Q 置換なら 'Q pytest' → 非分類 → unverified。
+        削除実装に変異すると ' pytest' → コマンド位置一致 → green 偽装が成立し、
+        このテストが RED になる（mutation killer）。"""
+        fp = judge.current_fingerprint(self.root)
+        self.log.write_text(_ev_line('"echo" pytest', "ok", fp))
+        self.assertEqual(judge.read_test_result(self.root), "unverified")
+
     def test_missing_strip_patterns_is_unverified(self):
         """patterns.sh に STRIP 変数が無い（破損・旧版）場合、判定は
         fail-closed（unverified）に倒れる。"""

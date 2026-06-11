@@ -73,7 +73,9 @@ AEGIS_DESTRUCTIVE_CMD_WARN=(
 # (safe as sed s/// payloads). Masking is CLASSIFICATION-ONLY: deny-side hooks
 # (check-destructive / check-control-plane / check-secrets) must never mask —
 # there it would be a quote-wrapping bypass (fail-open). The evidence log keeps
-# the raw command (fidelity / payload_sha unchanged).
+# the raw command (fidelity / payload_sha unchanged). If the number of STRIP
+# patterns ever changes, update the `len(strips) != 2` guard in
+# scripts/build-judge-card.py (and its pinning tests) in the same change.
 AEGIS_TR_STRIP_DQ='"(\\.|[^"\\])*"'
 AEGIS_TR_STRIP_SQ="'[^']*'"
 
