@@ -201,6 +201,67 @@ class TestUpdateGateLock(unittest.TestCase):
                                 "live claimer must not be disturbed")
             self.assertTrue(claim.exists(), "live claim must be left intact")
 
+    def _age(self, p: Path) -> None:
+        """採用 age-gate（-mmin +1 ＝実効 2 分超）より古い mtime に偽装する。
+        必ず dir へのエントリ追加が終わってから呼ぶこと（追加で mtime が戻る）。"""
+        subprocess.run(["touch", "-t", "202601010000", str(p)], check=True)
+
+    def test_pidless_old_lock_is_adopted(self):
+        """pid なし・実効 2 分超のロックは O_EXCL 採用で引き取られ、
+        承認が成功して通常解放される（T4b v1.5.2）。"""
+        with tempfile.TemporaryDirectory() as d:
+            root = self._scaffold(Path(d))
+            lock = root / ".claude" / ".gate-update.lock.d"
+            lock.mkdir(parents=True)
+            self._age(lock)
+            r = self._run(root, "brainstorm", "approve")
+            self.assertEqual(r.returncode, 0,
+                             f"aged pid-less lock must be adopted: "
+                             f"{r.stdout}{r.stderr}")
+            self.assertIn("brainstorm: approved",
+                          (root / "docs" / "STATUS.md").read_text())
+            self.assertFalse(lock.exists(),
+                             "adopted lock must be released after run")
+
+    def test_pidless_young_lock_is_not_adopted(self):
+        """若い pid なし dir（mkdir〜pid 書込の正常な瞬間）は採用しない
+        （guard、約10s 待機）。"""
+        with tempfile.TemporaryDirectory() as d:
+            root = self._scaffold(Path(d))
+            lock = root / ".claude" / ".gate-update.lock.d"
+            lock.mkdir(parents=True)
+            r = self._run(root, "brainstorm", "approve")
+            self.assertNotEqual(r.returncode, 0,
+                                "young pid-less dir must not be adopted")
+            self.assertTrue(lock.exists())
+
+    def test_old_lock_with_live_claim_is_not_adopted(self):
+        """claim が存在する dir は採用対象外（T4a の管轄、guard、約10s 待機）。"""
+        with tempfile.TemporaryDirectory() as d:
+            root = self._scaffold(Path(d))
+            lock = root / ".claude" / ".gate-update.lock.d"
+            lock.mkdir(parents=True)
+            claim = lock / f"pid.claim.{os.getpid()}"
+            claim.write_text("1", encoding="utf-8")
+            self._age(lock)
+            r = self._run(root, "brainstorm", "approve")
+            self.assertNotEqual(r.returncode, 0)
+            self.assertTrue(claim.exists())
+
+    def test_empty_pid_old_lock_stays_fail_closed(self):
+        """空 pid ファイルは O_EXCL を構造的に失敗させ、採用されない＝
+        従来どおり手動削除案内（fail-closed・guard、約10s 待機）。"""
+        with tempfile.TemporaryDirectory() as d:
+            root = self._scaffold(Path(d))
+            lock = root / ".claude" / ".gate-update.lock.d"
+            lock.mkdir(parents=True)
+            (lock / "pid").write_text("", encoding="utf-8")
+            self._age(lock)
+            r = self._run(root, "brainstorm", "approve")
+            self.assertNotEqual(r.returncode, 0,
+                                "empty pid must stay manual-removal")
+            self.assertTrue(lock.exists())
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -132,6 +132,34 @@ for _ in 1 2 3 4 5 6 7 8 9 10; do
       fi
       ;;
   esac
+  # Pid-less adoption (T4b v1.5.2): a crash between mkdir and the pid write
+  # (kill -9, trap not yet installed) leaves a pid-less dir forever. NEVER
+  # delete it — an age check followed by rm/rmdir is check-then-act and can
+  # destroy a NEW live winner's lock (grill-plan A red-2, reproduced). Instead
+  # ADOPT it: atomically create our pid via O_EXCL (noclobber) — the kernel
+  # picks at most one winner in a single syscall; losers observe a live pid
+  # and wait. Age gate: POSIX -mmin +1 compares floor(age/60) > 1, i.e.
+  # effectively >2 min (BSD/GNU common; avoids a stat -f/-c fork). Dir mtime
+  # refreshes on any entry add/remove, so a freshly acquired or actively
+  # contested lock is always young; find of a vanished dir is silenced. An
+  # EXISTING empty/garbage pid structurally defeats O_EXCL and stays
+  # manual-removal (fail-closed). SIGSTOP >2 min inside the original holder's
+  # mkdir->write window can still cross with an adopter — accepted residual
+  # (single-user operation), recorded in v152-security.md.
+  if [ ! -e "$LOCK_DIR/pid" ]; then
+    _has_claim=false
+    for _claim in "$LOCK_DIR"/pid.claim.*; do
+      [ -e "$_claim" ] && _has_claim=true && break
+    done
+    if [ "$_has_claim" = "false" ] \
+       && [ -n "$(find "$LOCK_DIR" -maxdepth 0 -mmin +1 2>/dev/null)" ]; then
+      if ( set -C; printf '%s' "$$" > "$LOCK_DIR/pid" ) 2>/dev/null; then
+        LOCK_OK=true
+        trap 'rm -f "$LOCK_DIR/pid" 2>/dev/null; rmdir "$LOCK_DIR" 2>/dev/null || true' EXIT
+        break
+      fi
+    fi
+  fi
   sleep 0.2
 done
 if [ "$LOCK_OK" != "true" ]; then
