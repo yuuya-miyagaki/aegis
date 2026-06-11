@@ -17,4 +17,4 @@
 （LLM が平易日本語で記述）
 
 ## ACK
-- grill-code 独立2本=マージ可（A 🟡-1 は 4c52528 で修正済み・🔴0）。テスト記録 manual green・fp 一致。証跡 docs/qa-reports/v151-review.md （2026-06-11 10:43）
+- grill-code 独立 2 本（A: 🟡1/🟢3=条件付きマージ可、B: 🟢3=マージ可）が PoC・revert 検証付きで精査。条件 J1 は b79184a の mutation-killer テストで充足（削除変異 RED→正実装 GREEN を両方向実証）。証跡 docs/qa-reports/v152-review.md （2026-06-11 19:12）

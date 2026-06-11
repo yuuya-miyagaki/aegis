@@ -3,31 +3,31 @@ framework: aegis
 framework_version: "1.5.2"
 project_name: "Aegis"
 mode: Dev
-phase: implement
+phase: deploy
 task_type: framework
 task_size: L
 task_size_rationale: "確定（brainstorm）: v151-security.md 記録の残余リスク全消化バッチ（v1.5.2 patch）。T1 クォートマスク正規化（false-RED 根治、Q 置換）/ T2 入れ子 ( アンカー拡張 / T3 \\/ fidelity ルーティング / T4 ロック自己修復（孤児 claim 復元＋O_EXCL 採用）/ T5 待機窓 10s。lib×2・hook×1・scripts×2＋ミラー×5＋テスト 4 本前後＝12 ファイル前後で L。"
 iteration: 20
 ui_surface: false
-last_updated: "2026-06-11T05:02:57Z"
+last_updated: "2026-06-11T10:14:06Z"
 gate_approvals:
   client_ready_for_dev: n/a
   brainstorm: approved
   plan: approved
-  review: pending
-  qa: pending
-  security: pending
-  deploy: pending
+  review: approved
+  qa: approved
+  security: approved
+  deploy: approved
   dev_ready_for_client: pending
 current_refs:
   requirements:
     - docs/qa-reports/v151-security.md
   plan: docs/plans/2026-06-11-v152-residual-elimination-implementation-plan.md
   spec: docs/specs/2026-06-11-v152-residual-elimination-design.md
-  review: null
-  qa: null
-  security: null
-  deploy: null
+  review: docs/qa-reports/v152-review.md
+  qa: docs/qa-reports/v152-qa.md
+  security: docs/qa-reports/v152-security.md
+  deploy: docs/qa-reports/v152-deploy-checklist.md
   translation: null
 external_evidence:
   - type: "second-opinion-v1-foundation-r1-r2"
@@ -42,14 +42,10 @@ external_evidence:
     scope: "v0.12.2 実装後 4 ラウンドレビュー"
     findings: "Round 6 (P1×2, P2×1: pre-compact exit 2 / minimal-project / test rc), Round 7 (P1×1, P3×1: git add 漏れ / テスト件数表記), Round 8 (P2×1, P3×1: stale last_updated / grep 自己マッチ), Round 9 (P3×2: コメント不整合)"
     resolution: "9件全反映。tier 1/2 PASS、134 tests PASS、本体と minimal-project 完全同期確認済み。"
-next_action: "iteration 20（v1.5.2 残余全消化バッチ）: grill-plan 独立 2 本完了（A 🔴2/🟡2/🟢2・B 🟡2/🟢1）→ 全反映済み（Q 置換化・O_EXCL 採用化ほか）。次: ユーザーの設計書レビュー → 実装計画作成 → plan ゲート。"
+next_action: "iteration 20（v1.5.2 残余全消化バッチ）完了: 4 ゲート承認・tag v1.5.2 で締め。残: origin push（ユーザー判断）。次タスク未定。"
 blockers: []
 failure_tracking: null
 session_history:
-  - date: "2026-06-10"
-    mode: Dev
-    phase: "deploy"
-    note: "iteration 17（v1.4.0 fix batch）: T0〜T16 を TDD で完走（frontmatter.sh 新設、failure policy 表＋実発火突合テスト、check-task-completed closed 化、check-secrets 鍵種追加、WRITE_INDICATORS 語境界化、pre-compact env 改名、deploy gate RC 契約＋size-skip ask 化、update-gate mkdir ロック＋単一パス書込、contract lib 追跡＋版数同期、B1 ドリル docs/** 除外、standard Bash ガード4種、hooks $CLAUDE_PROJECT_DIR 化、K-2、v1.4.0 版数）。grill-code=マージ可（Critical 0）、🟡2件（実リポジトリミラーテスト不在／CLAUDE_PROJECT_DIR 未設定で moat silent fail-open）を同セッション修正。389 tests OK・contract・drift・smoke・--strict 全 PASS。証跡 v140-review/qa/security/deploy-checklist.md。review→qa→security→deploy を tri-state judge --ack で承認（current_refs 無傷＝update-gate 単一パス書込の実証、LEARNINGS の旧バグ記録を解消注記）。v1.4.0 minor で締め・tag v1.4.0。origin push は別途ユーザー判断。"
   - date: "2026-06-11"
     mode: Dev
     phase: "deploy"
@@ -58,6 +54,10 @@ session_history:
     mode: Dev
     phase: "deploy"
     note: "iteration 19（v1.5.1 grill 残余バッチ）: T1〜T5＋版数を Task 1〜7 TDD で完走（436→461 tests）。T1=テストランナー分類のコマンド位置アンカー＋消費者 2 系統の改行正規化（実装中に extract-input.sh の grep 経路が JSON \\n エスケープをリテラル 2 文字で返す計画前提の誤りを検出→python3 fidelity ルーティングを計画逸脱として実装・記録）、T2=deploy-gate stderr 分離、T3=ロック前倒し TOCTOU 封鎖、T4=dead-pid 限定 stale lock 自動回収（atomic-mv claim・15 回レース実証）、T5=WRITE_INDICATORS 左境界＋find -exec 族封鎖（実書込バイパスの封鎖）。grill-code 独立 2 本（B は API フィルタ誤反応 2 回→sonnet 再実行で完走）が 🟡1（'(' アンカーのクォート内グループ衝突 false-RED・judge 直呼び実証）＋🟢6 を検出し全対応（4c52528）。両レビューが extract-input 逸脱を「正当かつ必要」と判定。461 tests・contract full/standard・drift・smoke・--strict 全 PASS。テスト記録 manual green・4 ゲート --ack 承認（証跡 v151-*.md）。v140/v150 記録の grill 残余 5 系統を全消化、v1.5.1 patch で締め・tag v1.5.1。origin push は別途ユーザー判断。"
+  - date: "2026-06-11"
+    mode: Dev
+    phase: "deploy"
+    note: "iteration 20（v1.5.2 残余全消化バッチ）: v151-security.md 記録の残余 5 系統を Task 1〜9 TDD で完走（461→479 tests）。T1=クォート span の Q 置換マスク（false-RED 根治。置換であって削除でない＝green 偽装封鎖、sed/python re バイト一致パリティ、len(strips)!=2→unverified の fail-closed ガード、deny 系 3 hook 不波及を TestMaskScopeBoundary で契約化）、T2=入れ子 ( アンカー (\\( *)*、T3=\\/ fidelity ルーティング、T4=孤児 claim 復元＋pid なしロックの O_EXCL 採用（年齢ゲート -mmin +1・削除しない採用方式）、T5=待機窓 10s（light ゲート競合は両者成功の意図的仕様変更・3 contenders×15 回ドリル クリーン）。grill-code 独立 2 本（A=条件付きマージ可 🟡1/🟢3、B=マージ可 🟢3）: A J1=マスク置換が production 消費者で未ピン（削除変異が全テスト素通し・forge PoC 付き）→ mutation-killer テストで充足（b79184a、変異 RED→正実装 GREEN 両方向実証）。B は 5 実装の revert 検証・プロモーション攻撃実走で偽装ベクトルなしを独立確認。受容残余（混在クォート横断・SIGSTOP >2分窓・PID 再利用、全て unverified/可用性方向）は v152-security.md に記録。479 tests・contract full/standard・drift・smoke・--strict 全 PASS。テスト記録 manual green（fp=HEAD 一致）・4 ゲート --ack 承認（証跡 v152-*.md）。v1.5.2 patch で締め・tag v1.5.2。origin push は別途ユーザー判断。"
 ---
 
 ## Summary

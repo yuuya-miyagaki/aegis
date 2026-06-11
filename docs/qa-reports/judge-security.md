@@ -20,4 +20,4 @@
 （LLM が平易日本語で記述）
 
 ## ACK
-- v140/v150 記録の残余5系統を本バッチで解消（find 書込形 deny・左境界・TOCTOU・stale lock・stderr 分離）。受容/残余リスクは docs/qa-reports/v151-security.md に明示記録。バイパス回帰は既存テストで deny 維持 （2026-06-11 10:43）
+- v151 記録残余 5 系統を全消化（T1〜T5）。新規 fail-open 方向の残余なし — 受容残余（混在クォート横断・SIGSTOP >2分窓・PID 再利用）は全て unverified/可用性方向で green 偽装・deny バイパス不能、v152-security.md に明示記録。deny 系 3 hook へのマスク不波及を TestMaskScopeBoundary で契約化、grill A/B が独立に偽装ベクトルなしを実証。証跡 docs/qa-reports/v152-security.md （2026-06-11 19:13）

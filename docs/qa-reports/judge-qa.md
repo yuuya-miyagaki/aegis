@@ -14,4 +14,4 @@
 （LLM が平易日本語で記述）
 
 ## ACK
-- 461 tests OK・contract full/standard・drift・smoke・--strict 全 PASS。TDD 来歴と実地検証は docs/qa-reports/v151-qa.md。テスト記録 manual green・fp 一致 （2026-06-11 10:43）
+- 479 tests OK（record-test-result.py の信頼実行で manual green・fp=HEAD 一致）。Task 1〜9 の RED→GREEN 来歴・レースドリル 15/15・contract full/standard・drift・smoke・--strict 全 PASS。grill B の revert 検証（5 実装で該当テスト RED）がテスト強度の手動 mutation 同等証明。証跡 docs/qa-reports/v152-qa.md （2026-06-11 19:13）
