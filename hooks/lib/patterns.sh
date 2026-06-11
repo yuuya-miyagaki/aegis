@@ -54,12 +54,16 @@ AEGIS_DESTRUCTIVE_CMD_WARN=(
 # shared fixtures; add a fixture line whenever you add a pattern.
 #
 # Command-position anchor (v1.5.1): a runner name matches only at the start of
-# a (sub)command — string start, after ; & | (, across env assignments
-# (FOO=bar ), or through known wrappers (npx/bunx, uv/poetry/pipenv run).
-# Mentions as arguments (grep vitest package.json) do not match. Consumers
-# normalize newlines to ';' BEFORE matching (grep '^' is per-line, python re
-# '^' is string-start — normalization keeps the two engines in parity).
-_AEGIS_TR_PRE='(^|[;&|(] *)([A-Za-z_][A-Za-z0-9_]*=[^ ]* +)*((npx|bunx) +|(uv|poetry|pipenv) +run +)?'
+# a (sub)command — string start, after ; & |, optionally through one subshell
+# '(' AT that position, across env assignments (FOO=bar ), or through known
+# wrappers (npx/bunx, uv/poetry/pipenv run). Mentions as arguments
+# (grep vitest package.json) do not match. '(' is NOT a bare class member:
+# quoted group regexes (grep -E "(pytest|...)" — rc=1 on no match) would
+# false-RED (grill-code v1.5.1 🟡-1). Nested '((pytest))' is an accepted
+# miss (fail-closed). Consumers normalize newlines to ';' BEFORE matching
+# (grep '^' is per-line, python re '^' is string-start — normalization keeps
+# the two engines in parity).
+_AEGIS_TR_PRE='(^|[;&|]) *\(? *([A-Za-z_][A-Za-z0-9_]*=[^ ]* +)*((npx|bunx) +|(uv|poetry|pipenv) +run +)?'
 AEGIS_TEST_RUNNER_REGEX=(
   "${_AEGIS_TR_PRE}vitest($|[^a-zA-Z0-9_])"
   "${_AEGIS_TR_PRE}jest($|[^a-zA-Z0-9_])"

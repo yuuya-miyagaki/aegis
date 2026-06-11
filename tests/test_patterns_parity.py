@@ -43,6 +43,12 @@ FIXTURES = [
     ("uv run pytest", True),
     ("poetry run pytest tests/", True),
     ("echo build done\nvitest run", True),   # 正規化後の ';' 境界で一致
+    ("(pytest)", True),                       # サブシェル先頭
+    ("cd app && (vitest run)", True),         # 区切り直後のサブシェル
+    # v1.5.1 grill-code 🟡-1: '(' はコマンド位置直後のみ。クォート内グループ
+    # 正規表現（grep -E "(pytest|...)" は不一致時 rc=1）が false-RED にならない
+    ('grep -E "(pytest|unittest)" log.txt', False),
+    ('grep "(vitest" src/a.ts', False),
     # v1.5.1 で意図的に反転（コマンド位置アンカー）: 引数・echo 言及は分類しない
     ("echo pytest", False),
     ("grep vitest package.json", False),

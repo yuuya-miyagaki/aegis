@@ -21,6 +21,7 @@
 | 種別 | ファイル | タスク |
 |---|---|---|
 | lib | `hooks/lib/patterns.sh` | 1 |
+| lib | `hooks/lib/extract-input.sh`（実装中の計画逸脱: JSON バックスラッシュエスケープの python3 fidelity ルーティング。設計書 §T1 に記録、grill-code B 🟢-1 で本表へ追記） | 2 |
 | hook | `hooks/post-bash.sh` | 2 |
 | script | `scripts/build-judge-card.py` | 2 |
 | hook | `hooks/check-deploy-gate.sh` | 3 |
@@ -32,7 +33,7 @@
 | test | `tests/test_update_gate_lock.py` | 4, 5 |
 | test | `tests/test_check_status.py` | 6 |
 | 版数 | `scripts/check_framework_contract.py`, `templates/STATUS.template.md`, `docs/STATUS.md`, `README.md` | 7 |
-| ミラー | `examples/minimal-project/hooks/lib/patterns.sh`, `examples/minimal-project/hooks/post-bash.sh`, `examples/minimal-project/scripts/build-judge-card.py`, `examples/minimal-project/hooks/check-deploy-gate.sh`, `examples/minimal-project/scripts/update-gate.sh`, `examples/minimal-project/hooks/check-control-plane.sh` | 各タスク |
+| ミラー | `examples/minimal-project/hooks/lib/patterns.sh`, `examples/minimal-project/hooks/lib/extract-input.sh`, `examples/minimal-project/hooks/post-bash.sh`, `examples/minimal-project/scripts/build-judge-card.py`, `examples/minimal-project/hooks/check-deploy-gate.sh`, `examples/minimal-project/scripts/update-gate.sh`, `examples/minimal-project/hooks/check-control-plane.sh` | 各タスク |
 
 ---
 

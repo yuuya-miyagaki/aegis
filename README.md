@@ -178,7 +178,8 @@ python3 scripts/check_status.py --root . --strict
   `grep vitest package.json` や `echo pytest` のような「引数・文字列としての
   言及」はテスト実行と分類されなくなり、その失敗が judge の 🔴 を誘発しない。
   分類から外れたコマンドは unverified 方向に倒れる（fail-open しない）。
-  `time pytest` 等のラッパー形は分類されないため、ゲート承認前は実テストを
+  `time pytest`・`bash -c "pytest"`・`if ...; then pytest; fi` 等のラッパー/
+  制御構文形は分類されないため、ゲート承認前は実テストを
   直接実行（または `scripts/record-test-result.py` で手動記録）すること。
 - deploy ゲートの ask/deny 文面に python の警告や traceback が混入しなくなった（T2）。
 - `update-gate.sh` の排他ロックが読み取り前に取得され（T3）、kill 等で残った
