@@ -5,6 +5,7 @@
 単一ソース、消費者は post-bash.sh=grep -E と build-judge-card.py=re の2系統）。
 共有フィクスチャで両エンジンの判定一致と期待値を検証する。
 禁止構文: [[:space:]] / \\b（エンジン間で挙動が割れるため）。
+照合前パイプライン: 改行→';' ＋ クォート span→Q 置換（DQ→SQ 順、T1 v1.5.2）。
 """
 from __future__ import annotations
 
@@ -65,12 +66,49 @@ FIXTURES = [
     ("cargo build", False),
     ("attest something", False),
     ("protest --loud", False),
+    # --- T1 v1.5.2: クォートマスク（"…"/'…' → Q 置換）---
+    # false-RED 根治（v1.5.1 ではクォート内 |runner / ; runner が一致していた）
+    ('grep -E "(unittest|pytest)" missing.txt', False),
+    ('grep "foo; pytest" missing.txt', False),
+    ('grep "a\\" ; pytest" log.txt', False),   # escaped-quote: \\. が \" を吸収
+    # 不変ピン（マスク後も先頭ランナーは残る／クォート起動は従来どおり不一致）
+    ('pytest "tests/foo bar"', True),
+    ('npx "vitest"', False),
+    ('echo ""; pytest', True),
+    # 反転 fixture（grill A 🔴-1）: Q「置換」を「削除」に revert すると
+    # ' pytest' に縮退して True 化＝green 偽装。この行が RED で封鎖する。
+    ('"echo" pytest', False),
+    # 受容残余（grill A 🟡-2）: 混在クォート横断は unverified=fail-closed 方向
+    ("echo 'a\"b'; pytest \"x\"", False),
 ]
 
 
-def normalize(cmd: str) -> str:
-    """消費者と同一の改行→';' 正規化（grep の行単位 ^ と re の文字列先頭 ^ の差を吸収）。"""
-    return cmd.replace("\n", ";")
+def normalize_py(cmd: str, strips: list[re.Pattern]) -> str:
+    """消費者（build-judge-card.py）と同一の正規化: 改行→';'、
+    クォート span→Q 置換（DQ→SQ の順は fixtures でピン留めする規約）。"""
+    s = cmd.replace("\n", ";")
+    for p in strips:
+        s = p.sub("Q", s)
+    return s
+
+
+def normalize_sed(cmd: str, strips: list[str]) -> str:
+    """消費者（post-bash.sh）と同一の tr+sed パイプラインを実走する。"""
+    script = ('printf %s "$1" | tr "\\n" ";" '
+              '| sed -E "s/$2/Q/g" | sed -E "s/$3/Q/g"')
+    r = subprocess.run(["bash", "-c", script, "_", cmd, strips[0], strips[1]],
+                       capture_output=True, text=True, timeout=10, check=True)
+    return r.stdout
+
+
+def bash_strip_patterns() -> list[str]:
+    out = subprocess.run(
+        ["bash", "-c",
+         'source "$1"; printf "%s\\n%s\\n" '
+         '"$AEGIS_TR_STRIP_DQ" "$AEGIS_TR_STRIP_SQ"',
+         "_", str(PATTERNS)],
+        capture_output=True, text=True, timeout=10, check=True)
+    return [l for l in out.stdout.splitlines() if l.strip()]
 
 
 def bash_patterns() -> list[str]:
@@ -95,9 +133,17 @@ class TestTestRunnerParity(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.patterns = bash_patterns()
+        cls.strips_raw = bash_strip_patterns()
+        cls.strips = [re.compile(p) for p in cls.strips_raw]
 
     def test_patterns_exist(self):
         self.assertGreaterEqual(len(self.patterns), 5)
+
+    def test_strip_patterns_exist_and_sed_safe(self):
+        # DQ→SQ の 2 本。'/' を含まない＝sed s/// デリミタ安全（T1 v1.5.2）。
+        self.assertEqual(len(self.strips_raw), 2)
+        for p in self.strips_raw:
+            self.assertNotIn("/", p)
 
     def test_no_engine_splitting_syntax(self):
         for p in self.patterns:
@@ -111,13 +157,22 @@ class TestTestRunnerParity(unittest.TestCase):
     def test_fixtures_python(self):
         compiled = [re.compile(p) for p in self.patterns]
         for cmd, expected in FIXTURES:
-            got = any(c.search(normalize(cmd)) for c in compiled)
-            self.assertEqual(got, expected, f"python re: {cmd!r}")
+            s = normalize_py(cmd, self.strips)
+            got = any(c.search(s) for c in compiled)
+            self.assertEqual(got, expected, f"python re: {cmd!r} -> {s!r}")
 
     def test_fixtures_grep(self):
         for cmd, expected in FIXTURES:
-            got = grep_match(normalize(cmd), self.patterns)
-            self.assertEqual(got, expected, f"grep -E: {cmd!r}")
+            s = normalize_sed(cmd, self.strips_raw)
+            got = grep_match(s, self.patterns)
+            self.assertEqual(got, expected, f"grep -E: {cmd!r} -> {s!r}")
+
+    def test_mask_engines_agree(self):
+        # sed -E と python re のマスク結果バイト一致（12+ 形、grill 実測の恒久化）。
+        for cmd, _ in FIXTURES:
+            self.assertEqual(normalize_py(cmd, self.strips),
+                             normalize_sed(cmd, self.strips_raw),
+                             f"mask parity: {cmd!r}")
 
 
 if __name__ == "__main__":

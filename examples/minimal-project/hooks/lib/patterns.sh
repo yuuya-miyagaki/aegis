@@ -63,6 +63,20 @@ AEGIS_DESTRUCTIVE_CMD_WARN=(
 # miss (fail-closed). Consumers normalize newlines to ';' BEFORE matching
 # (grep '^' is per-line, python re '^' is string-start — normalization keeps
 # the two engines in parity).
+# Quote-span mask (T1 v1.5.2): consumers replace "…"/'…' spans with the inert
+# token Q BEFORE matching, so quoted runner mentions — grep -E "(unittest|pytest)" f,
+# grep "foo; pytest" f — never reach the classifier (quote-blind false-RED root
+# fix). Substitution, NOT deletion: deletion would promote trailing arguments to
+# command position ('"echo" pytest' -> ' pytest' = green forgery, grill A red-1).
+# Apply DQ then SQ — the order is a convention pinned by the parity fixtures.
+# Both patterns stay in the grep-E/python-re common subset and contain no '/'
+# (safe as sed s/// payloads). Masking is CLASSIFICATION-ONLY: deny-side hooks
+# (check-destructive / check-control-plane / check-secrets) must never mask —
+# there it would be a quote-wrapping bypass (fail-open). The evidence log keeps
+# the raw command (fidelity / payload_sha unchanged).
+AEGIS_TR_STRIP_DQ='"(\\.|[^"\\])*"'
+AEGIS_TR_STRIP_SQ="'[^']*'"
+
 _AEGIS_TR_PRE='(^|[;&|]) *\(? *([A-Za-z_][A-Za-z0-9_]*=[^ ]* +)*((npx|bunx) +|(uv|poetry|pipenv) +run +)?'
 AEGIS_TEST_RUNNER_REGEX=(
   "${_AEGIS_TR_PRE}vitest($|[^a-zA-Z0-9_])"
