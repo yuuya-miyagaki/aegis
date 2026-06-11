@@ -3,32 +3,31 @@ framework: aegis
 framework_version: "1.5.1"
 project_name: "Aegis"
 mode: Dev
-phase: deploy
+phase: brainstorm
 task_type: framework
 task_size: L
-task_size_rationale: "確定（brainstorm）: grill 🟢残余 5 件の小修正バッチ（v1.5.1 patch）。T1 false-RED アンカー（patterns.sh）/ T2 deploy-gate stderr 分離 / T3 update-gate ロック前倒し / T4 stale lock PID 回収 / T5 WRITE_INDICATORS 左境界＋find -exec 族封鎖。hooks×2・lib×1・scripts×1＋ミラー×4＋テスト 4 本前後＝12 ファイル前後で L。"
-iteration: 19
+task_size_rationale: "確定（brainstorm）: v151-security.md 記録の残余リスク全消化バッチ（v1.5.2 patch）。T1 クォート除去正規化（false-RED 根治）/ T2 入れ子 ( アンカー拡張 / T3 \\/ fidelity ルーティング / T4 ロック自己修復（孤児 claim 復元＋age-gated 回収）/ T5 待機窓 10s。lib×2・hook×1・scripts×2＋ミラー×5＋テスト 4 本前後＝12 ファイル前後で L。"
+iteration: 20
 ui_surface: false
-last_updated: "2026-06-11T01:45:10Z"
+last_updated: "2026-06-11T04:44:05Z"
 gate_approvals:
   client_ready_for_dev: n/a
   brainstorm: approved
-  plan: approved
-  review: approved
-  qa: approved
-  security: approved
-  deploy: approved
+  plan: pending
+  review: pending
+  qa: pending
+  security: pending
+  deploy: pending
   dev_ready_for_client: pending
 current_refs:
   requirements:
-    - docs/qa-reports/v140-security.md
-    - docs/qa-reports/v150-security.md
-  plan: docs/plans/2026-06-11-grill-residual-fixes-implementation-plan.md
-  spec: docs/specs/2026-06-11-grill-residual-fixes-design.md
-  review: docs/qa-reports/v151-review.md
-  qa: docs/qa-reports/v151-qa.md
-  security: docs/qa-reports/v151-security.md
-  deploy: docs/qa-reports/v151-deploy-checklist.md
+    - docs/qa-reports/v151-security.md
+  plan: null
+  spec: docs/specs/2026-06-11-v152-residual-elimination-design.md
+  review: null
+  qa: null
+  security: null
+  deploy: null
   translation: null
 external_evidence:
   - type: "second-opinion-v1-foundation-r1-r2"
@@ -43,7 +42,7 @@ external_evidence:
     scope: "v0.12.2 実装後 4 ラウンドレビュー"
     findings: "Round 6 (P1×2, P2×1: pre-compact exit 2 / minimal-project / test rc), Round 7 (P1×1, P3×1: git add 漏れ / テスト件数表記), Round 8 (P2×1, P3×1: stale last_updated / grep 自己マッチ), Round 9 (P3×2: コメント不整合)"
     resolution: "9件全反映。tier 1/2 PASS、134 tests PASS、本体と minimal-project 完全同期確認済み。"
-next_action: "iteration 19（v1.5.1）完了・tag 済み。origin push はユーザー判断。次タスク未定（v140/v150 記録の grill 残余は本バッチで全消化、新規残余は v151-security.md に記録済み）。"
+next_action: "iteration 20（v1.5.2 残余全消化バッチ）brainstorm: 設計確定（A案=クォート除去正規化、ユーザー承認済み）。次: grill-plan（独立 2 本）→ 指摘反映 → 実装計画作成 → plan ゲート。"
 blockers: []
 failure_tracking: null
 session_history:
