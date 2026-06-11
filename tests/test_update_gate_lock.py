@@ -262,6 +262,57 @@ class TestUpdateGateLock(unittest.TestCase):
                                 "empty pid must stay manual-removal")
             self.assertTrue(lock.exists())
 
+    def _spawn(self, root: Path, gate: str, action: str) -> subprocess.Popen:
+        return subprocess.Popen(
+            ["bash", str(root / "scripts" / "update-gate.sh"), gate, action],
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+
+    def test_wait_window_is_50_iterations(self):
+        """構造固定（T5 v1.5.2）: 待機ループは 50 回 × 0.2s = 10s。"""
+        text = (ROOT / "scripts" / "update-gate.sh").read_text(encoding="utf-8")
+        self.assertIn("for _ in {1..50}; do", text)
+
+    def test_live_contention_both_succeed(self):
+        """高速パス（approve/reset）の実競合 2 contender: 敗者も勝者完了後に
+        10s 窓内で自力取得し両方成功する（T5。v1.5.1 では敗者 rc=1 だった
+        仕様の意図的変更）。"""
+        with tempfile.TemporaryDirectory() as d:
+            root = self._scaffold(Path(d))
+            ops = [("brainstorm", "approve"), ("security", "reset")]
+            procs = [self._spawn(root, g, a) for g, a in ops]
+            outs = [p.communicate(timeout=30) for p in procs]
+            self.assertEqual([p.returncode for p in procs], [0, 0],
+                             f"both contenders must succeed: {outs}")
+            status = (root / "docs" / "STATUS.md").read_text()
+            self.assertIn("brainstorm: approved", status)
+            self.assertIn("security: pending", status)
+            self.assertFalse(
+                (root / ".claude" / ".gate-update.lock.d").exists())
+
+    def test_adoption_race_no_lost_update(self):
+        """pid なし旧ロックへ 3 contender 同時（T4b×T5 合成ドリル）:
+        O_EXCL の単一勝者はカーネル保証。観測契約は「全員逐次成功・
+        lost update ゼロ・ロック残留ゼロ」。"""
+        with tempfile.TemporaryDirectory() as d:
+            root = self._scaffold(Path(d))
+            lock = root / ".claude" / ".gate-update.lock.d"
+            lock.mkdir(parents=True)
+            subprocess.run(["touch", "-t", "202601010000", str(lock)],
+                           check=True)
+            ops = [("brainstorm", "approve"), ("security", "reset"),
+                   ("client_ready_for_dev", "reset")]
+            procs = [self._spawn(root, g, a) for g, a in ops]
+            outs = [p.communicate(timeout=30) for p in procs]
+            self.assertEqual([p.returncode for p in procs], [0, 0, 0],
+                             f"all contenders must succeed: {outs}")
+            status = (root / "docs" / "STATUS.md").read_text()
+            self.assertIn("brainstorm: approved", status)
+            self.assertIn("security: pending", status)
+            self.assertIn("client_ready_for_dev: pending", status)
+            self.assertTrue(status.startswith("---"),
+                            "frontmatter must not be torn")
+            self.assertFalse(lock.exists())
+
 
 if __name__ == "__main__":
     unittest.main()

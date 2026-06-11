@@ -82,7 +82,7 @@ LOCK_DIR="${SNAPSHOT_DIR}/.gate-update.lock.d"
 mkdir -p "$SNAPSHOT_DIR"
 LOCK_OK=false
 LOCK_HOLDER_PID=""
-for _ in 1 2 3 4 5 6 7 8 9 10; do
+for _ in {1..50}; do
   if mkdir "$LOCK_DIR" 2>/dev/null; then
     LOCK_OK=true
     # rm pid first: rmdir alone would always fail once the pid file exists.
