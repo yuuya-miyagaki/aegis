@@ -6,10 +6,10 @@ mode: Dev
 phase: brainstorm
 task_type: framework
 task_size: L
-task_size_rationale: "確定（brainstorm）: v151-security.md 記録の残余リスク全消化バッチ（v1.5.2 patch）。T1 クォート除去正規化（false-RED 根治）/ T2 入れ子 ( アンカー拡張 / T3 \\/ fidelity ルーティング / T4 ロック自己修復（孤児 claim 復元＋age-gated 回収）/ T5 待機窓 10s。lib×2・hook×1・scripts×2＋ミラー×5＋テスト 4 本前後＝12 ファイル前後で L。"
+task_size_rationale: "確定（brainstorm）: v151-security.md 記録の残余リスク全消化バッチ（v1.5.2 patch）。T1 クォートマスク正規化（false-RED 根治、Q 置換）/ T2 入れ子 ( アンカー拡張 / T3 \\/ fidelity ルーティング / T4 ロック自己修復（孤児 claim 復元＋O_EXCL 採用）/ T5 待機窓 10s。lib×2・hook×1・scripts×2＋ミラー×5＋テスト 4 本前後＝12 ファイル前後で L。"
 iteration: 20
 ui_surface: false
-last_updated: "2026-06-11T04:44:05Z"
+last_updated: "2026-06-11T05:02:57Z"
 gate_approvals:
   client_ready_for_dev: n/a
   brainstorm: approved
@@ -42,7 +42,7 @@ external_evidence:
     scope: "v0.12.2 実装後 4 ラウンドレビュー"
     findings: "Round 6 (P1×2, P2×1: pre-compact exit 2 / minimal-project / test rc), Round 7 (P1×1, P3×1: git add 漏れ / テスト件数表記), Round 8 (P2×1, P3×1: stale last_updated / grep 自己マッチ), Round 9 (P3×2: コメント不整合)"
     resolution: "9件全反映。tier 1/2 PASS、134 tests PASS、本体と minimal-project 完全同期確認済み。"
-next_action: "iteration 20（v1.5.2 残余全消化バッチ）brainstorm: 設計確定（A案=クォート除去正規化、ユーザー承認済み）。次: grill-plan（独立 2 本）→ 指摘反映 → 実装計画作成 → plan ゲート。"
+next_action: "iteration 20（v1.5.2 残余全消化バッチ）: grill-plan 独立 2 本完了（A 🔴2/🟡2/🟢2・B 🟡2/🟢1）→ 全反映済み（Q 置換化・O_EXCL 採用化ほか）。次: ユーザーの設計書レビュー → 実装計画作成 → plan ゲート。"
 blockers: []
 failure_tracking: null
 session_history:
