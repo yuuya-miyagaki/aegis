@@ -80,6 +80,11 @@ FIXTURES = [
     ('"echo" pytest', False),
     # 受容残余（grill A 🟡-2）: 混在クォート横断は unverified=fail-closed 方向
     ("echo 'a\"b'; pytest \"x\"", False),
+    # --- T2 v1.5.2: 入れ子サブシェル（unverified 縮小、green 偽装には使えない）---
+    ("((pytest))", True),
+    ("( (vitest run))", True),
+    # 閉じ忘れクォート＝マスク不能な不正形はアンカーが受け皿（defense-in-depth）
+    ('grep "(pytest x', False),
 ]
 
 

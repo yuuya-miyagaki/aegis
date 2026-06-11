@@ -53,16 +53,16 @@ AEGIS_DESTRUCTIVE_CMD_WARN=(
 # boundaries instead. tests/test_patterns_parity.py enforces parity with
 # shared fixtures; add a fixture line whenever you add a pattern.
 #
-# Command-position anchor (v1.5.1): a runner name matches only at the start of
-# a (sub)command — string start, after ; & |, optionally through one subshell
-# '(' AT that position, across env assignments (FOO=bar ), or through known
-# wrappers (npx/bunx, uv/poetry/pipenv run). Mentions as arguments
-# (grep vitest package.json) do not match. '(' is NOT a bare class member:
-# quoted group regexes (grep -E "(pytest|...)" — rc=1 on no match) would
-# false-RED (grill-code v1.5.1 🟡-1). Nested '((pytest))' is an accepted
-# miss (fail-closed). Consumers normalize newlines to ';' BEFORE matching
-# (grep '^' is per-line, python re '^' is string-start — normalization keeps
-# the two engines in parity).
+# Command-position anchor (v1.5.1, nested-subshell extension v1.5.2): a runner
+# name matches only at the start of a (sub)command — string start, after ; & |,
+# through any run of subshell '(' at that position, across env assignments
+# (FOO=bar ), or through known wrappers (npx/bunx, uv/poetry/pipenv run).
+# Mentions as arguments (grep vitest package.json) do not match. Quoted spans
+# are masked to Q before this anchor applies (T1 above), so quoted regex groups
+# (grep -E "(pytest|...)") never reach it; the anchor stays as defense-in-depth
+# for unmaskable malformed input (e.g. an unclosed quote). Consumers also
+# normalize newlines to ';' BEFORE matching (grep '^' is per-line, python re
+# '^' is string-start — normalization keeps the two engines in parity).
 # Quote-span mask (T1 v1.5.2): consumers replace "…"/'…' spans with the inert
 # token Q BEFORE matching, so quoted runner mentions — grep -E "(unittest|pytest)" f,
 # grep "foo; pytest" f — never reach the classifier (quote-blind false-RED root
@@ -77,7 +77,7 @@ AEGIS_DESTRUCTIVE_CMD_WARN=(
 AEGIS_TR_STRIP_DQ='"(\\.|[^"\\])*"'
 AEGIS_TR_STRIP_SQ="'[^']*'"
 
-_AEGIS_TR_PRE='(^|[;&|]) *\(? *([A-Za-z_][A-Za-z0-9_]*=[^ ]* +)*((npx|bunx) +|(uv|poetry|pipenv) +run +)?'
+_AEGIS_TR_PRE='(^|[;&|]) *(\( *)*([A-Za-z_][A-Za-z0-9_]*=[^ ]* +)*((npx|bunx) +|(uv|poetry|pipenv) +run +)?'
 AEGIS_TEST_RUNNER_REGEX=(
   "${_AEGIS_TR_PRE}vitest($|[^a-zA-Z0-9_])"
   "${_AEGIS_TR_PRE}jest($|[^a-zA-Z0-9_])"
