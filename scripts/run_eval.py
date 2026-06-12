@@ -111,7 +111,9 @@ def run_tier0(root: Path) -> int:
             ["python3", "-m", "unittest", "discover", "-s", str(root / "tests"), "-v"],
             capture_output=True,
             text=True,
-            timeout=120,
+            # 507 subprocess-heavy tests run ~135s; 120s silently failed the
+            # whole tier on suite growth (v1.6.0).
+            timeout=300,
             cwd=str(root),
         )
         print(proc.stderr, end="")  # unittest writes to stderr

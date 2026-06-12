@@ -30,7 +30,7 @@ CONTRACT_PY = SCRIPTS_DIR / "check_framework_contract.py"
 # command-surface check self-extending: adding a command to MIRROR_ALLOWLIST
 # automatically requires it to be wired into setup.sh resolve_source.
 sys.path.insert(0, str(SCRIPTS_DIR))
-from check_reference_drift import MIRROR_ALLOWLIST  # noqa: E402
+from check_reference_drift import MIRROR_ALLOWLIST, check_skill_reachability  # noqa: E402
 
 # Profiles validated by file manifest (contract). full --profile validates the
 # framework repo itself (ignores --root), so it cannot be contract-validated as a
@@ -263,6 +263,17 @@ def verify_settings_project_dir(target: Path, profile: str) -> tuple[bool, str]:
     return True, f"{profile}: all hook commands use CLAUDE_PROJECT_DIR"
 
 
+def verify_skill_reachability(target: Path, profile: str) -> tuple[bool, str]:
+    """Installed skills must each have a boot path inside the install target."""
+    failures, _warnings = check_skill_reachability(target)
+    if failures:
+        return False, (
+            f"skill reachability failed in {profile} install: "
+            + "; ".join(failures)
+        )
+    return True, ""
+
+
 def verify_command_surface(target: Path, profile: str) -> tuple[bool, str]:
     """Prove setup.sh delivered the right command surface (audit F2, F3).
 
@@ -343,6 +354,11 @@ def run_scaffold_test(profile: str, target: Path) -> tuple[str, str]:
     if not ok:
         return "FAIL", detail
 
+    # Skill boot-path validation at the install target (P1-A, F6-class).
+    ok, detail = verify_skill_reachability(target, profile)
+    if not ok:
+        return "FAIL", detail
+
     # Template-reference validation in the install output (P1-B, OBS-012).
     ok, detail = verify_template_references(target, profile)
     if not ok:
@@ -420,6 +436,10 @@ def run_full_hook_exec_test(target: Path) -> tuple[str, str]:
     if not ok:
         return "FAIL", detail
     ok, detail = verify_settings_project_dir(target, "full")
+    if not ok:
+        return "FAIL", detail
+    # Skill boot-path validation at the install target (P1-A, F6-class).
+    ok, detail = verify_skill_reachability(target, "full")
     if not ok:
         return "FAIL", detail
     ok, detail = verify_template_references(target, "full")
