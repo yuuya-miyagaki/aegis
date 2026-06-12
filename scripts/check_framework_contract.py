@@ -269,6 +269,8 @@ PLACEHOLDER_ALLOWLIST = {
     "<パス>",
     "<gate>",
     "<gate-name>",
+    # /gate ack instruction token (the LLM substitutes the user's reason)
+    "<user-stated reason>",
     # Python source code tokens (docstrings/comments in check_status.py etc.)
     "<body>",
     "<key>",
