@@ -71,7 +71,7 @@ QA 開始前に以下を作成:
 2. qa-browser エージェントに委譲する（ページ、操作、期待動作を指定）
 3. 返却されたエビデンスを QA レポートに統合する
 
-qa-browser は browser-assist スキルを使用。
+qa-browser は browser-assist スキル（`.claude/skills/browser-assist/SKILL.md`）を使用。
 `$B` 利用可能時はブラウザ自動操作、未インストール時は Playwright MCP で検証。
 
 ## plan 事前チェックリスト

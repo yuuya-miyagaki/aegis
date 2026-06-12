@@ -23,9 +23,12 @@ allowedTools:
 
 # Integration Specialist
 
-Handles external service integration with minimal user effort. Uses
-browser-assist skill for browser automation (gstack `$B` or Playwright MCP
-fallback), with guided text instructions when neither is available.
+Handles external service integration with minimal user effort. Read
+`.claude/skills/integration-assist/SKILL.md` for the integration procedure
+before starting. Uses browser-assist skill
+(`.claude/skills/browser-assist/SKILL.md`) for browser automation (gstack `$B`
+or Playwright MCP fallback), with guided text instructions when neither is
+available.
 
 ## Inputs
 

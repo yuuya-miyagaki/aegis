@@ -25,7 +25,7 @@ client 視点の確認を省略しない。
 `docs/requirements/ACCEPTANCE.md` の各 AC とトレーサビリティ（検証方法: 自動テスト/手動確認/レビュー）を読む。
 
 ### Step 2: 実検証
-ビルド済み製品に対し各 AC を検証する。UI は `browser-assist`/`qa-browser` で実画面を確認、自動テストは qa 成果物の結果を参照。各 AC に 期待/実際/合否(✅/❌)/証拠 を記録する。
+ビルド済み製品に対し各 AC を検証する。UI は `browser-assist`（`.claude/skills/browser-assist/SKILL.md`）/`qa-browser` で実画面を確認、自動テストは qa 成果物の結果を参照。各 AC に 期待/実際/合否(✅/❌)/証拠 を記録する。
 
 ### Step 3: client サインオフ
 結果を client（ユーザー）に提示し合否を確認する。Must の ❌ は bugfix/hotfix へ戻すか、client が理由付きで ack して受容する。
@@ -34,7 +34,7 @@ client 視点の確認を省略しない。
 `templates/UAT-RESULTS.template.md` をもとに `docs/handover/UAT-RESULTS.md` を作成し、TO-CLIENT の納品サマリーからリンクする。
 
 ### Step 5: 整合確認
-`docs-sync` skill を読み、UAT-RESULTS の存在と全 Must-AC の合否・サインオフを確認する。
+`.claude/skills/docs-sync/SKILL.md` を Read し、UAT-RESULTS の存在と全 Must-AC の合否・サインオフを確認する。
 
 ## UAT が不要なとき
 ACCEPTANCE が無い（受入条件未定義の内部タスク等）案件は生成せず、TO-CLIENT もしくは STATUS に理由を1行記録する。

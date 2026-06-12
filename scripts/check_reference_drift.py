@@ -334,34 +334,6 @@ def check_template_references(root: Path) -> tuple[list[str], list[str]]:
     return failures, warnings
 
 
-def check_session_start_hints(root: Path) -> tuple[list[str], list[str]]:
-    """#8: skill names in session-start.sh case statement vs actual skills"""
-    failures: list[str] = []
-    warnings: list[str] = []
-
-    ss_path = root / "hooks" / "session-start.sh"
-    skills_dir = root / ".claude" / "skills"
-
-    if not ss_path.exists() or not skills_dir.is_dir():
-        return failures, warnings
-
-    text = _read(ss_path)
-    actual_skills = _glob_dir_names(skills_dir)
-
-    # Extract skill names from HINT lines: "skill: name" or "skill: name("
-    hint_skills: set[str] = set()
-    for m in re.finditer(r'skill:\s*([a-z][a-z0-9_-]*)', text):
-        hint_skills.add(m.group(1))
-
-    missing = hint_skills - actual_skills
-    for name in sorted(missing):
-        warnings.append(
-            f"session-start.sh references skill '{name}' but no .claude/skills/{name}/SKILL.md"
-        )
-
-    return failures, warnings
-
-
 SKILL_PATH_RE = re.compile(r"\.claude/skills/([a-z][a-z0-9_-]*)/SKILL\.md")
 PHASE_MAP_NAMES_RE = re.compile(r'names="([^"]*)"')
 USER_INVOCABLE_RE = re.compile(r"^user-invocable:\s*true\b", re.M)
@@ -589,7 +561,7 @@ ALL_CHECKS = [
     ("template profiles", check_template_profiles),
     ("README counts", check_readme_counts),
     ("template version", check_template_version),
-    ("session-start hints", check_session_start_hints),
+    ("skill reachability", check_skill_reachability),
     ("template references", check_template_references),
     ("example README counts", check_example_readme_counts),
     ("example commands", check_example_commands),

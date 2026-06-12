@@ -891,7 +891,7 @@ def check_gate_prerequisites(
                 "docs/handover/UAT-RESULTS.md が見つかりません。"
             )
             print("       dev_ready_for_client の前に UAT を実行してください。")
-            print("       → uat skill を使用")
+            print("       → .claude/skills/uat/SKILL.md を Read して UAT を実施")
             return 1
         return 0
 

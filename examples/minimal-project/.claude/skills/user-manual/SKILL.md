@@ -35,7 +35,7 @@ SCOPE/PRD/ACCEPTANCE と出荷機能から、各読者の主要タスクを列�
 1タスク=1見出し＋番号付きステップ。専門語を使ったら用語章で言い換える。
 
 ### Step 3: 図（任意）
-`ui_surface: true` かつ UI が存在する場合、`browser-assist`（または `qa-browser`）で
+`ui_surface: true` かつ UI が存在する場合、`browser-assist`（`.claude/skills/browser-assist/SKILL.md`。または `qa-browser`）で
 主要画面を撮り、該当手順に `![説明](パス)` で貼る。UI が無い/撮れない場合はプレースホルダを
 残し、図不要の理由を1行記す。**図の自動取得は必須ではない。**
 
@@ -47,7 +47,7 @@ SCOPE/PRD/ACCEPTANCE と出荷機能から、各読者の主要タスクを列�
 `docs/handover/MANUAL.md` へのリンクを記入する。
 
 ### Step 6: 整合確認
-`docs-sync` skill を読み、MANUAL.md の存在と宣言読者ごとの章充足を確認する。
+`.claude/skills/docs-sync/SKILL.md` を Read し、MANUAL.md の存在と宣言読者ごとの章充足を確認する。
 
 ## マニュアルが不要なとき
 使う人も運用者もいない内部使い捨て等で不要な場合は、生成せず TO-CLIENT もしくは

@@ -56,14 +56,14 @@ user-invocable: false
 
 ### Step 2.5: 操作マニュアル作成（該当時）
 
-`user-manual` skill を読み、製品を使う/運用する人がいる場合は
+`.claude/skills/user-manual/SKILL.md` を Read し、製品を使う/運用する人がいる場合は
 `templates/MANUAL.template.md` をもとに `docs/handover/MANUAL.md` を作成する。
 該当読者（利用者/運用者）ごとに操作手順を記述し、TO-CLIENT の「納品サマリー」の
 操作マニュアル欄にリンクする。使う人も運用者もいない場合は生成せず、理由を同欄に記録する。
 
 ### Step 2.6: 運用 RUNBOOK 作成（該当時）
 
-`maintenance` skill（Part A）を読み、製品を運用する人がいる場合は
+`.claude/skills/maintenance/SKILL.md`（Part A）を Read し、製品を運用する人がいる場合は
 `templates/RUNBOOK.template.md` をもとに `docs/handover/RUNBOOK.md` を作成する。
 監視・トリアージ・エスカレーションを記述し、TO-CLIENT の「納品サマリー」の
 運用 RUNBOOK 欄にリンクする。運用者がいない場合は生成せず、理由を同欄に記録する。
@@ -71,7 +71,7 @@ user-invocable: false
 
 ### Step 2.7: UAT 実行（該当時）
 
-`uat` skill を読み、`docs/requirements/ACCEPTANCE.md` がある場合は各 AC をビルド済み製品に対し
+`.claude/skills/uat/SKILL.md` を Read し、`docs/requirements/ACCEPTANCE.md` がある場合は各 AC をビルド済み製品に対し
 実検証し、`docs/handover/UAT-RESULTS.md` を作成して client サインオフを得る。TO-CLIENT の
 「納品サマリー」の UAT 結果欄にリンクする。ACCEPTANCE が無い場合は生成せず理由を同欄に記録する。
 （ACCEPTANCE があるのに UAT-RESULTS が無いと Step 6 の dev_ready_for_client 申請が機械ブロックされる。）
@@ -85,7 +85,7 @@ TO-CLIENT の内容をユーザーに提示し、承認を得る。
 
 ### Step 4: LEARNINGS 更新
 
-まず `docs-sync` skill を読み、整合性チェックを実施する。
+まず `.claude/skills/docs-sync/SKILL.md` を Read し、整合性チェックを実施する。
 
 `docs/LEARNINGS.md` に以下を追記し、昇格ルールに基づいて既存エントリを評価する:
 

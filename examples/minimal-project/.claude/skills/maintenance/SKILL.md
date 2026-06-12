@@ -31,7 +31,7 @@ user-invocable: false
 `docs/handover/TO-CLIENT.md` の納品サマリーに `docs/handover/RUNBOOK.md` へのリンクを追加する。
 
 ### Step 4: 整合確認
-`docs-sync` skill を読み、RUNBOOK.md の存在と必須節（監視/インシデント対応（トリアージ）/エスカレーション/インシデント履歴/用語）の充足を確認する。
+`.claude/skills/docs-sync/SKILL.md` を Read し、RUNBOOK.md の存在と必須節（監視/インシデント対応（トリアージ）/エスカレーション/インシデント履歴/用語）の充足を確認する。
 
 ## Part B: インシデント対応ループ（運用時）
 

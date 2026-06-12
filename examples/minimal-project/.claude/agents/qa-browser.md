@@ -41,7 +41,7 @@ into the QA report.
 
 ## Browser Tool Priority
 
-1. Check if `$B` is available (browser-assist skill resolution logic).
+1. Check if `$B` is available (browser-assist skill resolution logic; see `.claude/skills/browser-assist/SKILL.md`).
 2. If `$B` available:
    - Use `$B goto`, `$B snapshot`, `$B click` for navigation and interaction.
    - Use `$B screenshot` for visual evidence capture.

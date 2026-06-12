@@ -13,4 +13,4 @@ Subagents: `planner`, `implementer`, `reviewer`, `qa`, `security`, `ui`,
 Each agent's own file defines its domain.
 
 `brainstorm` runs in session context (live user dialogue), not as a subagent.
-`browser-assist` skill is available to any agent needing browser automation.
+`browser-assist` skill (`.claude/skills/browser-assist/SKILL.md`) is available to any agent needing browser automation.
