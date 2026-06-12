@@ -234,6 +234,22 @@ case "$ACTION" in
       # 🔴 (1) or any unexpected code: hard block.
       exit 1
     fi
+    # B2 judge-card push (P1-C2, OBS-019): print the full card into the
+    # transcript so the LLM relays it to the client. Pull-only cards (/judge)
+    # never reached non-engineer clients in the behavioral review.
+    # Gate list duplicates check_status.py JUDGE_GATES (bash cannot import it).
+    case "$GATE_NAME" in
+      review|qa|security|deploy)
+        CARD_FILE="${ROOT}/docs/qa-reports/judge-${GATE_NAME}.md"
+        if [ -f "$CARD_FILE" ]; then
+          echo ""
+          echo "===== JUDGE CARD (${GATE_NAME}) ====="
+          cat "$CARD_FILE"
+          echo "===== END JUDGE CARD ====="
+          echo "[judge-card] 上のカードを平易な日本語で依頼者に提示してください（「次のアクション」欄は文脈に合わせて補完）。"
+        fi
+        ;;
+    esac
     TARGET_VALUE="approved"
     ACTION_TAG="gate-approve"
     ;;
