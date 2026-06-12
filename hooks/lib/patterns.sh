@@ -102,22 +102,39 @@ AEGIS_TEST_RUNNER_REGEX=(
 # CONSTRAINT (same as runner regex): grep-E ∩ python-re common subset — no
 # [[:space:]], no \b. Use ( |^|$) style boundaries.
 #
-# Each entry is anchored to a separator before the marker so a free-text
-# "1 passed" in a previous line cannot satisfy the regex; we require the
-# runner's actual final summary form (== N passed in / Tests: N passed /
-# test result: ok / Ran N tests in / OK at line start / ok pkg X.Xs).
+# v1.6.1 grill-code Critical: an output containing JUST "OK" or just
+# "test result: ok." is forgeable in 1 line — `pytest --version && echo OK`.
+# We split markers into STRONG (single-line sufficient) and WEAK (pair
+# required). The consumer (evidence.sh) requires BOTH halves of any pair to
+# be present in the output for marker_verified=true. Also see the no-run-flag
+# guard in evidence.sh that disqualifies `pytest --collect-only` etc.
+#
+# STRONG markers: each line includes runner-specific structural anchors
+# (===== prefix for pytest, "Tests:" prefix for jest, package-path+time
+# for go) that are not trivially echoed. These verify on their own.
 AEGIS_TEST_PASS_MARKER_REGEX=(
   # pytest: "============ 3 passed in 0.42s ============" or "1 failed, 2 passed in"
   '={3,} [0-9]+ (passed|failed)'
   # jest / vitest: "Tests:       5 passed, 5 total"
   '(^|\n)Tests:[ \t]+([0-9]+ failed,[ \t]+)?[0-9]+ passed'
   '(^|\n)Test Files[ \t]+[0-9]+ passed'
-  # cargo: "test result: ok. 12 passed; 0 failed; ..."
-  '(^|\n)test result: (ok|FAILED)\.'
   # go: "ok      example/pkg     0.123s"  or  "FAIL    example/pkg     [build failed]"
   '(^|\n)(ok|FAIL)[ \t]+[A-Za-z0-9_./-]+[ \t]+[0-9]+\.[0-9]+s'
-  # python -m unittest: "Ran 17 tests in 89.6s" plus the OK / FAILED line
-  '(^|\n)Ran [0-9]+ tests? in [0-9]+(\.[0-9]+)?s'
-  '(^|\n)OK( \(.+\))?( |$)'
-  '(^|\n)FAILED \('
 )
+
+# WEAK markers: each individual line is too easy to forge with `echo`.
+# Each entry is "ANCHOR_REGEX|COMPANION_REGEX" — BOTH must hit the output.
+# Format: anchor and companion are separated by `|||` (a token that never
+# appears in regex). evidence.sh splits on this token before grep-ing.
+# - unittest:    `Ran N tests in X.Xs`  AND  `OK` / `FAILED (...)`
+# - cargo test:  `running N tests`      AND  `test result: ok./FAILED.`
+AEGIS_TEST_PASS_MARKER_PAIRS=(
+  '(^|\n)Ran [0-9]+ tests? in [0-9]+(\.[0-9]+)?s|||(^|\n)(OK( \(|$)|FAILED \()'
+  '(^|\n)running [0-9]+ tests?|||(^|\n)test result: (ok|FAILED)\.'
+)
+
+# No-run flags — when present in the COMMAND, the run produced no tests
+# regardless of output content. Used to disqualify forged-output cases
+# where a runner-name match is paired with a non-running flag.
+# Each pattern is anchored on word boundaries via ( |^|$).
+AEGIS_TEST_NO_RUN_FLAG_REGEX='(^|[[:space:]])(-{1,2}(version|help|collect-only|co|dry-run|no-run|fixtures|markers|listTests|list-tests|listFiles|listAllFiles)|-h)($|[[:space:]])'

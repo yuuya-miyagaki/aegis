@@ -26,13 +26,32 @@ AEGIS_EVIDENCE_MAX_BYTES="${AEGIS_EVIDENCE_MAX_BYTES:-1048576}"
 evidence_log_path() { printf '%s/.claude/evidence-log.jsonl' "${1:-.}"; }
 
 # _check_test_marker <raw-hook-input-json> — print "true" / "false".
-# Extracts tool_response.output and checks if ANY pattern in
-# AEGIS_TEST_PASS_MARKER_REGEX matches a real summary line in the output.
-# If python3 is unavailable, the output cannot be extracted → "false"
-# (fail-closed in the sense that the entry will not be honored as green).
+# Decides whether the recorded tool_response demonstrates an ACTUAL test
+# execution (not just a runner-named command that echoed forged text).
+#
+# Three-stage gate (all stages must pass for "true"):
+#   (1) No-run flag check — if the command itself contains a no-run flag
+#       like `--version`, `--collect-only`, `-h`, `--dry-run`, no test ran
+#       regardless of output → "false". (Closes the
+#       `echo "===== 1 passed in 0.01s =====" && pytest --collect-only`
+#       grill-code A-Crit-2 / B-Critical forge.)
+#   (2) Strong markers (AEGIS_TEST_PASS_MARKER_REGEX) — single-line
+#       sufficient for verification. pytest === summary, jest "Tests:",
+#       go "ok pkg X.Xs", etc. Any hit → "true".
+#   (3) Weak markers (AEGIS_TEST_PASS_MARKER_PAIRS) — each entry is
+#       "ANCHOR|||COMPANION"; BOTH halves must hit the output. unittest
+#       and cargo: `Ran N tests in` + `OK`/`FAILED`, `running N tests`
+#       + `test result: ok./FAILED.`. Single-line forge (e.g. echo OK
+#       alone) does not satisfy.
+#
+# Stage 1 also requires the COMMAND text; we extract it via python3.
+# If python3 is unavailable the output cannot be safely parsed → "false"
+# (fail-closed).
 _check_test_marker() {
-  local input="$1" out pat
-  out=$(printf '%s' "$input" | python3 -c '
+  local input="$1" out cmd pat split anchor companion
+  # Extract output (tail 4 KiB) and command via a single python3 pass.
+  local extracted
+  extracted=$(printf '%s' "$input" | python3 -c '
 import sys, json
 try:
     d = json.loads(sys.stdin.read())
@@ -42,24 +61,54 @@ try:
         o = "".join(str(x) for x in o)
     elif not isinstance(o, str):
         o = str(o)
-    sys.stdout.write(o[-4096:])
+    c = (d.get("tool_input") or {}).get("command", "") or ""
+    if not isinstance(c, str):
+        c = str(c)
+    # Separator unlikely to appear in either field.
+    sys.stdout.write(c[:4096] + "\x1eAEGISSEP\x1e" + o[-4096:])
 except Exception:
     pass
-' 2>/dev/null) || out=""
+' 2>/dev/null) || extracted=""
+  if [ -z "$extracted" ]; then
+    printf 'false'
+    return 0
+  fi
+  cmd="${extracted%%$'\x1e'AEGISSEP$'\x1e'*}"
+  out="${extracted##*$'\x1e'AEGISSEP$'\x1e'}"
   if [ -z "$out" ]; then
     printf 'false'
     return 0
   fi
-  if [ "${#AEGIS_TEST_PASS_MARKER_REGEX[@]}" -eq 0 ]; then
+  # Stage 1: no-run flag in the command disqualifies regardless of output.
+  if [ -n "${AEGIS_TEST_NO_RUN_FLAG_REGEX:-}" ] && \
+     printf '%s' "$cmd" | grep -qE "$AEGIS_TEST_NO_RUN_FLAG_REGEX"; then
     printf 'false'
     return 0
   fi
-  for pat in "${AEGIS_TEST_PASS_MARKER_REGEX[@]}"; do
-    if printf '%s' "$out" | grep -qE "$pat"; then
-      printf 'true'
-      return 0
-    fi
-  done
+  # Stage 2: strong markers — any single hit verifies.
+  if [ "${#AEGIS_TEST_PASS_MARKER_REGEX[@]}" -gt 0 ]; then
+    for pat in "${AEGIS_TEST_PASS_MARKER_REGEX[@]}"; do
+      if printf '%s' "$out" | grep -qE "$pat"; then
+        printf 'true'
+        return 0
+      fi
+    done
+  fi
+  # Stage 3: weak pairs — BOTH halves must hit.
+  if [ "${#AEGIS_TEST_PASS_MARKER_PAIRS[@]}" -gt 0 ]; then
+    for split in "${AEGIS_TEST_PASS_MARKER_PAIRS[@]}"; do
+      anchor="${split%%\|\|\|*}"
+      companion="${split##*\|\|\|}"
+      if [ -z "$anchor" ] || [ -z "$companion" ] || [ "$anchor" = "$split" ]; then
+        continue
+      fi
+      if printf '%s' "$out" | grep -qE "$anchor" && \
+         printf '%s' "$out" | grep -qE "$companion"; then
+        printf 'true'
+        return 0
+      fi
+    done
+  fi
   printf 'false'
 }
 
