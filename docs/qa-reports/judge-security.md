@@ -20,4 +20,4 @@
 （LLM が平易日本語で記述）
 
 ## ACK
-- v151 記録残余 5 系統を全消化（T1〜T5）。新規 fail-open 方向の残余なし — 受容残余（混在クォート横断・SIGSTOP >2分窓・PID 再利用）は全て unverified/可用性方向で green 偽装・deny バイパス不能、v152-security.md に明示記録。deny 系 3 hook へのマスク不波及を TestMaskScopeBoundary で契約化、grill A/B が独立に偽装ベクトルなしを実証。証跡 docs/qa-reports/v152-security.md （2026-06-11 19:13）
+- deny/block 系の緩和ゼロ（grill A が gate-tamper/phase-skip/mode-tamper/placeholder の hook 実走無傷を独立確認）。注入は advisory additionalContext のみ＝fail-safe。受容残余 9 件（B-S2/S3/S4 含む）は docs/qa-reports/v160-security.md に理由付き記録。ユーザー委任による代行承認 （2026-06-12 17:43）

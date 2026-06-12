@@ -13,4 +13,4 @@
 （LLM が平易日本語で記述）
 
 ## ACK
-- ローカル patch リリース（コミット＋tag v1.5.2、外部インフラなし・origin push は別途ユーザー判断）。版数同期 6 ファイル・README Migration 追加済み。バンプ後最終検証: 479 tests OK・contract full/standard・drift・smoke・--strict 全 PASS。SemVer=patch（運用契約変更なし、light ゲート競合の敗者挙動是正は README 記載）。証跡 docs/qa-reports/v152-deploy-checklist.md （2026-06-11 19:13）
+- ローカル tag リリース（外部インフラなし）。版数 1.6.0 同期 6 owner・バンプ後最終検証（508 tests・contract・drift・全 tier・--strict）全 PASS。チェックリスト docs/qa-reports/v160-deploy-checklist.md 充足。ユーザー委任による代行承認 （2026-06-12 17:44）

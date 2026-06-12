@@ -24,3 +24,7 @@ STATUS.md retains only the latest 3 entries; older entries are moved here.
 
 - **findings:** P1x1 (README update-gate.sh手順欠落), P2x1 (example update-gate.sh未同梱)
 - **resolution:** README Step10追加、example scripts/コピー
+
+### session-history: iteration 18 (v1.5.0 E1 activity verification, 2026-06-11)
+
+検証の実行ベース化を 13 タスク TDD で完走。hook 観測の Bash 実行記録 `.claude/evidence-log.jsonl` を judge card テスト判定の唯一ソース化（自己申告 test-result.json 廃止）、fingerprint.sh 単一所有（HEAD sha 混入）、記録=fail-open／判定=fail-closed、observer 生存チェック（TaskCompleted 差し戻し）、smoke の観測系実発火。設計逸脱2件（payload_sha／HEAD 比 fingerprint）はユーザー事前承認・spec 同期済み。grill-code（独立2サブエージェント）が 🔴1（quotepath で非ASCII名の fp 不感＝silent green・実証付き）＋🟡4（無区切り連結衝突／example observer 未登録＋presence 穴／smoke 失敗側未発火／観測→判定 e2e 不在）を検出し全て同セッション修正。436 tests OK・contract・drift・smoke 全 PASS。テスト行は record-test-result.py の手動記録（manual ok・fp 一致）で green、4 ゲートを --ack 承認。v1.5.0 minor で締め・tag v1.5.0。

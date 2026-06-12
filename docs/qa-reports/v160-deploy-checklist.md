@@ -4,10 +4,10 @@
 
 ## デプロイ前ゲート確認
 
-- [ ] review approved（docs/qa-reports/v160-review.md、grill-code 独立 2 本＝マージ可・合流点 S1 は a8411fb で充足・Critical 0）
-- [ ] qa approved（docs/qa-reports/v160-qa.md、508 tests OK・RED→GREEN 来歴記録済み）
-- [ ] security approved（docs/qa-reports/v160-security.md、deny/block 緩和ゼロ・受容残余 9 件明示記録）
-- [ ] push なしのローカルリリース（origin push は別途ユーザー判断）
+- [x] review approved（docs/qa-reports/v160-review.md、grill-code 独立 2 本＝マージ可・合流点 S1 は a8411fb で充足・Critical 0）
+- [x] qa approved（docs/qa-reports/v160-qa.md、508 tests OK・テスト記録 manual green=信頼ランナー・RED→GREEN 来歴記録済み）
+- [x] security approved（docs/qa-reports/v160-security.md、deny/block 緩和ゼロ・受容残余 9 件明示記録）
+- [x] push なしのローカルリリース（origin push は別途ユーザー判断）
 
 ## バージョン同期（リリース内容）
 
