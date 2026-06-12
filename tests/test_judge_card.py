@@ -20,10 +20,19 @@ judge = _load("judge", SCRIPT)
 record = _load("record_mod", RECORDER)
 
 
-def _ev_line(cmd: str, status: str, fp: str) -> str:
+def _ev_line(cmd: str, status: str, fp: str,
+             marker_verified: bool = True) -> str:
+    """Build a synthetic OBSERVED evidence entry.
+
+    C-2 (v1.6.1) requires `marker_verified:true` for an observed entry
+    to count as green; existing fixtures simulate a real test run, so
+    we default to True. Tests that explicitly need a forgery / migration
+    case pass marker_verified=False.
+    """
     return json.dumps({"v": 1, "ts": "2026-06-10T00:00:00Z", "src": "observed",
                        "cmd": cmd, "status": status,
-                       "payload_sha": "0" * 64, "fp": fp}) + "\n"
+                       "payload_sha": "0" * 64, "fp": fp,
+                       "marker_verified": marker_verified}) + "\n"
 
 
 def _copy_lib(root: Path) -> None:

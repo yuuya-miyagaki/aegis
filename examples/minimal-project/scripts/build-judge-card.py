@@ -188,7 +188,19 @@ def read_test_result(root: Path) -> str:
     The newest test-runner entry decides; its fp must equal the CURRENT
     worktree fingerprint (both 64-hex). Anything else — no log, no matching
     entry, stale/oversize/nogit fingerprint, unreadable patterns — is
-    'unverified' (🟡 ack-able), never silent-green."""
+    'unverified' (🟡 ack-able), never silent-green.
+
+    C-2 (v1.6.1): runner-name match alone is insufficient. An entry from an
+    OBSERVED source (post-bash-observe.sh) is treated as 'green' / 'red'
+    ONLY when it carries marker_verified:true (meaning the observer saw an
+    actual final-summary line in tool_response.output — `== N passed in`,
+    `Tests: N passed`, etc.). Without marker_verified:true the entry
+    degrades to 'unverified' (fail-closed). Manual entries (src='manual',
+    via record-test-result.py with the trusted-runner contract) keep the
+    old behavior — they bypass marker_verified because the human attested.
+    Schema: entries written by v1.6.0 lack the field, so they all degrade
+    to 'unverified' on first load — re-run the test to upgrade the log.
+    """
     pats = _test_runner_patterns(root)
     if not pats:
         return "unverified"
@@ -210,6 +222,9 @@ def read_test_result(root: Path) -> str:
         if not any(p.search(cmd) for p in pats):
             continue
         if (d.get("fp") or "") != current:
+            return "unverified"
+        # C-2: marker_verified gate for observed entries.
+        if d.get("src") == "observed" and d.get("marker_verified") is not True:
             return "unverified"
         return "green" if d.get("status") == "ok" else "red"
     return "unverified"

@@ -43,9 +43,23 @@ def make_repo(d: Path) -> None:
                     "-m", "init"], check=True)
 
 
-def bash_payload(cmd: str) -> dict:
+def bash_payload(cmd: str, output: str = "") -> dict:
+    """Build a synthetic Bash tool_response. `output` defaults to empty so
+    pre-existing tests that don't care about output keep working; the
+    marker_verified field will then be `false` (C-2 v1.6.1)."""
     return {"tool_name": "Bash", "tool_input": {"command": cmd},
-            "tool_response": {"exitCode": 0}}
+            "tool_response": {"exitCode": 0, "output": output}}
+
+
+# A realistic python -m unittest summary line so marker_verified:true is set
+# in the resulting evidence-log entry (C-2 v1.6.1). Real test runs produce this
+# tail; the existing 'green' end-to-end fixtures need it.
+UNITTEST_GREEN_OUTPUT = (
+    "...\n"
+    "----------------------------------------------------------------------\n"
+    "Ran 3 tests in 0.123s\n\n"
+    "OK\n"
+)
 
 
 class TestPostBashObserve(unittest.TestCase):
@@ -168,14 +182,22 @@ class TestObserveToJudgeEndToEnd(unittest.TestCase):
 
     def test_observed_ok_certifies_green(self):
         rc, _ = fire("post-bash-observe.sh",
-                     bash_payload("python3 -m unittest discover -s tests"),
+                     bash_payload("python3 -m unittest discover -s tests",
+                                  output=UNITTEST_GREEN_OUTPUT),
                      self.root)
         self.assertEqual(rc, 0)
         self.assertEqual(judge.read_test_result(self.root), "green")
 
     def test_observed_failure_certifies_red(self):
+        # A failing unittest run produces "FAILED (failures=N)" tail plus
+        # "Ran N tests in X.Xs" summary. post-bash.sh path (failure side)
+        # records status=fail; the marker still hits "Ran N tests in".
         rc, _ = fire("post-bash.sh",
-                     bash_payload("python3 -m unittest discover -s tests"),
+                     bash_payload("python3 -m unittest discover -s tests",
+                                  output="..F\n"
+                                         "------\n"
+                                         "Ran 3 tests in 0.1s\n"
+                                         "FAILED (failures=1)\n"),
                      self.root)
         self.assertEqual(rc, 0)
         self.assertEqual(judge.read_test_result(self.root), "red")

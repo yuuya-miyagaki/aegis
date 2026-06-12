@@ -90,3 +90,34 @@ AEGIS_TEST_RUNNER_REGEX=(
   "${_AEGIS_TR_PRE}go +test($|[^a-zA-Z0-9_])"
   "${_AEGIS_TR_PRE}(npm|pnpm|bun|yarn) +(run +)?test(:[-a-zA-Z0-9_]+)?($|[^a-zA-Z0-9_])"
 )
+
+# C-2 (v1.6.1): pass-MARKER regex. Matching AEGIS_TEST_RUNNER_REGEX above only
+# proves the COMMAND was a test runner — not that any test ran. `pytest --version`,
+# `pytest --collect-only`, `pytest -k __NEVER_MATCH__` all match runner regex
+# yet execute zero tests. The marker array below matches each runner's
+# FINAL SUMMARY LINE so the consumer can distinguish "real test execution"
+# from "runner-named-but-no-tests-ran". post-bash-observe.sh and
+# build-judge-card.py both consume this single source.
+#
+# CONSTRAINT (same as runner regex): grep-E ∩ python-re common subset — no
+# [[:space:]], no \b. Use ( |^|$) style boundaries.
+#
+# Each entry is anchored to a separator before the marker so a free-text
+# "1 passed" in a previous line cannot satisfy the regex; we require the
+# runner's actual final summary form (== N passed in / Tests: N passed /
+# test result: ok / Ran N tests in / OK at line start / ok pkg X.Xs).
+AEGIS_TEST_PASS_MARKER_REGEX=(
+  # pytest: "============ 3 passed in 0.42s ============" or "1 failed, 2 passed in"
+  '={3,} [0-9]+ (passed|failed)'
+  # jest / vitest: "Tests:       5 passed, 5 total"
+  '(^|\n)Tests:[ \t]+([0-9]+ failed,[ \t]+)?[0-9]+ passed'
+  '(^|\n)Test Files[ \t]+[0-9]+ passed'
+  # cargo: "test result: ok. 12 passed; 0 failed; ..."
+  '(^|\n)test result: (ok|FAILED)\.'
+  # go: "ok      example/pkg     0.123s"  or  "FAIL    example/pkg     [build failed]"
+  '(^|\n)(ok|FAIL)[ \t]+[A-Za-z0-9_./-]+[ \t]+[0-9]+\.[0-9]+s'
+  # python -m unittest: "Ran 17 tests in 89.6s" plus the OK / FAILED line
+  '(^|\n)Ran [0-9]+ tests? in [0-9]+(\.[0-9]+)?s'
+  '(^|\n)OK( \(.+\))?( |$)'
+  '(^|\n)FAILED \('
+)
