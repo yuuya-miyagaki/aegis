@@ -466,6 +466,14 @@ def evidence_integrity_violations(
             for rel_path in requirements:
                 if not (root / rel_path).exists():
                     violations.append(f"points to missing requirements ref: {rel_path}")
+
+        if approvals.get("client_ready_for_dev") == "approved":
+            for rel in CLIENT_GATE_ARTIFACTS:
+                if not (root / rel).exists():
+                    violations.append(
+                        "gate 'client_ready_for_dev' is approved but handover "
+                        f"artifact is missing: {rel}"
+                    )
     except Exception as exc:
         # Never raises (callers — validate_status_file and the TaskCompleted hook —
         # must not crash). But do NOT swallow into "no violations": a crashed

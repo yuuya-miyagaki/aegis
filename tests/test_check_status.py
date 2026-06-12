@@ -2716,5 +2716,60 @@ class TestClientGateArtifacts(unittest.TestCase):
             self.assertEqual(r.returncode, 0, f"stdout={r.stdout}")
 
 
+class TestClientGateCompletionEvidence(unittest.TestCase):
+    """P1-D 完了側: approved な client ゲートは成果物の実在を要求し続ける。"""
+
+    # 注意（grill-plan B 🔴-1）: 既存ルールが「approved な client ゲート × current_refs.translation
+    # が空」で violation を出すため、approved ケースは refs.translation を必ず埋める。
+    # これを怠ると clean ケースが既存ルール起因のメッセージ（'client_ready_for_dev' を含む）で
+    # 誤 FAIL する。
+    def _scaffold(self, d: Path, gate: str, present: list[str],
+                  refs: dict[str, str] | None = None) -> Path:
+        (d / "docs").mkdir(parents=True, exist_ok=True)
+        (d / "docs" / "STATUS.md").write_text(
+            make_status_md(mode="Dev", phase="implement",
+                           approvals={"client_ready_for_dev": gate},
+                           refs=refs),
+            encoding="utf-8")
+        for rel in present:
+            p = d / rel
+            p.parent.mkdir(parents=True, exist_ok=True)
+            p.write_text("# stub\n", encoding="utf-8")
+        return d
+
+    def _check(self, root: Path) -> subprocess.CompletedProcess:
+        return subprocess.run(
+            ["python3", str(CHECK_STATUS), "--root", str(root),
+             "--check-completion-evidence"],
+            capture_output=True, text=True, timeout=60)
+
+    def test_approved_with_missing_artifact_is_violation(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._scaffold(
+                Path(tmp), "approved",
+                present=CLIENT_ARTIFACTS[:-1],  # TO-DEV までは存在、mapping.md が欠落
+                refs={"translation": "docs/translation/mapping.md"})
+            r = self._check(root)
+            self.assertNotEqual(r.returncode, 0)
+            self.assertIn("handover artifact is missing", r.stdout + r.stderr)
+            self.assertIn("docs/translation/mapping.md", r.stdout + r.stderr)
+
+    def test_na_gate_is_exempt(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._scaffold(Path(tmp), "n/a", present=[])
+            r = self._check(root)
+            out = r.stdout + r.stderr
+            self.assertNotIn("client_ready_for_dev", out)
+
+    def test_approved_with_all_artifacts_clean(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._scaffold(
+                Path(tmp), "approved", present=CLIENT_ARTIFACTS,
+                refs={"translation": "docs/translation/mapping.md"})
+            r = self._check(root)
+            self.assertNotIn("client_ready_for_dev",
+                             r.stdout + r.stderr)
+
+
 if __name__ == "__main__":
     unittest.main()
