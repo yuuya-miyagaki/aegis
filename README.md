@@ -170,6 +170,28 @@ python3 scripts/check_status.py --root . --strict
 
 ## Migration
 
+### From v1.5.2 to v1.6.0
+
+**Non-breaking — 行動レビュー（2026-06-12）P1×4 の fix-forward バッチ（構造起動・配布完全性・可視化・対称検査）。**
+
+- **skill が構造的に起動するようになった（P1-A）。** phase ごとの必読 skill が
+  SessionStart と正当な phase 遷移時に additionalContext（advisory）で
+  「`.claude/skills/<name>/SKILL.md` を Read」形式で注入される。
+  phase→skill map は `hooks/lib/phase-skills.sh` が単一所有。
+  additionalContext 未対応クライアントでは注入が消えるだけで deny/block 系は不変（fail-safe）。
+  制御ファイル内の skill 参照は path 形式が起動形となり、起動経路のない skill は
+  drift チェック（repo）と scaffold smoke（install 先）の両方で機械検出される。
+- **full プロファイルが skill 参照テンプレート 6 件を配布する（P1-B）。**
+  skill が参照するテンプレートの実在は drift＋install 先 smoke で契約化。
+- **judge card がゲート承認時に transcript へ全文 push される（P1-C）。**
+  pull 専用カードが非エンジニア依頼者に届かない問題の是正。/gate はカード提示→
+  承認確認の順序。judge/drill の scanner はバイナリ混在 repo でも crash せず
+  該当ファイルを skip（判定は unverified 方向＝green 偽装不能）。
+- **client_ready_for_dev が handover 成果物 6 点を機械検査する（P1-D）。**
+  承認側（pre-approve）と完了側（evidence integrity）の対称検査。
+- drill の scope から vendor/build 区画（`node_modules`/`dist`/`build`/`out`/`coverage` 等)
+  が恒久除外され、第三者コードによる scope 汚染がなくなった。
+
 ### From v1.5.1 to v1.5.2
 
 **Non-breaking — v1.5.1 記録残余の全消化バッチ（誤判定根治・可用性向上）。**

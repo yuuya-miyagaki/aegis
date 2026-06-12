@@ -1,7 +1,7 @@
 # Aegis — アーキテクチャ概観
 
-> 作成日: 2026-04-17（最終更新: 2026-06-11）
-> バージョン: v1.5.2
+> 作成日: 2026-04-17（最終更新: 2026-06-12）
+> バージョン: v1.6.0
 > 対象: フレームワーク全体の構造・設計思想・構成要素の解説
 
 ---
@@ -572,3 +572,4 @@ python3 scripts/check_framework_contract.py --profile=standard --root <your-proj
 | v1.5.0 | E1 activity verification（検証の実行ベース化）。hook 観測の Bash 実行記録 `.claude/evidence-log.jsonl` を judge card テスト判定の唯一ソースに（自己申告 `test-result.json` 廃止）。fingerprint.sh 単一所有（HEAD sha 混入・quotepath/読取不能は error に fail-closed）、記録=fail-open／判定=fail-closed の二段構え、observer 生存チェック（TaskCompleted 差し戻し）、scaffold smoke の観測系実発火（成功側＋失敗側） |
 | v1.5.1 | grill 🟢残余 5 件の修正バッチ。T1: テストランナー分類のコマンド位置アンカー＋消費者改行正規化（false-RED 解消）／T2: deploy-gate の stdout/stderr 分離（mktemp fail-open 封鎖込み）／T3: update-gate のロック前倒し（TOCTOU 解消）／T4: stale lock の PID ベース自動回収（原子 mv claim）／T5: WRITE_INDICATORS 左境界化＋find 実行系フラグ封鎖（書込バイパス閉鎖） |
 | v1.5.2 | v1.5.1 記録残余の全消化バッチ。T1: クォートマスク正規化（`"…"`/`'…'` → `Q` 置換、quote-blind false-RED 根治・削除方式は green 偽装のため不採用）／T2: 入れ子サブシェル `((runner))` のアンカー拡張／T3: `\/` エスケープの python3 fidelity ルーティング／T4: ロック自己修復（孤児 claim 復元＋pid なしロックの O_EXCL 採用）／T5: ロック待機窓 2s→10s |
+| v1.6.0 | 行動レビュー（2026-06-12）P1×4 の fix-forward。P1-A: skill 構造起動（phase-skills.sh 単一所有＋SessionStart/phase 遷移の path 形式注入＋到達性の drift/smoke 契約化）／P1-B: full への skill 参照テンプレート 6 件配布＋参照実在の契約化／P1-C: judge card のゲート承認時 transcript push＋scanner のバイナリ decode 耐性／P1-D: client_ready_for_dev の handover 6 成果物対称検査（承認側＋完了側）／drill の vendor/build 区画恒久除外 |

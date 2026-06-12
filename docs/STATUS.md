@@ -3,13 +3,13 @@ framework: aegis
 framework_version: "1.6.0"
 project_name: "Aegis"
 mode: Dev
-phase: implement
+phase: review
 task_type: framework
 task_size: L
 task_size_rationale: "確定（brainstorm）: behavioral-review-report-2026-06-12 §5.1 の fix-forward P1×4 バッチ（v1.6.0 minor）。P1-A skill 到達性（phase-skills lib 新設＋SessionStart/遷移注入＋drift/smoke 契約）/ P1-B templates 配布 / P1-C judge card crash 修正＋transcript push / P1-D Client ゲート対称検査。lib×1 新設・hook×2・scripts×6・skills/agents/rules 正規化 14 箇所＋ミラー＋新規テスト 4 本＝15 タスクで L。"
 iteration: 21
 ui_surface: false
-last_updated: "2026-06-12T07:30:00Z"
+last_updated: "2026-06-12T08:40:00Z"
 gate_approvals:
   client_ready_for_dev: n/a
   brainstorm: approved
@@ -42,7 +42,7 @@ external_evidence:
     scope: "v0.12.2 実装後 4 ラウンドレビュー"
     findings: "Round 6 (P1×2, P2×1: pre-compact exit 2 / minimal-project / test rc), Round 7 (P1×1, P3×1: git add 漏れ / テスト件数表記), Round 8 (P2×1, P3×1: stale last_updated / grep 自己マッチ), Round 9 (P3×2: コメント不整合)"
     resolution: "9件全反映。tier 1/2 PASS、134 tests PASS、本体と minimal-project 完全同期確認済み。"
-next_action: "iteration 21（v1.6.0 fix-forward P1×4）: Task 1〜15 全完了（HEAD d628748）。全 tier 0/1/2/3・--strict・drift・mirror identity PASS（507 tests）。次: grill-code 独立2本 → 指摘対応 → review/qa/security/deploy 4ゲート --ack 承認 → 証跡 v160-*.md → tag v1.6.0。"
+next_action: "iteration 21（v1.6.0 fix-forward P1×4）: 実装＋grill-code 独立2本（A マージ可/B S1 充足済み=a8411fb）＋証跡 v160-review/qa/security/deploy 4本準備完了（508 tests・全 tier・drift・--strict PASS）。次: ユーザーによる review→qa→security→deploy の 4 ゲート承認（/gate、🟡 は --ack）→ tag v1.6.0 → origin push 判断。"
 blockers: []
 failure_tracking: null
 session_history:
