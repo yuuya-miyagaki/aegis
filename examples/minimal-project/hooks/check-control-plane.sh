@@ -91,9 +91,16 @@ cmd_var_built_write() {
     || return 1
   # (2) VARIABLE REFERENCE anywhere — $X, ${X}, ${X:-...}, etc.
   printf '%s' "$cmd" | grep -qE '\$\{?[A-Za-z_][A-Za-z0-9_]*' || return 1
-  # (3) WRITE OPERATION: redirect or write utility or `-c` interpreter script.
+  # (3) WRITE OPERATION: redirect or write/modify/delete utility or `-c`
+  # interpreter script. Coverage extended from v1.6.1 initial (grill-code
+  # A-Crit-1): ln/curl/wget/rsync/chmod/chown/rm/mkdir/git apply/find write
+  # actions all can produce or zero-out a control-plane file via a var-built
+  # path and equally collapse the moat (a missing or non-readable lib
+  # silently fails the source — fail-open). Each utility is anchored on
+  # non-alphanumeric boundary so substring matches in identifiers (e.g. a
+  # filename containing `ln`) do not trigger.
   printf '%s' "$cmd" | grep -qE \
-    '>>?[[:space:]]*[^&]|(^|[^A-Za-z0-9_])(tee|cp|mv|install|dd|truncate)([[:space:]]|$)|sed[[:space:]]+-i|python3?[[:space:]]+-c|bash[[:space:]]+-c' \
+    '>>?[[:space:]]*[^&]|(^|[^A-Za-z0-9_])(tee|cp|mv|install|dd|truncate|ln|rm|chmod|chown|mkdir|curl|wget|rsync|tar)([[:space:]]|$)|sed[[:space:]]+-i|python3?[[:space:]]+-c|bash[[:space:]]+-c|git[[:space:]]+(apply|add|mv|rm|stage|update-index)|find[[:space:]]+.*-(exec|delete|fprint|fprintf)' \
     || return 1
   return 0
 }
