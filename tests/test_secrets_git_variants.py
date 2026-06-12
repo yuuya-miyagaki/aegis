@@ -69,6 +69,87 @@ class TestGitVariantBypass(unittest.TestCase):
                       f"-c kv bypass: {out[:120]}")
 
 
+class TestGitVarBuiltFilename(unittest.TestCase):
+    """grill-code A-Crit-4: `F=.env; git add $F` slips past the literal-`.env`
+    regex because the file is built via variable. Same C-1 var-built class
+    of attack carried over to S-3. Must ASK (mild friction is acceptable —
+    the user confirms `F` is intended)."""
+
+    def _expect_blocked(self, cmd: str):
+        rc, out = _hook(cmd)
+        blocked = (_PERMISSION_DENY in out
+                   or '"permissionDecision":"ask"' in out)
+        self.assertTrue(blocked,
+                        f"var-built filename `{cmd}` must DENY or ASK: {out[:160]}")
+
+    def test_F_eq_env_then_git_add_F(self):
+        self._expect_blocked("F=.env; git add $F")
+
+    def test_var_eq_id_rsa_then_git_add_var(self):
+        self._expect_blocked("F=id_rsa; git add $F")
+
+    def test_default_value_form_with_dot_env(self):
+        # ${HIDDEN:-.env} expands to .env when HIDDEN is unset.
+        self._expect_blocked('git add "${HIDDEN:-.env}"')
+
+
+class TestGitCommitGitPreOpts(unittest.TestCase):
+    """grill-code A-S4: `git commit` was only matched as the bare verb, so
+    `git --git-dir=.git --work-tree=. commit -am 'x'` could commit a staged
+    .env without triggering the staged-files deny. Apply GIT_PRE_OPTS to the
+    commit verb too."""
+
+    def _prepare_staged_env(self, tmp: Path):
+        subprocess.run(["git", "init", "-q"], cwd=tmp, check=True)
+        subprocess.run(["git", "config", "user.email", "x@y.z"],
+                       cwd=tmp, check=True)
+        subprocess.run(["git", "config", "user.name", "t"],
+                       cwd=tmp, check=True)
+        (tmp / ".env").write_text("SECRET=x", encoding="utf-8")
+        subprocess.run(["git", "add", "-f", ".env"], cwd=tmp, check=True)
+
+    def test_baseline_git_commit_with_staged_env_denies(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as td:
+            tmp = Path(td)
+            self._prepare_staged_env(tmp)
+            payload = json.dumps(
+                {"tool_name": "Bash",
+                 "tool_input": {"command": "git commit -m wip"}})
+            r = subprocess.run(["bash", str(HOOK)], input=payload,
+                               capture_output=True, text=True, cwd=str(tmp))
+            self.assertIn(_PERMISSION_DENY, r.stdout,
+                          f"baseline: {r.stdout[:160]}")
+
+    def test_git_dash_C_commit_with_staged_env_denies(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as td:
+            tmp = Path(td)
+            self._prepare_staged_env(tmp)
+            payload = json.dumps(
+                {"tool_name": "Bash",
+                 "tool_input": {"command": f"git -C {td} commit -m wip"}})
+            r = subprocess.run(["bash", str(HOOK)], input=payload,
+                               capture_output=True, text=True, cwd=str(tmp))
+            self.assertIn(_PERMISSION_DENY, r.stdout,
+                          f"-C variant: {r.stdout[:160]}")
+
+    def test_git_dir_flag_commit_with_staged_env_denies(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as td:
+            tmp = Path(td)
+            self._prepare_staged_env(tmp)
+            payload = json.dumps(
+                {"tool_name": "Bash",
+                 "tool_input": {"command":
+                                "git --git-dir=.git --work-tree=. "
+                                "commit -m wip"}})
+            r = subprocess.run(["bash", str(HOOK)], input=payload,
+                               capture_output=True, text=True, cwd=str(tmp))
+            self.assertIn(_PERMISSION_DENY, r.stdout,
+                          f"--git-dir variant: {r.stdout[:160]}")
+
+
 class TestGitVariantAllowList(unittest.TestCase):
     """False-positive guards: legitimate commands must NOT deny."""
 

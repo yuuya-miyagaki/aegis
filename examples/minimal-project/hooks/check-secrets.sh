@@ -125,7 +125,10 @@ fi
 
 # --- Check 2: Deny commit when .env is staged ---
 
-if printf '%s' "$CMD" | grep -qE 'git\s+commit' 2>/dev/null; then
+# grill-code A-S4 (v1.6.1): commit verb also accepts the same GIT_PRE_OPTS
+# prefix as the staging verbs above. Without this, `git --git-dir=.git
+# --work-tree=. commit` and `git -C dir commit` skipped the staged-diff check.
+if printf '%s' "$CMD" | grep -qE "git[[:space:]]+${GIT_PRE_OPTS}commit" 2>/dev/null; then
   # v0.13.0 Phase 0b NO-GO fix: high-risk credential files in staged diff (Form 4).
   if git diff --cached --name-only 2>/dev/null | grep -E "${AEGIS_HIGH_RISK_STAGED_RE}" | grep -q . 2>/dev/null; then
     emit_deny "[secrets] 高リスク認証ファイル (PEM鍵/SSH鍵/credentials.json/service-account.json) がステージングされています。git reset HEAD でファイル名を指定して除外してからコミットしてください。"
@@ -136,6 +139,17 @@ if printf '%s' "$CMD" | grep -qE 'git\s+commit' 2>/dev/null; then
     emit_deny "[secrets] .env ファイルがステージングされています。git reset HEAD .env で除外してからコミットしてください。"
     exit 0
   fi
+fi
+
+# grill-code A-Crit-4 (v1.6.1): `F=.env; git add $F` builds the filename via
+# variable expansion, so the literal-`.env` regex above misses it. Mirror the
+# C-1 var-built-write heuristic: if the command has BOTH a variable assignment
+# AND uses `git add $VAR` / `git stage $VAR` / `git update-index $VAR`, ASK.
+# Same logic applies to high-risk credentials staged via var-built names.
+if printf '%s' "$CMD" | grep -qE '(^|[;&|][[:space:]]*|[[:space:]])[A-Za-z_][A-Za-z0-9_]*=' 2>/dev/null && \
+   printf '%s' "$CMD" | grep -qE "git[[:space:]]+${GIT_PRE_OPTS}${GIT_STAGE_VERB}[[:space:]]+([^.[:space:]]+[[:space:]]+)*\\\$\\{?[A-Za-z_][A-Za-z0-9_]*" 2>/dev/null; then
+  emit_ask "[secrets] git のステージング先パスが変数 (\$VAR) で組み立てられています — .env や認証ファイルを意図せず追加しないか確認してください。"
+  exit 0
 fi
 
 # --- Check 3: Warn when .gitignore lacks .env protection ---
