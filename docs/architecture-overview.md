@@ -284,34 +284,39 @@ CLAUDE.md はフレームワークの中核であり、常時コンテキスト�
 各スキルは `SKILL.md` に frontmatter を持ち、Claude Code がフェーズに応じて読み込む参照文書として機能する。
 v1.0.0 で公式同名スキルとの衝突回避のため一部を `aegis-*` に改名した。
 
+起動経路は phase 遷移／SessionStart で `hooks/lib/phase-skills.sh` が
+追加コンテキストとして path 形式の Read 指示を流す。`session-recovery`
+だけ `user-invocable: true`（任意障害復旧で `/session-recovery` から
+直接呼び出せる必要があるため）、それ以外は `user-invocable: false`。
+
 | スキル | 対応フェーズ／用途 | user-invocable |
 |--------|------------------|---------------|
-| aegis-brainstorm | brainstorm | true |
-| bug-diagnosis | brainstorm（bugfix/hotfix） | true |
-| tdd | implement | true |
-| subagent-dev | plan, implement, review | true |
-| deploy | deploy | true |
-| client-workflow | Client 全フェーズ | true |
+| aegis-brainstorm | brainstorm | false |
+| bug-diagnosis | brainstorm（bugfix/hotfix） | false |
+| tdd | implement | false |
+| subagent-dev | plan, implement, review | false |
+| deploy | deploy | false |
+| client-workflow | Client 全フェーズ | false |
 | session-recovery | 任意（障害復旧） | true |
-| ship-and-docs | ship, docs | true |
+| ship-and-docs | ship, docs | false |
 | aegis-review-gate | review | false |
 | aegis-security-gate | security | false |
 | qa-verification | qa | false |
-| docs-sync | docs | true |
-| translation-mapping | Client→Dev 翻訳 | true |
-| integration-assist | 外部サービス統合 | true |
-| browser-assist | ブラウザ自動操作基盤（gstack $B + Playwright MCP） | true |
-| user-manual | docs（操作マニュアル生成・B3a） | true |
-| maintenance | 保守ライフサイクル（RUNBOOK・本番インシデント・B3c） | true |
-| uat | ship（受入テスト記録・B3b） | true |
+| docs-sync | docs | false |
+| translation-mapping | Client→Dev 翻訳 | false |
+| integration-assist | 外部サービス統合 | false |
+| browser-assist | ブラウザ自動操作基盤（gstack $B + Playwright MCP） | false |
+| user-manual | docs（操作マニュアル生成・B3a） | false |
+| maintenance | 保守ライフサイクル（RUNBOOK・本番インシデント・B3c） | false |
+| uat | ship（受入テスト記録・B3b） | false |
 
 ---
 
 ## 7. フック（Policy as Code）
 
-16 のランタイムフックが Claude Code のツール呼び出しを制御する。
+17 のランタイムフックが Claude Code のツール呼び出しを制御する。
 フック設定は `templates/hooks.template.json` に定義され、`bin/setup.sh` が `settings.local.json` として生成する。
-共有ライブラリは `hooks/lib/`（出力スキーマ＝`emit.sh`、破壊パターン＝`patterns.sh`、入力抽出＝`extract-input.sh`）。
+共有ライブラリは `hooks/lib/`（出力スキーマ＝`emit.sh`、破壊パターン＝`patterns.sh`、入力抽出＝`extract-input.sh`、frontmatter ＝`frontmatter.sh`、観測ログ＝`evidence.sh`/`fingerprint.sh`、phase→skill マップ＝`phase-skills.sh`、credential パターン＝`secrets-patterns.sh` の計 8 本）。
 `emit.sh` は pure-bash で外部依存ゼロ＝deny/block が fail-open しない。
 
 ### 7.1 フック一覧
@@ -399,7 +404,7 @@ TaskCreated / TaskCompleted
 |-----------|------|
 | `check_framework_contract.py` | フレームワーク契約検証（ファイル存在、CLAUDE.md 語数、スキル/エージェント/コマンド/フック整合性、model/effort policy、name lint、プロファイル検証、example placeholder/mirror） |
 | `check_status.py` | STATUS.md YAML frontmatter 検証（必須フィールド、ゲート整合性、tri-state pre-approve、完了 evidence） |
-| `check_reference_drift.py` | 参照名ドリフト検出（11 チェック。本体↔example の mirror-identity を byte 比較） |
+| `check_reference_drift.py` | 参照名ドリフト検出（12 チェック。本体↔example の mirror-identity を byte 比較） |
 | `lint_names.py` | 名前クロスリファレンス lint（種別ごとの抽出器） |
 | `run_eval.py` | 統合評価ランナー（Tier 0: unittest、Tier 1: 契約、Tier 2: scaffold スモーク、Tier 3: シナリオ） |
 | `eval_scaffold_smoke.py` | scaffold 後に hook/script を実発火して install 経路を検証 |
@@ -449,7 +454,7 @@ TaskCreated / TaskCompleted
 |------------|----------|---------|
 | minimal | session-start のみ | 最小（コア文書＋STATUS 検証） |
 | standard | session-start, check-gate, post-status-audit, pre-compact | 推奨（基本ゲート＋状態保護） |
-| full | 全 16 フック | 全構成（全スキル・全エージェント・全スクリプト・TDD backstop） |
+| full | 全 17 フック | 全構成（全スキル・全エージェント・全スクリプト・TDD backstop） |
 
 `setup.sh` は profile の `required`/`recommended` に列挙されたファイルと `hooks_include` の hook を配布し、
 hook を含む場合は `hooks/lib/*.sh` を全て配布する。
@@ -532,7 +537,7 @@ python3 scripts/check_framework_contract.py --profile=standard --root <your-proj
 | エージェント（.claude/agents/） | 12 |
 | スキル（.claude/skills/） | 19（SKILL.md x18 + platforms.md x1） |
 | コマンド（.claude/commands/） | 8 |
-| フック（hooks/） | 19（メイン16 + lib/ 3: emit/patterns/extract-input） |
+| フック（hooks/） | 25（メイン 17 + lib/ 8: emit / patterns / extract-input / frontmatter / evidence / fingerprint / phase-skills / secrets-patterns） |
 | スクリプト（scripts/） | 14 |
 | テンプレート（templates/） | 30（.template.md x26 + hooks.template.json + profiles x3） |
 | 拡張（extensions/） | 11 |
