@@ -362,6 +362,92 @@ def check_session_start_hints(root: Path) -> tuple[list[str], list[str]]:
     return failures, warnings
 
 
+SKILL_PATH_RE = re.compile(r"\.claude/skills/([a-z][a-z0-9_-]*)/SKILL\.md")
+PHASE_MAP_NAMES_RE = re.compile(r'names="([^"]*)"')
+USER_INVOCABLE_RE = re.compile(r"^user-invocable:\s*true\b", re.M)
+
+
+def _phase_map_skill_names(root: Path) -> set[str]:
+    lib = root / "hooks" / "lib" / "phase-skills.sh"
+    if not lib.is_file():
+        return set()
+    names: set[str] = set()
+    for m in PHASE_MAP_NAMES_RE.finditer(_read(lib)):
+        names.update(m.group(1).split())
+    return names
+
+
+# Pure existence manifests: they list every skill path as metadata, not as a
+# boot instruction. Counting them as reachability roots would make the check
+# permanently CLEAN (vacuous) — the exact fake-green this check exists to stop.
+SKILL_REF_EXCLUDE = {Path("scripts") / "check_framework_contract.py"}
+
+
+def _control_file_skill_refs(root: Path) -> set[str]:
+    sources: list[Path] = []
+    claude_md = root / "CLAUDE.md"
+    if claude_md.is_file():
+        sources.append(claude_md)
+    for sub in ("commands", "agents", "rules"):
+        base = root / ".claude" / sub
+        if base.is_dir():
+            sources.extend(p for p in sorted(base.rglob("*.md")) if p.is_file())
+    for sub, exts in (("hooks", (".sh",)), ("scripts", (".sh", ".py"))):
+        base = root / sub
+        if base.is_dir():
+            sources.extend(
+                p for p in sorted(base.rglob("*")) if p.is_file() and p.suffix in exts
+            )
+    refs: set[str] = set()
+    for path in sources:
+        if path.relative_to(root) in SKILL_REF_EXCLUDE:
+            continue
+        refs.update(SKILL_PATH_RE.findall(_read(path)))
+    return refs
+
+
+def check_skill_reachability(root: Path) -> tuple[list[str], list[str]]:
+    """#8: every skill must have a boot path (phase map / user-invocable / path ref)"""
+    failures: list[str] = []
+    warnings: list[str] = []
+
+    skills_dir = root / ".claude" / "skills"
+    if not skills_dir.is_dir():
+        return failures, warnings
+
+    skills: dict[str, Path] = {}
+    for entry in sorted(skills_dir.iterdir()):
+        skill_md = entry / "SKILL.md"
+        if skill_md.is_file():
+            skills[entry.name] = skill_md
+
+    roots = _phase_map_skill_names(root) | _control_file_skill_refs(root)
+    for name, skill_md in skills.items():
+        if USER_INVOCABLE_RE.search(_read(skill_md)):
+            roots.add(name)
+
+    reachable: set[str] = set()
+    queue = [name for name in sorted(roots) if name in skills]
+    while queue:
+        name = queue.pop()
+        if name in reachable:
+            continue
+        reachable.add(name)
+        for target in SKILL_PATH_RE.findall(_read(skills[name])):
+            if target in skills and target not in reachable:
+                queue.append(target)
+
+    for name in sorted(skills):
+        if name not in reachable:
+            failures.append(
+                "skill '%s' has no boot path (not in phase-skills.sh, not "
+                "user-invocable, and no control file Reads "
+                ".claude/skills/%s/SKILL.md)" % (name, name)
+            )
+
+    return failures, warnings
+
+
 def check_example_readme_counts(root: Path) -> tuple[list[str], list[str]]:
     """#9: examples/minimal-project/README.md counts vs actual example files"""
     failures: list[str] = []
