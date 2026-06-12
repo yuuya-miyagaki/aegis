@@ -49,6 +49,12 @@ CONTROL_PLANE="${CONTROL_PLANE}|(\\.\\./)+(${CP_DIRS})/"
 CONTROL_PLANE="${CONTROL_PLANE}|/\\./(${CP_DIRS})/"
 CONTROL_PLANE="${CONTROL_PLANE}|[)\`'\"]/(${CP_DIRS})/"
 CONTROL_PLANE="${CONTROL_PLANE}|\\\$[A-Za-z_{][A-Za-z0-9_}]*/(${CP_DIRS})/"
+# C-1 (v1.6.1): parameter-expansion DEFAULT literal — `${VAR:-hooks}/`.
+# The boundary `[^A-Za-z0-9_./-]` excluded `:-` so `${HOOKS_DIR:-hooks}/lib/`
+# slipped through. Cover :-, :=, :+ literals leading into a CP dir. The `}?`
+# allows the form `${VAR:-hooks}/lib/` (close-brace between hooks and /) as
+# well as `${VAR:-hooks/lib/...}` (path inside the braces).
+CONTROL_PLANE="${CONTROL_PLANE}|:[-=+](${CP_DIRS})}?/"
 
 # True when the command references this project's control plane, including
 # literal absolute paths under the project root (logical and physical forms —
@@ -68,6 +74,30 @@ cmd_mentions_control_plane() {
   return 1
 }
 
+# C-1 (v1.6.1): variable-built write target. Static expansion is undecidable,
+# so when a command satisfies ALL three conditions we route to `ask`:
+#   (1) at least one variable ASSIGNMENT at command position (X=val)
+#   (2) at least one variable USE elsewhere ($X or ${X})
+#   (3) a write operation present (redirect / write utility / -c script)
+# The bypass `D=h; D=${D}ooks; > $D/lib/emit.sh` matches all three; legitimate
+# `MY_VAR=safe make build` (no write to a var-built path) does not. The legit
+# `OUT=/tmp/x; echo y > $OUT` triggers `ask` (mild friction) — user confirms.
+# Receive list & rationale: docs/qa-reports/v161-security.md.
+cmd_var_built_write() {
+  local cmd="$1"
+  # (1) ASSIGNMENT at command position: token start followed by IDENT=
+  printf '%s' "$cmd" | grep -qE \
+    '(^|;|&|\|)[[:space:]]*[A-Za-z_][A-Za-z0-9_]*=|[[:space:]][A-Za-z_][A-Za-z0-9_]*=' \
+    || return 1
+  # (2) VARIABLE REFERENCE anywhere — $X, ${X}, ${X:-...}, etc.
+  printf '%s' "$cmd" | grep -qE '\$\{?[A-Za-z_][A-Za-z0-9_]*' || return 1
+  # (3) WRITE OPERATION: redirect or write utility or `-c` interpreter script.
+  printf '%s' "$cmd" | grep -qE \
+    '>>?[[:space:]]*[^&]|(^|[^A-Za-z0-9_])(tee|cp|mv|install|dd|truncate)([[:space:]]|$)|sed[[:space:]]+-i|python3?[[:space:]]+-c|bash[[:space:]]+-c' \
+    || return 1
+  return 0
+}
+
 # Extract the command with full fidelity: python3 first, bash fast-path next.
 # When the input carries embedded escaped quotes and python3 is unavailable,
 # the bash fast-path would truncate at the first inner quote and could hide a
@@ -83,6 +113,12 @@ fi
 # Bash command at install targets (P1-1, evolution review 2026-06-10).
 if [ -n "$CMD" ]; then
   if ! cmd_mentions_control_plane "$CMD"; then
+    # C-1: cannot statically prove the write target stays out of control plane
+    # when the command builds it via variable expansion. Ask rather than allow.
+    if cmd_var_built_write "$CMD"; then
+      emit_ask "[integrity] このコマンドは変数で書込み先 path を組み立てています (例: \$D/lib/...) — 制御プレーン (hooks/scripts/.claude) を意図せず上書きする可能性があるため確認してください。"
+      exit 0
+    fi
     emit_allow
     exit 0
   fi
