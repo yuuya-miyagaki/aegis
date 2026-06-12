@@ -87,7 +87,7 @@ def scan_stubs(root: Path) -> list[str]:
     for rel, lines in _changed_code_files(root).items():
         try:
             content = (root / rel).read_text(encoding="utf-8").split("\n")
-        except OSError:
+        except (OSError, UnicodeDecodeError):
             continue
         for ln in sorted(lines):
             if 1 <= ln <= len(content) and STUB_PATTERN.search(content[ln - 1]):
@@ -228,7 +228,7 @@ def scan_secrets(root: Path) -> list[str]:
     for rel, lines in _changed_code_files(root).items():
         try:
             content = (root / rel).read_text(encoding="utf-8").split("\n")
-        except OSError:
+        except (OSError, UnicodeDecodeError):
             continue
         for ln in sorted(lines):
             if 1 <= ln <= len(content) and SECRET_PATTERN.search(content[ln - 1]):

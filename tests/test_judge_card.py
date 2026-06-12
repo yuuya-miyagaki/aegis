@@ -535,5 +535,47 @@ class TestAuditDeps(unittest.TestCase):
             self.assertEqual(judge.audit_deps(Path(d)), "unverified")
 
 
+class TestBinaryScanResilience(unittest.TestCase):
+    """OBS-023: バイナリ混入 index で judge ビルダーがクラッシュしない。"""
+
+    def _scaffold_repo(self, root: Path) -> None:
+        sp.run(["git", "init", "-q"], cwd=str(root), check=True)
+        _copy_lib(root)
+        (root / "docs" / "qa-reports").mkdir(parents=True)
+        (root / "docs" / "STATUS.md").write_text(
+            "---\nframework: aegis\nmode: Dev\nphase: review\n"
+            "task_type: feature\ntask_size: M\n"
+            "gate_approvals:\n  review: pending\n"
+            "current_refs:\n  review: null\n---\n", encoding="utf-8")
+
+    def test_scan_skips_undecodable_changed_file(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            self._scaffold_repo(root)
+            (root / "src").mkdir()
+            # NUL なし不正 UTF-8 → drill は追加行として返し、read_text が strict だと落ちる
+            (root / "src" / "blob.bin").write_bytes(b"\xcf\xfa\xed\xfe" * 64 + b"\n")
+            sp.run(["git", "add", "-A"], cwd=str(root), check=True)
+            self.assertEqual(judge.scan_stubs(root), [])    # 例外なく skip
+            self.assertEqual(judge.scan_secrets(root), [])
+
+    def test_obs023_cli_repro_no_traceback(self):
+        # 再現コマンド: python3 scripts/build-judge-card.py --gate review --root .
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            self._scaffold_repo(root)
+            nm = root / "node_modules" / ".bin"
+            nm.mkdir(parents=True)
+            (nm / "esbuild").write_bytes(b"\xcf\xfa\xed\xfe" * 256 + b"\n")
+            (root / "src").mkdir()
+            (root / "src" / "blob.bin").write_bytes(b"\xcf\xfa\xed\xfe" * 64 + b"\n")
+            sp.run(["git", "add", "-A"], cwd=str(root), check=True)
+            r = sp.run(["python3", str(SCRIPT), "--gate", "review", "--root", str(root)],
+                       capture_output=True, text=True, timeout=120)
+            self.assertNotIn("Traceback", r.stderr)
+            self.assertIn(r.returncode, (0, 1, 2))
+            self.assertTrue((root / "docs" / "qa-reports" / "judge-review.md").is_file())
+
+
 if __name__ == "__main__":
     unittest.main()
