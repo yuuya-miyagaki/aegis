@@ -335,7 +335,10 @@ def check_template_references(root: Path) -> tuple[list[str], list[str]]:
 
 
 SKILL_PATH_RE = re.compile(r"\.claude/skills/([a-z][a-z0-9_-]*)/SKILL\.md")
-PHASE_MAP_NAMES_RE = re.compile(r'names="([^"]*)"')
+# Anchored per line, comment-prefix excluded, no newline inside quotes: a
+# names="..." example inside a header COMMENT must never become a boot root
+# (a real skill name in a comment would make reachability permanently CLEAN).
+PHASE_MAP_NAMES_RE = re.compile(r'^[^#\n]*\bnames="([^"\n]*)"', re.M)
 USER_INVOCABLE_RE = re.compile(r"^user-invocable:\s*true\b", re.M)
 
 

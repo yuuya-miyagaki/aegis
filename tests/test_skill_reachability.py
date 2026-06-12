@@ -88,6 +88,22 @@ class TestSkillReachability(unittest.TestCase):
         failures, _ = drift.check_skill_reachability(self.root)
         self.assertEqual(len(failures), 2)
 
+    def test_comment_names_example_is_not_root(self):
+        # ヘッダコメント中の names="..." 例文が root 化されると、例文に実 skill 名を
+        # 書いた瞬間に到達性が恒久 CLEAN＝空洞化する（grill-code v160 S1）。
+        _make_skill(self.root, "phantom")
+        lib = self.root / "hooks" / "lib"
+        lib.mkdir(parents=True)
+        (lib / "phase-skills.sh").write_text(
+            '#!/bin/bash\n'
+            '# parses the `names="phantom"` assignments below as roots\n'
+            'case "$phase" in\n  implement) names="tdd" ;;\nesac\n',
+            encoding="utf-8",
+        )
+        failures, _ = drift.check_skill_reachability(self.root)
+        self.assertEqual(len(failures), 1)
+        self.assertIn("phantom", failures[0])
+
     def test_existence_manifest_does_not_rescue(self):
         # check_framework_contract.py は全 skill の存在リスト（メタデータ）を持つ。
         # boot 指示ではないので到達性の root にしてはならない（恒久 CLEAN 化＝空洞化の防止）。
