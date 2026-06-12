@@ -148,6 +148,16 @@ REQUIRED_HOOK_FILES = [
     ROOT / "hooks/post-bash-observe.sh",
     ROOT / "hooks/lib/evidence.sh",
     ROOT / "hooks/lib/fingerprint.sh",
+    # P1-A skill reachability (v1.6.0): phase-skills lib sourced by
+    # session-start.sh and post-status-audit.sh. F6 lesson applies — an
+    # install missing this lib silently fail-opens both hooks at source
+    # time. S-11 (v1.6.1) registers it so the same class of detection gap
+    # is closed for every future skill-reachability-touching lib too.
+    ROOT / "hooks/lib/phase-skills.sh",
+    # C-9 (v1.6.1): high-risk credential pattern single-owner lib sourced
+    # by check-secrets.sh. Same F6 lesson — a missing lib silently fail-
+    # opens the secret-staging deny path.
+    ROOT / "hooks/lib/secrets-patterns.sh",
 ]
 
 REQUIRED_EXAMPLE_FILES = [
@@ -222,6 +232,10 @@ REQUIRED_EXAMPLE_FILES = [
     ROOT / "examples/minimal-project/hooks/post-bash-observe.sh",
     ROOT / "examples/minimal-project/hooks/lib/evidence.sh",
     ROOT / "examples/minimal-project/hooks/lib/fingerprint.sh",
+    # S-11 (v1.6.1): pin the example mirror for both new libs so drift's
+    # byte-identity check covers them too (same logic as L229-231).
+    ROOT / "examples/minimal-project/hooks/lib/phase-skills.sh",
+    ROOT / "examples/minimal-project/hooks/lib/secrets-patterns.sh",
     ROOT / "examples/minimal-project/.claude/agents/translation-specialist.md",
     ROOT / "examples/minimal-project/.claude/agents/integration-specialist.md",
 ]

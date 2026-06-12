@@ -3,31 +3,31 @@ framework: aegis
 framework_version: "1.6.0"
 project_name: "Aegis"
 mode: Dev
-phase: deploy
+phase: implement
 task_type: framework
 task_size: L
-task_size_rationale: "確定（brainstorm）: behavioral-review-report-2026-06-12 §5.1 の fix-forward P1×4 バッチ（v1.6.0 minor）。P1-A skill 到達性（phase-skills lib 新設＋SessionStart/遷移注入＋drift/smoke 契約）/ P1-B templates 配布 / P1-C judge card crash 修正＋transcript push / P1-D Client ゲート対称検査。lib×1 新設・hook×2・scripts×6・skills/agents/rules 正規化 14 箇所＋ミラー＋新規テスト 4 本＝15 タスクで L。"
-iteration: 21
+task_size_rationale: "確定（brainstorm→plan→grill-plan）: 第5回全力レビュー（full-review-2026-06-12.md）で実証された Critical 7 件 + S-3/S-11 の fix-forward バッチ（v1.6.1 patch）。lib×1 新設・hook×3 修正・scripts×3 修正・template×6 sentinel 追記・docs×1 訂正 + 新規テスト 9 本＝10 commit で L（ただし 1 commit/task の狭く深い修正）。"
+iteration: 22
 ui_surface: false
-last_updated: "2026-06-12T08:40:00Z"
+last_updated: "2026-06-12T14:30:00Z"
 gate_approvals:
   client_ready_for_dev: n/a
   brainstorm: approved
   plan: approved
-  review: approved
-  qa: approved
-  security: approved
-  deploy: approved
+  review: pending
+  qa: pending
+  security: pending
+  deploy: pending
   dev_ready_for_client: pending
 current_refs:
   requirements:
-    - docs/behavioral-review-report-2026-06-12.md
-  plan: docs/plans/2026-06-12-fix-forward-p1-implementation-plan.md
+    - docs/full-review-2026-06-12.md
+  plan: docs/plans/v1.6.1-fix-forward-plan.md
   spec: null
-  review: docs/qa-reports/v160-review.md
-  qa: docs/qa-reports/v160-qa.md
-  security: docs/qa-reports/v160-security.md
-  deploy: docs/qa-reports/v160-deploy-checklist.md
+  review: null
+  qa: null
+  security: null
+  deploy: null
   translation: null
 external_evidence:
   - type: "second-opinion-v1-foundation-r1-r2"
@@ -42,18 +42,18 @@ external_evidence:
     scope: "v0.12.2 実装後 4 ラウンドレビュー"
     findings: "Round 6 (P1×2, P2×1: pre-compact exit 2 / minimal-project / test rc), Round 7 (P1×1, P3×1: git add 漏れ / テスト件数表記), Round 8 (P2×1, P3×1: stale last_updated / grep 自己マッチ), Round 9 (P3×2: コメント不整合)"
     resolution: "9件全反映。tier 1/2 PASS、134 tests PASS、本体と minimal-project 完全同期確認済み。"
-next_action: "iteration 21（v1.6.0 fix-forward P1×4）完了: 4 ゲート承認（ユーザー委任の代行 --ack）・tag v1.6.0 で締め。残: origin push（ユーザー判断）。次タスク未定。"
+next_action: "iteration 22（v1.6.1 全力レビュー由来 fix-forward）implement 開始: Task 0（hooks/lib/secrets-patterns.sh 新設）から TDD で 9 commit を順次。完了後 grill-code → qa-reports v161-* 起票 → 4 ゲート ack → tag v1.6.1。"
 blockers: []
 failure_tracking: null
 session_history:
   - date: "2026-06-12"
     mode: Dev
-    phase: "deploy"
-    note: "iteration 21（v1.6.0 fix-forward P1×4）: behavioral-review-report-2026-06-12 §5.1 の P1×4 を Task 1〜15 TDD で完走（479→508 tests）。P1-A=skill 構造起動（phase-skills.sh 単一所有＋SessionStart/phase 遷移 additionalContext 注入＋BFS 到達性の drift/smoke 契約化＋path 形式正規化 14 箇所）、P1-B=full への skill 参照テンプレ 6 件配布＋参照実在契約、P1-C=judge card 承認時 transcript push＋scanner decode 耐性、P1-D=client_ready_for_dev 6 成果物の承認側＋完了側対称検査。計画乖離 2 件は強化方向（SKILL_REF_EXCLUDE=存在マニフェストの root 化除外・tier0 timeout 300s 追従）。grill-code 独立 2 本（A=マージ可 🟡3/🟢3、B=S1 修正後マージ 🟡4/🟢3）: 合流点 S1=names regex のコメント横断偽 root（vacuous CLEAN 再演リスク）→ 非コメント行 anchor＋テストで充足（a8411fb・実 repo トークン 15 件ちょうどを実測）。B-S2/S3/S4・A🟡2/3 は理由付き記録（v160-review.md）・B-S3 は security 残余 #4 に統合。テスト記録 manual green（信頼ランナー・fp=HEAD 一致）・4 ゲート --ack 承認＝ユーザー委任の代行（証跡 v160-*.md）。v1.6.0 minor で締め・tag v1.6.0。origin push は別途ユーザー判断。"
-  - date: "2026-06-11"
+    phase: "implement"
+    note: "iteration 22（v1.6.1 全力レビュー fix-forward）開始: 第5回全力レビュー（軸 A〜F 並列 6 サブエージェント・docs/full-review-2026-06-12.md）で実証された Critical 7 件 + S-3/S-11 の fix-forward。Critical 全 9 件は PoC/grep/measurement で実証済み（C-1 制御プレーン変数展開・C-2 test green 偽装・C-3 client gate touch・C-4 SessionStart resume 欠落・C-5 user-invocable 表 17 件 drift・C-6 hook/lib/drift カウント・C-7 テスト sleep 70%・C-8 巨大関数・C-9 credentials 4 形式）。C-7/C-8 は構造 refactor のため v1.7 へ送り、v1.6.1 は狭く深い security + drift 修正に絞る。plan は grill-plan で 5 致命的・5 要検討を指摘されて全反映（Schema Migration / Phase 進行表 / Commit プラン / 受容済みリスク / Release Checklist の 5 章追加、Task 1/2/3/7 の検知ロジック精緻化、Task 0/6 のテスト境界修正）。ブランチ fix/v1.6.1-critical-bypasses で TDD 実装中。"
+  - date: "2026-06-12"
     mode: Dev
     phase: "deploy"
-    note: "iteration 19（v1.5.1 grill 残余バッチ）: T1〜T5＋版数を Task 1〜7 TDD で完走（436→461 tests）。T1=テストランナー分類のコマンド位置アンカー＋消費者 2 系統の改行正規化（実装中に extract-input.sh の grep 経路が JSON \\n エスケープをリテラル 2 文字で返す計画前提の誤りを検出→python3 fidelity ルーティングを計画逸脱として実装・記録）、T2=deploy-gate stderr 分離、T3=ロック前倒し TOCTOU 封鎖、T4=dead-pid 限定 stale lock 自動回収（atomic-mv claim・15 回レース実証）、T5=WRITE_INDICATORS 左境界＋find -exec 族封鎖（実書込バイパスの封鎖）。grill-code 独立 2 本（B は API フィルタ誤反応 2 回→sonnet 再実行で完走）が 🟡1（'(' アンカーのクォート内グループ衝突 false-RED・judge 直呼び実証）＋🟢6 を検出し全対応（4c52528）。両レビューが extract-input 逸脱を「正当かつ必要」と判定。461 tests・contract full/standard・drift・smoke・--strict 全 PASS。テスト記録 manual green・4 ゲート --ack 承認（証跡 v151-*.md）。v140/v150 記録の grill 残余 5 系統を全消化、v1.5.1 patch で締め・tag v1.5.1。origin push は別途ユーザー判断。"
+    note: "iteration 21（v1.6.0 fix-forward P1×4）: behavioral-review-report-2026-06-12 §5.1 の P1×4 を Task 1〜15 TDD で完走（479→508 tests）。P1-A=skill 構造起動（phase-skills.sh 単一所有＋SessionStart/phase 遷移 additionalContext 注入＋BFS 到達性の drift/smoke 契約化＋path 形式正規化 14 箇所）、P1-B=full への skill 参照テンプレ 6 件配布＋参照実在契約、P1-C=judge card 承認時 transcript push＋scanner decode 耐性、P1-D=client_ready_for_dev 6 成果物の承認側＋完了側対称検査。計画乖離 2 件は強化方向（SKILL_REF_EXCLUDE=存在マニフェストの root 化除外・tier0 timeout 300s 追従）。grill-code 独立 2 本（A=マージ可 🟡3/🟢3、B=S1 修正後マージ 🟡4/🟢3）: 合流点 S1=names regex のコメント横断偽 root（vacuous CLEAN 再演リスク）→ 非コメント行 anchor＋テストで充足（a8411fb・実 repo トークン 15 件ちょうどを実測）。B-S2/S3/S4・A🟡2/3 は理由付き記録（v160-review.md）・B-S3 は security 残余 #4 に統合。テスト記録 manual green（信頼ランナー・fp=HEAD 一致）・4 ゲート --ack 承認＝ユーザー委任の代行（証跡 v160-*.md）。v1.6.0 minor で締め・tag v1.6.0。origin push は別途ユーザー判断。"
   - date: "2026-06-11"
     mode: Dev
     phase: "deploy"
