@@ -19,13 +19,24 @@ Usage: `/gate`, `/gate approve <gate>`, `/gate na <gate>`, `/gate reset <gate>`
 
 1. Read `docs/STATUS.md`
 2. Parse the gate name from arguments
-3. **Pre-validation check**: For gates with ref mappings (plan, review, qa, security, deploy), verify `current_refs.<gate>` is set. If empty, display the ref status and warn the user before proceeding. This will become a hard block in v0.13.0.
-4. Confirm with the user: "Approve {gate} gate? This advances the workflow."
-5. On confirmation, run:
+3. **Pre-validation check**: For gates with ref mappings (plan, review, qa, security, deploy), verify `current_refs.<gate>` is set. If empty, display the ref status and warn the user before proceeding.
+4. **Judge preview (review/qa/security/deploy のみ)**: 承認を求める**前に**カードを提示する:
+   - Run: `python3 scripts/build-judge-card.py --gate <gate-name> --root .`
+   - Read `docs/qa-reports/judge-<gate-name>.md` and present it to the user in plain Japanese, filling the「次のアクション」section from context. The user decides by looking at the card — never summarize it away.
+5. Confirm with the user: "Approve {gate} gate? This advances the workflow."
+6. On confirmation, run:
 
 ```bash
 bash scripts/update-gate.sh <gate-name> approve
 ```
+
+If the result is 🟡, relay the card's 🟡 items and ask the user for an explicit reason, then run:
+
+```bash
+bash scripts/update-gate.sh <gate-name> approve --ack "<user-stated reason>"
+```
+
+The reason must come from the user's reply — never invent one.
 
 ## N/A mode (`$ARGUMENTS` contains "na")
 
