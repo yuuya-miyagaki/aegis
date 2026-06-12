@@ -72,5 +72,49 @@ class TestPhaseSkillPaths(unittest.TestCase):
             self.assertEqual(paths_for(Path(d), "nonsense"), [])
 
 
+class TestSessionStartInjection(unittest.TestCase):
+    """session-start.sh が phase の必読 skill を path-form で注入する。"""
+
+    def _scaffold(self, d: Path, phase: str, skills: list[str],
+                  runbook: bool = False) -> Path:
+        (d / "docs").mkdir(parents=True)
+        (d / "docs" / "STATUS.md").write_text(
+            f"---\nframework: aegis\nmode: Dev\nphase: {phase}\n"
+            "task_type: feature\ntask_size: M\n"
+            "gate_approvals:\n  review: pending\n"
+            "current_refs:\n  review: null\n---\n", encoding="utf-8")
+        make_skills(d, skills)
+        if runbook:
+            (d / "docs" / "handover").mkdir(parents=True)
+            (d / "docs" / "handover" / "RUNBOOK.md").write_text("# r\n", encoding="utf-8")
+        # hook 一式を実体 copy（session-start.sh は dirname 基準で lib を解決）
+        import shutil
+        shutil.copytree(ROOT / "hooks", d / "hooks")
+        (d / "scripts").mkdir()
+        (d / "scripts" / "check_status.py").symlink_to(ROOT / "scripts" / "check_status.py")
+        return d
+
+    def _run(self, root: Path) -> str:
+        r = subprocess.run(
+            ["bash", str(root / "hooks" / "session-start.sh")],
+            capture_output=True, text=True, timeout=60,
+            env={"PATH": "/usr/bin:/bin", "CLAUDE_PROJECT_DIR": str(root)})
+        return r.stdout
+
+    def test_review_phase_injects_read_instruction(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._scaffold(Path(tmp), "review",
+                                  ["aegis-review-gate", "subagent-dev"])
+            out = self._run(root)
+            self.assertIn(".claude/skills/aegis-review-gate/SKILL.md", out)
+
+    def test_runbook_triggers_maintenance_hint(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._scaffold(Path(tmp), "docs", ["ship-and-docs", "maintenance"],
+                                  runbook=True)
+            out = self._run(root)
+            self.assertIn(".claude/skills/maintenance/SKILL.md", out)
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -8,6 +8,7 @@ STATUS_FILE="${ROOT}/docs/STATUS.md"
 
 source "${SCRIPT_DIR}/lib/emit.sh"
 source "${SCRIPT_DIR}/lib/frontmatter.sh"
+source "${SCRIPT_DIR}/lib/phase-skills.sh"
 
 # If STATUS.md doesn't exist, allow silently.
 if [ ! -f "$STATUS_FILE" ]; then
@@ -117,42 +118,44 @@ if [ "$HISTORY_COUNT" -ge 2 ]; then
   fi
 fi
 
-# Phase-aware skill and rule hints.
+# Phase-aware rule hints. Required-skill paths come from lib/phase-skills.sh
+# (single owner) — never name skills here (name-form hints proved dead in the
+# 2026-06-12 behavioral review; drift enforces reachability separately).
 HINT=""
 case "$PHASE" in
-  onboard|discovery|requirements|scope|acceptance)
-    HINT="skill: client-workflow"
-    ;;
   handover)
-    HINT="skill: client-workflow / mapping.md必須(translation-mapping skill)"
+    HINT="mapping.md必須"
     ;;
   brainstorm)
     if [ "$TASK_TYPE" = "bugfix" ] || [ "$TASK_TYPE" = "hotfix" ]; then
-      HINT="skill: bug-diagnosis / TDD必須 / brainstorm+plan=n/a"
+      HINT="TDD必須 / brainstorm+plan=n/a"
     else
-      HINT="skill: aegis-brainstorm / TDD必須 / エビデンスなき完了なし"
+      HINT="TDD必須 / エビデンスなき完了なし"
     fi
     ;;
   plan)
-    HINT="skill: subagent-dev(計画) / Boundary Map必須 / TDD必須"
+    HINT="Boundary Map必須 / TDD必須"
     ;;
   implement)
-    HINT="skill: subagent-dev / TDD必須: テストを先に書け / エビデンスなき完了なし"
+    HINT="TDD必須: テストを先に書け / エビデンスなき完了なし"
     ;;
   review)
-    HINT="skill: subagent-dev(レビュー) / Review Army: diff-scope分析でspecialist起動"
+    HINT="Review Army: diff-scope分析でspecialist起動"
     ;;
   qa)
-    HINT="skill: qa-verification / エビデンスなき完了なし / 再現・検証を実行せよ"
+    HINT="エビデンスなき完了なし / 再現・検証を実行せよ"
     ;;
   security)
-    HINT="skill: aegis-security-gate / エビデンスなき完了なし / 残留リスクを記録せよ"
+    HINT="エビデンスなき完了なし / 残留リスクを記録せよ"
     ;;
   deploy)
-    HINT="skill: deploy / Security Blockers確認必須 / 3回失敗=ゴールベースカウント"
+    HINT="Security Blockers確認必須 / 3回失敗=ゴールベースカウント"
     ;;
   ship|docs)
-    HINT="skill: ship-and-docs / LEARNINGS更新必須(confidence付き)"
+    HINT="LEARNINGS更新必須(confidence付き)"
+    ;;
+  onboard|discovery|requirements|scope|acceptance)
+    HINT=""
     ;;
   *)
     if [ -n "$PHASE" ]; then
@@ -162,6 +165,20 @@ case "$PHASE" in
 esac
 if [ -n "$HINT" ]; then
   CONTEXT="${CONTEXT} | ${HINT}"
+fi
+
+# P1-A: explicit Read instruction for the phase's required skills — their ONLY
+# boot path (all skills ship disable-model-invocation:true).
+SKILL_PATHS=$(aegis_phase_skill_paths "$ROOT" "$PHASE" "$TASK_TYPE" | tr '\n' ' ')
+SKILL_PATHS="${SKILL_PATHS% }"
+if [ -n "$SKILL_PATHS" ]; then
+  CONTEXT="${CONTEXT} | 必読skill(Readで読み込んで従う): ${SKILL_PATHS}"
+fi
+
+# Maintenance period (OBS-034): a delivered RUNBOOK means ops/incident
+# questions may arrive regardless of phase.
+if [ -f "${ROOT}/docs/handover/RUNBOOK.md" ] && [ -f "${ROOT}/.claude/skills/maintenance/SKILL.md" ]; then
+  CONTEXT="${CONTEXT} | 保守期: 障害・問い合わせ対応は .claude/skills/maintenance/SKILL.md をRead"
 fi
 
 # Extract high-confidence learnings with phase-aware priority.
