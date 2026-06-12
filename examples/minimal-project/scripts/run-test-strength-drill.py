@@ -98,6 +98,7 @@ def _tracked_added_lines(root: Path, ref: str) -> dict[str, set[int]]:
         out = subprocess.run(
             ["git", "-C", str(root), "diff", "--unified=0", ref],
             capture_output=True, text=True, check=True,
+            errors="replace",  # binary-ish diffs must not crash scope discovery
         ).stdout
     except (subprocess.CalledProcessError, OSError) as exc:
         raise DrillError(f"git diff failed: {exc}")

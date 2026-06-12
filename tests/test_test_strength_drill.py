@@ -474,6 +474,18 @@ class TestVendorExclusion(unittest.TestCase):
             self.assertIn("src/app.py", added)
             self.assertNotIn("node_modules/pkg/index.js", added)
 
+    def test_undecodable_tracked_diff_does_not_crash(self):
+        # NUL なし不正 UTF-8: git はテキスト扱いで +行に生バイトを乗せる
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            _git_init(root)
+            (root / "src").mkdir()
+            (root / "src" / "blob.bin").write_bytes(b"\xcf\xfa\xed\xfe" * 64 + b"\n")
+            (root / "src" / "app.py").write_text("x = 1\n", encoding="utf-8")
+            _git(root, "add", "-A")
+            added = drill.added_lines_by_file(root, drill.EMPTY_TREE)  # 例外なく返る
+            self.assertIn("src/app.py", added)
+
 
 if __name__ == "__main__":
     unittest.main()
