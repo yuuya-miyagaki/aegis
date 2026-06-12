@@ -1,33 +1,33 @@
 ---
 framework: aegis
-framework_version: "1.5.2"
+framework_version: "1.6.0"
 project_name: "Aegis"
 mode: Dev
-phase: deploy
+phase: implement
 task_type: framework
 task_size: L
-task_size_rationale: "確定（brainstorm）: v151-security.md 記録の残余リスク全消化バッチ（v1.5.2 patch）。T1 クォートマスク正規化（false-RED 根治、Q 置換）/ T2 入れ子 ( アンカー拡張 / T3 \\/ fidelity ルーティング / T4 ロック自己修復（孤児 claim 復元＋O_EXCL 採用）/ T5 待機窓 10s。lib×2・hook×1・scripts×2＋ミラー×5＋テスト 4 本前後＝12 ファイル前後で L。"
-iteration: 20
+task_size_rationale: "確定（brainstorm）: behavioral-review-report-2026-06-12 §5.1 の fix-forward P1×4 バッチ（v1.6.0 minor）。P1-A skill 到達性（phase-skills lib 新設＋SessionStart/遷移注入＋drift/smoke 契約）/ P1-B templates 配布 / P1-C judge card crash 修正＋transcript push / P1-D Client ゲート対称検査。lib×1 新設・hook×2・scripts×6・skills/agents/rules 正規化 14 箇所＋ミラー＋新規テスト 4 本＝15 タスクで L。"
+iteration: 21
 ui_surface: false
-last_updated: "2026-06-11T10:14:06Z"
+last_updated: "2026-06-12T07:30:00Z"
 gate_approvals:
   client_ready_for_dev: n/a
   brainstorm: approved
   plan: approved
-  review: approved
-  qa: approved
-  security: approved
-  deploy: approved
+  review: pending
+  qa: pending
+  security: pending
+  deploy: pending
   dev_ready_for_client: pending
 current_refs:
   requirements:
-    - docs/qa-reports/v151-security.md
-  plan: docs/plans/2026-06-11-v152-residual-elimination-implementation-plan.md
-  spec: docs/specs/2026-06-11-v152-residual-elimination-design.md
-  review: docs/qa-reports/v152-review.md
-  qa: docs/qa-reports/v152-qa.md
-  security: docs/qa-reports/v152-security.md
-  deploy: docs/qa-reports/v152-deploy-checklist.md
+    - docs/behavioral-review-report-2026-06-12.md
+  plan: docs/plans/2026-06-12-fix-forward-p1-implementation-plan.md
+  spec: null
+  review: null
+  qa: null
+  security: null
+  deploy: null
   translation: null
 external_evidence:
   - type: "second-opinion-v1-foundation-r1-r2"
@@ -42,7 +42,7 @@ external_evidence:
     scope: "v0.12.2 実装後 4 ラウンドレビュー"
     findings: "Round 6 (P1×2, P2×1: pre-compact exit 2 / minimal-project / test rc), Round 7 (P1×1, P3×1: git add 漏れ / テスト件数表記), Round 8 (P2×1, P3×1: stale last_updated / grep 自己マッチ), Round 9 (P3×2: コメント不整合)"
     resolution: "9件全反映。tier 1/2 PASS、134 tests PASS、本体と minimal-project 完全同期確認済み。"
-next_action: "iteration 20（v1.5.2 残余全消化バッチ）完了: 4 ゲート承認・tag v1.5.2 で締め。残: origin push（ユーザー判断）。次タスク未定。"
+next_action: "iteration 21（v1.6.0 fix-forward P1×4）: Task 1〜15 全完了（HEAD d628748）。全 tier 0/1/2/3・--strict・drift・mirror identity PASS（507 tests）。次: grill-code 独立2本 → 指摘対応 → review/qa/security/deploy 4ゲート --ack 承認 → 証跡 v160-*.md → tag v1.6.0。"
 blockers: []
 failure_tracking: null
 session_history:
