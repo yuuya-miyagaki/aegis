@@ -24,10 +24,21 @@ DRILL_ARTIFACT_PREFIX = "docs/qa-reports/"
 # are not task code — they pollute both mutant generation and the coverage
 # floor on framework-mixed diffs (38-hunk case, LEARNINGS:37).
 DRILL_EXCLUDED_PREFIXES = ("docs/",)  # superset of DRILL_ARTIFACT_PREFIX
+# OBS-023 (behavioral review 2026-06-12): vendor/build output swamped the
+# drill scope (node_modules hunks demanded mutants). Directory-segment match
+# at any depth; src/dist/ collateral is an accepted residual (v160-security 1).
+VENDOR_SEGMENTS = frozenset({
+    "node_modules", "vendor", "dist", "build", "out", "coverage",
+    ".git", ".venv", "venv", ".next", ".nuxt", ".astro",
+})
+
+
+def vendor_excluded(rel: str) -> bool:
+    return any(seg in VENDOR_SEGMENTS for seg in rel.split("/")[:-1])
 
 
 def _drill_excluded(rel: str) -> bool:
-    return rel.startswith(DRILL_EXCLUDED_PREFIXES)
+    return rel.startswith(DRILL_EXCLUDED_PREFIXES) or vendor_excluded(rel)
 # git's well-known empty-tree object; diffing against it makes a not-yet-
 # committed project treat all its current code as added.
 EMPTY_TREE = "4b825dc642cb6eb9a060e54bf8d69288fbee4904"

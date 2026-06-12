@@ -444,5 +444,36 @@ class TestMainEndToEnd(unittest.TestCase):
             self.assertIn("git", res.stdout + res.stderr)
 
 
+class TestVendorExclusion(unittest.TestCase):
+    def test_vendor_excluded_segments(self):
+        # OBS-023: vendor/build 出力が drill スコープを汚染しない
+        for rel in [
+            "node_modules/.bin/esbuild",
+            "packages/app/node_modules/x/index.js",
+            "dist/main.js",
+            ".venv/lib/python3.12/site-packages/x.py",
+            # 境界ピン: ディレクトリ segment 一致なら深さ問わず除外
+            # （grill-plan B 🟡-1 / v160-security.md 残余リスク 1）
+            "src/dist/gen.js",
+        ]:
+            self.assertTrue(drill.vendor_excluded(rel), rel)
+        for rel in ["src/app.py", "src/dist.py", "distribution/x.py"]:
+            self.assertFalse(drill.vendor_excluded(rel), rel)
+
+    def test_added_lines_exclude_vendor_under_empty_tree(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            _git_init(root)
+            (root / "src").mkdir()
+            (root / "src" / "app.py").write_text("a = 1\n", encoding="utf-8")
+            nm = root / "node_modules" / "pkg"
+            nm.mkdir(parents=True)
+            (nm / "index.js").write_text("x\n", encoding="utf-8")
+            _git(root, "add", "-A")
+            added = drill.added_lines_by_file(root, drill.EMPTY_TREE)
+            self.assertIn("src/app.py", added)
+            self.assertNotIn("node_modules/pkg/index.js", added)
+
+
 if __name__ == "__main__":
     unittest.main()
