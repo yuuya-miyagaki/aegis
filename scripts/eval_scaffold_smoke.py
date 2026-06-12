@@ -13,6 +13,7 @@ fails open. Firing a hook is the only way to catch that (audit F6, 2026-06-07).
 from __future__ import annotations
 
 import json
+import re
 import shutil
 import subprocess
 import sys
@@ -342,7 +343,35 @@ def run_scaffold_test(profile: str, target: Path) -> tuple[str, str]:
     if not ok:
         return "FAIL", detail
 
+    # Template-reference validation in the install output (P1-B, OBS-012).
+    ok, detail = verify_template_references(target, profile)
+    if not ok:
+        return "FAIL", detail
+
     return "PASS", f"{profile} scaffold validated + hooks runnable + command surface ok"
+
+
+TEMPLATE_REF_RE = re.compile(r"templates/[A-Za-z0-9._-]+\.template\.md")
+
+
+def verify_template_references(target: Path, profile: str) -> tuple[bool, str]:
+    """Installed skills must not reference templates that were not distributed
+    (P1-B / OBS-012 — the F6 lesson: validate the INSTALL OUTPUT, not the repo)."""
+    skills_dir = target / ".claude" / "skills"
+    if not skills_dir.is_dir():
+        return True, f"{profile}: no skills installed"
+    missing: list[str] = []
+    for sk in sorted(skills_dir.glob("*/SKILL.md")):
+        text = sk.read_text(encoding="utf-8")
+        for ref in sorted(set(TEMPLATE_REF_RE.findall(text))):
+            if not (target / ref).is_file():
+                missing.append(f"{sk.parent.name} -> {ref}")
+    if missing:
+        return False, (
+            f"{profile}: installed skills reference undistributed templates: "
+            + "; ".join(missing)
+        )
+    return True, f"{profile}: template refs resolve"
 
 
 def verify_status_doctor(target: Path) -> tuple[bool, str]:
@@ -391,6 +420,9 @@ def run_full_hook_exec_test(target: Path) -> tuple[str, str]:
     if not ok:
         return "FAIL", detail
     ok, detail = verify_settings_project_dir(target, "full")
+    if not ok:
+        return "FAIL", detail
+    ok, detail = verify_template_references(target, "full")
     if not ok:
         return "FAIL", detail
     return "PASS", "full scaffold hooks runnable + command surface ok + status_doctor runnable"
