@@ -372,6 +372,9 @@ class TempProjectWithHooks(TempProject):
         (lib_dir / "frontmatter.sh").symlink_to(
             ROOT / "hooks" / "lib" / "frontmatter.sh"
         )
+        (lib_dir / "phase-skills.sh").symlink_to(
+            ROOT / "hooks" / "lib" / "phase-skills.sh"
+        )
         # Copy each hook script (not symlink — so dirname resolves to temp).
         import shutil
         for hook_name in [

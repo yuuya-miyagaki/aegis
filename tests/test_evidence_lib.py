@@ -147,7 +147,8 @@ class TestSessionStartRotates(unittest.TestCase):
             (root / "hooks").mkdir()
             (root / "hooks" / "lib").mkdir()
             for f in ("emit.sh", "frontmatter.sh", "extract-input.sh",
-                      "fingerprint.sh", "evidence.sh", "patterns.sh"):
+                      "fingerprint.sh", "evidence.sh", "patterns.sh",
+                      "phase-skills.sh"):
                 (root / "hooks" / "lib" / f).write_bytes(
                     (ROOT / "hooks" / "lib" / f).read_bytes())
             (root / "hooks" / "session-start.sh").write_bytes(
