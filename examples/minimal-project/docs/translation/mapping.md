@@ -37,3 +37,5 @@
 - open-questions #1: 複数担当者対応の要否 → MVP は 1 名制約で実装し、データモデルは拡張余地を残す（`assigneeId` → `assigneeIds[]` に将来変更可能な設計）
 - open-questions #2: スプリント繰り越し挙動 → 確認中（クライアント回答待ち）
 - open-questions #3: SSO 認証スコープ → MVP 除外方向で合意待ち
+
+<!-- aegis-required-section: translation-mapping -->

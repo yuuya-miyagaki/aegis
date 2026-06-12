@@ -46,14 +46,47 @@ GATE_REF_MAPPING = {
 # P1-D (OBS-008): client_ready_for_dev is the ONLY machine gate between Client
 # and Dev. The handover package below mirrors the client-workflow skill's
 # phase table; without an existence check the gate approves on bare assertion.
+#
+# C-3 (v1.6.1): existence-only allowed `touch` to bypass the gate. Each
+# artifact also requires (a) ≥ CLIENT_ARTIFACT_MIN_BYTES of content AND
+# (b) the machine-readable sentinel comment associated with the template.
+# Templates embed the sentinel at the tail; users filling them out keep it.
 CLIENT_GATE_ARTIFACTS = (
-    "docs/requirements/PRD.md",
-    "docs/requirements/SCOPE.md",
-    "docs/requirements/NFR.md",
-    "docs/requirements/ACCEPTANCE.md",
-    "docs/handover/TO-DEV.md",
-    "docs/translation/mapping.md",
+    ("docs/requirements/PRD.md",         "prd-context"),
+    ("docs/requirements/SCOPE.md",       "scope-in-out"),
+    ("docs/requirements/NFR.md",         "nfr"),
+    ("docs/requirements/ACCEPTANCE.md",  "acceptance-criteria"),
+    ("docs/handover/TO-DEV.md",          "handover-to-dev"),
+    ("docs/translation/mapping.md",      "translation-mapping"),
 )
+
+CLIENT_ARTIFACT_MIN_BYTES = 200
+
+
+def _client_artifact_issues(root: Path) -> list[str]:
+    """Return human-readable issues, empty list if all 6 artifacts pass."""
+    issues: list[str] = []
+    for rel, sentinel in CLIENT_GATE_ARTIFACTS:
+        p = root / rel
+        if not p.exists():
+            issues.append(f"- {rel}: 不在")
+            continue
+        try:
+            text = p.read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError):
+            issues.append(f"- {rel}: 読み取り失敗")
+            continue
+        if len(text.encode("utf-8")) < CLIENT_ARTIFACT_MIN_BYTES:
+            issues.append(
+                f"- {rel}: 内容が {CLIENT_ARTIFACT_MIN_BYTES} バイト未満 "
+                f"（テンプレを実際に埋めてください）")
+            continue
+        marker = f"<!-- aegis-required-section: {sentinel} -->"
+        if marker not in text:
+            issues.append(
+                f"- {rel}: 必須 sentinel `{marker}` が見つかりません "
+                f"（テンプレ末尾のコメントを残してください）")
+    return issues
 
 REQUIRED_APPROVAL_KEYS = [
     "client_ready_for_dev",
@@ -468,12 +501,15 @@ def evidence_integrity_violations(
                     violations.append(f"points to missing requirements ref: {rel_path}")
 
         if approvals.get("client_ready_for_dev") == "approved":
-            for rel in CLIENT_GATE_ARTIFACTS:
-                if not (root / rel).exists():
-                    violations.append(
-                        "gate 'client_ready_for_dev' is approved but handover "
-                        f"artifact is missing: {rel}"
-                    )
+            # C-3 (v1.6.1): the gate's content check is bilateral —
+            # pre-approve enforces it AND task-completion re-checks it.
+            # Otherwise an approve-then-delete pattern would let a 6-touch
+            # bypass slip back in at completion time.
+            for issue in _client_artifact_issues(root):
+                violations.append(
+                    f"gate 'client_ready_for_dev' is approved but handover "
+                    f"artifact failed integrity check: {issue}"
+                )
     except Exception as exc:
         # Never raises (callers — validate_status_file and the TaskCompleted hook —
         # must not crash). But do NOT swallow into "no violations": a crashed
@@ -896,12 +932,15 @@ def check_gate_prerequisites(
         return 0
 
     if gate_name == "client_ready_for_dev":
-        missing = [rel for rel in CLIENT_GATE_ARTIFACTS
-                   if not (root / rel).exists()]
-        if missing:
+        # C-3 (v1.6.1): existence + ≥200 bytes + sentinel comment.
+        # Templates carry the sentinel at the tail so a normal "copy template
+        # → fill body → save" flow keeps it. `touch`-created empty files,
+        # sentinel-removed files, and < 200-byte files all DENY.
+        issues = _client_artifact_issues(root)
+        if issues:
             print("ERROR: client_ready_for_dev に必要な引き渡し成果物が不足しています:")
-            for rel in missing:
-                print(f"       - {rel}")
+            for issue in issues:
+                print(f"       {issue}")
             print("       → .claude/skills/client-workflow/SKILL.md を Read し、"
                   "不足フェーズを完了してください。")
             print("       （mapping.md の作り方は "

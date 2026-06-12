@@ -46,3 +46,5 @@
 
 - 承認者: Product Owner
 - 日付: 2026-04-06
+
+<!-- aegis-required-section: handover-to-dev -->

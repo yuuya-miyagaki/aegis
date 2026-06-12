@@ -26,3 +26,5 @@
 ## 未解決事項
 
 → `docs/client/open-questions.md` を参照
+
+<!-- aegis-required-section: translation-mapping -->

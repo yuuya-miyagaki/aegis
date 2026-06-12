@@ -40,3 +40,5 @@
 
 - 承認者: Product Owner
 - 日付: 2026-04-09
+
+<!-- aegis-required-section: acceptance-criteria -->

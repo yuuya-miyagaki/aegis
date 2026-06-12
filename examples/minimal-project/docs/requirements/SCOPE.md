@@ -40,3 +40,5 @@
 | # | マイルストーン | 含む項目 | 完了条件 |
 |---|-------------|---------|---------|
 | 1 | mock index 版 MVP | Must + Should | 主要クエリで検索・フィルター動作、evidence 完了 |
+
+<!-- aegis-required-section: scope-in-out -->

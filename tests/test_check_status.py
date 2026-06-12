@@ -1391,10 +1391,14 @@ class TestTranslationRefContract(unittest.TestCase):
             refs={"translation": "docs/translation/mapping.md"},
         )
         with TempProject(content) as root:
-            # Create the referenced file.
-            trans_dir = Path(root) / "docs" / "translation"
-            trans_dir.mkdir(parents=True)
-            (trans_dir / "mapping.md").write_text("# Mapping\n")
+            # C-3 (v1.6.1): make_status_md defaults to client_ready_for_dev:
+            # approved, so the integrity check runs over all 6 artifacts.
+            # Provide content that passes the gate so the only signal under
+            # test is the translation-ref existence check.
+            for rel, sentinel in CLIENT_ARTIFACT_TUPLES:
+                p = Path(root) / rel
+                p.parent.mkdir(parents=True, exist_ok=True)
+                p.write_text(_stub_client_artifact_content(sentinel))
             rc, out = run_check(root)
             # Should not fail on translation ref (may fail on other things).
             self.assertNotIn("translation", out,
@@ -1408,14 +1412,13 @@ class TestTranslationRefContract(unittest.TestCase):
             refs={"translation": "null"},
         )
         with TempProject(content) as root:
-            # P1-D: the gate now requires the full handover package; create all
-            # six artifacts so only the empty-ref ADVISORY is under test.
-            for rel in ("docs/requirements/PRD.md", "docs/requirements/SCOPE.md",
-                        "docs/requirements/NFR.md", "docs/requirements/ACCEPTANCE.md",
-                        "docs/handover/TO-DEV.md", "docs/translation/mapping.md"):
+            # P1-D + C-3 (v1.6.1): the gate now requires sentinel + ≥200 bytes
+            # per artifact. Use the proper stub generator so the only outstanding
+            # issue is the empty-ref ADVISORY.
+            for rel, sentinel in CLIENT_ARTIFACT_TUPLES:
                 p = Path(root) / rel
                 p.parent.mkdir(parents=True, exist_ok=True)
-                p.write_text("# stub\n")
+                p.write_text(_stub_client_artifact_content(sentinel))
             rc, out = run_check(root, "--pre-approve-gate", "client_ready_for_dev")
             self.assertEqual(rc, 0, f"Should still allow (deprecation): {out}")
             self.assertIn("ADVISORY", out,
@@ -2685,14 +2688,31 @@ class TestJudgeGate(unittest.TestCase):
             self.assertEqual(rc, 2, out)
 
 
-CLIENT_ARTIFACTS = [
-    "docs/requirements/PRD.md",
-    "docs/requirements/SCOPE.md",
-    "docs/requirements/NFR.md",
-    "docs/requirements/ACCEPTANCE.md",
-    "docs/handover/TO-DEV.md",
-    "docs/translation/mapping.md",
+# (path, sentinel) — keep in sync with check_status.py CLIENT_GATE_ARTIFACTS.
+# C-3 (v1.6.1): the gate now requires sentinel + ≥200 bytes per artifact.
+CLIENT_ARTIFACT_TUPLES = [
+    ("docs/requirements/PRD.md",        "prd-context"),
+    ("docs/requirements/SCOPE.md",      "scope-in-out"),
+    ("docs/requirements/NFR.md",        "nfr"),
+    ("docs/requirements/ACCEPTANCE.md", "acceptance-criteria"),
+    ("docs/handover/TO-DEV.md",         "handover-to-dev"),
+    ("docs/translation/mapping.md",     "translation-mapping"),
 ]
+# Backwards-named alias kept for the existing test asserts that just need
+# the path list (the actual stub generator uses the tuple form).
+CLIENT_ARTIFACTS = [t[0] for t in CLIENT_ARTIFACT_TUPLES]
+
+
+def _stub_client_artifact_content(sentinel: str) -> str:
+    """Generate placeholder content that satisfies the v1.6.1 gate check
+    (≥200 bytes + sentinel comment). Tests use this whenever they need
+    an artifact to read as "filled in"."""
+    body = ("# Document\n\n"
+            "Sufficient placeholder text to clear the minimum-bytes "
+            "check (≥200 bytes). This is a test stub; real client "
+            "content would describe the project's PRD/SCOPE/etc.\n\n"
+            "Section 2 has more text to push past 200 bytes.\n\n")
+    return body + f"<!-- aegis-required-section: {sentinel} -->\n"
 
 
 def _pre_approve(root: Path, gate: str) -> subprocess.CompletedProcess:
@@ -2712,10 +2732,13 @@ class TestClientGateArtifacts(unittest.TestCase):
                            approvals={"client_ready_for_dev": "pending",
                                       "brainstorm": "pending", "plan": "pending"}),
             encoding="utf-8")
+        sentinel_by_path = dict(CLIENT_ARTIFACT_TUPLES)
         for rel in present:
             p = d / rel
             p.parent.mkdir(parents=True, exist_ok=True)
-            p.write_text("# stub\n", encoding="utf-8")
+            # C-3 (v1.6.1): use stub content that passes the gate check.
+            p.write_text(_stub_client_artifact_content(sentinel_by_path[rel]),
+                         encoding="utf-8")
         return d
 
     def test_blocks_and_lists_all_missing(self):
@@ -2759,10 +2782,13 @@ class TestClientGateCompletionEvidence(unittest.TestCase):
                            approvals={"client_ready_for_dev": gate},
                            refs=refs),
             encoding="utf-8")
+        sentinel_by_path = dict(CLIENT_ARTIFACT_TUPLES)
         for rel in present:
             p = d / rel
             p.parent.mkdir(parents=True, exist_ok=True)
-            p.write_text("# stub\n", encoding="utf-8")
+            # C-3 (v1.6.1): stub content satisfies the integrity check.
+            p.write_text(_stub_client_artifact_content(sentinel_by_path[rel]),
+                         encoding="utf-8")
         return d
 
     def _check(self, root: Path) -> subprocess.CompletedProcess:
@@ -2779,7 +2805,10 @@ class TestClientGateCompletionEvidence(unittest.TestCase):
                 refs={"translation": "docs/translation/mapping.md"})
             r = self._check(root)
             self.assertNotEqual(r.returncode, 0)
-            self.assertIn("handover artifact is missing", r.stdout + r.stderr)
+            # C-3 (v1.6.1): integrity check message format covers all
+            # missing/short/sentinel-removed cases.
+            self.assertIn("handover artifact failed integrity check",
+                          r.stdout + r.stderr)
             self.assertIn("docs/translation/mapping.md", r.stdout + r.stderr)
 
     def test_na_gate_is_exempt(self):

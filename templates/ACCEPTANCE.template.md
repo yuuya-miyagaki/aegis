@@ -34,3 +34,5 @@
 
 - 承認者: <記入>
 - 日付: <記入>
+
+<!-- aegis-required-section: acceptance-criteria -->

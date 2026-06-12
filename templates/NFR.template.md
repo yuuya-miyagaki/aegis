@@ -46,3 +46,5 @@
 
 - 制約: <記入>
 <!-- exit-check: 該当カテゴリ記入・非該当は n/a → acceptance へ -->
+
+<!-- aegis-required-section: nfr -->

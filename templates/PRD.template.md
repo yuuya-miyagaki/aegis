@@ -47,3 +47,5 @@
 ## 未解決事項
 
 - なし / あれば記入
+
+<!-- aegis-required-section: prd-context -->

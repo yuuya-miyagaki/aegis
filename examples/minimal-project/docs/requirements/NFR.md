@@ -45,3 +45,5 @@
 ## 制約条件
 
 - 制約: 初期版では mock index を使い、実検索基盤との接続は次フェーズ
+
+<!-- aegis-required-section: nfr -->

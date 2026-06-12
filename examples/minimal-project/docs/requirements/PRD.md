@@ -49,3 +49,5 @@
 ## 未解決事項
 
 - 次フェーズで権限連携をどう扱うか未確定
+
+<!-- aegis-required-section: prd-context -->
