@@ -43,6 +43,18 @@ GATE_REF_MAPPING = {
     "client_ready_for_dev": "translation",
 }
 
+# P1-D (OBS-008): client_ready_for_dev is the ONLY machine gate between Client
+# and Dev. The handover package below mirrors the client-workflow skill's
+# phase table; without an existence check the gate approves on bare assertion.
+CLIENT_GATE_ARTIFACTS = (
+    "docs/requirements/PRD.md",
+    "docs/requirements/SCOPE.md",
+    "docs/requirements/NFR.md",
+    "docs/requirements/ACCEPTANCE.md",
+    "docs/handover/TO-DEV.md",
+    "docs/translation/mapping.md",
+)
+
 REQUIRED_APPROVAL_KEYS = [
     "client_ready_for_dev",
     "brainstorm",
@@ -876,11 +888,16 @@ def check_gate_prerequisites(
         return 0
 
     if gate_name == "client_ready_for_dev":
-        mapping_path = root / "docs" / "translation" / "mapping.md"
-        if not mapping_path.exists():
-            print("ERROR: docs/translation/mapping.md が見つかりません。")
-            print("       handover 前に translation mapping を作成してください。")
-            print("       → translation-mapping skill を使用")
+        missing = [rel for rel in CLIENT_GATE_ARTIFACTS
+                   if not (root / rel).exists()]
+        if missing:
+            print("ERROR: client_ready_for_dev に必要な引き渡し成果物が不足しています:")
+            for rel in missing:
+                print(f"       - {rel}")
+            print("       → .claude/skills/client-workflow/SKILL.md を Read し、"
+                  "不足フェーズを完了してください。")
+            print("       （mapping.md の作り方は "
+                  ".claude/skills/translation-mapping/SKILL.md）")
             return 1
         return 0
 

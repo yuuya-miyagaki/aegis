@@ -1405,10 +1405,14 @@ class TestTranslationRefContract(unittest.TestCase):
             refs={"translation": "null"},
         )
         with TempProject(content) as root:
-            # Create translation/mapping.md so the existing file check passes.
-            trans_dir = Path(root) / "docs" / "translation"
-            trans_dir.mkdir(parents=True)
-            (trans_dir / "mapping.md").write_text("# Mapping\n")
+            # P1-D: the gate now requires the full handover package; create all
+            # six artifacts so only the empty-ref ADVISORY is under test.
+            for rel in ("docs/requirements/PRD.md", "docs/requirements/SCOPE.md",
+                        "docs/requirements/NFR.md", "docs/requirements/ACCEPTANCE.md",
+                        "docs/handover/TO-DEV.md", "docs/translation/mapping.md"):
+                p = Path(root) / rel
+                p.parent.mkdir(parents=True, exist_ok=True)
+                p.write_text("# stub\n")
             rc, out = run_check(root, "--pre-approve-gate", "client_ready_for_dev")
             self.assertEqual(rc, 0, f"Should still allow (deprecation): {out}")
             self.assertIn("ADVISORY", out,
@@ -2651,6 +2655,65 @@ class TestJudgeGate(unittest.TestCase):
                 claims_block="```claims\nno_stubs: true\nverdict: approve\n```\n")
             rc, out = run_check(str(root), "--pre-approve-gate", "review")
             self.assertEqual(rc, 2, out)
+
+
+CLIENT_ARTIFACTS = [
+    "docs/requirements/PRD.md",
+    "docs/requirements/SCOPE.md",
+    "docs/requirements/NFR.md",
+    "docs/requirements/ACCEPTANCE.md",
+    "docs/handover/TO-DEV.md",
+    "docs/translation/mapping.md",
+]
+
+
+def _pre_approve(root: Path, gate: str) -> subprocess.CompletedProcess:
+    return subprocess.run(
+        ["python3", str(CHECK_STATUS), "--root", str(root),
+         "--pre-approve-gate", gate],
+        capture_output=True, text=True, timeout=60)
+
+
+class TestClientGateArtifacts(unittest.TestCase):
+    """P1-D (OBS-008): client_ready_for_dev は引き渡し成果物 6 点の存在を要求する。"""
+
+    def _scaffold(self, d: Path, present: list[str]) -> Path:
+        (d / "docs").mkdir(parents=True, exist_ok=True)
+        (d / "docs" / "STATUS.md").write_text(
+            make_status_md(mode="Client", phase="handover",
+                           approvals={"client_ready_for_dev": "pending",
+                                      "brainstorm": "pending", "plan": "pending"}),
+            encoding="utf-8")
+        for rel in present:
+            p = d / rel
+            p.parent.mkdir(parents=True, exist_ok=True)
+            p.write_text("# stub\n", encoding="utf-8")
+        return d
+
+    def test_blocks_and_lists_all_missing(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._scaffold(Path(tmp), present=[])
+            r = _pre_approve(root, "client_ready_for_dev")
+            self.assertNotEqual(r.returncode, 0)
+            for rel in CLIENT_ARTIFACTS:
+                self.assertIn(rel, r.stdout, f"missing artifact {rel} must be listed")
+            self.assertIn(".claude/skills/client-workflow/SKILL.md", r.stdout)
+
+    def test_lists_only_missing_subset(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            present = CLIENT_ARTIFACTS[:4]
+            root = self._scaffold(Path(tmp), present=present)
+            r = _pre_approve(root, "client_ready_for_dev")
+            self.assertNotEqual(r.returncode, 0)
+            self.assertIn("docs/handover/TO-DEV.md", r.stdout)
+            self.assertIn("docs/translation/mapping.md", r.stdout)
+            self.assertNotIn("docs/requirements/PRD.md", r.stdout)
+
+    def test_passes_with_all_artifacts(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._scaffold(Path(tmp), present=CLIENT_ARTIFACTS)
+            r = _pre_approve(root, "client_ready_for_dev")
+            self.assertEqual(r.returncode, 0, f"stdout={r.stdout}")
 
 
 if __name__ == "__main__":
