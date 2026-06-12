@@ -23,12 +23,28 @@
 AEGIS_HIGH_RISK_RE='\.pem(\b|$)|id_(rsa|ed25519|ecdsa)(\b|$)|credentials.*\.json|service-account.*\.json'
 
 # --- Form 2: basename case glob ---
-# Consumed by `case "$(basename "$f")" in ${AEGIS_HIGH_RISK_CASE_GLOB}) ...`
-# Bash case glob, NOT a regex. The .pub variants are listed explicitly because
-# they are NOT secrets per se but accompany the private key and broad globbing
-# (id_rsa*) might over-match unrelated files like id_rsa.txt. Pin the .pub
-# variants here for clarity.
+# String form: pipeline-joined for documentation / direct-source usage where the
+# whole literal would be inlined into a case stanza.
+# Array form (AEGIS_HIGH_RISK_CASE_GLOB_ARR): the consumer iterates the array and
+# uses bash's `[[ $name == $glob ]]` per entry. Bash's `case "$x" in $VAR)` does
+# NOT split a `|`-joined variable into alternatives at expansion time (the entire
+# expanded string is treated as a single pattern), so consumers must use the
+# array form when the patterns come from a variable.
+# The .pub variants are listed explicitly because they accompany the private key
+# but glob-broader names like `id_rsa.txt` would otherwise be over-matched by
+# `id_rsa*` (form 3). Form 2 is the tight gate.
 AEGIS_HIGH_RISK_CASE_GLOB='*.pem|id_rsa|id_rsa.pub|id_ed25519|id_ed25519.pub|id_ecdsa|id_ecdsa.pub|*credentials*.json|service-account*.json'
+AEGIS_HIGH_RISK_CASE_GLOB_ARR=(
+  '*.pem'
+  'id_rsa'
+  'id_rsa.pub'
+  'id_ed25519'
+  'id_ed25519.pub'
+  'id_ecdsa'
+  'id_ecdsa.pub'
+  '*credentials*.json'
+  'service-account*.json'
+)
 
 # --- Form 3: find -name globs (array) ---
 # Consumed by `find "$ROOT" \\( -name "${AEGIS_HIGH_RISK_FIND_NAMES[0]}" ... \\)`.

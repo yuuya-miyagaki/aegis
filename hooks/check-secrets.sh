@@ -1,13 +1,18 @@
 #!/usr/bin/env bash
 # PreToolUse hook for Bash: prevents .env files from being staged or committed.
 # Also warns when creating/editing .env without .gitignore protection.
+#
+# High-risk credential file patterns (PEM / SSH keys / credentials*.json /
+# service-account*.json) live in hooks/lib/secrets-patterns.sh as the single
+# source of truth (C-9). New credential types are added there, not here.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
-# Load shared input extraction.
+# Load shared libraries.
 source "${SCRIPT_DIR}/lib/extract-input.sh"
 source "${SCRIPT_DIR}/lib/emit.sh"
+source "${SCRIPT_DIR}/lib/secrets-patterns.sh"
 
 # Read stdin.
 INPUT=$(cat)
@@ -24,12 +29,8 @@ fi
 # Safe .env variants that are NOT secrets (may be committed).
 SAFE_ENV_SUFFIXES='\.env\.(example|template|sample)'
 
-# v0.13.0 Phase 0b: high-risk credential file patterns beyond .env.
-# These should never be staged regardless of variants.
-HIGH_RISK_RE='\.pem(\b|$)|id_(rsa|ed25519|ecdsa)(\b|$)|credentials.*\.json|service-account.*\.json'
-
-# --- Check 0: Deny staging high-risk credential files ---
-if printf '%s' "$CMD" | grep -qE "git\s+add\s+.*(${HIGH_RISK_RE})" 2>/dev/null; then
+# --- Check 0: Deny staging high-risk credential files (Form 1: command-text regex) ---
+if printf '%s' "$CMD" | grep -qE "git\s+add\s+.*(${AEGIS_HIGH_RISK_RE})" 2>/dev/null; then
   emit_deny "[secrets] 高リスク認証ファイル (PEM鍵/SSH鍵/credentials.json/service-account.json 等) を git に追加しないでください。鍵が漏洩します。"
   exit 0
 fi
@@ -52,16 +53,33 @@ fi
 if printf '%s' "$CMD" | grep -qE 'git\s+add\s+(-A|--all|\.)' 2>/dev/null; then
   ROOT=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
 
-  # v0.13.0 Phase 0b NO-GO fix: broad staging must also catch PEM/SSH/credentials
-  # files (these have no "safe variant", so any presence in the repo is risky).
+  # v0.13.0 Phase 0b NO-GO fix: broad staging must also catch high-risk credentials
+  # (these have no "safe variant", so any presence in the repo is risky).
+  # Form 3 (find -name globs) + Form 2 (basename case glob): broad capture by
+  # find, then tight match by case.
+  FIND_ARGS=()
+  for _name in "${AEGIS_HIGH_RISK_FIND_NAMES[@]}"; do
+    FIND_ARGS+=( -name "$_name" -o )
+  done
+  # Trim the trailing -o.
+  unset 'FIND_ARGS[${#FIND_ARGS[@]}-1]'
+
   HAS_HIGH_RISK=false
   while IFS= read -r f; do
-    case "$(basename "$f")" in
-      *.pem|id_rsa|id_rsa.pub|id_ed25519|id_ed25519.pub|id_ecdsa|id_ecdsa.pub|*credentials*.json|service-account*.json)
-        HAS_HIGH_RISK=true; break ;;
-    esac
+    BN=$(basename "$f")
+    # Iterate AEGIS_HIGH_RISK_CASE_GLOB_ARR — `case "$x" in $JOINED)` does NOT
+    # honor `|` as alternation after variable expansion (the whole expanded
+    # string becomes ONE pattern). Per-entry [[ == glob ]] preserves the
+    # narrow-match intent of the original literal case stanza.
+    for _glob in "${AEGIS_HIGH_RISK_CASE_GLOB_ARR[@]}"; do
+      # shellcheck disable=SC2053
+      # Intentional unquoted RHS — _glob is a glob pattern.
+      if [[ $BN == $_glob ]]; then
+        HAS_HIGH_RISK=true; break 2
+      fi
+    done
   done < <(find "$ROOT" \
-    \( -name '*.pem' -o -name 'id_rsa*' -o -name 'id_ed25519*' -o -name 'id_ecdsa*' -o -name '*credentials*.json' -o -name 'service-account*.json' \) \
+    \( "${FIND_ARGS[@]}" \) \
     -not -path '*/node_modules/*' \
     -not -path '*/.git/*' \
     -not -path '*/vendor/*' \
@@ -95,8 +113,8 @@ fi
 # --- Check 2: Deny commit when .env is staged ---
 
 if printf '%s' "$CMD" | grep -qE 'git\s+commit' 2>/dev/null; then
-  # v0.13.0 Phase 0b NO-GO fix: high-risk credential files in staged diff.
-  if git diff --cached --name-only 2>/dev/null | grep -E '\.pem$|(^|/)id_(rsa|ed25519|ecdsa)(\.pub)?$|credentials.*\.json$|service-account.*\.json$' | grep -q . 2>/dev/null; then
+  # v0.13.0 Phase 0b NO-GO fix: high-risk credential files in staged diff (Form 4).
+  if git diff --cached --name-only 2>/dev/null | grep -E "${AEGIS_HIGH_RISK_STAGED_RE}" | grep -q . 2>/dev/null; then
     emit_deny "[secrets] 高リスク認証ファイル (PEM鍵/SSH鍵/credentials.json/service-account.json) がステージングされています。git reset HEAD でファイル名を指定して除外してからコミットしてください。"
     exit 0
   fi

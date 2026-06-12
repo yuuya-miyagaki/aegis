@@ -1465,6 +1465,11 @@ class TestSecretsHookMonorepo(unittest.TestCase):
         (lib_dir / "frontmatter.sh").symlink_to(
             ROOT / "hooks" / "lib" / "frontmatter.sh"
         )
+        # Task 6 (v1.6.1): check-secrets.sh sources secrets-patterns.sh
+        # for the high-risk credential single-owner lib (C-9).
+        (lib_dir / "secrets-patterns.sh").symlink_to(
+            ROOT / "hooks" / "lib" / "secrets-patterns.sh"
+        )
         return tmpdir, root
 
     def _run_hook(self, root: str, cmd: str) -> tuple[int, str]:
@@ -1564,6 +1569,11 @@ class TestTemplateProtection(unittest.TestCase):
         (lib_dir / "frontmatter.sh").symlink_to(
             ROOT / "hooks" / "lib" / "frontmatter.sh"
         )
+        # Task 6 (v1.6.1): check-secrets.sh sources secrets-patterns.sh
+        # for the high-risk credential single-owner lib (C-9).
+        (lib_dir / "secrets-patterns.sh").symlink_to(
+            ROOT / "hooks" / "lib" / "secrets-patterns.sh"
+        )
         return tmpdir, root
 
     def _run_hook(self, root: str, file_path: str) -> tuple[int, str]:
@@ -1644,6 +1654,11 @@ class TestControlPlaneAllowlistBypass(unittest.TestCase):
         )
         (lib_dir / "frontmatter.sh").symlink_to(
             ROOT / "hooks" / "lib" / "frontmatter.sh"
+        )
+        # Task 6 (v1.6.1): check-secrets.sh sources secrets-patterns.sh
+        # for the high-risk credential single-owner lib (C-9).
+        (lib_dir / "secrets-patterns.sh").symlink_to(
+            ROOT / "hooks" / "lib" / "secrets-patterns.sh"
         )
         return tmpdir, root
 
@@ -1870,6 +1885,11 @@ class TestControlPlaneRealisticInput(unittest.TestCase):
         )
         (lib_dir / "frontmatter.sh").symlink_to(
             ROOT / "hooks" / "lib" / "frontmatter.sh"
+        )
+        # Task 6 (v1.6.1): check-secrets.sh sources secrets-patterns.sh
+        # for the high-risk credential single-owner lib (C-9).
+        (lib_dir / "secrets-patterns.sh").symlink_to(
+            ROOT / "hooks" / "lib" / "secrets-patterns.sh"
         )
         return tmpdir, root
 
@@ -2181,6 +2201,11 @@ class TestGateProjectPathCollision(unittest.TestCase):
         )
         (lib_dir / "frontmatter.sh").symlink_to(
             ROOT / "hooks" / "lib" / "frontmatter.sh"
+        )
+        # Task 6 (v1.6.1): check-secrets.sh sources secrets-patterns.sh
+        # for the high-risk credential single-owner lib (C-9).
+        (lib_dir / "secrets-patterns.sh").symlink_to(
+            ROOT / "hooks" / "lib" / "secrets-patterns.sh"
         )
         return tmpdir, root
 
