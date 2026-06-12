@@ -68,7 +68,13 @@
     "docs/client/context.md",
     "docs/client/glossary.md",
     "docs/client/open-questions.md",
-    "docs/translation/mapping.md"
+    "docs/translation/mapping.md",
+    "templates/BRAINSTORM-RECORD.template.md",
+    "templates/SPEC.template.md",
+    "templates/TRANSLATION-MAPPING.template.md",
+    "templates/RUNBOOK.template.md",
+    "templates/MANUAL.template.md",
+    "templates/UAT-RESULTS.template.md"
   ],
   "hooks_include": [
     "session-start.sh",

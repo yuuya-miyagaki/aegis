@@ -288,6 +288,52 @@ def check_template_version(root: Path) -> tuple[list[str], list[str]]:
     return failures, warnings
 
 
+TEMPLATE_REF_RE = re.compile(r"templates/[A-Za-z0-9._-]+\.template\.md")
+
+
+def check_template_references(root: Path) -> tuple[list[str], list[str]]:
+    """#12: templates/ refs in skills must exist AND be shipped by any profile
+    that ships the referencing skill (P1-B, OBS-012 — F6-class install gap:
+    a skill instructing 'use templates/X' dies at install when X is absent)."""
+    failures: list[str] = []
+    warnings: list[str] = []
+
+    skills_dir = root / ".claude" / "skills"
+    refs_by_file: dict[str, set[str]] = {}
+    if skills_dir.is_dir():
+        for sk in sorted(skills_dir.glob("*/SKILL.md")):
+            refs = set(TEMPLATE_REF_RE.findall(_read(sk)))
+            if refs:
+                refs_by_file[f".claude/skills/{sk.parent.name}/SKILL.md"] = refs
+
+    # 1) Repo-level: referenced template files must exist.
+    for src, refs in sorted(refs_by_file.items()):
+        for ref in sorted(refs):
+            if not (root / ref).is_file():
+                failures.append(f"{src} references {ref} but the template does not exist")
+
+    # 2) Profile-level: a profile shipping the skill must ship its templates.
+    profiles_dir = root / "templates" / "profiles"
+    if profiles_dir.is_dir():
+        for prof in sorted(profiles_dir.glob("*.json")):
+            try:
+                data = json.loads(_read(prof))
+            except ValueError:
+                continue  # malformed profile is check_template_profiles' job
+            shipped = set(data.get("required", [])) | set(data.get("recommended", []))
+            for src, refs in sorted(refs_by_file.items()):
+                if src not in shipped:
+                    continue
+                for ref in sorted(refs):
+                    if ref not in shipped:
+                        failures.append(
+                            f"profile {prof.name} ships {src} (references {ref}) "
+                            f"but does not ship the template"
+                        )
+
+    return failures, warnings
+
+
 def check_session_start_hints(root: Path) -> tuple[list[str], list[str]]:
     """#8: skill names in session-start.sh case statement vs actual skills"""
     failures: list[str] = []
@@ -458,6 +504,7 @@ ALL_CHECKS = [
     ("README counts", check_readme_counts),
     ("template version", check_template_version),
     ("session-start hints", check_session_start_hints),
+    ("template references", check_template_references),
     ("example README counts", check_example_readme_counts),
     ("example commands", check_example_commands),
     ("mirror identity (root ↔ example)", check_mirror_identity),
