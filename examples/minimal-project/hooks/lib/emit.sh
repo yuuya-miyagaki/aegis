@@ -17,8 +17,8 @@
 # Schema reference (verified 2026-06-05):
 #   PreToolUse:            hookSpecificOutput.{permissionDecision, permissionDecisionReason}
 #   PostToolUse / PreCompact(block) / Stop / SubagentStop: top-level {decision:"block", reason}
-#   PostToolUseFailure / SessionStart / PreCompact(allow) / UserPromptSubmit:
-#                          hookSpecificOutput.{hookEventName, additionalContext}
+#   PostToolUseFailure / SessionStart / PreCompact(allow) / UserPromptSubmit /
+#   PostToolUse(advisory context): hookSpecificOutput.{hookEventName, additionalContext}
 #   TaskCreated (hard stop): top-level {continue:false, stopReason}
 #
 # Source: source "$(dirname "$0")/lib/emit.sh"

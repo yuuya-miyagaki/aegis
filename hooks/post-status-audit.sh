@@ -23,6 +23,7 @@ SNAPSHOT_FILE="${ROOT}/.claude/.gate-snapshot"
 source "${SCRIPT_DIR}/lib/extract-input.sh"
 source "${SCRIPT_DIR}/lib/emit.sh"
 source "${SCRIPT_DIR}/lib/frontmatter.sh"
+source "${SCRIPT_DIR}/lib/phase-skills.sh"
 
 # Read stdin (JSON with tool_input/tool_result).
 INPUT=$(cat)
@@ -122,6 +123,20 @@ sed -n '/^gate_approvals:/,/^[a-z]/{ /^gate_approvals:/p; /^  /p; }' "$STATUS_FI
 grep -m1 "^phase:" "$STATUS_FILE" >> "$SNAPSHOT_FILE" 2>/dev/null || true
 # Preserve mode in snapshot.
 grep -m1 "^mode:" "$STATUS_FILE" >> "$SNAPSHOT_FILE" 2>/dev/null || true
+
+# Phase-skill injection (P1-A): a legitimate phase transition is the moment the
+# next phase's skills must be loaded — SessionStart injection cannot reach a
+# mid-session transition (2026-06-12 behavioral review). additionalContext is
+# advisory: clients that ignore it lose only the hint, never the audit (fail-safe).
+if [ -n "$OLD_PHASE" ] && [ -n "$NEW_PHASE" ] && [ "$OLD_PHASE" != "$NEW_PHASE" ]; then
+  TASK_TYPE=$(grep -m1 "^task_type:" "$STATUS_FILE" | sed "s/^task_type:[[:space:]]*//" | sed 's/^"//;s/"$//' || true)
+  SKILL_PATHS=$(aegis_phase_skill_paths "$ROOT" "$NEW_PHASE" "$TASK_TYPE" | tr '\n' ' ')
+  SKILL_PATHS="${SKILL_PATHS% }"
+  if [ -n "$SKILL_PATHS" ]; then
+    emit_context PostToolUse "[phase-skills] phase=${NEW_PHASE}: 必読skill(Readで読み込んで従う): ${SKILL_PATHS}"
+    exit 0
+  fi
+fi
 
 emit_allow
 exit 0
