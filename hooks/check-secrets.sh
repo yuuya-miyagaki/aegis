@@ -29,8 +29,21 @@ fi
 # Safe .env variants that are NOT secrets (may be committed).
 SAFE_ENV_SUFFIXES='\.env\.(example|template|sample)'
 
+# S-3 (v1.6.1): extend the "git staging" detection to cover all command-line
+# variants that the baseline `git\s+add\s+` regex missed:
+#   - git --git-dir=.git --work-tree=. add .env     (--git-dir / --work-tree flags)
+#   - git -C /tmp/repo add .env                     (-C path)
+#   - git -c safe.directory=foo add .env            (-c key=value)
+#   - git stage .env                                (add alias)
+#   - git update-index --add .env                   (plumbing path)
+# GIT_PRE_OPTS matches any series of git options (long/short with optional value).
+# OUT OF SCOPE (v1.6.1 受容済み・v161-security.md): git stash push .env
+# (legitimate use cases dominate), git apply --index, eval/alias forms.
+GIT_PRE_OPTS='(-{1,2}[A-Za-z][-A-Za-z0-9]*(=[^[:space:]]+|[[:space:]]+[^[:space:]-][^[:space:]]*)?[[:space:]]+)*'
+GIT_STAGE_VERB='(add|stage|update-index)'
+
 # --- Check 0: Deny staging high-risk credential files (Form 1: command-text regex) ---
-if printf '%s' "$CMD" | grep -qE "git\s+add\s+.*(${AEGIS_HIGH_RISK_RE})" 2>/dev/null; then
+if printf '%s' "$CMD" | grep -qE "git[[:space:]]+${GIT_PRE_OPTS}${GIT_STAGE_VERB}([[:space:]]+(--[A-Za-z][-A-Za-z0-9]*[[:space:]]+)*)?.*(${AEGIS_HIGH_RISK_RE})" 2>/dev/null; then
   emit_deny "[secrets] 高リスク認証ファイル (PEM鍵/SSH鍵/credentials.json/service-account.json 等) を git に追加しないでください。鍵が漏洩します。"
   exit 0
 fi
@@ -41,16 +54,16 @@ fi
 # Strip safe variants from command text, then check for remaining .env refs.
 STRIPPED=$(printf '%s' "$CMD" | sed -E "s/${SAFE_ENV_SUFFIXES}//g")
 
-# Direct .env staging: git add .env, git add .env.local, git add path/.env.
-# Case-insensitive: on a case-insensitive FS (macOS/Windows default) `git add .ENV`
-# stages the real `.env` secret.
-if printf '%s' "$STRIPPED" | grep -qiE 'git\s+add\s+.*\.env' 2>/dev/null; then
+# Direct .env staging across all variants. Case-insensitive: on case-insensitive
+# FS (macOS/Windows default) `git add .ENV` stages the real `.env` secret.
+if printf '%s' "$STRIPPED" | grep -qiE "git[[:space:]]+${GIT_PRE_OPTS}${GIT_STAGE_VERB}([[:space:]]+(--[A-Za-z][-A-Za-z0-9]*[[:space:]]+)*)?.*\.env" 2>/dev/null; then
   emit_deny "[secrets] .env ファイルを git に追加しないでください。認証情報がリポジトリに漏洩します。"
   exit 0
 fi
 
 # Broad staging that would include .env or high-risk credentials: git add -A, git add .
-if printf '%s' "$CMD" | grep -qE 'git\s+add\s+(-A|--all|\.)' 2>/dev/null; then
+# Only `add` (not stage / update-index) has the -A/--all/. broad-stage spellings.
+if printf '%s' "$CMD" | grep -qE "git[[:space:]]+${GIT_PRE_OPTS}add[[:space:]]+(-A|--all|\.)" 2>/dev/null; then
   ROOT=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
 
   # v0.13.0 Phase 0b NO-GO fix: broad staging must also catch high-risk credentials
