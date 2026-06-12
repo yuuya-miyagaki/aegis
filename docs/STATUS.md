@@ -1,33 +1,33 @@
 ---
 framework: aegis
-framework_version: "1.6.0"
+framework_version: "1.6.1"
 project_name: "Aegis"
 mode: Dev
-phase: implement
+phase: deploy
 task_type: framework
 task_size: L
-task_size_rationale: "確定（brainstorm→plan→grill-plan）: 第5回全力レビュー（full-review-2026-06-12.md）で実証された Critical 7 件 + S-3/S-11 の fix-forward バッチ（v1.6.1 patch）。lib×1 新設・hook×3 修正・scripts×3 修正・template×6 sentinel 追記・docs×1 訂正 + 新規テスト 9 本＝10 commit で L（ただし 1 commit/task の狭く深い修正）。"
+task_size_rationale: "確定（brainstorm→plan→grill-plan）: 第5回全力レビュー（full-review-2026-06-12.md）で実証された Critical 7 件 + S-3/S-11 の fix-forward バッチ（v1.6.1 patch）。実装は計画通り 9 commit、grill-code A/B が指摘した残 Critical 4 件（marker forge、WRITE_OP 不完全、var-built filename、git commit GIT_PRE_OPTS）を追加 3 commit で吸収、合計 12 commit + release。"
 iteration: 22
 ui_surface: false
-last_updated: "2026-06-12T14:30:00Z"
+last_updated: "2026-06-13T01:00:00Z"
 gate_approvals:
   client_ready_for_dev: n/a
   brainstorm: approved
   plan: approved
-  review: pending
-  qa: pending
-  security: pending
-  deploy: pending
+  review: approved
+  qa: approved
+  security: approved
+  deploy: approved
   dev_ready_for_client: pending
 current_refs:
   requirements:
     - docs/full-review-2026-06-12.md
   plan: docs/plans/v1.6.1-fix-forward-plan.md
   spec: null
-  review: null
-  qa: null
-  security: null
-  deploy: null
+  review: docs/qa-reports/v161-review.md
+  qa: docs/qa-reports/v161-qa.md
+  security: docs/qa-reports/v161-security.md
+  deploy: docs/qa-reports/v161-deploy-checklist.md
   translation: null
 external_evidence:
   - type: "second-opinion-v1-foundation-r1-r2"
@@ -42,7 +42,7 @@ external_evidence:
     scope: "v0.12.2 実装後 4 ラウンドレビュー"
     findings: "Round 6 (P1×2, P2×1: pre-compact exit 2 / minimal-project / test rc), Round 7 (P1×1, P3×1: git add 漏れ / テスト件数表記), Round 8 (P2×1, P3×1: stale last_updated / grep 自己マッチ), Round 9 (P3×2: コメント不整合)"
     resolution: "9件全反映。tier 1/2 PASS、134 tests PASS、本体と minimal-project 完全同期確認済み。"
-next_action: "iteration 22（v1.6.1 全力レビュー由来 fix-forward）implement 開始: Task 0（hooks/lib/secrets-patterns.sh 新設）から TDD で 9 commit を順次。完了後 grill-code → qa-reports v161-* 起票 → 4 ゲート ack → tag v1.6.1。"
+next_action: "iteration 22（v1.6.1 全力レビュー由来 fix-forward）完了: 12 commit + release で全 Critical 9 件 + S-3 + S-11 + grill-code A/B 残 Critical 4 件を消化、606 tests / contract / drift / smoke 全 PASS。残: tag v1.6.1 付与＋origin push（ユーザ判断）。"
 blockers: []
 failure_tracking: null
 session_history:
