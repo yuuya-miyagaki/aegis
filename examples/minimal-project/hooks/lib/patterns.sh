@@ -138,3 +138,54 @@ AEGIS_TEST_PASS_MARKER_PAIRS=(
 # where a runner-name match is paired with a non-running flag.
 # Each pattern is anchored on word boundaries via ( |^|$).
 AEGIS_TEST_NO_RUN_FLAG_REGEX='(^|[[:space:]])(-{1,2}(version|help|collect-only|co|dry-run|no-run|fixtures|markers|listTests|list-tests|listFiles|listAllFiles)|-h)($|[[:space:]])'
+
+# K-1 (v1.6.2): zero-run output signals. After strong/weak marker has hit,
+# scan the output for runner-emitted "no tests actually ran" lines. This
+# closes the REDTEAM-01 forge:
+#   echo "===== 3 passed in 0.42s ====="; pytest -k __NEVER__
+# where the echo provides the strong marker and pytest writes `collected 0
+# items` / `no tests ran` to stdout. Each pattern targets a specific
+# runner's zero-execution finalizer line.
+#
+# CONSTRAINT (same as runner regex): grep-E ∩ python-re common subset — no
+# [[:space:]], no \b. Use ( |^|$) style boundaries.
+AEGIS_TEST_ZERO_RUN_REGEX=(
+  '(^|\n)collected 0 items'                     # pytest
+  '(^|\n)no tests ran'                          # pytest -k <NOMATCH>
+  '(^|\n)Ran 0 tests'                           # unittest
+  '(^|\n)No tests (found|ran)'                  # pytest/jest variant
+  '(^|\n)test result: (ok|FAILED)\. 0 passed'   # cargo
+  '(^|\n)Tests:[ \t]+0 passed[ \t]*,[ \t]*0 total' # jest "0 passed, 0 total"
+  '(^|\n)Test Files[ \t]+0 passed'              # vitest
+  '(^|\n)0 passing(\b|$)'                       # mocha
+  '(^|\n)PASS[ \t]+\([ \t]*0 tests'             # go test -v: "PASS\t(0 tests"
+)
+
+# K-1 (v1.6.2): pytest prologue regex. When a pytest-family command runs,
+# pytest prints a multi-line prologue (platform/Python version, rootdir,
+# collected N items) BEFORE the strong summary. A forged `echo "== 3 passed
+# in 0.42s ====="` produces ONLY the summary line with no prologue. If a
+# pytest-classified command yields a strong-marker hit but the output has
+# NONE of the prologue lines, treat as zero-run (axis 3). This is
+# pytest-only — jest/vitest/cargo/go have less stable prologues and
+# applying this check there would produce false positives.
+AEGIS_TEST_PROLOGUE_REGEX=(
+  '(^|\n)platform [A-Za-z0-9_]+ -- Python'      # pytest header
+  '(^|\n)rootdir: '                              # pytest rootdir
+  '(^|\n)collected [0-9]+ item'                  # pytest collection
+  '(^|\n)cachedir: '                             # pytest cachedir
+  '(^|\n)plugins: '                              # pytest plugins line
+)
+
+# K-1 (v1.6.2): command-side classifier — "is this command in the pytest
+# family?". Axes 2 (exit code) and 3 (prologue) apply ONLY to pytest, since
+# other runners' exit codes and prologues are inconsistent. Matches the
+# pytest entries in AEGIS_TEST_RUNNER_REGEX above.
+AEGIS_TEST_IS_PYTEST_REGEX='(^|[;&|]| |\()(npx +|bunx +|(uv|poetry|pipenv) +run +)?(pytest|python3? +-m +pytest)($|[^a-zA-Z0-9_])'
+
+# K-1 (v1.6.2): pytest-only zero-run exit code. Other runners' exit codes
+# do not uniquely encode "no tests ran" (e.g. unittest returns 0 on `Ran 0
+# tests in 0.001s OK`). pytest exit 5 = "no tests collected" is the only
+# reliable cross-version signal.
+# Reference: https://docs.pytest.org/en/stable/reference/exit-codes.html
+AEGIS_TEST_ZERO_RUN_EXIT_PYTEST=5

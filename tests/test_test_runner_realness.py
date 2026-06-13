@@ -329,6 +329,13 @@ class TestPostBashObserveMarkerField(unittest.TestCase):
         return json.loads(last)
 
     def test_real_summary_sets_marker_true(self):
+        """K-1 (v1.6.2): pytest 系コマンドは strong marker に加えてプロローグ
+        (platform / rootdir / collected N items) が出力に存在する必要がある。
+        v1.6.1 は summary 1 行だけで true としたが、これは
+        `echo "===== 3 passed ====="` 1 発の forge と区別不能なため、
+        v1.6.2 でプロローグ存在を必須化（軸 3）。
+        ここでは『実際の pytest 出力（プロローグ + 進捗 + 終端 summary）』を
+        与えて引き続き verified=true を確認する。"""
         with self._scratch() as _:
             r = Path(_)
             entry = self._run(r, {
@@ -336,7 +343,13 @@ class TestPostBashObserveMarkerField(unittest.TestCase):
                 "tool_input": {"command": "pytest tests/"},
                 "tool_response": {
                     "exitCode": 0,
-                    "output": ("============== 3 passed in 0.42s ==============\n"),
+                    "output": (
+                        "platform darwin -- Python 3.11.5, pytest-7.4.3, pluggy-1.3.0\n"
+                        "rootdir: /tmp/proj\n"
+                        "collected 3 items\n\n"
+                        "tests/test_x.py ...\n\n"
+                        "============== 3 passed in 0.42s ==============\n"
+                    ),
                 },
             })
             self.assertIsNotNone(entry, "no log entry written")

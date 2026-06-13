@@ -29,27 +29,40 @@ evidence_log_path() { printf '%s/.claude/evidence-log.jsonl' "${1:-.}"; }
 # Decides whether the recorded tool_response demonstrates an ACTUAL test
 # execution (not just a runner-named command that echoed forged text).
 #
-# Three-stage gate (all stages must pass for "true"):
+# Pipeline:
 #   (1) No-run flag check — if the command itself contains a no-run flag
 #       like `--version`, `--collect-only`, `-h`, `--dry-run`, no test ran
 #       regardless of output → "false". (Closes the
 #       `echo "===== 1 passed in 0.01s =====" && pytest --collect-only`
 #       grill-code A-Crit-2 / B-Critical forge.)
 #   (2) Strong markers (AEGIS_TEST_PASS_MARKER_REGEX) — single-line
-#       sufficient for verification. pytest === summary, jest "Tests:",
-#       go "ok pkg X.Xs", etc. Any hit → "true".
+#       sufficient candidate. pytest === summary, jest "Tests:",
+#       go "ok pkg X.Xs", etc. Any hit → proceed to zero-run gate.
 #   (3) Weak markers (AEGIS_TEST_PASS_MARKER_PAIRS) — each entry is
 #       "ANCHOR|||COMPANION"; BOTH halves must hit the output. unittest
 #       and cargo: `Ran N tests in` + `OK`/`FAILED`, `running N tests`
-#       + `test result: ok./FAILED.`. Single-line forge (e.g. echo OK
-#       alone) does not satisfy.
+#       + `test result: ok./FAILED.`. Any hit → proceed to zero-run gate.
+#   (4) K-1 (v1.6.2) Zero-run gate — after a marker candidate, run three
+#       independent axes:
+#         Axis 1 (universal): output contains a zero-run regex
+#         (`collected 0 items`, `no tests ran`, `Ran 0 tests`,
+#         `test result: ok. 0 passed`, etc.) → "false".
+#         Axis 2 (pytest only): exitCode == 5 (no tests collected) → "false".
+#         Axis 3 (pytest only): strong marker hit but ZERO prologue lines
+#         (platform/rootdir/collected/cachedir/plugins) → "false".
+#       Axis 2 and 3 require the command to match
+#       AEGIS_TEST_IS_PYTEST_REGEX. The gate ensures REDTEAM-01 and its
+#       grill-derived variants (output filter / stderr suppression /
+#       prologue-less forge) all fail-closed.
 #
 # Stage 1 also requires the COMMAND text; we extract it via python3.
 # If python3 is unavailable the output cannot be safely parsed → "false"
 # (fail-closed).
 _check_test_marker() {
-  local input="$1" out cmd pat split anchor companion
-  # Extract output (tail 4 KiB) and command via a single python3 pass.
+  local input="$1" out cmd pat split anchor companion exit_code
+  # Extract command (head 4 KiB), output (tail 4 KiB), and exitCode via a
+  # single python3 pass. Claude Code uses camelCase `exitCode` in
+  # tool_response; we accept either spelling for forward-compat.
   local extracted
   extracted=$(printf '%s' "$input" | python3 -c '
 import sys, json
@@ -64,8 +77,17 @@ try:
     c = (d.get("tool_input") or {}).get("command", "") or ""
     if not isinstance(c, str):
         c = str(c)
-    # Separator unlikely to appear in either field.
-    sys.stdout.write(c[:4096] + "\x1eAEGISSEP\x1e" + o[-4096:])
+    ec = tr.get("exitCode")
+    if ec is None:
+        ec = tr.get("exit_code")
+    if isinstance(ec, bool) or not isinstance(ec, int):
+        ec = ""
+    else:
+        ec = str(ec)
+    # Separator unlikely to appear in any field.
+    sys.stdout.write(
+        c[:4096] + "\x1eAEGISSEP\x1e" + o[-4096:] + "\x1eAEGISSEP\x1e" + ec
+    )
 except Exception:
     pass
 ' 2>/dev/null) || extracted=""
@@ -73,8 +95,16 @@ except Exception:
     printf 'false'
     return 0
   fi
-  cmd="${extracted%%$'\x1e'AEGISSEP$'\x1e'*}"
-  out="${extracted##*$'\x1e'AEGISSEP$'\x1e'}"
+  # Split on the separator. extracted = cmd ⌷ out ⌷ exit_code
+  local _SEP=$'\x1e'AEGISSEP$'\x1e'
+  cmd="${extracted%%${_SEP}*}"
+  local _rest="${extracted#*${_SEP}}"
+  out="${_rest%%${_SEP}*}"
+  exit_code="${_rest#*${_SEP}}"
+  # When extraction missed a separator, exit_code may equal _rest itself.
+  if [ "$exit_code" = "$_rest" ]; then
+    exit_code=""
+  fi
   if [ -z "$out" ]; then
     printf 'false'
     return 0
@@ -85,17 +115,17 @@ except Exception:
     printf 'false'
     return 0
   fi
-  # Stage 2: strong markers — any single hit verifies.
+  # Stage 2 / 3: did any marker hit?
+  local marker_hit=0
   if [ "${#AEGIS_TEST_PASS_MARKER_REGEX[@]}" -gt 0 ]; then
     for pat in "${AEGIS_TEST_PASS_MARKER_REGEX[@]}"; do
       if printf '%s' "$out" | grep -qE "$pat"; then
-        printf 'true'
-        return 0
+        marker_hit=1
+        break
       fi
     done
   fi
-  # Stage 3: weak pairs — BOTH halves must hit.
-  if [ "${#AEGIS_TEST_PASS_MARKER_PAIRS[@]}" -gt 0 ]; then
+  if [ $marker_hit -eq 0 ] && [ "${#AEGIS_TEST_PASS_MARKER_PAIRS[@]}" -gt 0 ]; then
     for split in "${AEGIS_TEST_PASS_MARKER_PAIRS[@]}"; do
       anchor="${split%%\|\|\|*}"
       companion="${split##*\|\|\|}"
@@ -104,12 +134,55 @@ except Exception:
       fi
       if printf '%s' "$out" | grep -qE "$anchor" && \
          printf '%s' "$out" | grep -qE "$companion"; then
-        printf 'true'
+        marker_hit=1
+        break
+      fi
+    done
+  fi
+  if [ $marker_hit -eq 0 ]; then
+    printf 'false'
+    return 0
+  fi
+  # Stage 4: zero-run gate (K-1 v1.6.2). The marker hit is necessary but
+  # not sufficient — any axis below downgrades to false.
+  # Axis 1: universal output zero-run regex.
+  if [ "${#AEGIS_TEST_ZERO_RUN_REGEX[@]}" -gt 0 ]; then
+    for pat in "${AEGIS_TEST_ZERO_RUN_REGEX[@]}"; do
+      if printf '%s' "$out" | grep -qE "$pat"; then
+        printf 'false'
         return 0
       fi
     done
   fi
-  printf 'false'
+  # Axes 2 & 3: only apply when the command is in the pytest family.
+  local is_pytest=0
+  if [ -n "${AEGIS_TEST_IS_PYTEST_REGEX:-}" ] && \
+     printf '%s' "$cmd" | grep -qE "$AEGIS_TEST_IS_PYTEST_REGEX"; then
+    is_pytest=1
+  fi
+  if [ $is_pytest -eq 1 ]; then
+    # Axis 2: pytest exit 5 = no tests collected.
+    if [ -n "$exit_code" ] && \
+       [ "$exit_code" = "${AEGIS_TEST_ZERO_RUN_EXIT_PYTEST:-5}" ]; then
+      printf 'false'
+      return 0
+    fi
+    # Axis 3: strong marker hit but ZERO prologue lines.
+    if [ "${#AEGIS_TEST_PROLOGUE_REGEX[@]}" -gt 0 ]; then
+      local prologue_hit=0 ppat
+      for ppat in "${AEGIS_TEST_PROLOGUE_REGEX[@]}"; do
+        if printf '%s' "$out" | grep -qE "$ppat"; then
+          prologue_hit=1
+          break
+        fi
+      done
+      if [ $prologue_hit -eq 0 ]; then
+        printf 'false'
+        return 0
+      fi
+    fi
+  fi
+  printf 'true'
 }
 
 # append_evidence <root> <ok|fail> <raw-hook-input-json>  — always returns 0.
