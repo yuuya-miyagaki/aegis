@@ -1,15 +1,15 @@
 ---
 framework: aegis
-framework_version: "1.6.2"
+framework_version: "1.6.3"
 project_name: "Aegis"
 mode: Dev
 phase: deploy
 task_type: framework
 task_size: L
 task_size_rationale: "確定（brainstorm→plan→grill-plan→実装→grill-code）: 第6回全力レビュー（full-review-2026-06-13.md、6 軸並列）で実証された Critical 16 件のうち機械 moat + 配布パス + UX の 13 件（K-1〜K-13）+ S-1/DIST-12 前倒し。実装は計画通り 7 task + 9 commit、grill-code が指摘した残 Critical 2 件（Path B 全 redirect 走査・evidence.sh head+tail 抽出）を追加 1 commit で吸収。合計 10 commit + release。"
-iteration: 23
+iteration: 24
 ui_surface: false
-last_updated: "2026-06-13T06:50:00Z"
+last_updated: "2026-06-13T12:30:00Z"
 gate_approvals:
   client_ready_for_dev: n/a
   brainstorm: approved
@@ -21,8 +21,8 @@ gate_approvals:
   dev_ready_for_client: pending
 current_refs:
   requirements:
-    - docs/full-review-2026-06-13.md
-  plan: docs/plans/2026-06-13-v162-improvement-plan.md
+    - docs/full-review-2026-06-13-context-futureproof.md
+  plan: docs/plans/2026-06-13-v163-moat-context-hardening-plan.md
   spec: null
   review: docs/qa-reports/v162-review.md
   qa: docs/qa-reports/v162-qa.md
@@ -42,10 +42,14 @@ external_evidence:
     scope: "v0.12.2 実装後 4 ラウンドレビュー"
     findings: "Round 6 (P1×2, P2×1: pre-compact exit 2 / minimal-project / test rc), Round 7 (P1×1, P3×1: git add 漏れ / テスト件数表記), Round 8 (P2×1, P3×1: stale last_updated / grep 自己マッチ), Round 9 (P3×2: コメント不整合)"
     resolution: "9件全反映。tier 1/2 PASS、134 tests PASS、本体と minimal-project 完全同期確認済み。"
-next_action: "iteration 23（v1.6.2 全力レビュー fix-forward）完了: 10 commit + release で Critical 13 件（K-1〜K-13）+ S-1/DIST-12 前倒し + grill-code Critical 2 件を消化、683 tests / contract / drift / smoke / 18 PoC 全 PASS。残: tag v1.6.2 付与＋origin push（ユーザ判断）。"
+next_action: "iteration 24（v1.6.3 第7回全力レビュー fix-forward）実装完了: R1 制御バイト / R2+C1 untrusted 注入+肥大 / R3 抽出失敗 fail-closed / R4 capital-R 再帰削除 を TDD 実装、P1 は YAGNI で除外。705 tests / contract 全 profile / drift / smoke / v162 18 PoC / v163 5 PoC 全 PASS。grill-plan 致命4件 + grill-code 反映済み。残: commit 後の tag v1.6.3 付与＋origin push（ユーザ判断）。"
 blockers: []
 failure_tracking: null
 session_history:
+  - date: "2026-06-13"
+    mode: Dev
+    phase: "deploy"
+    note: "iteration 24（v1.6.3 第7回全力レビュー fix-forward）実装完了: 5 軸並列レビュー（コンテキスト予算 / 機能整合 / 将来耐性 / 複雑性 / 敵対堅牢性）で moat の未カバー 3 件（R1 制御バイトで deny/block JSON 破損→fail-open・R2 STATUS/LEARNINGS の無サニタイズ注入・R3 抽出失敗時の emit_allow）を抽出。R1=emit.sh の _aegis_json_escape に C0 制御バイト空白置換（pure-bash・外部依存契約維持）。R2+C1=新 lib sanitize.sh（aegis_sanitize_field + UTF-8 安全 byte 切断 _aegis_utf8_trunc）+ session-start で blockers/learnings を untrusted エンベロープ封入・next_action はフェンス外維持・全自由文に上限。R3=check-destructive/secrets の抽出失敗分岐を raw INPUT パターン一致で emit_ask に fail-closed 化。grill-code 中に capital-R 再帰削除の既存 gap を発見し R4 として畳み込み（-[a-zA-Z]*[rR]）。P1（aegis-* description 短縮）は disable-model-invocation で system prompt 非掲載=0 トークンの YAGNI として除外。grill-plan 致命4件（UTF-8 切断割れ・next_action フェンス誤封入・P1 無価値・severity 過大）を着手前に実証反映、UTF-8 切断は bash 3.2 で 80+20 fuzz 検証。705 tests OK（683→705・新規22）/ contract 全 profile / drift / smoke / v162 18 PoC / v163 5 PoC 全 PASS。R1/R2/R3 は defense-in-depth（前提条件が gate 済 or 稀）と整理。残 P2（HINT opt-out 化・volatile マニフェスト）/ P3（ミラー自動生成・docs archive・STATUS パーサ一本化）は backlog。"
   - date: "2026-06-13"
     mode: Dev
     phase: "deploy"
@@ -54,10 +58,6 @@ session_history:
     mode: Dev
     phase: "implement"
     note: "iteration 22（v1.6.1 全力レビュー fix-forward）開始: 第5回全力レビュー（軸 A〜F 並列 6 サブエージェント・docs/full-review-2026-06-12.md）で実証された Critical 7 件 + S-3/S-11 の fix-forward。Critical 全 9 件は PoC/grep/measurement で実証済み（C-1 制御プレーン変数展開・C-2 test green 偽装・C-3 client gate touch・C-4 SessionStart resume 欠落・C-5 user-invocable 表 17 件 drift・C-6 hook/lib/drift カウント・C-7 テスト sleep 70%・C-8 巨大関数・C-9 credentials 4 形式）。C-7/C-8 は構造 refactor のため v1.7 へ送り、v1.6.1 は狭く深い security + drift 修正に絞る。plan は grill-plan で 5 致命的・5 要検討を指摘されて全反映（Schema Migration / Phase 進行表 / Commit プラン / 受容済みリスク / Release Checklist の 5 章追加、Task 1/2/3/7 の検知ロジック精緻化、Task 0/6 のテスト境界修正）。ブランチ fix/v1.6.1-critical-bypasses で TDD 実装中。"
-  - date: "2026-06-12"
-    mode: Dev
-    phase: "deploy"
-    note: "iteration 21（v1.6.0 fix-forward P1×4）: behavioral-review-report-2026-06-12 §5.1 の P1×4 を Task 1〜15 TDD で完走（479→508 tests）。P1-A=skill 構造起動（phase-skills.sh 単一所有＋SessionStart/phase 遷移 additionalContext 注入＋BFS 到達性の drift/smoke 契約化＋path 形式正規化 14 箇所）、P1-B=full への skill 参照テンプレ 6 件配布＋参照実在契約、P1-C=judge card 承認時 transcript push＋scanner decode 耐性、P1-D=client_ready_for_dev 6 成果物の承認側＋完了側対称検査。計画乖離 2 件は強化方向（SKILL_REF_EXCLUDE=存在マニフェストの root 化除外・tier0 timeout 300s 追従）。grill-code 独立 2 本（A=マージ可 🟡3/🟢3、B=S1 修正後マージ 🟡4/🟢3）: 合流点 S1=names regex のコメント横断偽 root（vacuous CLEAN 再演リスク）→ 非コメント行 anchor＋テストで充足（a8411fb・実 repo トークン 15 件ちょうどを実測）。B-S2/S3/S4・A🟡2/3 は理由付き記録（v160-review.md）・B-S3 は security 残余 #4 に統合。テスト記録 manual green（信頼ランナー・fp=HEAD 一致）・4 ゲート --ack 承認＝ユーザー委任の代行（証跡 v160-*.md）。v1.6.0 minor で締め・tag v1.6.0。origin push は別途ユーザー判断。"
 ---
 
 ## Summary
