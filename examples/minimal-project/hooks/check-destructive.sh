@@ -31,9 +31,26 @@ INPUT=$(cat)
 # Extract command.
 CMD=$(extract_command "$INPUT")
 
-# If no command extracted, allow.
+# If no command extracted, allow — UNLESS the raw payload still matches a
+# destructive pattern. Extraction can fail on truncated/oversized JSON; CC emits
+# well-formed JSON, so this is a defense-in-depth fail-closed fallback (mirrors
+# check-control-plane.sh's raw-target scan).
 if [ -z "$CMD" ]; then
-  emit_allow
+  RAW_LOWER=$(printf '%s' "$INPUT" | tr '[:upper:]' '[:lower:]')
+  _raw_hit=""
+  for i in "${!AEGIS_DESTRUCTIVE_LOWER_REGEX[@]}"; do
+    if printf '%s' "$RAW_LOWER" | grep -qE "${AEGIS_DESTRUCTIVE_LOWER_REGEX[$i]}" 2>/dev/null; then _raw_hit=1; break; fi
+  done
+  if [ -z "$_raw_hit" ]; then
+    for i in "${!AEGIS_DESTRUCTIVE_CMD_REGEX[@]}"; do
+      if printf '%s' "$INPUT" | grep -qE "${AEGIS_DESTRUCTIVE_CMD_REGEX[$i]}" 2>/dev/null; then _raw_hit=1; break; fi
+    done
+  fi
+  if [ -n "$_raw_hit" ] || printf '%s' "$INPUT" | grep -qE 'rm[[:space:]]+(-[a-zA-Z]*[rR]|--recursive)' 2>/dev/null; then
+    emit_ask "[careful] command extraction failed but the raw payload matches a destructive pattern — confirm intent"
+  else
+    emit_allow
+  fi
   exit 0
 fi
 
@@ -67,8 +84,9 @@ WARN=""
 
 # rm -r recursive: special-cased (the safe-targets exception above already
 # returned for build-artifact-only deletes, so this is a real recursive delete).
-if printf '%s' "$CMD" | grep -qE 'rm\s+(-[a-zA-Z]*r|--recursive)' 2>/dev/null; then
-  WARN="Destructive: recursive delete (rm -r). Permanently removes files."
+# [rR] covers both -r (GNU) and -R (BSD/macOS) recursive flags (R4).
+if printf '%s' "$CMD" | grep -qE 'rm\s+(-[a-zA-Z]*[rR]|--recursive)' 2>/dev/null; then
+  WARN="Destructive: recursive delete (rm -r/-R). Permanently removes files."
 fi
 
 # LOWER-cased command patterns (SQL) from patterns.sh.

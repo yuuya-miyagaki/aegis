@@ -36,9 +36,16 @@ INPUT=$(cat)
 # Extract command.
 CMD=$(extract_command "$INPUT")
 
-# If no command extracted, allow.
+# If no command extracted, allow — UNLESS the raw payload still references a
+# secret/credential file (defense-in-depth fail-closed fallback for truncated JSON).
 if [ -z "$CMD" ]; then
-  emit_allow
+  # Credential file patterns come from the lib (C-9 single owner); .env is local.
+  if printf '%s' "$INPUT" | grep -qE "\.env([^.a-z]|\$)|${AEGIS_HIGH_RISK_RE}" 2>/dev/null \
+     && ! printf '%s' "$INPUT" | grep -qE '\.env\.(example|template|sample)' 2>/dev/null; then
+    emit_ask "[careful] command extraction failed but the raw payload references a secret/credential file — confirm intent"
+  else
+    emit_allow
+  fi
   exit 0
 fi
 
