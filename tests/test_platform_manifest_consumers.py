@@ -47,3 +47,59 @@ def test_contract_imports_manifest_atoms():
     # マニフェスト原子を import 経由で使用していること（リテラル再定義の防止）
     from platform_manifest import OPUS_ONLY_EFFORTS
     assert cfc.OPUS_ONLY_EFFORTS is OPUS_ONLY_EFFORTS
+
+
+# --- Task 3: check_reference_drift consumes manifest event/tool atoms ---
+
+def _write_template(tmp_path, hooks: dict) -> Path:
+    root = tmp_path
+    (root / "templates").mkdir(parents=True, exist_ok=True)
+    (root / "templates" / "hooks.template.json").write_text(
+        json.dumps({"hooks": hooks}), encoding="utf-8"
+    )
+    return root
+
+
+def test_drift_clean_template_passes(tmp_path):
+    root = _write_template(tmp_path, {
+        "PreToolUse": [{"matcher": "Edit|Write|NotebookEdit", "hooks": []}],
+        "PostToolUse": [{"matcher": "Bash", "hooks": []}],
+    })
+    failures, warnings = crd.check_platform_manifest(root)
+    assert failures == []
+    assert warnings == []  # staleness は別関数なので壁時計に依存しない
+
+
+def test_drift_unknown_event_fails(tmp_path):
+    root = _write_template(tmp_path, {
+        "PreToolUseX": [{"matcher": "Bash", "hooks": []}],
+    })
+    failures, _ = crd.check_platform_manifest(root)
+    assert any("PreToolUseX" in f and "KNOWN_HOOK_EVENTS" in f for f in failures)
+
+
+def test_drift_unknown_tool_warns(tmp_path):
+    root = _write_template(tmp_path, {
+        "PreToolUse": [{"matcher": "Bash|FrobnicateTool", "hooks": []}],
+    })
+    failures, warnings = crd.check_platform_manifest(root)
+    assert failures == []
+    assert any("FrobnicateTool" in w for w in warnings)
+
+
+def test_drift_ignores_session_source_matchers(tmp_path):
+    # SessionStart の matcher は tool ではない＝WARN を出さない
+    root = _write_template(tmp_path, {
+        "SessionStart": [{"matcher": "startup|resume|clear|compact", "hooks": []}],
+    })
+    failures, warnings = crd.check_platform_manifest(root)
+    assert failures == []
+    assert warnings == []
+
+
+def test_staleness_skipped_when_not_framework_root(tmp_path):
+    # platform_manifest.py を含まない root（例: install 先 scaffold）では staleness を
+    # 発火させない＝二重発火を防ぐ。
+    failures, warnings = crd.check_platform_staleness(tmp_path)
+    assert failures == []
+    assert warnings == []

@@ -13,7 +13,19 @@ from __future__ import annotations
 import argparse
 import json
 import re
+import sys
 from pathlib import Path
+
+# Some tests load this module via importlib.spec_from_file_location without
+# putting scripts/ on sys.path. Self-bootstrap so `platform_manifest` resolves
+# regardless of how we are loaded.
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from platform_manifest import (
+    KNOWN_HOOK_EVENTS,
+    KNOWN_TOOL_NAMES,
+    TOOL_MATCHING_EVENTS,
+    stale_keys,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -513,6 +525,57 @@ MIRROR_ALLOWLIST = {
 }
 
 
+def check_platform_manifest(root: Path) -> tuple[list[str], list[str]]:
+    """volatile-truth manifest（決定論部）: template の hook event は既知 event
+    集合の部分でなければならない（FAIL）。tool-matcher のトークンは既知 tool
+    レジストリに収まるべき（WARN・regex 曖昧性ゆえ best-effort）。"""
+    failures: list[str] = []
+    warnings: list[str] = []
+
+    template = root / "templates" / "hooks.template.json"
+    if not template.exists():
+        return failures, warnings
+    try:
+        data = json.loads(_read(template))
+    except (json.JSONDecodeError, OSError):
+        warnings.append(f"could not parse {template.name}")
+        return failures, warnings
+
+    for event, matchers in data.get("hooks", {}).items():
+        if event not in KNOWN_HOOK_EVENTS:
+            failures.append(
+                f"platform-manifest: hooks.template.json event '{event}' "
+                f"not in KNOWN_HOOK_EVENTS (renamed/typo?)"
+            )
+        if event not in TOOL_MATCHING_EVENTS or not isinstance(matchers, list):
+            continue
+        for matcher in matchers:
+            for token in matcher.get("matcher", "").split("|"):
+                token = token.strip()
+                if token and token not in KNOWN_TOOL_NAMES:
+                    warnings.append(
+                        f"platform-manifest: matcher token '{token}' "
+                        f"(event {event}) not in KNOWN_TOOL_NAMES registry"
+                    )
+
+    return failures, warnings
+
+
+def check_platform_staleness(root: Path) -> tuple[list[str], list[str]]:
+    """volatile-truth manifest（時間依存部）: 検証日が staleness 窓を超えたら
+    再確認を促す advisory（WARN・非ブロック）。manifest を持つ framework root
+    のみで発火させ、install 先 scaffold での二重発火を避ける。"""
+    warnings: list[str] = []
+    if not (root / "scripts" / "platform_manifest.py").exists():
+        return [], warnings
+    for key in stale_keys():
+        warnings.append(
+            f"platform-manifest: '{key}' verification date exceeds the staleness "
+            f"window; re-verify against the live platform and bump PLATFORM_VERIFIED"
+        )
+    return [], warnings
+
+
 def check_mirror_identity(root: Path) -> tuple[list[str], list[str]]:
     """#11: control files mirrored into examples/minimal-project must be
     byte-identical to the framework root. Compares only files present on BOTH
@@ -569,6 +632,8 @@ ALL_CHECKS = [
     ("example README counts", check_example_readme_counts),
     ("example commands", check_example_commands),
     ("mirror identity (root ↔ example)", check_mirror_identity),
+    ("platform manifest (events/tools)", check_platform_manifest),
+    ("platform verification staleness", check_platform_staleness),
 ]
 
 
