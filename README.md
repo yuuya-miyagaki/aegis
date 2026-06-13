@@ -163,6 +163,8 @@ python3 scripts/check_framework_contract.py --profile=standard --root examples/m
 Available profiles: `minimal` (4 core files), `standard` (15 required + 8 recommended). `full` is framework repo root only (do not use with `--root`).
 Profile definitions: `templates/profiles/*.json`.
 
+When developing the framework, after editing any control file under `hooks/`, `scripts/`, or `.claude/`, run `make example` to regenerate the `examples/minimal-project/` mirror from the root (a forgotten regen is caught by `check_reference_drift.py`'s mirror identity check).
+
 Optional strict YAML validation (requires PyYAML):
 
 ```bash
