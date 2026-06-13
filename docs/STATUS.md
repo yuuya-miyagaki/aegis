@@ -6,10 +6,10 @@ mode: Dev
 phase: deploy
 task_type: framework
 task_size: L
-task_size_rationale: "確定（brainstorm→writing-plans→grill-plan→TDD 実装→grill-code）: 第7回全力レビュー §1 M3『STATUS パーサ二重化』。Python 側は既に一本化済みと判明し bash のみがスコープ。frontmatter.sh に frontmatter_value/gate_value を追加し extract_value 2定義＋インライン約11箇所＋gate抽出（post-status-audit の extract_gate 含む）を集約。lib+8 hook+テスト+profiles+版数。8 commit。"
-iteration: 26
+task_size_rationale: "確定（brainstorm→writing-plans→grill-plan→TDD 実装→grill-code）: 第7回全力レビュー §1 M1『example ミラー 520K 手動同期』。新規 script+tests+Makefile+README+版数4ファイル＝6+ ファイルで L。scripts/sync_example_mirror.py が check_reference_drift の MIRROR_* を import し root→example を copy（allowlist skip・mode 保持・stale 除去 DIRS+FILES）。make example で実行、検証は既存 check_mirror_identity に委任＝安全網非破壊。新規 script+tests+Makefile+README+版数。3 commit。"
+iteration: 27
 ui_surface: false
-last_updated: "2026-06-13T18:00:00Z"
+last_updated: "2026-06-13T18:30:00Z"
 gate_approvals:
   client_ready_for_dev: n/a
   brainstorm: approved
@@ -22,8 +22,8 @@ gate_approvals:
 current_refs:
   requirements:
     - docs/full-review-2026-06-13-context-futureproof.md
-  plan: docs/plans/2026-06-13-v171-status-parser-unification-implementation.md
-  spec: docs/plans/2026-06-13-status-parser-unification-design.md
+  plan: docs/plans/2026-06-13-v172-example-mirror-autogen-implementation.md
+  spec: docs/plans/2026-06-13-example-mirror-autogen-design.md
   review: docs/qa-reports/v162-review.md
   qa: docs/qa-reports/v162-qa.md
   security: docs/qa-reports/v162-security.md
@@ -42,10 +42,14 @@ external_evidence:
     scope: "v0.12.2 実装後 4 ラウンドレビュー"
     findings: "Round 6 (P1×2, P2×1: pre-compact exit 2 / minimal-project / test rc), Round 7 (P1×1, P3×1: git add 漏れ / テスト件数表記), Round 8 (P2×1, P3×1: stale last_updated / grep 自己マッチ), Round 9 (P3×2: コメント不整合)"
     resolution: "9件全反映。tier 1/2 PASS、134 tests PASS、本体と minimal-project 完全同期確認済み。"
-next_action: "iteration 26（v1.7.1 M3: STATUS パーサ bash 一本化）実装完了: frontmatter.sh に frontmatter_value（whole-file grep）/gate_value（frontmatter_section||raw_section 両対応・2スペース anchor）を追加し、散在する extract_value 2定義＋インライン scalar 約11箇所＋gate 抽出（check-gate/check-task-created＋post-status-audit の extract_gate/extract_gate_from_status）を単一所有者へ集約。Python 側は既に一本化済みのため bash のみ。挙動不変は equivalence テスト（scalar/gate/bare-snapshot 新旧一致）＋既存 tamper/snapshot テスト緑で実証。control-plane/task-completed/client-info/pre-compact に frontmatter.sh source 追加（前3者は fail-closed require）。grill-plan 致命2（gate_value の bare 非対応・post-status-audit extract_gate 取りこぼし）を着手前に反映、grill-code 🟡1（frontmatter.sh が minimal/full の required 未ピン）を fix-forward（REQUIRED_LIBS＋3 profile に追加）。版数4箇所を 1.7.1 統一。726 tests OK（711→726・新規15）/ contract 全 profile / drift / scaffold smoke / v162 18 PoC / v163 5 PoC 全 PASS。残: tag v1.7.1 付与＋origin push（ユーザ判断）。backlog: P2 volatile マニフェスト / P3 ミラー自動生成・docs archive。"
+next_action: "iteration 27（v1.7.2 M1: example ミラー自動生成）実装完了: scripts/sync_example_mirror.py が check_reference_drift から MIRROR_DIRS/MIRROR_FILES/MIRROR_ALLOWLIST を import（生成と検証が同一マニフェスト共有＝乖離不能）し、root→examples/minimal-project を shutil.copy2（mode 保持）。allowlist（validate.md/retro.md）skip、MIRROR_DIRS＋MIRROR_FILES 両方の stale 除去、分岐ファイル（CLAUDE.md/STATUS.md/docs/*＝MIRROR_DIRS 外）は不可侵。make example で実行。検証は既存 check_mirror_identity に委任し安全網（drift/contract/smoke）は非破壊＝committed ミラーの物理除去（smoke-only 化）は browsable 維持のため非ゴール。grill-plan 要検討（MIRROR_FILES stale 対称化）を着手前反映、grill-code は 🔴/🟡 ゼロ・🟢 は全 YAGNI で fix なし。実 repo で sync 実行→git diff 空＝現状 example を byte/mode 再現（回帰なし）を実証。734 tests OK（726→734・新規8）/ contract 全 profile / drift / scaffold smoke / v162 18 PoC / v163 5 PoC 全 PASS。残: tag v1.7.2 付与＋origin push（ユーザ判断）。backlog: P2 volatile マニフェスト / P3 過程 docs archive 化。"
 blockers: []
 failure_tracking: null
 session_history:
+  - date: "2026-06-13"
+    mode: Dev
+    phase: "deploy"
+    note: "iteration 27（v1.7.2 M1: example ミラー自動生成）実装完了: 第7回全力レビュー §1 M1『example ミラー 520K の手動同期＝最大の保守税』。新規 scripts/sync_example_mirror.py が check_reference_drift から MIRROR_DIRS/MIRROR_FILES/MIRROR_ALLOWLIST を import（生成と検証が同一マニフェスト共有＝原理的に乖離不能）し、root→examples/minimal-project を shutil.copy2（mode 保持）で同期。allowlist（validate.md/retro.md）skip、MIRROR_DIRS＋MIRROR_FILES 両方の stale 除去、分岐ファイル（CLAUDE.md/STATUS.md/docs/requirements・specs・qa-reports 等＝MIRROR_DIRS 外）は不可侵。make example ターゲットで実行、制御ファイル編集後の手動 cp（M3 で9ファイル cp の痛みを実感）を消す。検証は既存 check_mirror_identity に委任し安全網（drift/contract/scaffold smoke）は一切改廃しない additive＝committed ミラーの物理除去（smoke-only 化）は browsable（北極星=非エンジニア向け見本）維持のため非ゴール。スコープ確定時に Python 側 mirror が ~380K・分岐 ~240K と実測。grill-plan が MIRROR_FILES の stale 非対称を指摘→着手前に対称化（step3）。grill-code は 🔴/🟡 ゼロ、🟢3件（空ディレクトリ残置/出力冗長/非原子性）は全 YAGNI（git/drift が空dir無視・手動冪等ツール）で fix なし。実 repo で sync 実行→git diff 空＝現状 example を byte/mode 再現（回帰なし）を実証。734 tests OK（726→734・新規8）/ contract 全 profile / drift / scaffold smoke / v162 18 PoC / v163 5 PoC 全 PASS。残 backlog: P2 volatile マニフェスト / P3 過程 docs archive 化。"
   - date: "2026-06-13"
     mode: Dev
     phase: "deploy"
@@ -54,10 +58,6 @@ session_history:
     mode: Dev
     phase: "deploy"
     note: "iteration 25（v1.7.0 P2-a: AEGIS_NUDGE opt-out）実装完了: 第7回全力レビュー §2 P2-a。session-start の phase HINT 説教のみを AEGIS_NUDGE=off で抑制し、gates/skill 起動パス/blockers/failure_tracking/各 warning/unknown-phase 診断は無条件で残す（enforce outcomes, delegate paths）。スコープは常時オンの session-start のみ＝skill/agent の静的合理化テーブルは env で切れず profile 別二重化＝M1 複製税なので非ゴール。profile 連動 full=on / minimal・standard=off は setup.sh の generate_settings が settings.local.json の env に AEGIS_NUDGE=off を key-level setdefault で注入（settings env→hook 伝播は CC 公式仕様で実証・ユーザ明示値は再 install で保全）。fail-safe=小文字 off のみ off、他は on。brainstorm→writing-plans→grill-plan→TDD→grill-code を完走: grill-plan 致命1（unknown-phase 警告が HINT 変数同居で off 巻き添え→minimal/standard 既定 off で恒久診断喪失）を着手前にゲート外 [WARNING] へ分離、grill-code 🟡1（env clobber でユーザ値上書き）を key-level setdefault に修正。版数4箇所（定数/template/example STATUS/本体 STATUS）を 1.7.0 統一（v1.6.3 が docs/STATUS.md のみ bump し scaffold stamp 1.6.2 残置だった split を解消）。711 tests OK（705→711・新規6）/ contract 全 profile / drift / scaffold smoke / v162 18 PoC / v163 5 PoC 全 PASS。残 backlog: P2 volatile マニフェスト / P3 ミラー自動生成・docs archive・STATUS パーサ一本化。"
-  - date: "2026-06-13"
-    mode: Dev
-    phase: "deploy"
-    note: "iteration 24（v1.6.3 第7回全力レビュー fix-forward）実装完了: 5 軸並列レビュー（コンテキスト予算 / 機能整合 / 将来耐性 / 複雑性 / 敵対堅牢性）で moat の未カバー 3 件（R1 制御バイトで deny/block JSON 破損→fail-open・R2 STATUS/LEARNINGS の無サニタイズ注入・R3 抽出失敗時の emit_allow）を抽出。R1=emit.sh の _aegis_json_escape に C0 制御バイト空白置換（pure-bash・外部依存契約維持）。R2+C1=新 lib sanitize.sh（aegis_sanitize_field + UTF-8 安全 byte 切断 _aegis_utf8_trunc）+ session-start で blockers/learnings を untrusted エンベロープ封入・next_action はフェンス外維持・全自由文に上限。R3=check-destructive/secrets の抽出失敗分岐を raw INPUT パターン一致で emit_ask に fail-closed 化。grill-code 中に capital-R 再帰削除の既存 gap を発見し R4 として畳み込み（-[a-zA-Z]*[rR]）。P1（aegis-* description 短縮）は disable-model-invocation で system prompt 非掲載=0 トークンの YAGNI として除外。grill-plan 致命4件（UTF-8 切断割れ・next_action フェンス誤封入・P1 無価値・severity 過大）を着手前に実証反映、UTF-8 切断は bash 3.2 で 80+20 fuzz 検証。705 tests OK（683→705・新規22）/ contract 全 profile / drift / smoke / v162 18 PoC / v163 5 PoC 全 PASS。R1/R2/R3 は defense-in-depth（前提条件が gate 済 or 稀）と整理。"
 ---
 
 ## Summary
