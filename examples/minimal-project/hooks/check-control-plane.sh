@@ -85,6 +85,44 @@ cmd_mentions_control_plane() {
 # Receive list & rationale: docs/qa-reports/v161-security.md.
 cmd_var_built_write() {
   local cmd="$1"
+  # K-2 (v1.6.2): three independent paths cover REDTEAM-02 bypasses.
+  #
+  # Path A (v1.6.1 baseline): ASSIGNMENT + VARIABLE USE + WRITE OP.
+  # Path B (v1.6.2 NEW): "first write redirect's target" contains $(...)
+  #   or backtick. Static expansion is impossible — fail-closed by ASK.
+  #   The target is sliced as everything between '>' and the next chain
+  #   separator (|, &, ;) to avoid over-flagging an unrelated cmdsub in a
+  #   later command (grill 要検討 1).
+  # Path C (v1.6.2 NEW): alternative ASSIGNMENT forms (printf -v, read,
+  #   eval, declare, local) co-occurring with any WRITE OP. The literal
+  #   identifier= regex in Path A's gate (1) misses these.
+
+  # --- Path B: cmdsub / backtick in the first write target ---
+  # Extract the first redirect target token: everything from the first
+  # '>' / '>>' up to the next chain separator. If that slice contains
+  # `$(` or backtick, ASK. Sliced (not whole-cmd) to keep unrelated
+  # cmdsubs in later commands from triggering.
+  local _write_target
+  _write_target=$(printf '%s' "$cmd" | \
+    sed -nE 's/^[^>]*>>?[[:space:]]*([^|&;]*).*/\1/p' | head -1)
+  if [ -n "$_write_target" ] && \
+     printf '%s' "$_write_target" | grep -qE '\$\(|`'; then
+    return 0
+  fi
+
+  # --- Path C: alternative assignment forms + write op ---
+  # printf -v VAR ... / read VAR / eval "VAR=..." / declare VAR=... /
+  # local VAR=... can build a control-plane path that Path A's IDENT=
+  # regex never sees. Pair with a write op (same regex as gate 3 below)
+  # to avoid over-flagging plain `read x` etc.
+  if printf '%s' "$cmd" | grep -qE \
+       '(^|;|&|\|)[[:space:]]*(printf[[:space:]]+-v[[:space:]]+[A-Za-z_]|read[[:space:]]+[A-Za-z_]|eval[[:space:]]+["'\'']|declare[[:space:]]+[A-Za-z_]|local[[:space:]]+[A-Za-z_])' && \
+     printf '%s' "$cmd" | grep -qE \
+       '>>?[[:space:]]*[^&]|(^|[^A-Za-z0-9_])(tee|cp|mv|install|dd|truncate|ln|rm|chmod|chown|mkdir|curl|wget|rsync|tar)([[:space:]]|$)|sed[[:space:]]+-i|python3?[[:space:]]+-c|bash[[:space:]]+-c|git[[:space:]]+(apply|add|mv|rm|stage|update-index)|find[[:space:]]+.*-(exec|delete|fprint|fprintf)'; then
+    return 0
+  fi
+
+  # --- Path A: v1.6.1 baseline (ASSIGNMENT + VAR USE + WRITE OP) ---
   # (1) ASSIGNMENT at command position: token start followed by IDENT=
   printf '%s' "$cmd" | grep -qE \
     '(^|;|&|\|)[[:space:]]*[A-Za-z_][A-Za-z0-9_]*=|[[:space:]][A-Za-z_][A-Za-z0-9_]*=' \

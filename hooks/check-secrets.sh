@@ -141,14 +141,33 @@ if printf '%s' "$CMD" | grep -qE "git[[:space:]]+${GIT_PRE_OPTS}commit" 2>/dev/n
   fi
 fi
 
-# grill-code A-Crit-4 (v1.6.1): `F=.env; git add $F` builds the filename via
-# variable expansion, so the literal-`.env` regex above misses it. Mirror the
-# C-1 var-built-write heuristic: if the command has BOTH a variable assignment
-# AND uses `git add $VAR` / `git stage $VAR` / `git update-index $VAR`, ASK.
-# Same logic applies to high-risk credentials staged via var-built names.
+# grill-code A-Crit-4 (v1.6.1) + K-3 (v1.6.2):
+# `F=.env; git add $F`, `F=.env; git add "${F}"`, `F=.env; git add '${F}'`
+# all build the filename via variable expansion, so the literal-`.env` regex
+# above misses it. Mirror the C-1 var-built-write heuristic: if the command
+# has BOTH a variable assignment AND uses `git <stage> [QUOTE]$VAR[QUOTE]`,
+# ASK. Same logic applies to high-risk credentials staged via var-built names.
+# K-3 extends the v1.6.1 regex to accept optional `"` / `'` immediately
+# before `$` (REDTEAM-03: `git add "${F}"` had silently passed because the
+# leading quote broke the [^.[:space:]]+ chain).
 if printf '%s' "$CMD" | grep -qE '(^|[;&|][[:space:]]*|[[:space:]])[A-Za-z_][A-Za-z0-9_]*=' 2>/dev/null && \
-   printf '%s' "$CMD" | grep -qE "git[[:space:]]+${GIT_PRE_OPTS}${GIT_STAGE_VERB}[[:space:]]+([^.[:space:]]+[[:space:]]+)*\\\$\\{?[A-Za-z_][A-Za-z0-9_]*" 2>/dev/null; then
+   printf '%s' "$CMD" | grep -qE "git[[:space:]]+${GIT_PRE_OPTS}${GIT_STAGE_VERB}[[:space:]]+([\"'\\\\]?[^.[:space:]]+[[:space:]]+)*[\"'\\\\]?\\\$\\{?[A-Za-z_][A-Za-z0-9_]*" 2>/dev/null; then
   emit_ask "[secrets] git のステージング先パスが変数 (\$VAR) で組み立てられています — .env や認証ファイルを意図せず追加しないか確認してください。"
+  exit 0
+fi
+
+# K-4 (v1.6.2): cmdsub / backtick で git や引数を組み立てる経路の bypass。
+# REDTEAM-04: `$(echo git) add .env` / `` `echo git` add .env `` は
+# git[[:space:]]+... 前提の全 regex を完全に迂回する。
+# 静的に解決不能（コマンド置換の出力次第）なので、cmdsub/backtick が含まれ、
+# かつ word-boundary 付きの `.env` か高リスク認証ファイル参照があれば ASK。
+# safe variants (.env.example/.template/.sample) は事前 strip して
+# false-positive を抑止（grill 要検討 2）。
+K4_STRIPPED=$(printf '%s' "$CMD" | sed -E "s/${SAFE_ENV_SUFFIXES}//g")
+if printf '%s' "$CMD" | grep -qE '\$\(|`' 2>/dev/null && \
+   { printf '%s' "$K4_STRIPPED" | grep -qE "(^|[^A-Za-z0-9_])\\.env([^A-Za-z0-9_]|$)" 2>/dev/null || \
+     printf '%s' "$K4_STRIPPED" | grep -qE "${AEGIS_HIGH_RISK_RE}" 2>/dev/null; }; then
+  emit_ask "[secrets] コマンドが \$(...) / \`...\` で構築されており、.env や認証ファイルを参照しています — 意図しないステージング/書込みでないか確認してください。"
   exit 0
 fi
 

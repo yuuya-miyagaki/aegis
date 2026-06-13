@@ -233,5 +233,102 @@ class TestExistingDirectFormsStillDeny(unittest.TestCase):
                       f"literal hooks/ write must deny: {out[:120]!r}")
 
 
+# ---------------------------------------------------------------------------
+# K-2 (v1.6.2): cmdsub / printf -v / read / eval / declare / local の bypass
+# 第6回 Phase A REDTEAM-02 で次が allow に落ちることが判明：
+#   > "$(echo hooks)/lib/emit.sh"
+#   printf -v D %s hooks; > $D/lib/emit.sh
+#   read D <<<hooks; > $D/lib/emit.sh
+#   eval "D=hooks"; > $D/lib/emit.sh
+# 経路 B（write-target に cmdsub / backtick）と
+# 経路 C（printf -v / read / eval / declare / local + 書込み op）を追加で
+# ASK に倒す。
+# ---------------------------------------------------------------------------
+
+
+class TestK2CmdsubAndAltAssignmentBlocked(unittest.TestCase):
+    """K-2 PoC: write-target に cmdsub / backtick がある、または代替
+    assignment 形（printf -v / read / eval / declare / local）+ write が
+    共存するケースは ASK に倒す。"""
+
+    @classmethod
+    def setUpClass(cls):
+        cls._tmp = _scratch_root()
+        cls.root = Path(cls._tmp.name)
+
+    @classmethod
+    def tearDownClass(cls):
+        cls._tmp.cleanup()
+
+    def _assert_blocked(self, cmd: str):
+        out = _hook(self.root, cmd)
+        self.assertTrue(_is_blocked(out),
+                        f"K-2 PoC must NOT pass: cmd={cmd!r}, out={out[:200]!r}")
+
+    def test_write_target_with_cmdsub_blocked(self):
+        """REDTEAM-02 主 PoC: 純コマンド置換で書込先を構築"""
+        self._assert_blocked('> "$(echo hooks)/lib/emit.sh"')
+
+    def test_write_target_with_backtick_blocked(self):
+        """backtick は cmdsub の旧記法"""
+        self._assert_blocked('> `echo hooks`/lib/emit.sh')
+
+    def test_write_target_with_unquoted_cmdsub_blocked(self):
+        self._assert_blocked('echo evil > $(echo hooks)/lib/emit.sh')
+
+    def test_printf_dash_v_assignment_blocked(self):
+        """printf -v で変数を組み立てる代替 assignment 形"""
+        self._assert_blocked('printf -v D %s hooks; > $D/lib/emit.sh')
+
+    def test_read_assignment_blocked(self):
+        """read で変数を組み立てる代替 assignment 形"""
+        self._assert_blocked('read D <<<hooks; > $D/lib/emit.sh')
+
+    def test_eval_assignment_blocked(self):
+        """eval で変数を組み立てる代替 assignment 形"""
+        self._assert_blocked('eval "D=hooks"; > $D/lib/emit.sh')
+
+    def test_declare_assignment_blocked(self):
+        self._assert_blocked('declare D=hooks; > $D/lib/emit.sh')
+
+    def test_local_assignment_blocked(self):
+        """local は通常関数内のみだが、検査側は文法を解釈しないので拾う"""
+        self._assert_blocked('local D=hooks; > $D/lib/emit.sh')
+
+
+class TestK2OverGreedyAvoided(unittest.TestCase):
+    """grill 要検討 1: write-target は『最初の `>` 直後の token』に限定し、
+    チェーンを跨いだ無関係な cmdsub を ASK 化してはいけない。"""
+
+    @classmethod
+    def setUpClass(cls):
+        cls._tmp = _scratch_root()
+        cls.root = Path(cls._tmp.name)
+
+    @classmethod
+    def tearDownClass(cls):
+        cls._tmp.cleanup()
+
+    def _assert_allowed(self, cmd: str):
+        out = _hook(self.root, cmd)
+        self.assertNotIn(_PERMISSION_DENY, out,
+                         f"unrelated cmdsub denied: cmd={cmd!r}, out={out!r}")
+        self.assertNotIn(_PERMISSION_ASK, out,
+                         f"unrelated cmdsub asked: cmd={cmd!r}, out={out!r}")
+
+    def test_unrelated_cmdsub_after_semicolon_allowed(self):
+        """write target は /tmp/out（リテラル）。後段の cmdsub は無関係。"""
+        self._assert_allowed(
+            'echo a > /tmp/out ; cat $(find . -name "*.log")')
+
+    def test_unrelated_cmdsub_after_amp_allowed(self):
+        self._assert_allowed(
+            'echo a > /tmp/out && grep $(date +%s) /tmp/foo')
+
+    def test_unrelated_cmdsub_in_pipe_allowed(self):
+        self._assert_allowed(
+            'echo a > /tmp/out | grep $(date +%s)')
+
+
 if __name__ == "__main__":
     unittest.main()
