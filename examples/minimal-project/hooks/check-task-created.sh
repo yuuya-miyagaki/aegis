@@ -104,8 +104,8 @@ if [ ! -f "$STATUS_FILE" ]; then
 fi
 
 # Extract plan gate and current phase.
-PLAN_GATE=$(frontmatter_section "$STATUS_FILE" gate_approvals | grep -m1 "plan:" | sed "s/.*plan:[[:space:]]*//" | sed 's/^"//;s/"$//' || true)
-PHASE=$(grep -m1 "^phase:" "$STATUS_FILE" | sed "s/^phase:[[:space:]]*//" | sed 's/^"//;s/"$//' || true)
+PLAN_GATE=$(gate_value "$STATUS_FILE" "plan")
+PHASE=$(frontmatter_value "$STATUS_FILE" "phase")
 
 # Hard-stop condition: phase=implement AND plan gate is not approved/n/a.
 # Other phases (brainstorm, plan, review, qa, security, deploy, ship, docs) allow

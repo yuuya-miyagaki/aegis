@@ -103,7 +103,7 @@ is_protected_dir() {
 
 # --- Templates: framework-controlled files ---
 if is_protected_dir "$TARGET_FILE" templates; then
-  TASK_TYPE=$(grep -m1 "^task_type:" "$STATUS_FILE" | sed "s/^task_type:[[:space:]]*//" | sed 's/^"//;s/"$//' || true)
+  TASK_TYPE=$(frontmatter_value "$STATUS_FILE" "task_type")
   if [ "$TASK_TYPE" = "framework" ]; then
     emit_allow
     exit 0
@@ -129,7 +129,7 @@ is_control_file() {
 
 if is_control_file "$TARGET_FILE"; then
   # Allow only when task_type is "framework".
-  TASK_TYPE=$(grep -m1 "^task_type:" "$STATUS_FILE" | sed "s/^task_type:[[:space:]]*//" | sed 's/^"//;s/"$//' || true)
+  TASK_TYPE=$(frontmatter_value "$STATUS_FILE" "task_type")
   if [ "$TASK_TYPE" = "framework" ]; then
     emit_allow
     exit 0
@@ -140,8 +140,8 @@ if is_control_file "$TARGET_FILE"; then
 fi
 
 # Extract mode and plan gate from STATUS.md frontmatter.
-MODE=$(grep -m1 "^mode:" "$STATUS_FILE" | sed "s/^mode:[[:space:]]*//" | sed 's/^"//;s/"$//' || true)
-PLAN_GATE=$(frontmatter_section "$STATUS_FILE" gate_approvals | grep -m1 "plan:" | sed "s/.*plan:[[:space:]]*//" | sed 's/^"//;s/"$//' || true)
+MODE=$(frontmatter_value "$STATUS_FILE" "mode")
+PLAN_GATE=$(gate_value "$STATUS_FILE" "plan")
 
 # Block code edits in Client mode.
 if [ "$MODE" = "Client" ]; then

@@ -10,6 +10,7 @@ STATUS_FILE="${ROOT}/docs/STATUS.md"
 # Load shared input extraction.
 source "${SCRIPT_DIR}/lib/extract-input.sh"
 source "${SCRIPT_DIR}/lib/emit.sh"
+source "${SCRIPT_DIR}/lib/frontmatter.sh"
 
 # Read stdin (JSON with tool_input).
 INPUT=$(cat)
@@ -34,7 +35,7 @@ if [ ! -f "$STATUS_FILE" ]; then
 fi
 
 # Check MODE: skip if Dev.
-MODE=$(grep -m1 "^mode:" "$STATUS_FILE" | sed "s/^mode:[[:space:]]*//" | sed 's/^"//;s/"$//' || true)
+MODE=$(frontmatter_value "$STATUS_FILE" "mode")
 if [ "$MODE" = "Dev" ]; then
   emit_allow
   exit 0
