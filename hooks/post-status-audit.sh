@@ -67,27 +67,19 @@ fi
 # → snapshot was partially written or tampered. Fail-closed (emit_block)
 # so the tamper detector below isn't trivially bypassed by editing the
 # snapshot to a blank field.
-_AEGIS_SNAP_PHASE_CHECK=$(grep -m1 '^phase:' "$SNAPSHOT_FILE" | sed "s/^phase:[[:space:]]*//" | sed 's/^"//;s/"$//' || true)
-_AEGIS_SNAP_MODE_CHECK=$(grep -m1 '^mode:' "$SNAPSHOT_FILE" | sed "s/^mode:[[:space:]]*//" | sed 's/^"//;s/"$//' || true)
+_AEGIS_SNAP_PHASE_CHECK=$(frontmatter_value "$SNAPSHOT_FILE" "phase")
+_AEGIS_SNAP_MODE_CHECK=$(frontmatter_value "$SNAPSHOT_FILE" "mode")
 if [ -z "$_AEGIS_SNAP_PHASE_CHECK" ] || [ -z "$_AEGIS_SNAP_MODE_CHECK" ]; then
   emit_block "[integrity] snapshot ファイル (.claude/.gate-snapshot) に必須フィールド (phase / mode) が欠落しています。手動編集や中断書き込みの可能性 — ファイルを確認するか /recover を実行してください。"
   exit 0
 fi
 
-# Extract gate value from a file. Falls back to raw_section because
-# .gate-snapshot stores the section without --- frontmatter delimiters.
-extract_gate() {
-  local file="$1"
-  local gate="$2"
-  { frontmatter_section "$file" gate_approvals 2>/dev/null || raw_section "$file" gate_approvals; } | grep -m1 "${gate}:" | sed "s/.*${gate}:[[:space:]]*//" | sed 's/^"//;s/"$//' || true
-}
-
 # Check ALL gates for unauthorized value changes.
 # Detect ANY change (not just →approved) to prevent bypass via direct edit.
 # Authorized changes go through update-gate.sh which updates the snapshot atomically.
 for gate in client_ready_for_dev brainstorm plan review qa security deploy dev_ready_for_client; do
-  OLD=$(extract_gate "$SNAPSHOT_FILE" "$gate")
-  NEW=$(extract_gate "$STATUS_FILE" "$gate")
+  OLD=$(gate_value "$SNAPSHOT_FILE" "$gate")
+  NEW=$(gate_value "$STATUS_FILE" "$gate")
 
   if [ "$OLD" != "$NEW" ] && [ -n "$OLD" ]; then
     REASON=$(printf '[gate-tamper] %s gate changed %s→%s without authorization. Use the /gate command to change gate values.' "$gate" "$OLD" "$NEW")
@@ -97,8 +89,8 @@ for gate in client_ready_for_dev brainstorm plan review qa security deploy dev_r
 done
 
 # --- Phase transition validation ---
-OLD_PHASE=$(grep -m1 "^phase:" "$SNAPSHOT_FILE" | sed "s/^phase:[[:space:]]*//" | sed 's/^"//;s/"$//' || true)
-NEW_PHASE=$(grep -m1 "^phase:" "$STATUS_FILE" | sed "s/^phase:[[:space:]]*//" | sed 's/^"//;s/"$//' || true)
+OLD_PHASE=$(frontmatter_value "$SNAPSHOT_FILE" "phase")
+NEW_PHASE=$(frontmatter_value "$STATUS_FILE" "phase")
 
 if [ -n "$OLD_PHASE" ] && [ -n "$NEW_PHASE" ] && [ "$OLD_PHASE" != "$NEW_PHASE" ]; then
   # set +e: python returning non-zero is expected (deny) — must not abort before emitting JSON.
@@ -115,25 +107,20 @@ if [ -n "$OLD_PHASE" ] && [ -n "$NEW_PHASE" ] && [ "$OLD_PHASE" != "$NEW_PHASE" 
 fi
 
 # --- Mode change validation ---
-OLD_MODE=$(grep -m1 "^mode:" "$SNAPSHOT_FILE" | sed "s/^mode:[[:space:]]*//" | sed 's/^"//;s/"$//' || true)
-NEW_MODE=$(grep -m1 "^mode:" "$STATUS_FILE" | sed "s/^mode:[[:space:]]*//" | sed 's/^"//;s/"$//' || true)
+OLD_MODE=$(frontmatter_value "$SNAPSHOT_FILE" "mode")
+NEW_MODE=$(frontmatter_value "$STATUS_FILE" "mode")
 
 if [ -n "$OLD_MODE" ] && [ -n "$NEW_MODE" ] && [ "$OLD_MODE" != "$NEW_MODE" ]; then
   # Mode changed — verify boundary gate.
-  extract_gate_from_status() {
-    local gate="$1"
-    frontmatter_section "$STATUS_FILE" gate_approvals | grep -m1 "${gate}:" | sed "s/.*${gate}:[[:space:]]*//" | sed 's/^"//;s/"$//' || true
-  }
-
   if [ "$OLD_MODE" = "Client" ] && [ "$NEW_MODE" = "Dev" ]; then
-    BOUNDARY_GATE=$(extract_gate_from_status "client_ready_for_dev")
+    BOUNDARY_GATE=$(gate_value "$STATUS_FILE" "client_ready_for_dev")
     if [ "$BOUNDARY_GATE" != "approved" ]; then
       REASON=$(printf "[mode-tamper] Mode changed Client→Dev but client_ready_for_dev is '%s' (must be approved). Use /gate approve client_ready_for_dev first." "$BOUNDARY_GATE")
       emit_block "$REASON"
       exit 0
     fi
   elif [ "$OLD_MODE" = "Dev" ] && [ "$NEW_MODE" = "Client" ]; then
-    BOUNDARY_GATE=$(extract_gate_from_status "dev_ready_for_client")
+    BOUNDARY_GATE=$(gate_value "$STATUS_FILE" "dev_ready_for_client")
     if [ "$BOUNDARY_GATE" != "approved" ]; then
       REASON=$(printf "[mode-tamper] Mode changed Dev→Client but dev_ready_for_client is '%s' (must be approved). Use /gate approve dev_ready_for_client first." "$BOUNDARY_GATE")
       emit_block "$REASON"
@@ -161,7 +148,7 @@ _AEGIS_SNAP_TMP="${SNAPSHOT_FILE}.tmp.$$"
 # mid-session transition (2026-06-12 behavioral review). additionalContext is
 # advisory: clients that ignore it lose only the hint, never the audit (fail-safe).
 if [ -n "$OLD_PHASE" ] && [ -n "$NEW_PHASE" ] && [ "$OLD_PHASE" != "$NEW_PHASE" ]; then
-  TASK_TYPE=$(grep -m1 "^task_type:" "$STATUS_FILE" | sed "s/^task_type:[[:space:]]*//" | sed 's/^"//;s/"$//' || true)
+  TASK_TYPE=$(frontmatter_value "$STATUS_FILE" "task_type")
   SKILL_PATHS=$(aegis_phase_skill_paths "$ROOT" "$NEW_PHASE" "$TASK_TYPE" | tr '\n' ' ')
   SKILL_PATHS="${SKILL_PATHS% }"
   if [ -n "$SKILL_PATHS" ]; then
