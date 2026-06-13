@@ -114,6 +114,150 @@ class TestRawSection(unittest.TestCase):
             self.assertNotIn("next:", out)
 
 
+class TestFrontmatterValue(unittest.TestCase):
+    def _write(self, tmp: Path, text: str) -> Path:
+        p = tmp / "STATUS.md"
+        p.write_text(text, encoding="utf-8")
+        return p
+
+    def test_quoted_value(self):
+        with tempfile.TemporaryDirectory() as d:
+            p = self._write(Path(d), '---\nmode: "Dev"\nphase: implement\n---\n')
+            rc, out = run_fn("frontmatter_value", str(p), "mode")
+            self.assertEqual(out, "Dev\n")
+
+    def test_unquoted_value(self):
+        with tempfile.TemporaryDirectory() as d:
+            p = self._write(Path(d), "---\nphase: implement\n---\n")
+            rc, out = run_fn("frontmatter_value", str(p), "phase")
+            self.assertEqual(out, "implement\n")
+
+    def test_empty_string_value(self):
+        with tempfile.TemporaryDirectory() as d:
+            p = self._write(Path(d), '---\nnext_action: ""\n---\n')
+            rc, out = run_fn("frontmatter_value", str(p), "next_action")
+            self.assertEqual(out, "\n")
+
+    def test_value_with_spaces_and_colon(self):
+        with tempfile.TemporaryDirectory() as d:
+            p = self._write(Path(d), '---\nnext_action: "do X: then Y"\n---\n')
+            rc, out = run_fn("frontmatter_value", str(p), "next_action")
+            self.assertEqual(out, "do X: then Y\n")
+
+    def test_absent_key_empty_rc0(self):
+        with tempfile.TemporaryDirectory() as d:
+            p = self._write(Path(d), "---\nmode: Dev\n---\n")
+            rc, out = run_fn("frontmatter_value", str(p), "nonexistent")
+            self.assertEqual(rc, 0)
+            self.assertEqual(out, "")
+
+    def test_bare_snapshot_value(self):
+        # --- 無しの .gate-snapshot からも読める（post-status-audit 依存）
+        with tempfile.TemporaryDirectory() as d:
+            p = Path(d) / ".gate-snapshot"
+            p.write_text("phase: implement\nmode: Dev\n", encoding="utf-8")
+            rc, out = run_fn("frontmatter_value", str(p), "phase")
+            self.assertEqual(out, "implement\n")
+
+    def test_missing_file_empty_rc0(self):
+        rc, out = run_fn("frontmatter_value", "/nonexistent/x.md", "mode")
+        self.assertEqual(rc, 0)
+        self.assertEqual(out, "")
+
+
+class TestGateValue(unittest.TestCase):
+    def _write(self, tmp: Path, text: str) -> Path:
+        p = tmp / "STATUS.md"
+        p.write_text(text, encoding="utf-8")
+        return p
+
+    def test_gate_present(self):
+        with tempfile.TemporaryDirectory() as d:
+            p = self._write(Path(d), "---\ngate_approvals:\n  plan: approved\n  qa: pending\n---\n")
+            rc, out = run_fn("gate_value", str(p), "plan")
+            self.assertEqual(out, "approved\n")
+
+    def test_gate_null(self):
+        with tempfile.TemporaryDirectory() as d:
+            p = self._write(Path(d), "---\ngate_approvals:\n  plan: null\n---\n")
+            rc, out = run_fn("gate_value", str(p), "plan")
+            self.assertEqual(out, "null\n")
+
+    def test_gate_absent_empty(self):
+        with tempfile.TemporaryDirectory() as d:
+            p = self._write(Path(d), "---\ngate_approvals:\n  plan: approved\n---\n")
+            rc, out = run_fn("gate_value", str(p), "deploy")
+            self.assertEqual(out, "")
+
+    def test_gate_anchor_no_substring_match(self):
+        # 2スペース anchor: "plan" が "plan_extra" を誤って拾わない
+        with tempfile.TemporaryDirectory() as d:
+            p = self._write(Path(d), "---\ngate_approvals:\n  plan_extra: approved\n  plan: pending\n---\n")
+            rc, out = run_fn("gate_value", str(p), "plan")
+            self.assertEqual(out, "pending\n")
+
+    def test_gate_bare_snapshot(self):
+        # grill 致命1: --- 無し .gate-snapshot からも読める（raw_section fallback）
+        with tempfile.TemporaryDirectory() as d:
+            p = Path(d) / ".gate-snapshot"
+            p.write_text("gate_approvals:\n  plan: approved\n  qa: pending\nphase: implement\n",
+                         encoding="utf-8")
+            rc, out = run_fn("gate_value", str(p), "plan")
+            self.assertEqual(out, "approved\n")
+
+
+class TestValueEquivalenceWithLegacyPipeline(unittest.TestCase):
+    """新関数が旧3段パイプと全キーで一致することを実証（挙動不変）。"""
+    STATUS = ('---\nframework: aegis\nframework_version: "1.7.1"\n'
+              'mode: Dev\nphase: implement\ntask_type: framework\n'
+              'task_size: M\nnext_action: "do X: then Y"\nblockers: []\n'
+              'gate_approvals:\n  plan: approved\n  qa: pending\n  deploy: null\n---\nbody\n')
+    SNAPSHOT = ("gate_approvals:\n  plan: approved\n  qa: pending\n"
+                "phase: implement\nmode: Dev\n")
+
+    def _legacy_value(self, path: str, key: str) -> str:
+        cmd = (f'grep -m1 "^{key}:" "{path}" | sed "s/^{key}:[[:space:]]*//" '
+               f"| sed 's/^\"//;s/\"$//' || true")
+        return subprocess.run(["bash", "-c", cmd], capture_output=True, text=True).stdout
+
+    def _legacy_gate(self, path: str, gate: str) -> str:
+        cmd = (f'{{ source "{LIB}"; frontmatter_section "{path}" gate_approvals 2>/dev/null '
+               f'|| raw_section "{path}" gate_approvals; }} | grep -m1 "{gate}:" '
+               f"| sed \"s/.*{gate}:[[:space:]]*//\" | sed 's/^\"//;s/\"$//' || true")
+        return subprocess.run(["bash", "-c", cmd], capture_output=True, text=True).stdout
+
+    def test_scalar_all_keys_match(self):
+        with tempfile.TemporaryDirectory() as d:
+            p = Path(d) / "STATUS.md"
+            p.write_text(self.STATUS, encoding="utf-8")
+            for key in ("mode", "phase", "task_type", "task_size",
+                        "next_action", "framework_version", "missing"):
+                _, new = run_fn("frontmatter_value", str(p), key)
+                self.assertEqual(new, self._legacy_value(str(p), key),
+                                 f"scalar divergence for {key!r}")
+
+    def test_scalar_bare_snapshot_match(self):
+        with tempfile.TemporaryDirectory() as d:
+            p = Path(d) / ".gate-snapshot"
+            p.write_text(self.SNAPSHOT, encoding="utf-8")
+            for key in ("phase", "mode", "missing"):
+                _, new = run_fn("frontmatter_value", str(p), key)
+                self.assertEqual(new, self._legacy_value(str(p), key),
+                                 f"bare-snapshot scalar divergence for {key!r}")
+
+    def test_gate_match_status_and_snapshot(self):
+        with tempfile.TemporaryDirectory() as d:
+            st = Path(d) / "STATUS.md"
+            st.write_text(self.STATUS, encoding="utf-8")
+            snap = Path(d) / ".gate-snapshot"
+            snap.write_text(self.SNAPSHOT, encoding="utf-8")
+            for path in (st, snap):
+                for gate in ("plan", "qa", "deploy", "client_ready_for_dev"):
+                    _, new = run_fn("gate_value", str(path), gate)
+                    self.assertEqual(new, self._legacy_gate(str(path), gate),
+                                     f"gate divergence for {gate!r} in {path.name}")
+
+
 class TestCallSitesUse20PlusLines(unittest.TestCase):
     def test_update_gate_lists_gates_beyond_20_lines(self):
         # P3-5 regression: a gate_approvals section longer than 20 lines must

@@ -48,3 +48,26 @@ raw_section() {
   [ -n "$out" ] || return 1
   printf '%s\n' "$out"
 }
+
+# frontmatter_value <file> <key>
+#   stdout: top-level scalar value (surrounding double-quotes stripped).
+#   Whole-file `^key:` match so bare frontmatter files (.gate-snapshot, no `---`)
+#   work identically. Empty stdout + RC 0 when the file or key is absent
+#   (callers test -n/-z; matches the prior `... || true` inline behavior).
+frontmatter_value() {
+  local file="$1" key="$2"
+  [ -f "$file" ] || return 0
+  grep -m1 "^${key}:" "$file" | sed "s/^${key}:[[:space:]]*//" | sed 's/^"//;s/"$//' || true
+}
+
+# gate_value <file> <gate>
+#   stdout: the value of `<gate>:` under the gate_approvals section.
+#   frontmatter_section || raw_section: works on BOTH ---delimited STATUS.md
+#   AND bare .gate-snapshot (no ---), the same dual-file robustness as
+#   frontmatter_value. 2-space anchor prevents substring matches
+#   (e.g. `plan` vs `plan_extra`). Empty stdout + RC 0 when absent.
+gate_value() {
+  local file="$1" gate="$2"
+  { frontmatter_section "$file" gate_approvals 2>/dev/null || raw_section "$file" gate_approvals; } \
+    | grep -m1 "  ${gate}:" | sed "s/.*${gate}:[[:space:]]*//" | sed 's/^"//;s/"$//' || true
+}
