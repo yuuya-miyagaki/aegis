@@ -232,6 +232,30 @@ class TestPython3AbsentBehavior(unittest.TestCase):
         ev_tmp = tempfile.TemporaryDirectory()
         self.addCleanup(ev_tmp.cleanup)
         ev_root = {"AEGIS_ROOT_OVERRIDE": ev_tmp.name}
+        # post-status-audit resolves its root via CLAUDE_PROJECT_DIR (NOT
+        # AEGIS_ROOT_OVERRIDE). Point it at an isolated project whose STATUS.md
+        # and .gate-snapshot are in sync, so the audit reaches emit_allow on its
+        # own merits — never reading the live repo snapshot, which other tests
+        # transiently mutate (the source of an order-dependent flake). Matching
+        # phase/mode also keeps us off the python3 transition path, which would
+        # (correctly) fail-closed under the broken-python3 env.
+        audit_tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(audit_tmp.cleanup)
+        audit_root = Path(audit_tmp.name)
+        (audit_root / "docs").mkdir()
+        (audit_root / ".claude").mkdir()
+        _synced_gates = (
+            "gate_approvals:\n"
+            "  client_ready_for_dev: n/a\n"
+            "  brainstorm: approved\n"
+            "  plan: approved\n"
+        )
+        (audit_root / "docs" / "STATUS.md").write_text(
+            "---\nmode: Dev\nphase: implement\n" + _synced_gates + "---\n",
+            encoding="utf-8")
+        (audit_root / ".claude" / ".gate-snapshot").write_text(
+            _synced_gates + "phase: implement\nmode: Dev\n", encoding="utf-8")
+        audit_env = {"CLAUDE_PROJECT_DIR": str(audit_root)}
         cases = [
             ("post-bash.sh",
              json.dumps(make_posttool_payload("Bash", {"command": "ls"})),
@@ -241,7 +265,8 @@ class TestPython3AbsentBehavior(unittest.TestCase):
              ev_root),
             ("post-status-audit.sh",
              json.dumps(make_posttool_payload(
-                 "Edit", {"file_path": str(ROOT / "docs" / "STATUS.md")})), {}),
+                 "Edit", {"file_path": str(audit_root / "docs" / "STATUS.md")})),
+             audit_env),
             ("pre-compact.sh", "{}", FRESH_PRECOMPACT_ENV),
             ("session-start.sh",
              json.dumps({"hook_event_name": "SessionStart", "source": "startup"}),

@@ -111,11 +111,17 @@ def _filled_content(sentinel: str) -> str:
 
 
 def _run_gate(root: Path) -> tuple[int, str]:
-    # update-gate.sh resolves the project root via SCRIPT_DIR/..; we need
-    # the scripts/ and hooks/ trees present, so symlink them in.
-    for d in ("scripts", "hooks", "templates", ".claude"):
+    # update-gate.sh resolves the project root via SCRIPT_DIR/..; symlink the
+    # read-only trees so the script can find scripts/hooks/templates.
+    # `.claude` must be a REAL local dir, NOT a symlink to the framework repo's
+    # own `.claude`: update-gate.sh writes the gate snapshot and lock dir under
+    # `${ROOT}/.claude`, and a symlink would leak those writes into the live
+    # `.claude/.gate-snapshot`, corrupting the developer's real session state
+    # and cross-contaminating other tests that read it (order-dependent flake).
+    for d in ("scripts", "hooks", "templates"):
         if not (root / d).exists():
             (root / d).symlink_to(ROOT / d)
+    (root / ".claude").mkdir(exist_ok=True)
     r = subprocess.run(
         ["bash", str(root / "scripts" / "update-gate.sh"),
          "client_ready_for_dev", "approve", "--ack", "test"],
