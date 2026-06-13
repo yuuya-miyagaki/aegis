@@ -6,10 +6,10 @@ mode: Dev
 phase: deploy
 task_type: framework
 task_size: L
-task_size_rationale: "確定（brainstorm→writing-plans→grill-plan→TDD 実装→grill-code）: 第7回全力レビュー §1 M1『example ミラー 520K 手動同期』。新規 script+tests+Makefile+README+版数4ファイル＝6+ ファイルで L。scripts/sync_example_mirror.py が check_reference_drift の MIRROR_* を import し root→example を copy（allowlist skip・mode 保持・stale 除去 DIRS+FILES）。make example で実行、検証は既存 check_mirror_identity に委任＝安全網非破壊。新規 script+tests+Makefile+README+版数。3 commit。"
-iteration: 27
+task_size_rationale: "確定（brainstorm→writing-plans→grill-plan→TDD 実装→grill-code）: 第7回全力レビュー §2 P2『volatile-truth マニフェスト』。新規 scripts/platform_manifest.py＋2 テスト＋checker 2 本改修＋CLAUDE.md＋版数4＝6+ ファイルで L。platform_manifest が ALLOWED/FORBIDDEN/EFFORT/OPUS_ONLY/KNOWN_HOOK_EVENTS/KNOWN_TOOL_NAMES/検証日 を単一所有し、check_framework_contract（model 照合）/check_reference_drift（event drift・tool registry・staleness）が import 消費。emit.sh は不可侵（schema は検証日のみ）。"
+iteration: 28
 ui_surface: false
-last_updated: "2026-06-13T18:30:00Z"
+last_updated: "2026-06-14T12:30:00Z"
 gate_approvals:
   client_ready_for_dev: n/a
   brainstorm: approved
@@ -22,8 +22,8 @@ gate_approvals:
 current_refs:
   requirements:
     - docs/full-review-2026-06-13-context-futureproof.md
-  plan: docs/plans/2026-06-13-v172-example-mirror-autogen-implementation.md
-  spec: docs/plans/2026-06-13-example-mirror-autogen-design.md
+  plan: docs/plans/2026-06-14-v180-volatile-truth-manifest-implementation.md
+  spec: docs/plans/2026-06-14-volatile-truth-manifest-design.md
   review: docs/qa-reports/v162-review.md
   qa: docs/qa-reports/v162-qa.md
   security: docs/qa-reports/v162-security.md
@@ -42,10 +42,14 @@ external_evidence:
     scope: "v0.12.2 実装後 4 ラウンドレビュー"
     findings: "Round 6 (P1×2, P2×1: pre-compact exit 2 / minimal-project / test rc), Round 7 (P1×1, P3×1: git add 漏れ / テスト件数表記), Round 8 (P2×1, P3×1: stale last_updated / grep 自己マッチ), Round 9 (P3×2: コメント不整合)"
     resolution: "9件全反映。tier 1/2 PASS、134 tests PASS、本体と minimal-project 完全同期確認済み。"
-next_action: "iteration 27（v1.7.2 M1: example ミラー自動生成）実装完了: scripts/sync_example_mirror.py が check_reference_drift から MIRROR_DIRS/MIRROR_FILES/MIRROR_ALLOWLIST を import（生成と検証が同一マニフェスト共有＝乖離不能）し、root→examples/minimal-project を shutil.copy2（mode 保持）。allowlist（validate.md/retro.md）skip、MIRROR_DIRS＋MIRROR_FILES 両方の stale 除去、分岐ファイル（CLAUDE.md/STATUS.md/docs/*＝MIRROR_DIRS 外）は不可侵。make example で実行。検証は既存 check_mirror_identity に委任し安全網（drift/contract/smoke）は非破壊＝committed ミラーの物理除去（smoke-only 化）は browsable 維持のため非ゴール。grill-plan 要検討（MIRROR_FILES stale 対称化）を着手前反映、grill-code は 🔴/🟡 ゼロ・🟢 は全 YAGNI で fix なし。実 repo で sync 実行→git diff 空＝現状 example を byte/mode 再現（回帰なし）を実証。734 tests OK（726→734・新規8）/ contract 全 profile / drift / scaffold smoke / v162 18 PoC / v163 5 PoC 全 PASS。残: tag v1.7.2 付与＋origin push（ユーザ判断）。backlog: P2 volatile マニフェスト / P3 過程 docs archive 化。"
+next_action: "iteration 28（v1.8.0 P2: volatile-truth マニフェスト）実装完了: 新規 scripts/platform_manifest.py（root 専用・非ミラー）が ALLOWED_MODELS/FORBIDDEN_MODELS(haiku)/EFFORT_LEVELS/OPUS_ONLY_EFFORTS/KNOWN_HOOK_EVENTS/KNOWN_TOOL_NAMES/PLATFORM_VERIFIED(検証日)/stale_keys() を単一所有。check_framework_contract が原子を import し model/effort を照合＋新規 check_model_policy_manifest_consistency が MODEL_EFFORT_POLICY を許容集合に照合（新モデル系統の単一更新点）。check_reference_drift が自己 bootstrap 付き import で check_platform_manifest（template event∈既知集合=FAIL／tool token∈registry=WARN／SessionStart の session-source は除外）と check_platform_staleness（検証日超過=WARN・framework root のみ発火）を ALL_CHECKS に追加（12→14）。emit.sh 不可侵（schema は検証日のみ）。設計判断: 機械強制（内部整合）＋人手検証日（現実整合）の2層で『沈黙する第3ミラー』を回避。grill-plan 致命2（importlib ローダ用 self-bootstrap／staleness 関数分離で壁時計依存テスト排除）を着手前反映、grill-code 🟡1（malformed template で crash→報告化）を fix-forward。make example で example 差分ゼロ＝新ミラー面無しを実証。750 passed/1 skip（+18 新規）/ 既知の順序依存 flake test_python3_absent は単独緑 / contract 全 profile / drift / v162 18 PoC / v163 5 PoC 全 PASS。残: tag v1.8.0 付与＋origin push（ユーザ判断）。backlog: P3 過程 docs archive 化・空 scaffold 削除（最後の未消化項目）。"
 blockers: []
 failure_tracking: null
 session_history:
+  - date: "2026-06-14"
+    mode: Dev
+    phase: "deploy"
+    note: "iteration 28（v1.8.0 P2: volatile-truth マニフェスト）実装完了: 第7回全力レビュー §2 P2。プラットフォーム結合値（model id/effort・hook event 名・tool 名・hook 出力 schema 検証日）を新規 scripts/platform_manifest.py に隔離し『追従トレッドミルの税』を1箇所へ集約。M1 で実証した『生成と検証が同一マニフェストを import＝原理的に乖離不能』パターンの横展開。設計の核は2層分離: 機械強制できる内部整合（散在リテラルを import/drift で束ねる）＋機械強制できない現実整合（人手の検証日 PLATFORM_VERIFIED＋staleness advisory）。これで過去セカンドオピニオン R1/J-1 が警告した『沈黙する第3 declarative ミラー』を回避（実 import 消費者あり・現実検証は人手と明示）。スコープ: model（強制 import）/event（drift FAIL）/tool（registry WARN）/schema（検証日のみ＝emit.sh のフィールド名は移さず pure-bash 単一ソースを不可侵）。check_framework_contract が ALLOWED/FORBIDDEN/EFFORT/OPUS_ONLY を import 消費しリテラル置換＋新規 check_model_policy_manifest_consistency が MODEL_EFFORT_POLICY（aegis 設計）を許容集合に照合（platform 真実 vs aegis 設計の分離）。check_reference_drift が自己 bootstrap 付き import で check_platform_manifest（template event∈KNOWN_HOOK_EVENTS=FAIL／matcher token∈KNOWN_TOOL_NAMES=WARN／TOOL_MATCHING_EVENTS 限定で SessionStart の startup|resume を tool 誤検知しない）と check_platform_staleness（検証日超過=WARN・platform_manifest.py を持つ framework root のみ発火で二重発火防止）を追加（ALL_CHECKS 12→14・architecture-overview 同期）。CLAUDE.md Model Policy に値出典の一本化を明記（語数 599/650）。非ミラー checker のみが import＝新ミラー面ゼロを make example で実証。grill-plan が致命2件（①importlib ローダ test_skill_reachability 用に check_reference_drift へ self-bootstrap sys.path.insert を追加＝単独実行 collection error を封鎖／②staleness を check_platform_staleness に関数分離し template 検査を決定論化＝壁時計依存テストの時限爆弾を排除）を指摘→着手前反映。grill-code は 🔴ゼロ・🟡1（malformed template の null/非dict matcher で crash→報告に倒す＋sys.path 冪等化）を fix-forward。版数4箇所（contract 定数/template STATUS/example STATUS/本体 STATUS）を 1.8.0 統一。750 passed/1 skip（734→752・新規18）/ contract 全 profile / drift / v162 18 PoC / v163 5 PoC 全 PASS。既知の順序依存 flake test_python3_absent_advisory_hooks_do_not_crash（post-status-audit が実 docs/STATUS.md と .gate-snapshot の gate 差を tamper 検知＝共有状態のテスト分離問題）は単独実行で緑・本変更とは無関係（baseline でも同失敗）。残 backlog: P3 過程 docs archive 化・空 scaffold 削除（第7回レビュー最後の未消化項目）。"
   - date: "2026-06-13"
     mode: Dev
     phase: "deploy"
@@ -54,10 +58,6 @@ session_history:
     mode: Dev
     phase: "deploy"
     note: "iteration 26（v1.7.1 M3: STATUS パーサ bash 一本化）実装完了: 第7回全力レビュー §1 M3『STATUS パーサ二重化』。調査で Python 側（check_status.py が extract_* を所有・status_doctor が再利用）は既に一本化済みと判明し、実重複は bash のみ＝スコープを正しく絞った。frontmatter.sh に frontmatter_value（whole-file grep で STATUS.md・bare .gate-snapshot 両対応）と gate_value（frontmatter_section||raw_section fallback＋2スペース anchor）を追加。散在する extract_value 2定義（session-start/pre-compact）＋インライン scalar 約11箇所＋gate 抽出（check-gate/check-task-created）＋post-status-audit のローカル extract_gate/extract_gate_from_status 2関数を単一所有者へ集約。挙動不変は equivalence テスト（旧3段パイプ vs 新関数を scalar/gate/bare-snapshot の3軸で全キー一致）＋既存 tamper/snapshot テスト緑で実証。control-plane/task-completed/client-info/pre-compact に frontmatter.sh source 追加（前3者は fail-closed require＝コメント明記）。grill-plan が致命2件（gate_value の frontmatter_section-only では bare snapshot で silent-empty＝frontmatter_value と非対称／post-status-audit の extract_gate を取りこぼし）を指摘→着手前に gate_value を両対応化＋extract_gate も統一に含める形で反映。実装中に control-plane fixture（frontmatter.sh 非copy）の fail-closed リグレッションを検知し fixture 修正。grill-code 🟡1（frontmatter.sh が standard のみ required＝minimal/full 未ピン、複数 hook が hard-depend）を fix-forward（REQUIRED_LIBS＋minimal/full.json に追加）。版数4箇所（定数/template/example STATUS/本体 STATUS）を 1.7.1 統一。726 tests OK（711→726・新規15）/ contract 全 profile / drift / scaffold smoke / v162 18 PoC / v163 5 PoC 全 PASS。残 backlog: P2 volatile マニフェスト / P3 ミラー自動生成・docs archive。"
-  - date: "2026-06-13"
-    mode: Dev
-    phase: "deploy"
-    note: "iteration 25（v1.7.0 P2-a: AEGIS_NUDGE opt-out）実装完了: 第7回全力レビュー §2 P2-a。session-start の phase HINT 説教のみを AEGIS_NUDGE=off で抑制し、gates/skill 起動パス/blockers/failure_tracking/各 warning/unknown-phase 診断は無条件で残す（enforce outcomes, delegate paths）。スコープは常時オンの session-start のみ＝skill/agent の静的合理化テーブルは env で切れず profile 別二重化＝M1 複製税なので非ゴール。profile 連動 full=on / minimal・standard=off は setup.sh の generate_settings が settings.local.json の env に AEGIS_NUDGE=off を key-level setdefault で注入（settings env→hook 伝播は CC 公式仕様で実証・ユーザ明示値は再 install で保全）。fail-safe=小文字 off のみ off、他は on。brainstorm→writing-plans→grill-plan→TDD→grill-code を完走: grill-plan 致命1（unknown-phase 警告が HINT 変数同居で off 巻き添え→minimal/standard 既定 off で恒久診断喪失）を着手前にゲート外 [WARNING] へ分離、grill-code 🟡1（env clobber でユーザ値上書き）を key-level setdefault に修正。版数4箇所（定数/template/example STATUS/本体 STATUS）を 1.7.0 統一（v1.6.3 が docs/STATUS.md のみ bump し scaffold stamp 1.6.2 残置だった split を解消）。711 tests OK（705→711・新規6）/ contract 全 profile / drift / scaffold smoke / v162 18 PoC / v163 5 PoC 全 PASS。残 backlog: P2 volatile マニフェスト / P3 ミラー自動生成・docs archive・STATUS パーサ一本化。"
 ---
 
 ## Summary
