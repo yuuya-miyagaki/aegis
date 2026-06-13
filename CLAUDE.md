@@ -47,6 +47,8 @@ Agent `model`/`effort` is pinned by role tier (enforced by `scripts/check_framew
 
 Rules: lineage aliases or `inherit` only (no version-pinned ids); `xhigh`/`max` only on `opus` roles; `haiku` is not used. A pin sets the role default and survives a session `--model` downgrade (frontmatter outranks the session model); it is overridden only by `CLAUDE_CODE_SUBAGENT_MODEL`, which globally downgrades ALL pins (including security). Session-start emits an advisory when that env var is set.
 
+Valid model aliases, the forbidden set (`haiku`), effort levels, and the opus-only effort rule are defined once in `scripts/platform_manifest.py` (the volatile-truth manifest) and enforced by `check_framework_contract.py`. Update model lineage there, not inline.
+
 ## Context Budget Policy
 
 L0 `CLAUDE.md`+`STATUS.md` (always-on), L1 phase refs, L2 task files, L3 on-demand.
