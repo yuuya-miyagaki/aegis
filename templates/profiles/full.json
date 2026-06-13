@@ -20,7 +20,10 @@
     "hooks/session-start.sh",
     "hooks/check-gate.sh",
     "hooks/post-status-audit.sh",
-    "hooks/lib/extract-input.sh"
+    "hooks/lib/extract-input.sh",
+    "hooks/lib/safety.sh",
+    "hooks/lib/secrets-patterns.sh",
+    "hooks/lib/phase-skills.sh"
   ],
   "recommended": [
     "hooks/check-tdd.sh",

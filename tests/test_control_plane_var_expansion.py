@@ -65,7 +65,7 @@ def _scratch_root() -> tempfile.TemporaryDirectory:
                  hooks_dir / "check-control-plane.sh")
     lib_dir = hooks_dir / "lib"
     lib_dir.mkdir()
-    for lib in ("extract-input.sh", "emit.sh"):
+    for lib in ("extract-input.sh", "emit.sh", "safety.sh"):
         (lib_dir / lib).symlink_to(ROOT / "hooks" / "lib" / lib)
     return tmp
 

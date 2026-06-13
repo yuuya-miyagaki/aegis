@@ -16,7 +16,10 @@
     "hooks/check-gate.sh",
     "hooks/post-status-audit.sh",
     "hooks/lib/extract-input.sh",
-    "hooks/lib/frontmatter.sh"
+    "hooks/lib/frontmatter.sh",
+    "hooks/lib/safety.sh",
+    "hooks/lib/secrets-patterns.sh",
+    "hooks/lib/phase-skills.sh"
   ],
   "recommended": [
     "hooks/post-bash.sh",

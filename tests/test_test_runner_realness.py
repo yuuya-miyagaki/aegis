@@ -313,7 +313,7 @@ class TestPostBashObserveMarkerField(unittest.TestCase):
         lib_dir = hooks_dir / "lib"
         lib_dir.mkdir()
         for lib in ("extract-input.sh", "emit.sh", "patterns.sh",
-                    "fingerprint.sh", "evidence.sh"):
+                    "fingerprint.sh", "evidence.sh", "safety.sh"):
             (lib_dir / lib).symlink_to(ROOT / "hooks" / "lib" / lib)
         return tmp
 

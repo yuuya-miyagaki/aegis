@@ -325,11 +325,15 @@ fi
 # --- Update snapshot atomically ---
 
 mkdir -p "$SNAPSHOT_DIR"
-sed -n '/^gate_approvals:/,/^[a-z]/{ /^gate_approvals:/p; /^  /p; }' "$STATUS_FILE" > "$SNAPSHOT_FILE" 2>/dev/null || true
-# Preserve phase in snapshot (used by post-status-audit.sh for phase transition monitoring).
-grep -m1 "^phase:" "$STATUS_FILE" >> "$SNAPSHOT_FILE" 2>/dev/null || true
-# Preserve mode in snapshot (used by post-status-audit.sh for mode change monitoring).
-grep -m1 "^mode:" "$STATUS_FILE" >> "$SNAPSHOT_FILE" 2>/dev/null || true
+# K-7 (v1.6.2): atomic write — see post-status-audit.sh for rationale.
+_AEGIS_SNAP_TMP="${SNAPSHOT_FILE}.tmp.$$"
+{
+  sed -n '/^gate_approvals:/,/^[a-z]/{ /^gate_approvals:/p; /^  /p; }' "$STATUS_FILE" 2>/dev/null
+  grep -m1 "^phase:" "$STATUS_FILE" 2>/dev/null
+  grep -m1 "^mode:" "$STATUS_FILE" 2>/dev/null
+} > "$_AEGIS_SNAP_TMP" 2>/dev/null && \
+  mv "$_AEGIS_SNAP_TMP" "$SNAPSHOT_FILE" 2>/dev/null || \
+  rm -f "$_AEGIS_SNAP_TMP" 2>/dev/null || true
 
 echo "[${ACTION_TAG}] STATUS.md and .gate-snapshot updated."
 

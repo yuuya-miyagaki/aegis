@@ -38,6 +38,21 @@ control plane 言及があれば deny（fail-closed）。言及がなければ a
 ※3 pre-compact の stale 判定は入力非依存（STATUS.md の mtime のみ参照）。
 パース失敗でも鮮度判定はそのまま機能する＝STATUS が新しければ allow。
 
+## K-5 / K-6 / K-7 (v1.6.2) — 構造障害下の挙動
+
+第6回全力レビュー Phase C1（F-01〜F-03）で抽出した構造障害ケースを policy 表に追加。
+
+| 障害 | 対象 | 挙動 | 実装 |
+| --- | --- | --- | --- |
+| `hooks/lib/*.sh` 欠落 (lib missing) | 全 deny hook | **明示 DENY**（exit 0 + integrity reason） | `hooks/lib/safety.sh` + 全 deny hook 冒頭の `AEGIS_SAFETY_FALLBACK_BEGIN`/`END` ブロック。SHA256 一致を `tests/test_safety_fallback_identity.py` で契約 |
+| `safety.sh` 自身の欠落 | 全 deny hook | **明示 DENY**（static fallback inline JSON） | 各 hook 冒頭の fallback ブロックは pure-bash で safety.sh に依存しない |
+| hook timeout（native 既定打ち切り） | 全 PreToolUse hook | timeout 値を `settings.json` で宣言（30s / check-secrets は 60s） | `templates/hooks.template.json` の全 PreToolUse entry に `timeout`。基準は `docs/perf-baseline.md` |
+| snapshot ファイル不在 | post-status-audit.sh | 初回 Edit allowance（allow） + `.claude/.audit-skip.log` 追記 | consumer policy（次回 SessionStart で蓄積を警告できる） |
+| snapshot 部分破損（phase / mode 欠落） | post-status-audit.sh | **明示 DENY**（`emit_block` + integrity reason） | tamper detector の `[ -n "$OLD_PHASE" ]` ガード bypass を塞ぐ |
+| snapshot 書込み中断（SIGKILL / OOM） | post-status-audit / session-start / update-gate | **atomic write**（tmp → mv）で部分書込み不可 | 3 箇所同時に `${SNAPSHOT_FILE}.tmp.$$` 経由 |
+
+これらは `tests/test_safety_*.py` / `tests/test_snapshot_*.py` で契約化。
+
 ## size-skip（task_size S/M の deploy）
 
 `check_status.py --check-deploy-ready` は S/M（deploy フェーズなし）のとき

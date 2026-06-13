@@ -158,6 +158,12 @@ REQUIRED_HOOK_FILES = [
     # by check-secrets.sh. Same F6 lesson — a missing lib silently fail-
     # opens the secret-staging deny path.
     ROOT / "hooks/lib/secrets-patterns.sh",
+    # K-5 (v1.6.2): safety lib provides aegis_require_lib + fail-closed
+    # emitter. Sourced FIRST in every deny hook so even if other libs
+    # disappear, the moat emits an explicit deny instead of empty stdout +
+    # exit 1 (Claude Code fail-open). Loss of this lib alone collapses the
+    # entire moat — must be REQUIRED in framework_contract.
+    ROOT / "hooks/lib/safety.sh",
 ]
 
 REQUIRED_EXAMPLE_FILES = [
@@ -236,6 +242,8 @@ REQUIRED_EXAMPLE_FILES = [
     # byte-identity check covers them too (same logic as L229-231).
     ROOT / "examples/minimal-project/hooks/lib/phase-skills.sh",
     ROOT / "examples/minimal-project/hooks/lib/secrets-patterns.sh",
+    # K-5 (v1.6.2): pin example mirror for safety.sh — same rationale.
+    ROOT / "examples/minimal-project/hooks/lib/safety.sh",
     ROOT / "examples/minimal-project/.claude/agents/translation-specialist.md",
     ROOT / "examples/minimal-project/.claude/agents/integration-specialist.md",
 ]

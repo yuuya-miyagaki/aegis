@@ -375,6 +375,10 @@ class TempProjectWithHooks(TempProject):
         (lib_dir / "phase-skills.sh").symlink_to(
             ROOT / "hooks" / "lib" / "phase-skills.sh"
         )
+        # K-5 (v1.6.2): safety.sh is required by all deny hooks' fallback.
+        (lib_dir / "safety.sh").symlink_to(
+            ROOT / "hooks" / "lib" / "safety.sh"
+        )
         # Copy each hook script (not symlink — so dirname resolves to temp).
         import shutil
         for hook_name in [
@@ -747,12 +751,19 @@ class TestPhaseSkipHookDenyJSON(unittest.TestCase):
 
     HOOK_NAME = "post-status-audit.sh"
 
-    def _make_snapshot(self, root: str, phase: str, gates: dict[str, str]) -> None:
-        """Create .claude/.gate-snapshot with phase and gate data."""
+    def _make_snapshot(self, root: str, phase: str, gates: dict[str, str],
+                       mode: str = "Dev") -> None:
+        """Create .claude/.gate-snapshot with phase, mode, and gate data.
+
+        K-7 (v1.6.2): consumer policy requires `mode:` present; without it the
+        snapshot is considered partially-written / tampered and rejected with
+        an integrity block, masking phase-skip detection."""
         snapshot_dir = Path(root) / ".claude"
         snapshot_dir.mkdir(exist_ok=True)
         gate_lines = "\n".join(f"  {k}: {v}" for k, v in gates.items())
-        snapshot = f"gate_approvals:\n{gate_lines}\nphase: {phase}\n"
+        snapshot = (
+            f"gate_approvals:\n{gate_lines}\nphase: {phase}\nmode: {mode}\n"
+        )
         (snapshot_dir / ".gate-snapshot").write_text(snapshot, encoding="utf-8")
 
     def test_phase_skip_deny_emits_json(self):
@@ -1473,6 +1484,10 @@ class TestSecretsHookMonorepo(unittest.TestCase):
         (lib_dir / "secrets-patterns.sh").symlink_to(
             ROOT / "hooks" / "lib" / "secrets-patterns.sh"
         )
+        # K-5 (v1.6.2): safety.sh required by all deny hooks' fallback.
+        (lib_dir / "safety.sh").symlink_to(
+            ROOT / "hooks" / "lib" / "safety.sh"
+        )
         return tmpdir, root
 
     def _run_hook(self, root: str, cmd: str) -> tuple[int, str]:
@@ -1577,6 +1592,10 @@ class TestTemplateProtection(unittest.TestCase):
         (lib_dir / "secrets-patterns.sh").symlink_to(
             ROOT / "hooks" / "lib" / "secrets-patterns.sh"
         )
+        # K-5 (v1.6.2): safety.sh required by all deny hooks' fallback.
+        (lib_dir / "safety.sh").symlink_to(
+            ROOT / "hooks" / "lib" / "safety.sh"
+        )
         return tmpdir, root
 
     def _run_hook(self, root: str, file_path: str) -> tuple[int, str]:
@@ -1662,6 +1681,10 @@ class TestControlPlaneAllowlistBypass(unittest.TestCase):
         # for the high-risk credential single-owner lib (C-9).
         (lib_dir / "secrets-patterns.sh").symlink_to(
             ROOT / "hooks" / "lib" / "secrets-patterns.sh"
+        )
+        # K-5 (v1.6.2): safety.sh required by all deny hooks' fallback.
+        (lib_dir / "safety.sh").symlink_to(
+            ROOT / "hooks" / "lib" / "safety.sh"
         )
         return tmpdir, root
 
@@ -1893,6 +1916,10 @@ class TestControlPlaneRealisticInput(unittest.TestCase):
         # for the high-risk credential single-owner lib (C-9).
         (lib_dir / "secrets-patterns.sh").symlink_to(
             ROOT / "hooks" / "lib" / "secrets-patterns.sh"
+        )
+        # K-5 (v1.6.2): safety.sh required by all deny hooks' fallback.
+        (lib_dir / "safety.sh").symlink_to(
+            ROOT / "hooks" / "lib" / "safety.sh"
         )
         return tmpdir, root
 
@@ -2209,6 +2236,10 @@ class TestGateProjectPathCollision(unittest.TestCase):
         # for the high-risk credential single-owner lib (C-9).
         (lib_dir / "secrets-patterns.sh").symlink_to(
             ROOT / "hooks" / "lib" / "secrets-patterns.sh"
+        )
+        # K-5 (v1.6.2): safety.sh required by all deny hooks' fallback.
+        (lib_dir / "safety.sh").symlink_to(
+            ROOT / "hooks" / "lib" / "safety.sh"
         )
         return tmpdir, root
 

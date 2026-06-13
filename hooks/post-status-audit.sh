@@ -15,9 +15,12 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+# Resolve framework root (allow CLAUDE_PROJECT_DIR override for test fixtures
+# that source hooks from a copy laid out outside the framework repo).
+ROOT="${CLAUDE_PROJECT_DIR:-$(cd "${SCRIPT_DIR}/.." && pwd)}"
 STATUS_FILE="${ROOT}/docs/STATUS.md"
 SNAPSHOT_FILE="${ROOT}/.claude/.gate-snapshot"
+AUDIT_SKIP_LOG="${ROOT}/.claude/.audit-skip.log"
 
 # Load shared input extraction.
 source "${SCRIPT_DIR}/lib/extract-input.sh"
@@ -42,9 +45,32 @@ case "$TARGET_FILE" in
     ;;
 esac
 
-# If snapshot or STATUS.md doesn't exist, skip audit.
-if [ ! -f "$SNAPSHOT_FILE" ] || [ ! -f "$STATUS_FILE" ]; then
+# K-7 (v1.6.2) consumer policy: snapshot lifecycle.
+#   - STATUS.md missing → can't compare, skip audit (no allowance log).
+#   - snapshot missing → first-edit allowance: allow but log to
+#     .audit-skip.log so the next SessionStart can warn on accumulation.
+if [ ! -f "$STATUS_FILE" ]; then
   emit_allow
+  exit 0
+fi
+if [ ! -f "$SNAPSHOT_FILE" ]; then
+  mkdir -p "$(dirname "$AUDIT_SKIP_LOG")" 2>/dev/null || true
+  printf '%s first-edit allowance (snapshot missing)\n' \
+    "$(date -u +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || echo unknown)" \
+    >> "$AUDIT_SKIP_LOG" 2>/dev/null || true
+  emit_allow
+  exit 0
+fi
+
+# K-7 (v1.6.2) consumer policy: snapshot integrity check.
+# snapshot exists but a required field (phase or mode) is empty / missing
+# → snapshot was partially written or tampered. Fail-closed (emit_block)
+# so the tamper detector below isn't trivially bypassed by editing the
+# snapshot to a blank field.
+_AEGIS_SNAP_PHASE_CHECK=$(grep -m1 '^phase:' "$SNAPSHOT_FILE" | sed "s/^phase:[[:space:]]*//" | sed 's/^"//;s/"$//' || true)
+_AEGIS_SNAP_MODE_CHECK=$(grep -m1 '^mode:' "$SNAPSHOT_FILE" | sed "s/^mode:[[:space:]]*//" | sed 's/^"//;s/"$//' || true)
+if [ -z "$_AEGIS_SNAP_PHASE_CHECK" ] || [ -z "$_AEGIS_SNAP_MODE_CHECK" ]; then
+  emit_block "[integrity] snapshot ファイル (.claude/.gate-snapshot) に必須フィールド (phase / mode) が欠落しています。手動編集や中断書き込みの可能性 — ファイルを確認するか /recover を実行してください。"
   exit 0
 fi
 
@@ -116,13 +142,19 @@ if [ -n "$OLD_MODE" ] && [ -n "$NEW_MODE" ] && [ "$OLD_MODE" != "$NEW_MODE" ]; t
   fi
 fi
 
-# No tampering or invalid transition detected. Update snapshot to reflect legitimate changes.
-# Extract gate_approvals section for next comparison.
-sed -n '/^gate_approvals:/,/^[a-z]/{ /^gate_approvals:/p; /^  /p; }' "$STATUS_FILE" > "$SNAPSHOT_FILE" 2>/dev/null || true
-# Preserve phase in snapshot.
-grep -m1 "^phase:" "$STATUS_FILE" >> "$SNAPSHOT_FILE" 2>/dev/null || true
-# Preserve mode in snapshot.
-grep -m1 "^mode:" "$STATUS_FILE" >> "$SNAPSHOT_FILE" 2>/dev/null || true
+# K-7 (v1.6.2): atomic snapshot write. Stage the file in a per-PID tmp,
+# then rename. If we crash before the mv (SIGKILL / OOM / power loss),
+# the previous snapshot stays intact — never a partially-written file
+# with phase: / mode: missing (which the v1.6.1 detector bypassed via
+# `[ -n "$OLD_PHASE" ]` guard).
+_AEGIS_SNAP_TMP="${SNAPSHOT_FILE}.tmp.$$"
+{
+  sed -n '/^gate_approvals:/,/^[a-z]/{ /^gate_approvals:/p; /^  /p; }' "$STATUS_FILE" 2>/dev/null
+  grep -m1 "^phase:" "$STATUS_FILE" 2>/dev/null
+  grep -m1 "^mode:" "$STATUS_FILE" 2>/dev/null
+} > "$_AEGIS_SNAP_TMP" 2>/dev/null && \
+  mv "$_AEGIS_SNAP_TMP" "$SNAPSHOT_FILE" 2>/dev/null || \
+  rm -f "$_AEGIS_SNAP_TMP" 2>/dev/null || true
 
 # Phase-skill injection (P1-A): a legitimate phase transition is the moment the
 # next phase's skills must be loaded — SessionStart injection cannot reach a

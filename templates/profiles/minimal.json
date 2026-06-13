@@ -5,8 +5,13 @@
     "CLAUDE.md",
     "docs/STATUS.md",
     "docs/LEARNINGS.md",
-    "scripts/check_status.py"
+    "scripts/check_status.py",
+    "hooks/lib/safety.sh",
+    "hooks/lib/secrets-patterns.sh",
+    "hooks/lib/phase-skills.sh"
   ],
   "recommended": [],
-  "hooks_include": ["session-start.sh"]
+  "hooks_include": [
+    "session-start.sh"
+  ]
 }

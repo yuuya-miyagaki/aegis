@@ -20,11 +20,15 @@ fi
 SNAPSHOT_DIR="${ROOT}/.claude"
 SNAPSHOT_FILE="${SNAPSHOT_DIR}/.gate-snapshot"
 mkdir -p "$SNAPSHOT_DIR"
-sed -n '/^gate_approvals:/,/^[a-z]/{ /^gate_approvals:/p; /^  /p; }' "$STATUS_FILE" > "$SNAPSHOT_FILE" 2>/dev/null || true
-# Save phase to snapshot (used by post-status-audit.sh for phase transition monitoring).
-grep -m1 "^phase:" "$STATUS_FILE" >> "$SNAPSHOT_FILE" 2>/dev/null || true
-# Save mode to snapshot (used by post-status-audit.sh for mode change monitoring).
-grep -m1 "^mode:" "$STATUS_FILE" >> "$SNAPSHOT_FILE" 2>/dev/null || true
+# K-7 (v1.6.2): atomic write — see post-status-audit.sh for rationale.
+_AEGIS_SNAP_TMP="${SNAPSHOT_FILE}.tmp.$$"
+{
+  sed -n '/^gate_approvals:/,/^[a-z]/{ /^gate_approvals:/p; /^  /p; }' "$STATUS_FILE" 2>/dev/null
+  grep -m1 "^phase:" "$STATUS_FILE" 2>/dev/null
+  grep -m1 "^mode:" "$STATUS_FILE" 2>/dev/null
+} > "$_AEGIS_SNAP_TMP" 2>/dev/null && \
+  mv "$_AEGIS_SNAP_TMP" "$SNAPSHOT_FILE" 2>/dev/null || \
+  rm -f "$_AEGIS_SNAP_TMP" 2>/dev/null || true
 
 # E1: rotate + touch the evidence log. The (possibly empty) file is the
 # "observer layer alive" liveness signal consumed by check-task-completed.sh.

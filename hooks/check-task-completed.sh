@@ -17,7 +17,23 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-source "${SCRIPT_DIR}/lib/emit.sh"
+# AEGIS_SAFETY_FALLBACK_BEGIN
+if [ ! -r "${SCRIPT_DIR}/lib/safety.sh" ]; then
+  printf '[aegis-safety] fail-closed: safety.sh not readable\n' >&2
+  printf '%s\n' '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"[integrity] hook safety lib unavailable — check hooks/lib/* integrity"}}'
+  exit 0
+fi
+set +e
+source "${SCRIPT_DIR}/lib/safety.sh" 2>/dev/null
+_aegis_safety_rc=$?
+set -e
+if [ "$_aegis_safety_rc" -ne 0 ]; then
+  printf '[aegis-safety] fail-closed: safety.sh source failed\n' >&2
+  printf '%s\n' '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"[integrity] hook safety lib unavailable — check hooks/lib/* integrity"}}'
+  exit 0
+fi
+# AEGIS_SAFETY_FALLBACK_END
+aegis_require_lib "${SCRIPT_DIR}/lib/emit.sh"
 DEFAULT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 # Allow ROOT override via env (test fixtures use this to isolate from real aegis state).
 ROOT="${AEGIS_ROOT_OVERRIDE:-${DEFAULT_ROOT}}"

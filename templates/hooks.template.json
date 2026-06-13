@@ -17,15 +17,18 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash \"${CLAUDE_PROJECT_DIR:-.}\"/hooks/check-gate.sh"
+            "command": "bash \"${CLAUDE_PROJECT_DIR:-.}\"/hooks/check-gate.sh",
+            "timeout": 30
           },
           {
             "type": "command",
-            "command": "bash \"${CLAUDE_PROJECT_DIR:-.}\"/hooks/check-tdd.sh"
+            "command": "bash \"${CLAUDE_PROJECT_DIR:-.}\"/hooks/check-tdd.sh",
+            "timeout": 30
           },
           {
             "type": "command",
-            "command": "bash \"${CLAUDE_PROJECT_DIR:-.}\"/hooks/check-client-info.sh"
+            "command": "bash \"${CLAUDE_PROJECT_DIR:-.}\"/hooks/check-client-info.sh",
+            "timeout": 30
           }
         ]
       },
@@ -34,19 +37,23 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash \"${CLAUDE_PROJECT_DIR:-.}\"/hooks/check-control-plane.sh"
+            "command": "bash \"${CLAUDE_PROJECT_DIR:-.}\"/hooks/check-control-plane.sh",
+            "timeout": 30
           },
           {
             "type": "command",
-            "command": "bash \"${CLAUDE_PROJECT_DIR:-.}\"/hooks/check-destructive.sh"
+            "command": "bash \"${CLAUDE_PROJECT_DIR:-.}\"/hooks/check-destructive.sh",
+            "timeout": 30
           },
           {
             "type": "command",
-            "command": "bash \"${CLAUDE_PROJECT_DIR:-.}\"/hooks/check-secrets.sh"
+            "command": "bash \"${CLAUDE_PROJECT_DIR:-.}\"/hooks/check-secrets.sh",
+            "timeout": 60
           },
           {
             "type": "command",
-            "command": "bash \"${CLAUDE_PROJECT_DIR:-.}\"/hooks/check-deploy-gate.sh"
+            "command": "bash \"${CLAUDE_PROJECT_DIR:-.}\"/hooks/check-deploy-gate.sh",
+            "timeout": 30
           }
         ]
       },
@@ -55,7 +62,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash \"${CLAUDE_PROJECT_DIR:-.}\"/hooks/check-deploy-mcp-gate.sh"
+            "command": "bash \"${CLAUDE_PROJECT_DIR:-.}\"/hooks/check-deploy-mcp-gate.sh",
+            "timeout": 30
           }
         ]
       },
@@ -64,7 +72,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash \"${CLAUDE_PROJECT_DIR:-.}\"/hooks/check-skill-gate.sh"
+            "command": "bash \"${CLAUDE_PROJECT_DIR:-.}\"/hooks/check-skill-gate.sh",
+            "timeout": 30
           }
         ]
       },
@@ -73,7 +82,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash \"${CLAUDE_PROJECT_DIR:-.}\"/hooks/check-cron-gate.sh"
+            "command": "bash \"${CLAUDE_PROJECT_DIR:-.}\"/hooks/check-cron-gate.sh",
+            "timeout": 30
           }
         ]
       }
