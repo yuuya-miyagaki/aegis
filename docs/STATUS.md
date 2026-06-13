@@ -1,6 +1,6 @@
 ---
 framework: aegis
-framework_version: "1.7.1"
+framework_version: "1.7.2"
 project_name: "Aegis"
 mode: Dev
 phase: deploy
