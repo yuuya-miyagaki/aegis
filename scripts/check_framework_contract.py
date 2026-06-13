@@ -10,6 +10,12 @@ import sys
 from pathlib import Path
 
 from check_status import validate_status_file
+from platform_manifest import (
+    ALLOWED_MODELS,
+    EFFORT_LEVELS,
+    FORBIDDEN_MODELS,
+    OPUS_ONLY_EFFORTS,
+)
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -337,7 +343,6 @@ MODEL_EFFORT_POLICY = {
     "ui.md": ("inherit", "high"),
     "integration-specialist.md": ("inherit", "high"),
 }
-_OPUS_ONLY_EFFORTS = {"xhigh", "max"}
 _VERSION_ID_RE = re.compile(r"claude-[\w-]*\d")
 # root と example ミラーの両方を同一ポリシーで検証する。
 MODEL_POLICY_ROOTS = [ROOT, ROOT / "examples/minimal-project"]
@@ -371,17 +376,39 @@ def check_model_effort_policy(roots) -> list:
                 failures.append(f"model-policy: {rel} model={model} expected {exp_model}")
             if effort != exp_effort:
                 failures.append(f"model-policy: {rel} effort={effort} expected {exp_effort}")
-            if model == "haiku":
-                failures.append(f"model-policy: {rel} uses haiku (forbidden; floor is sonnet)")
+            if model in FORBIDDEN_MODELS:
+                failures.append(f"model-policy: {rel} uses {model} (forbidden; floor is sonnet)")
             if model and _VERSION_ID_RE.search(model):
                 failures.append(f"model-policy: {rel} uses version-pinned id '{model}' (alias or inherit only)")
-            if effort in _OPUS_ONLY_EFFORTS and model != "opus":
+            if effort and effort not in EFFORT_LEVELS:
+                failures.append(f"model-policy: {rel} effort={effort} not in {sorted(EFFORT_LEVELS)}")
+            if effort in OPUS_ONLY_EFFORTS and model != "opus":
                 failures.append(f"model-policy: {rel} effort={effort} only allowed on opus-pinned roles")
         for path in sorted(agents_dir.glob("*.md")):
             if path.name not in MODEL_EFFORT_POLICY:
                 failures.append(
                     f"model-policy: {path.relative_to(ROOT)} not classified in MODEL_EFFORT_POLICY (assign a tier)"
                 )
+    return failures
+
+
+def check_model_policy_manifest_consistency() -> list:
+    """MODEL_EFFORT_POLICY（aegis 設計）の各値が platform_manifest の許容集合に
+    収まることを検証。新モデル系統の追加/廃止時の単一更新点を担保する。"""
+    failures = []
+    for name, (model, effort) in MODEL_EFFORT_POLICY.items():
+        if model in FORBIDDEN_MODELS:
+            failures.append(f"model-manifest: policy[{name}] model={model} is forbidden")
+        elif model not in ALLOWED_MODELS:
+            failures.append(
+                f"model-manifest: policy[{name}] model={model} not in ALLOWED_MODELS {sorted(ALLOWED_MODELS)}"
+            )
+        if effort not in EFFORT_LEVELS:
+            failures.append(
+                f"model-manifest: policy[{name}] effort={effort} not in EFFORT_LEVELS {sorted(EFFORT_LEVELS)}"
+            )
+        if effort in OPUS_ONLY_EFFORTS and model != "opus":
+            failures.append(f"model-manifest: policy[{name}] effort={effort} only allowed on opus")
     return failures
 
 
@@ -976,6 +1003,7 @@ def main() -> int:
             else:
                 failures.append("name-lint: exited with non-zero status but produced no output")
 
+    failures.extend(check_model_policy_manifest_consistency())
     failures.extend(check_model_effort_policy(MODEL_POLICY_ROOTS))
     failures.extend(check_agent_names(MODEL_POLICY_ROOTS))
 
