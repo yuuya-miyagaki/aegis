@@ -113,16 +113,17 @@ cmd_var_built_write() {
   #   eval, declare, local) co-occurring with any WRITE OP. The literal
   #   identifier= regex in Path A's gate (1) misses these.
 
-  # --- Path B: cmdsub / backtick in the first write target ---
-  # Extract the first redirect target token: everything from the first
-  # '>' / '>>' up to the next chain separator. If that slice contains
-  # `$(` or backtick, ASK. Sliced (not whole-cmd) to keep unrelated
-  # cmdsubs in later commands from triggering.
-  local _write_target
-  _write_target=$(printf '%s' "$cmd" | \
-    sed -nE 's/^[^>]*>>?[[:space:]]*([^|&;]*).*/\1/p' | head -1)
-  if [ -n "$_write_target" ] && \
-     printf '%s' "$_write_target" | grep -qE '\$\(|`'; then
+  # --- Path B: cmdsub / backtick in ANY write target ---
+  # Extract EVERY redirect target token (everything from a `>` / `>>` up
+  # to the next chain separator). If any of them contains `$(` or
+  # backtick, ASK. grill-code Critical 1 fix: the prior `sed -nE
+  # 's/^[^>]*>>?...'` anchored to the FIRST `>` only and let attackers
+  # bypass via `echo a > /tmp/safe; > $(echo hooks)/lib/emit.sh`. `grep
+  # -oE` walks every redirect, including ones after `;`, `&&`, `||`.
+  # Each match still slices target tokens at `|&;` so unrelated cmdsubs
+  # in a later, separate command stay out (grill 要検討 1 preserved).
+  if printf '%s' "$cmd" | grep -oE '>>?[[:space:]]*[^|&;]*' \
+       | grep -qE '\$\(|`'; then
     return 0
   fi
 

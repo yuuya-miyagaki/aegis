@@ -187,6 +187,56 @@ class TestRegressionStillVerifies(unittest.TestCase):
         }
         self.assertEqual(_check(payload), "true")
 
+    def test_large_verbose_pytest_output_keeps_prologue_via_head(self):
+        """grill-code Critical 2: 8KB 超の verbose 出力でも、head 抽出で
+        プロローグ（platform / rootdir / collected）が保持されるため
+        marker_verified=true に倒れる。
+
+        v1.6.2 初版は output[-4096:] で tail のみ抽出していたため、200 件規模
+        の `pytest -v` ではプロローグが完全に欠落し、軸 3（プロローグ欠落
+        → false）で実テスト走行を誤って 🟡 化していた。head+tail に修正。"""
+        prologue = (
+            "platform darwin -- Python 3.11.5, pytest-7.4.3, pluggy-1.3.0\n"
+            "rootdir: /tmp/proj\n"
+            "plugins: anyio-4.0.0\n"
+            "collected 200 items\n\n"
+        )
+        # 200 行 × 約 40 文字 ≈ 8 KB の進捗行
+        middle = "".join(
+            f"tests/test_module_{i:03d}.py::test_function_{i:03d} PASSED [ {i // 2:2d}%]\n"
+            for i in range(200)
+        )
+        summary = "\n===== 200 passed in 12.34s =====\n"
+        full_output = prologue + middle + summary
+        # 物理的に > 4KB であることを assert（テストの前提）
+        assert len(full_output) > 8000, f"test fixture too small: {len(full_output)}"
+        payload = {
+            "tool_name": "Bash",
+            "tool_input": {"command": "pytest -v"},
+            "tool_response": {
+                "output": full_output,
+                "exitCode": 0,
+            },
+        }
+        self.assertEqual(
+            _check(payload), "true",
+            "verbose pytest output (with prologue at head) must verify "
+            "even when head+tail extraction is needed to keep prologue."
+        )
+
+    def test_normal_unittest_passed_still_verified(self):
+        """unittest プロローグは pytest と異なるが、軸 3 は pytest のみ適用
+        なので unittest は strong/weak のみで判定。WEAK pair: Ran N + OK"""
+        payload = {
+            "tool_name": "Bash",
+            "tool_input": {"command": "python3 -m unittest"},
+            "tool_response": {
+                "output": "test_x (m.T) ... ok\nRan 3 tests in 0.1s\n\nOK\n",
+                "exitCode": 0,
+            },
+        }
+        self.assertEqual(_check(payload), "true")
+
     def test_normal_unittest_passed_still_verified(self):
         """unittest プロローグは pytest と異なるが、軸 3 は pytest のみ適用
         なので unittest は strong/weak のみで判定。WEAK pair: Ran N + OK"""

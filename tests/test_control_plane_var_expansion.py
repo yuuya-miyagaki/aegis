@@ -276,6 +276,23 @@ class TestK2CmdsubAndAltAssignmentBlocked(unittest.TestCase):
     def test_write_target_with_unquoted_cmdsub_blocked(self):
         self._assert_blocked('echo evil > $(echo hooks)/lib/emit.sh')
 
+    # grill-code Critical 1 (v1.6.2 残余): 2 番目以降の redirect の write-target
+    # に cmdsub があると Path B の sed が ^[^>]* で先頭固定なので素通りしていた。
+    def test_second_redirect_with_cmdsub_blocked(self):
+        """`echo a > /tmp/safe; > $(echo hooks)/lib/emit.sh` — 2 番目の
+        redirect が真の攻撃ターゲット"""
+        self._assert_blocked('echo a > /tmp/safe; > $(echo hooks)/lib/emit.sh')
+
+    def test_second_append_redirect_with_cmdsub_blocked(self):
+        """`>>` 形式の 2 番目 redirect"""
+        self._assert_blocked(
+            'echo a > /tmp/safe && echo b >> $(echo hooks)/lib/emit.sh')
+
+    def test_third_redirect_with_backtick_blocked(self):
+        """3 段チェーンの末尾 redirect"""
+        self._assert_blocked(
+            'a > /tmp/x; b > /tmp/y; c > `echo hooks`/lib/emit.sh')
+
     def test_printf_dash_v_assignment_blocked(self):
         """printf -v で変数を組み立てる代替 assignment 形"""
         self._assert_blocked('printf -v D %s hooks; > $D/lib/emit.sh')

@@ -84,9 +84,20 @@ try:
         ec = ""
     else:
         ec = str(ec)
+    # K-1 axis 3 keeps a pytest prologue regex (`platform / rootdir /
+    # collected`); a verbose run with >4 KiB of progress lines would
+    # truncate the prologue out of a tail-only window and force every
+    # real test run to false. Take both ends (~4 KiB each) so prologue
+    # and summary survive. grill-code Critical 2.
+    HEAD_MAX = 4096
+    TAIL_MAX = 4096
+    if len(o) <= HEAD_MAX + TAIL_MAX:
+        o_window = o
+    else:
+        o_window = o[:HEAD_MAX] + "\n...[aegis-truncated]...\n" + o[-TAIL_MAX:]
     # Separator unlikely to appear in any field.
     sys.stdout.write(
-        c[:4096] + "\x1eAEGISSEP\x1e" + o[-4096:] + "\x1eAEGISSEP\x1e" + ec
+        c[:4096] + "\x1eAEGISSEP\x1e" + o_window + "\x1eAEGISSEP\x1e" + ec
     )
 except Exception:
     pass
