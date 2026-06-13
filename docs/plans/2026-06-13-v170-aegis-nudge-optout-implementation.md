@@ -81,6 +81,13 @@
                 with self.subTest(value=value):
                     out = self._run(root, {"AEGIS_NUDGE": value})
                     self.assertIn("TDD必須", out, f"{value!r} must keep HINT (fail-safe)")
+
+    def test_nudge_off_keeps_unknown_phase_warning(self):
+        # grill 致命: unknown-phase は診断であり nudge ではない。off でも残す。
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._scaffold(Path(tmp), "bogus_phase", ["tdd"])
+            out = self._run(root, {"AEGIS_NUDGE": "off"})
+            self.assertIn("unknown phase", out, "off must keep misconfig diagnostic")
 ```
 
 - [ ] **Step 3: テストを実行して失敗を確認**
@@ -88,9 +95,31 @@
 Run: `python3 -m unittest tests.test_phase_skills_lib.TestSessionStartInjection -v`
 Expected: `test_nudge_off_drops_hint_keeps_enforcement` が FAIL（`AssertionError: nudge off: HINT sermon must be gone` — 現状 off でも HINT が出る）。他 2 つの新規テストは現状でも PASS しうる（既定 on のため）。少なくとも off テストが赤になること。
 
-- [ ] **Step 4: session-start.sh の HINT 追記を条件化**
+- [ ] **Step 4: session-start.sh の HINT 追記を条件化（＋unknown-phase をゲート外へ）**
 
-`hooks/session-start.sh` の現 176-178 行:
+まず `hooks/session-start.sh` の `case "$PHASE"` 末尾の `*)` ブランチ（現 170-174 行）:
+
+```bash
+  *)
+    if [ -n "$PHASE" ]; then
+      HINT="unknown phase: ${PHASE} — docs/STATUS.md を確認"
+    fi
+    ;;
+```
+
+を次に置換する（unknown-phase は診断＝nudge ではないので CONTEXT に無条件 append、HINT には入れない）:
+
+```bash
+  *)
+    if [ -n "$PHASE" ]; then
+      # 未知 phase は STATUS.md の誤設定診断（nudge ではない）。AEGIS_NUDGE に関係なく出す。
+      CONTEXT="${CONTEXT} | [WARNING] unknown phase: ${PHASE} — docs/STATUS.md を確認"
+      HINT=""
+    fi
+    ;;
+```
+
+次に HINT 追記ブロック（現 176-178 行）:
 
 ```bash
 if [ -n "$HINT" ]; then
@@ -102,8 +131,9 @@ fi
 
 ```bash
 # AEGIS_NUDGE=off suppresses the phase HINT sermon (path-telling); gates,
-# skill paths, blockers, and warnings stay (they are enforcement, not nudge).
-# Lowercase "off" only — any other value keeps the nudge on (fail-safe = more guidance).
+# skill paths, blockers, warnings, and the unknown-phase diagnostic above all
+# stay (they are enforcement/diagnostics, not nudge). Lowercase "off" only —
+# any other value keeps the nudge on (fail-safe = more guidance).
 if [ -n "$HINT" ] && [ "${AEGIS_NUDGE:-}" != "off" ]; then
   CONTEXT="${CONTEXT} | ${HINT}"
 fi
