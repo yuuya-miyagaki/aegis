@@ -203,8 +203,47 @@ def run_doctor_collect(root: Path) -> tuple[list[str], list[str]]:
     all_failures.extend(d3_failure_escalation(frontmatter, root))
     # D4
     all_warnings.extend(d4_phase_stagnation(frontmatter))
+    # D5 (K-11 / v1.6.2): framework_version stamp drift
+    all_warnings.extend(d5_install_version_drift(root))
 
     return all_warnings, all_failures
+
+
+def d5_install_version_drift(root: Path) -> list[str]:
+    """D5: .claude/.aegis-install-version が framework の FRAMEWORK_VERSION と
+    乖離していたら WARNING（K-11 / v1.6.2）。
+
+    install 先で setup.sh が古いまま上書きされたケースや、framework を
+    upgrade した直後で再 install していないケースを表面化する。
+    framework_contract.py の FRAMEWORK_VERSION 定数を真値とする。
+    """
+    warnings: list[str] = []
+    stamp_path = root / ".claude" / ".aegis-install-version"
+    if not stamp_path.exists():
+        return warnings  # 初回起動扱い（aegis 未 install or 古い install）
+    installed = stamp_path.read_text(encoding="utf-8").strip()
+    # FRAMEWORK_VERSION 定数を読み出す（同梱コードを優先、無ければ install 先の
+    # scripts を見る）
+    framework_root = Path(__file__).resolve().parent.parent
+    contract_py = framework_root / "scripts" / "check_framework_contract.py"
+    if not contract_py.exists():
+        contract_py = root / "scripts" / "check_framework_contract.py"
+    if not contract_py.exists():
+        return warnings
+    try:
+        import re as _re
+        text = contract_py.read_text(encoding="utf-8")
+        m = _re.search(r'FRAMEWORK_VERSION\s*=\s*"([^"]+)"', text)
+        framework = m.group(1) if m else None
+    except Exception:
+        framework = None
+    if framework and installed and installed != framework:
+        warnings.append(
+            f"install version mismatch: .claude/.aegis-install-version={installed} "
+            f"but framework_contract FRAMEWORK_VERSION={framework}. Re-run "
+            f"bin/setup.sh to refresh the install."
+        )
+    return warnings
 
 
 def run_doctor(root: Path) -> int:
