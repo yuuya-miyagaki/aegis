@@ -65,7 +65,9 @@ def _scratch_root() -> tempfile.TemporaryDirectory:
                  hooks_dir / "check-control-plane.sh")
     lib_dir = hooks_dir / "lib"
     lib_dir.mkdir()
-    for lib in ("extract-input.sh", "emit.sh", "safety.sh"):
+    # frontmatter.sh: check-control-plane requires it (task_type read via
+    # frontmatter_value, M3). The real install ships the whole lib/ dir.
+    for lib in ("extract-input.sh", "emit.sh", "safety.sh", "frontmatter.sh"):
         (lib_dir / lib).symlink_to(ROOT / "hooks" / "lib" / lib)
     return tmp
 

@@ -34,6 +34,9 @@ if [ "$_aegis_safety_rc" -ne 0 ]; then
 fi
 # AEGIS_SAFETY_FALLBACK_END
 aegis_require_lib "${SCRIPT_DIR}/lib/emit.sh"
+# frontmatter.sh provides frontmatter_value (next_action read). Required
+# (fail-closed) for consistency; the whole lib/ ships in every install.
+aegis_require_lib "${SCRIPT_DIR}/lib/frontmatter.sh"
 DEFAULT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 # Allow ROOT override via env (test fixtures use this to isolate from real aegis state).
 ROOT="${AEGIS_ROOT_OVERRIDE:-${DEFAULT_ROOT}}"
@@ -95,7 +98,7 @@ if [ ! -f "$STATUS_FILE" ]; then
 fi
 
 # Extract next_action from STATUS.md.
-NEXT_ACTION=$(grep -m1 "^next_action:" "$STATUS_FILE" | sed "s/^next_action:[[:space:]]*//" | sed 's/^"//;s/"$//' || true)
+NEXT_ACTION=$(frontmatter_value "$STATUS_FILE" "next_action")
 
 # Strip whitespace.
 NEXT_ACTION_STRIPPED=$(printf '%s' "$NEXT_ACTION" | tr -d '[:space:]')

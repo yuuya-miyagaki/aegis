@@ -42,6 +42,9 @@ STATUS_FILE="${ROOT}/docs/STATUS.md"
 # Load shared input extraction (fail-closed via safety lib on source failure).
 aegis_require_lib "${SCRIPT_DIR}/lib/extract-input.sh"
 aegis_require_lib "${SCRIPT_DIR}/lib/emit.sh"
+# frontmatter.sh provides frontmatter_value (task_type read). Required (fail-closed)
+# for consistency with the libs above; the whole lib/ ships in every install.
+aegis_require_lib "${SCRIPT_DIR}/lib/frontmatter.sh"
 
 # Read stdin (raw hook input).
 INPUT=$(cat)
@@ -223,7 +226,7 @@ if [ -n "$CMD" ] && is_allowlisted "$CMD"; then
 fi
 
 # Check task_type: allow all if framework task.
-TASK_TYPE=$(grep -m1 "^task_type:" "$STATUS_FILE" | sed "s/^task_type:[[:space:]]*//" | sed 's/^"//;s/"$//' || true)
+TASK_TYPE=$(frontmatter_value "$STATUS_FILE" "task_type")
 if [ "$TASK_TYPE" = "framework" ]; then
   emit_allow
   exit 0
