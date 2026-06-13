@@ -83,6 +83,35 @@ class TestK8PreserveUserSettings(unittest.TestCase):
             self.assertEqual(after.get("env", {}).get("MY_VAR"), "x",
                              f"env lost: {after}")
 
+    def test_user_set_nudge_value_preserved(self):
+        """P2-a: minimal/standard の profile 既定は env.AEGIS_NUDGE=off だが、
+        ユーザが明示設定した値は再インストールで上書きしない（K-8 保全）。"""
+        with tempfile.TemporaryDirectory() as tmp:
+            project = pathlib.Path(tmp) / "proj"
+            project.mkdir()
+            (project / ".claude").mkdir()
+            existing = {"env": {"AEGIS_NUDGE": "on"}, "hooks": {}}
+            (project / ".claude/settings.local.json").write_text(
+                json.dumps(existing))
+            r = _setup("standard", project)
+            self.assertEqual(r.returncode, 0, f"setup failed: {r.stderr}")
+            after = json.loads(
+                (project / ".claude/settings.local.json").read_text())
+            self.assertEqual(after.get("env", {}).get("AEGIS_NUDGE"), "on",
+                             f"user nudge value clobbered: {after}")
+
+    def test_fresh_minimal_install_defaults_nudge_off(self):
+        """P2-a: 既存 settings がない新規 minimal install は env.AEGIS_NUDGE=off。"""
+        with tempfile.TemporaryDirectory() as tmp:
+            project = pathlib.Path(tmp) / "proj"
+            project.mkdir()
+            r = _setup("minimal", project)
+            self.assertEqual(r.returncode, 0, f"setup failed: {r.stderr}")
+            after = json.loads(
+                (project / ".claude/settings.local.json").read_text())
+            self.assertEqual(after.get("env", {}).get("AEGIS_NUDGE"), "off",
+                             f"fresh minimal must default off: {after}")
+
     def test_unknown_top_level_key_preserved(self):
         """grill 致命 4: 将来 Claude Code が追加する未知 key も保存"""
         with tempfile.TemporaryDirectory() as tmp:

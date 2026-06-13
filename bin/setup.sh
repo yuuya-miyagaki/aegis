@@ -283,10 +283,11 @@ if os.path.exists(target):
 
 # P2-a (v1.7.0): minimal/standard default the phase-HINT nudge OFF via settings
 # env (settings env propagates to hook process env). full leaves it unset = on.
-# Only ADD the lean-profile default; never strip a user-set value for full.
+# Key-level setdefault: only ADD the default when absent — a user's explicit
+# env.AEGIS_NUDGE (on or off) survives re-install (K-8 preserve-user-keys).
 profile_name = profile.get('name', '')
 if profile_name in ('minimal', 'standard'):
-    out.setdefault('env', {})['AEGIS_NUDGE'] = 'off'
+    out.setdefault('env', {}).setdefault('AEGIS_NUDGE', 'off')
 
 with open(target, 'w') as f:
     json.dump(out, f, indent=2)
