@@ -103,3 +103,20 @@ def test_staleness_skipped_when_not_framework_root(tmp_path):
     failures, warnings = crd.check_platform_staleness(tmp_path)
     assert failures == []
     assert warnings == []
+
+
+def test_drift_malformed_matcher_does_not_crash(tmp_path):
+    # drift checker は不正 template を「報告」すべきで crash してはならない:
+    # matcher が null / 非 dict 要素 / hooks が非 dict のいずれでも例外を出さない。
+    root = _write_template(tmp_path, {
+        "PreToolUse": [{"matcher": None, "hooks": []}, "not-a-dict"],
+    })
+    failures, warnings = crd.check_platform_manifest(root)  # 例外が出ないこと
+    assert isinstance(failures, list) and isinstance(warnings, list)
+
+    bad = tmp_path / "bad"
+    (bad / "templates").mkdir(parents=True)
+    (bad / "templates" / "hooks.template.json").write_text(
+        json.dumps({"hooks": []}), encoding="utf-8")
+    failures, warnings = crd.check_platform_manifest(bad)  # hooks が list でも crash しない
+    assert isinstance(failures, list) and isinstance(warnings, list)

@@ -18,9 +18,11 @@ from pathlib import Path
 
 # Some tests load this module via importlib.spec_from_file_location without
 # putting scripts/ on sys.path. Self-bootstrap so `platform_manifest` resolves
-# regardless of how we are loaded.
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-from platform_manifest import (
+# regardless of how we are loaded (idempotent: avoid stacking duplicate entries).
+_SCRIPTS_DIR = str(Path(__file__).resolve().parent)
+if _SCRIPTS_DIR not in sys.path:
+    sys.path.insert(0, _SCRIPTS_DIR)
+from platform_manifest import (  # noqa: E402  (import follows sys.path bootstrap)
     KNOWN_HOOK_EVENTS,
     KNOWN_TOOL_NAMES,
     TOOL_MATCHING_EVENTS,
@@ -541,7 +543,12 @@ def check_platform_manifest(root: Path) -> tuple[list[str], list[str]]:
         warnings.append(f"could not parse {template.name}")
         return failures, warnings
 
-    for event, matchers in data.get("hooks", {}).items():
+    hooks = data.get("hooks", {})
+    if not isinstance(hooks, dict):
+        warnings.append(f"{template.name}: 'hooks' is not an object")
+        return failures, warnings
+
+    for event, matchers in hooks.items():
         if event not in KNOWN_HOOK_EVENTS:
             failures.append(
                 f"platform-manifest: hooks.template.json event '{event}' "
@@ -550,7 +557,9 @@ def check_platform_manifest(root: Path) -> tuple[list[str], list[str]]:
         if event not in TOOL_MATCHING_EVENTS or not isinstance(matchers, list):
             continue
         for matcher in matchers:
-            for token in matcher.get("matcher", "").split("|"):
+            if not isinstance(matcher, dict):
+                continue
+            for token in (matcher.get("matcher") or "").split("|"):
                 token = token.strip()
                 if token and token not in KNOWN_TOOL_NAMES:
                     warnings.append(
