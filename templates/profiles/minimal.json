@@ -8,7 +8,8 @@
     "scripts/check_status.py",
     "hooks/lib/safety.sh",
     "hooks/lib/secrets-patterns.sh",
-    "hooks/lib/phase-skills.sh"
+    "hooks/lib/phase-skills.sh",
+    "hooks/lib/frontmatter.sh"
   ],
   "recommended": [],
   "hooks_include": [

@@ -23,7 +23,8 @@
     "hooks/lib/extract-input.sh",
     "hooks/lib/safety.sh",
     "hooks/lib/secrets-patterns.sh",
-    "hooks/lib/phase-skills.sh"
+    "hooks/lib/phase-skills.sh",
+    "hooks/lib/frontmatter.sh"
   ],
   "recommended": [
     "hooks/check-tdd.sh",

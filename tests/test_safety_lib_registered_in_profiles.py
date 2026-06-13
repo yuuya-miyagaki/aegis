@@ -18,11 +18,14 @@ import unittest
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 
-# K-5 で必須化する 3 つの lib（safety.sh は v1.6.2 新規）
+# 複数 hook が source する必須 lib。fail-closed 依存があるため 3 profile の
+# required と契約で配布を固定する（safety.sh は v1.6.2、frontmatter.sh は
+# M3/v1.7.1 で session-start に加え control-plane/task-completed も hard-depend）。
 REQUIRED_LIBS = [
     "hooks/lib/safety.sh",
     "hooks/lib/secrets-patterns.sh",
     "hooks/lib/phase-skills.sh",
+    "hooks/lib/frontmatter.sh",
 ]
 
 PROFILES = ["minimal", "standard", "full"]
