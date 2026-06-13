@@ -6,10 +6,10 @@ mode: Dev
 phase: deploy
 task_type: framework
 task_size: L
-task_size_rationale: "確定（brainstorm→writing-plans→grill-plan→TDD 実装→grill-code）: 第7回全力レビュー §2 P2-a『HINT/合理化テーブルを AEGIS_NUDGE=off+profile 連動で opt-out 化』。スコープは session-start の常時オン HINT のみ（skill/agent 静的テーブルは M1 複製税回避で非ゴール）。source 4 ファイル＋テスト＋docs＋版数。6 commit。"
-iteration: 25
+task_size_rationale: "確定（brainstorm→writing-plans→grill-plan→TDD 実装→grill-code）: 第7回全力レビュー §1 M3『STATUS パーサ二重化』。Python 側は既に一本化済みと判明し bash のみがスコープ。frontmatter.sh に frontmatter_value/gate_value を追加し extract_value 2定義＋インライン約11箇所＋gate抽出（post-status-audit の extract_gate 含む）を集約。lib+8 hook+テスト+profiles+版数。8 commit。"
+iteration: 26
 ui_surface: false
-last_updated: "2026-06-13T16:00:00Z"
+last_updated: "2026-06-13T18:00:00Z"
 gate_approvals:
   client_ready_for_dev: n/a
   brainstorm: approved
@@ -22,8 +22,8 @@ gate_approvals:
 current_refs:
   requirements:
     - docs/full-review-2026-06-13-context-futureproof.md
-  plan: docs/plans/2026-06-13-v170-aegis-nudge-optout-implementation.md
-  spec: docs/plans/2026-06-13-aegis-nudge-optout-design.md
+  plan: docs/plans/2026-06-13-v171-status-parser-unification-implementation.md
+  spec: docs/plans/2026-06-13-status-parser-unification-design.md
   review: docs/qa-reports/v162-review.md
   qa: docs/qa-reports/v162-qa.md
   security: docs/qa-reports/v162-security.md
@@ -42,10 +42,14 @@ external_evidence:
     scope: "v0.12.2 実装後 4 ラウンドレビュー"
     findings: "Round 6 (P1×2, P2×1: pre-compact exit 2 / minimal-project / test rc), Round 7 (P1×1, P3×1: git add 漏れ / テスト件数表記), Round 8 (P2×1, P3×1: stale last_updated / grep 自己マッチ), Round 9 (P3×2: コメント不整合)"
     resolution: "9件全反映。tier 1/2 PASS、134 tests PASS、本体と minimal-project 完全同期確認済み。"
-next_action: "iteration 25（v1.7.0 P2-a: AEGIS_NUDGE opt-out）実装完了: session-start の phase HINT 説教のみを AEGIS_NUDGE=off で抑制（gates/skill パス/blockers/各 warning/unknown-phase 診断は無条件で残す）。profile 連動 full=on / minimal・standard=off を setup.sh の settings env 注入で実現（key-level setdefault でユーザ明示値を保全）。brainstorm→writing-plans→grill-plan（致命1=unknown-phase 巻き添え抑制を着手前にゲート外へ）→TDD 実装→grill-code（🟡1=env clobber を setdefault 修正）。版数4箇所（定数/template/example/STATUS）を 1.7.0 統一（1.6.2 残置 split 解消）。711 tests OK（705→711・新規6）/ contract 全 profile / drift / scaffold smoke / v162 18 PoC / v163 5 PoC 全 PASS。残: tag v1.7.0 付与＋origin push（ユーザ判断）。backlog: P2 volatile マニフェスト / P3 ミラー自動生成・docs archive・STATUS パーサ一本化。"
+next_action: "iteration 26（v1.7.1 M3: STATUS パーサ bash 一本化）実装完了: frontmatter.sh に frontmatter_value（whole-file grep）/gate_value（frontmatter_section||raw_section 両対応・2スペース anchor）を追加し、散在する extract_value 2定義＋インライン scalar 約11箇所＋gate 抽出（check-gate/check-task-created＋post-status-audit の extract_gate/extract_gate_from_status）を単一所有者へ集約。Python 側は既に一本化済みのため bash のみ。挙動不変は equivalence テスト（scalar/gate/bare-snapshot 新旧一致）＋既存 tamper/snapshot テスト緑で実証。control-plane/task-completed/client-info/pre-compact に frontmatter.sh source 追加（前3者は fail-closed require）。grill-plan 致命2（gate_value の bare 非対応・post-status-audit extract_gate 取りこぼし）を着手前に反映、grill-code 🟡1（frontmatter.sh が minimal/full の required 未ピン）を fix-forward（REQUIRED_LIBS＋3 profile に追加）。版数4箇所を 1.7.1 統一。726 tests OK（711→726・新規15）/ contract 全 profile / drift / scaffold smoke / v162 18 PoC / v163 5 PoC 全 PASS。残: tag v1.7.1 付与＋origin push（ユーザ判断）。backlog: P2 volatile マニフェスト / P3 ミラー自動生成・docs archive。"
 blockers: []
 failure_tracking: null
 session_history:
+  - date: "2026-06-13"
+    mode: Dev
+    phase: "deploy"
+    note: "iteration 26（v1.7.1 M3: STATUS パーサ bash 一本化）実装完了: 第7回全力レビュー §1 M3『STATUS パーサ二重化』。調査で Python 側（check_status.py が extract_* を所有・status_doctor が再利用）は既に一本化済みと判明し、実重複は bash のみ＝スコープを正しく絞った。frontmatter.sh に frontmatter_value（whole-file grep で STATUS.md・bare .gate-snapshot 両対応）と gate_value（frontmatter_section||raw_section fallback＋2スペース anchor）を追加。散在する extract_value 2定義（session-start/pre-compact）＋インライン scalar 約11箇所＋gate 抽出（check-gate/check-task-created）＋post-status-audit のローカル extract_gate/extract_gate_from_status 2関数を単一所有者へ集約。挙動不変は equivalence テスト（旧3段パイプ vs 新関数を scalar/gate/bare-snapshot の3軸で全キー一致）＋既存 tamper/snapshot テスト緑で実証。control-plane/task-completed/client-info/pre-compact に frontmatter.sh source 追加（前3者は fail-closed require＝コメント明記）。grill-plan が致命2件（gate_value の frontmatter_section-only では bare snapshot で silent-empty＝frontmatter_value と非対称／post-status-audit の extract_gate を取りこぼし）を指摘→着手前に gate_value を両対応化＋extract_gate も統一に含める形で反映。実装中に control-plane fixture（frontmatter.sh 非copy）の fail-closed リグレッションを検知し fixture 修正。grill-code 🟡1（frontmatter.sh が standard のみ required＝minimal/full 未ピン、複数 hook が hard-depend）を fix-forward（REQUIRED_LIBS＋minimal/full.json に追加）。版数4箇所（定数/template/example STATUS/本体 STATUS）を 1.7.1 統一。726 tests OK（711→726・新規15）/ contract 全 profile / drift / scaffold smoke / v162 18 PoC / v163 5 PoC 全 PASS。残 backlog: P2 volatile マニフェスト / P3 ミラー自動生成・docs archive。"
   - date: "2026-06-13"
     mode: Dev
     phase: "deploy"
@@ -54,10 +58,6 @@ session_history:
     mode: Dev
     phase: "deploy"
     note: "iteration 24（v1.6.3 第7回全力レビュー fix-forward）実装完了: 5 軸並列レビュー（コンテキスト予算 / 機能整合 / 将来耐性 / 複雑性 / 敵対堅牢性）で moat の未カバー 3 件（R1 制御バイトで deny/block JSON 破損→fail-open・R2 STATUS/LEARNINGS の無サニタイズ注入・R3 抽出失敗時の emit_allow）を抽出。R1=emit.sh の _aegis_json_escape に C0 制御バイト空白置換（pure-bash・外部依存契約維持）。R2+C1=新 lib sanitize.sh（aegis_sanitize_field + UTF-8 安全 byte 切断 _aegis_utf8_trunc）+ session-start で blockers/learnings を untrusted エンベロープ封入・next_action はフェンス外維持・全自由文に上限。R3=check-destructive/secrets の抽出失敗分岐を raw INPUT パターン一致で emit_ask に fail-closed 化。grill-code 中に capital-R 再帰削除の既存 gap を発見し R4 として畳み込み（-[a-zA-Z]*[rR]）。P1（aegis-* description 短縮）は disable-model-invocation で system prompt 非掲載=0 トークンの YAGNI として除外。grill-plan 致命4件（UTF-8 切断割れ・next_action フェンス誤封入・P1 無価値・severity 過大）を着手前に実証反映、UTF-8 切断は bash 3.2 で 80+20 fuzz 検証。705 tests OK（683→705・新規22）/ contract 全 profile / drift / smoke / v162 18 PoC / v163 5 PoC 全 PASS。R1/R2/R3 は defense-in-depth（前提条件が gate 済 or 稀）と整理。"
-  - date: "2026-06-13"
-    mode: Dev
-    phase: "deploy"
-    note: "iteration 23（v1.6.2 第6回全力レビュー fix-forward）完了: 6 軸並列レビュー（敵対バイパス再 PoC + 障害モード + パフォーマンス + 配布パス + 競合比較 + 非エンジニア E2E）で Critical 16 件抽出。grill-plan で致命 5 件反映、Task 1〜7 を TDD 実装（K-1 3 軸 zero-run gate / K-2-4 cmdsub + quoted-var fail-closed / K-5-7 safety.sh + atomic snapshot + timeout / K-8-11 配布パス破壊抑止 + version stamp / K-10 prereq + K-12 ARTIFACT_TO_TEMPLATE + K-13 cheatsheet 🟡 ack 例）。grill-code が Path B 単一 redirect 走査と evidence.sh tail-only 抽出の 2 Critical を発見、追加 1 commit で吸収。18 PoC 全 PASS、683 tests OK（unittest discover）、contract / drift / smoke 全 PASS。配布パスは framework_version stamp + atomic snapshot + ユーザ設定保存 + framework_root self-install abort + python3 prereq で F6 / DIST 系統を根治。S-1 と DIST-12 は v1.7 計画から前倒し。残 K-14（PERF-1）/ K-15（PERF-2）/ K-16（README）は v1.7 へ送り。"
 ---
 
 ## Summary
