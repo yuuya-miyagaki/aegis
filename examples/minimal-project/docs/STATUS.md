@@ -1,6 +1,6 @@
 ---
 framework: aegis
-framework_version: "1.6.2"
+framework_version: "1.7.0"
 project_name: "社内ナレッジ検索アシスタント"
 mode: Dev
 phase: docs
