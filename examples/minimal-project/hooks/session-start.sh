@@ -169,11 +169,17 @@ case "$PHASE" in
     ;;
   *)
     if [ -n "$PHASE" ]; then
-      HINT="unknown phase: ${PHASE} — docs/STATUS.md を確認"
+      # 未知 phase は STATUS.md の誤設定診断（nudge ではない）。AEGIS_NUDGE に関係なく出す。
+      CONTEXT="${CONTEXT} | [WARNING] unknown phase: ${PHASE} — docs/STATUS.md を確認"
+      HINT=""
     fi
     ;;
 esac
-if [ -n "$HINT" ]; then
+# AEGIS_NUDGE=off suppresses the phase HINT sermon (path-telling); gates,
+# skill paths, blockers, warnings, and the unknown-phase diagnostic above all
+# stay (they are enforcement/diagnostics, not nudge). Lowercase "off" only —
+# any other value keeps the nudge on (fail-safe = more guidance).
+if [ -n "$HINT" ] && [ "${AEGIS_NUDGE:-}" != "off" ]; then
   CONTEXT="${CONTEXT} | ${HINT}"
 fi
 

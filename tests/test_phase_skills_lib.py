@@ -94,11 +94,14 @@ class TestSessionStartInjection(unittest.TestCase):
         (d / "scripts" / "check_status.py").symlink_to(ROOT / "scripts" / "check_status.py")
         return d
 
-    def _run(self, root: Path) -> str:
+    def _run(self, root: Path, extra_env: dict | None = None) -> str:
+        env = {"PATH": "/usr/bin:/bin", "CLAUDE_PROJECT_DIR": str(root)}
+        if extra_env:
+            env.update(extra_env)
         r = subprocess.run(
             ["bash", str(root / "hooks" / "session-start.sh")],
             capture_output=True, text=True, timeout=60,
-            env={"PATH": "/usr/bin:/bin", "CLAUDE_PROJECT_DIR": str(root)})
+            env=env)
         return r.stdout
 
     def test_review_phase_injects_read_instruction(self):
@@ -114,6 +117,41 @@ class TestSessionStartInjection(unittest.TestCase):
                                   runbook=True)
             out = self._run(root)
             self.assertIn(".claude/skills/maintenance/SKILL.md", out)
+
+    # --- AEGIS_NUDGE opt-out (P2-a / v1.7.0) -------------------------------
+    def test_nudge_default_injects_phase_hint(self):
+        # 未設定（既定 on）: implement 期の HINT 説教が文脈に乗る
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._scaffold(Path(tmp), "implement", ["tdd", "subagent-dev"])
+            out = self._run(root)
+            self.assertIn("TDD必須", out, "nudge on: HINT must be present")
+            self.assertIn(".claude/skills/tdd/SKILL.md", out)
+
+    def test_nudge_off_drops_hint_keeps_enforcement(self):
+        # off: HINT 説教は消えるが、state/skill パス等の enforcement は残る
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._scaffold(Path(tmp), "implement", ["tdd", "subagent-dev"])
+            out = self._run(root, {"AEGIS_NUDGE": "off"})
+            self.assertNotIn("TDD必須", out, "nudge off: HINT sermon must be gone")
+            self.assertIn("phase=implement", out, "off must keep phase state")
+            self.assertIn("必読skill", out, "off must keep skill boot path")
+            self.assertIn(".claude/skills/tdd/SKILL.md", out)
+
+    def test_nudge_non_exact_off_keeps_hint(self):
+        # fail-safe: 小文字 off 以外（大文字/末尾空白/別語）は on のまま
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._scaffold(Path(tmp), "implement", ["tdd", "subagent-dev"])
+            for value in ("OFF", "Off", "off ", "on", "1", "true"):
+                with self.subTest(value=value):
+                    out = self._run(root, {"AEGIS_NUDGE": value})
+                    self.assertIn("TDD必須", out, f"{value!r} must keep HINT (fail-safe)")
+
+    def test_nudge_off_keeps_unknown_phase_warning(self):
+        # grill 致命: unknown-phase は診断であり nudge ではない。off でも残す。
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._scaffold(Path(tmp), "bogus_phase", ["tdd"])
+            out = self._run(root, {"AEGIS_NUDGE": "off"})
+            self.assertIn("unknown phase", out, "off must keep misconfig diagnostic")
 
 
 if __name__ == "__main__":
