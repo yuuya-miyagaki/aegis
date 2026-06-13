@@ -20,7 +20,7 @@ from platform_manifest import (
 
 ROOT = Path(__file__).resolve().parents[1]
 
-FRAMEWORK_VERSION = "1.7.2"
+FRAMEWORK_VERSION = "1.8.0"
 
 PROFILES_DIR = ROOT / "templates" / "profiles"
 VALID_PROFILES = ["minimal", "standard", "full"]
