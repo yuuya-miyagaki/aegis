@@ -105,6 +105,8 @@ Available profiles: `minimal` (core only), `standard` (recommended), `full` (eve
 
 TDD backstop strictness follows the profile: `full` installs `check-tdd.sh` (strict — prompts when production code is edited without test changes); `minimal`/`standard` omit it (off). Within `full`, set `AEGIS_TDD_MODE=off` to disable the backstop for a single session (e.g. a large no-test refactor); session-start prints a warning while it is off. Lowercase `off` only.
 
+Phase HINT nudges (the per-phase reminder sermon injected at session start) also follow the profile: `full` shows them; `minimal`/`standard` write `AEGIS_NUDGE=off` into the generated settings `env`, so the sermon is suppressed by default. Set `AEGIS_NUDGE=off` to silence it for a session in any profile (lowercase `off` only). Only the phase HINT is removed — gates, skill boot-paths, blockers, failure-tracking, the unknown-phase diagnostic, and safety warnings always remain. To re-enable nudges on a `minimal`/`standard` install, remove the `env.AEGIS_NUDGE` key from `.claude/settings.local.json` (the unambiguous method; shell-vs-settings env precedence is platform-dependent). Unlike `AEGIS_TDD_MODE`, session-start does not warn when nudges are off (it is benign).
+
 ### Manual setup
 
 1. Read [CLAUDE.md](CLAUDE.md)

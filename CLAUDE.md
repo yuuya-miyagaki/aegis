@@ -15,6 +15,7 @@
   Reset to null when the goal is achieved or changed.
 - Destructive commands require explicit user approval. Enforce via hooks (PaC).
 - Hook enforcement level is set at install via `bin/setup.sh --profile` — TDD backstop is on in `full`, off in `minimal`/`standard`. In `full`, `AEGIS_TDD_MODE=off` disables it for the session (session-start warns).
+- Phase HINT nudges follow the profile: `full` shows them; `minimal`/`standard` default `AEGIS_NUDGE=off` (written to settings `env` at install). `AEGIS_NUDGE=off` suppresses the phase-HINT sermon for the session; gates, skill boot-paths, blockers, the unknown-phase diagnostic, and warnings are unaffected. Lowercase `off` only; session-start does NOT warn (off is benign).
 
 ## Session Start
 

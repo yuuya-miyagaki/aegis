@@ -323,7 +323,7 @@ v1.0.0 で公式同名スキルとの衝突回避のため一部を `aegis-*` �
 
 | フック | イベント | マッチャー | 機能 |
 |--------|---------|----------|------|
-| **session-start.sh** | SessionStart | startup\|clear\|compact | STATUS.md を読取り、モード・フェーズ・ブロッカー・スキルヒント・高信頼度 LEARNINGS を注入。ゲートスナップショット初期化。second-opinion.md 検出 |
+| **session-start.sh** | SessionStart | startup\|clear\|compact | STATUS.md を読取り、モード・フェーズ・ブロッカー・スキルヒント・高信頼度 LEARNINGS を注入。ゲートスナップショット初期化。second-opinion.md 検出。phase HINT 説教は `AEGIS_NUDGE=off`（minimal/standard 既定）で抑制可（enforcement/state/skill パス/unknown-phase 診断は無条件で残す） |
 | **check-gate.sh** | PreToolUse | Edit\|Write\|NotebookEdit | plan ゲート未承認時にコード編集をブロック。Client モード中の編集もブロック。非 framework タスクでの制御ファイル編集をブロック |
 | **check-tdd.sh** | PreToolUse | Edit\|Write\|NotebookEdit | テスト変更なしのプロダクションコード編集を警告（`ask`）。full のみ。`AEGIS_TDD_MODE=off` で無効化 |
 | **check-client-info.sh** | PreToolUse | Edit\|Write\|NotebookEdit | Client モードで `docs/client/context.md` が無い場合に要件編集をブロック |
