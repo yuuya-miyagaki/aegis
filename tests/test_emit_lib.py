@@ -69,6 +69,26 @@ class TestEmitContract(unittest.TestCase):
             'a "q" \\ and\nnewline',
         )
 
+    def test_control_byte_does_not_corrupt_json(self):
+        """R1: a C0 control byte (0x01) in a reason must still yield valid JSON.
+
+        Raw control bytes are forbidden in JSON strings; leaving them produced
+        invalid JSON that a strict parser drops, silently failing the deny/block
+        path open. Source values (STATUS.md gate/phase) are attacker-influenceable.
+        """
+        # ANSI-C quoting injects a literal 0x01 (printf '\001' is implementation-dependent)
+        rc, out = emit(r"""reason=$'gate \x01 tamper'; emit_block "$reason" """)
+        # emit() returns (rc, raw_str) when json.loads fails -> dict means valid JSON
+        self.assertIsInstance(out, dict, f"control byte corrupted JSON: {out!r}")
+        self.assertEqual(out["decision"], "block")
+        self.assertNotIn("\x01", out["reason"])
+
+    def test_escape_keeps_legitimate_whitespace(self):
+        r"""\n \t \r must remain escaped (control-byte squashing must not eat them)."""
+        rc, out = emit("emit_deny 'tab\there\nnl'")
+        self.assertEqual(
+            out["hookSpecificOutput"]["permissionDecisionReason"], "tab\there\nnl")
+
 
 class TestEmitFailClosed(unittest.TestCase):
     """Round 1 #3 / Round 2 P1: the deny/block output path must NOT depend on any

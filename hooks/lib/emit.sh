@@ -33,6 +33,14 @@ _aegis_json_escape() {
   s=${s//$'\n'/\\n}   # newline
   s=${s//$'\t'/\\t}   # tab
   s=${s//$'\r'/\\r}   # carriage return
+  # Squash remaining C0 control bytes (0x01-0x1F minus the whitespace handled
+  # above) to a space. JSON forbids raw control bytes in strings; leaving them
+  # produced invalid JSON that a strict parser drops, silently failing the
+  # deny/block path open. Pure-bash glob replacement preserves the
+  # no-external-interpreter contract (test_emit_sh_has_no_interpreter_dependency).
+  # 0x00 cannot occur in a bash variable, so it is not in the class.
+  local _aegis_ctl=$'\x01\x02\x03\x04\x05\x06\x07\x08\x0b\x0c\x0e\x0f\x10\x11\x12\x13\x14\x15\x16\x17\x18\x19\x1a\x1b\x1c\x1d\x1e\x1f'
+  s=${s//[$_aegis_ctl]/ }
   printf '%s' "$s"
 }
 
