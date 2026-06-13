@@ -139,10 +139,12 @@ KNOWN_HOOK_EVENTS = frozenset({
 # session sources like startup|resume|clear|compact) must NOT be checked here.
 TOOL_MATCHING_EVENTS = frozenset({"PreToolUse", "PostToolUse", "PostToolUseFailure"})
 
-# --- Known tool / MCP-tool names a matcher may reference (best-effort registry). ---
+# --- Tool / MCP-tool tokens referenced by template matchers today. Extend ONLY
+#     when a new tool-matching matcher is added (best-effort registry; do not pad
+#     with tools no matcher references, or the registry silently rots). ---
 KNOWN_TOOL_NAMES = frozenset({
-    "Bash", "Edit", "Write", "NotebookEdit", "Read",
-    "Skill", "Task", "CronCreate",
+    "Bash", "Edit", "Write", "NotebookEdit",
+    "Skill", "CronCreate",
     "mcp__claude_ai_Vercel__deploy_to_vercel",
 })
 
@@ -337,18 +339,21 @@ git commit -m "feat(manifest): source model/effort policy from platform_manifest
 ## Task 3: check_reference_drift.py に event/tool/staleness check を追加
 
 **Files:**
-- Modify: `scripts/check_reference_drift.py`（16 付近 import、新規 `check_platform_manifest()`、559-572 ALL_CHECKS 登録）
+- Modify: `scripts/check_reference_drift.py`（16 付近 import＋自己 bootstrap、新規 `check_platform_manifest()` ＋ `check_platform_staleness()`、559-572 ALL_CHECKS に 2 エントリ登録）
 - Test: `tests/test_platform_manifest_consumers.py`（追記）
 
 - [ ] **Step 1: 失敗するテストを書く**
 
-`tests/test_platform_manifest_consumers.py` に追記:
+まず `tests/test_platform_manifest_consumers.py` の**先頭 import ブロック**（Task 2 の import 群と同じ位置）に追記（mid-file import を避けるため必ず先頭へ hoist）:
 
 ```python
 import json
 import check_reference_drift as crd
+```
 
+次に同ファイル末尾へテスト関数を追記。`check_platform_manifest` は template 専用（決定論）、`check_platform_staleness` は検証日専用（時間依存）に分離する設計なので、template 系テストは前者だけを対象にする（staleness を巻き込まない＝壁時計非依存）:
 
+```python
 def _write_template(tmp_path, hooks: dict) -> Path:
     root = tmp_path
     (root / "templates").mkdir(parents=True, exist_ok=True)
@@ -365,7 +370,7 @@ def test_drift_clean_template_passes(tmp_path):
     })
     failures, warnings = crd.check_platform_manifest(root)
     assert failures == []
-    assert warnings == []
+    assert warnings == []  # staleness は別関数なので壁時計に依存しない
 
 
 def test_drift_unknown_event_fails(tmp_path):
@@ -393,18 +398,29 @@ def test_drift_ignores_session_source_matchers(tmp_path):
     failures, warnings = crd.check_platform_manifest(root)
     assert failures == []
     assert warnings == []
+
+
+def test_staleness_skipped_when_not_framework_root(tmp_path):
+    # platform_manifest.py を含まない root（例: install 先 scaffold）では staleness を
+    # 発火させない＝二重発火を防ぐ。
+    failures, warnings = crd.check_platform_staleness(tmp_path)
+    assert failures == []
+    assert warnings == []
 ```
 
 - [ ] **Step 2: テストが失敗することを確認**
 
-Run: `python3 -m pytest tests/test_platform_manifest_consumers.py -q -k drift`
+Run: `python3 -m pytest tests/test_platform_manifest_consumers.py -q -k "drift or staleness"`
 Expected: FAIL（`module 'check_reference_drift' has no attribute 'check_platform_manifest'`）
 
-- [ ] **Step 3: import を追加**
+- [ ] **Step 3: import を追加（自己 bootstrap 付き — grill 致命#1）**
 
-`scripts/check_reference_drift.py` の `from pathlib import Path`（16 行目）の直後に追加:
+`scripts/check_reference_drift.py` の `from pathlib import Path`（16 行目）の直後に追加。**重要**: `test_skill_reachability.py` は `importlib.spec_from_file_location` で本モジュールをロードするが scripts/ を sys.path に入れない。素の top-level import を足すと同テストが単独実行で collection error（現状 `pytest tests/test_skill_reachability.py` は 8 passed＝回帰）。よって import 前に自モジュールのディレクトリを sys.path へ自己挿入し、どのローダ経由でも解決できるようにする（再発クラスごと封鎖）:
 
 ```python
+import sys
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 from platform_manifest import (
     KNOWN_HOOK_EVENTS,
     KNOWN_TOOL_NAMES,
@@ -413,69 +429,86 @@ from platform_manifest import (
 )
 ```
 
-- [ ] **Step 4: check 関数を実装**
+確認: 変更後に `python3 -m pytest tests/test_skill_reachability.py -q` が単独で緑のままであること。
 
-`check_mirror_identity`（516 行目）の直前に新規関数を追加:
+- [ ] **Step 4: check 関数を実装（template 検査と staleness を分離 — grill 致命#2）**
+
+`check_mirror_identity`（516 行目）の直前に**2 つの**新規関数を追加。template 検査（決定論）と検証日 staleness（時間依存）を別関数に分ける。これにより clean-template テストが壁時計に依存せず（staleness 窓超過後も恒久緑）、staleness は framework root のみで発火（install 先 scaffold での二重発火を防止）:
 
 ```python
 def check_platform_manifest(root: Path) -> tuple[list[str], list[str]]:
-    """volatile-truth manifest: template の hook event は既知 event 集合の
-    部分でなければならない（FAIL）。tool-matcher のトークンは既知 tool レジストリに
-    収まるべき（WARN・regex 曖昧性ゆえ best-effort）。検証日が staleness 窓を
-    超えたら再確認を促す advisory（WARN）。"""
+    """volatile-truth manifest（決定論部）: template の hook event は既知 event
+    集合の部分でなければならない（FAIL）。tool-matcher のトークンは既知 tool
+    レジストリに収まるべき（WARN・regex 曖昧性ゆえ best-effort）。"""
     failures: list[str] = []
     warnings: list[str] = []
 
     template = root / "templates" / "hooks.template.json"
-    if template.exists():
-        try:
-            data = json.loads(_read(template))
-        except (json.JSONDecodeError, OSError):
-            warnings.append(f"could not parse {template.name}")
-            data = {}
-        for event, matchers in data.get("hooks", {}).items():
-            if event not in KNOWN_HOOK_EVENTS:
-                failures.append(
-                    f"platform-manifest: hooks.template.json event '{event}' "
-                    f"not in KNOWN_HOOK_EVENTS (renamed/typo?)"
-                )
-            if event not in TOOL_MATCHING_EVENTS or not isinstance(matchers, list):
-                continue
-            for matcher in matchers:
-                for token in matcher.get("matcher", "").split("|"):
-                    token = token.strip()
-                    if token and token not in KNOWN_TOOL_NAMES:
-                        warnings.append(
-                            f"platform-manifest: matcher token '{token}' "
-                            f"(event {event}) not in KNOWN_TOOL_NAMES registry"
-                        )
+    if not template.exists():
+        return failures, warnings
+    try:
+        data = json.loads(_read(template))
+    except (json.JSONDecodeError, OSError):
+        warnings.append(f"could not parse {template.name}")
+        return failures, warnings
 
+    for event, matchers in data.get("hooks", {}).items():
+        if event not in KNOWN_HOOK_EVENTS:
+            failures.append(
+                f"platform-manifest: hooks.template.json event '{event}' "
+                f"not in KNOWN_HOOK_EVENTS (renamed/typo?)"
+            )
+        if event not in TOOL_MATCHING_EVENTS or not isinstance(matchers, list):
+            continue
+        for matcher in matchers:
+            for token in matcher.get("matcher", "").split("|"):
+                token = token.strip()
+                if token and token not in KNOWN_TOOL_NAMES:
+                    warnings.append(
+                        f"platform-manifest: matcher token '{token}' "
+                        f"(event {event}) not in KNOWN_TOOL_NAMES registry"
+                    )
+
+    return failures, warnings
+
+
+def check_platform_staleness(root: Path) -> tuple[list[str], list[str]]:
+    """volatile-truth manifest（時間依存部）: 検証日が staleness 窓を超えたら
+    再確認を促す advisory（WARN・非ブロック）。manifest を持つ framework root
+    のみで発火させ、install 先 scaffold での二重発火を避ける。"""
+    warnings: list[str] = []
+    if not (root / "scripts" / "platform_manifest.py").exists():
+        return [], warnings
     for key in stale_keys():
         warnings.append(
             f"platform-manifest: '{key}' verification date exceeds the staleness "
             f"window; re-verify against the live platform and bump PLATFORM_VERIFIED"
         )
-
-    return failures, warnings
+    return [], warnings
 ```
 
-- [ ] **Step 5: ALL_CHECKS に登録**
+- [ ] **Step 5: ALL_CHECKS に登録（両方）**
 
-571 行目 `("mirror identity (root ↔ example)", check_mirror_identity),` の直後（リスト末尾）に追加:
+571 行目 `("mirror identity (root ↔ example)", check_mirror_identity),` の直後（リスト末尾）に**2 行**追加:
 
 ```python
-    ("platform manifest (events/tools/staleness)", check_platform_manifest),
+    ("platform manifest (events/tools)", check_platform_manifest),
+    ("platform verification staleness", check_platform_staleness),
 ```
 
 - [ ] **Step 6: テストが通ることを確認**
 
 Run: `python3 -m pytest tests/test_platform_manifest_consumers.py -q`
-Expected: PASS（全 10 passed）
+Expected: PASS（Task 2 の 6 ＋ Task 3 の 5 ＝ 11 passed）
 
-- [ ] **Step 7: drift checker が緑であることを確認**
+- [ ] **Step 7: drift checker が緑であること＋既存 importlib テスト非回帰を確認**
 
-Run: `python3 scripts/check_reference_drift.py`
-Expected: `PASS: no reference drift detected`（WARNING があれば許容だが、現状 template の event/tool は既知集合内・検証日は当日なので 0 件のはず）
+Run:
+```bash
+python3 scripts/check_reference_drift.py
+python3 -m pytest tests/test_skill_reachability.py -q
+```
+Expected: drift は `PASS: no reference drift detected`（実 template の event/tool は既知集合内・検証日は当日なので staleness 0 件）。`test_skill_reachability.py` は単独で緑（自己 bootstrap が効いている＝grill 致命#1 解消の実証）。
 
 - [ ] **Step 8: コミット**
 
@@ -582,12 +615,19 @@ git commit -m "chore: bump framework_version to 1.8.0 (volatile-truth manifest) 
 **2. Placeholder scan:** TBD/TODO/「適切に」等なし。全コードブロックは実コード。✓
 
 **3. Type consistency:**
-- `stale_keys(today=None) -> list[str]`：Task 1 定義、Task 3 で引数なし呼び出し、テストで `today=` 注入 — 一致 ✓
+- `stale_keys(today=None) -> list[str]`：Task 1 定義、`check_platform_staleness` で引数なし呼び出し、テストで `today=` 注入 — 一致 ✓
 - `check_model_policy_manifest_consistency() -> list`：Task 2 定義・登録・テスト — 名前一致 ✓
-- `check_platform_manifest(root) -> tuple[list, list]`：Task 3 定義・ALL_CHECKS 登録・テスト — `(failures, warnings)` 形が ALL_CHECKS 規約（他 check と同型）と一致 ✓
-- import される原子名（ALLOWED_MODELS / FORBIDDEN_MODELS / EFFORT_LEVELS / OPUS_ONLY_EFFORTS / KNOWN_HOOK_EVENTS / KNOWN_TOOL_NAMES / TOOL_MATCHING_EVENTS）は Task 1 の定義と全 consumer で綴り一致 ✓
+- `check_platform_manifest(root) / check_platform_staleness(root) -> tuple[list, list]`：Task 3 定義・ALL_CHECKS に 2 エントリ登録・テスト — `(failures, warnings)` 形が ALL_CHECKS 規約（他 check と同型）と一致 ✓
+- import される原子名（ALLOWED_MODELS / FORBIDDEN_MODELS / EFFORT_LEVELS / OPUS_ONLY_EFFORTS / KNOWN_HOOK_EVENTS / KNOWN_TOOL_NAMES / TOOL_MATCHING_EVENTS / stale_keys）は Task 1 の定義と全 consumer で綴り一致 ✓
 
-**留意（grill-plan へ渡す論点）:**
-- KNOWN_TOOL_NAMES の網羅度（template に現れる全 matcher トークンを含むか）を Task 3 Step 7 の実 drift 実行で実証。`Read` 等の未使用エントリは YAGNI なら削る。
-- STALENESS_DAYS=180 の妥当性（モデル世代更新頻度）。
+**grill-plan 反映済み（2026-06-14）:**
+- 致命#1: check_reference_drift.py に自己 bootstrap（`sys.path.insert(自モジュール dir)`）を追加。importlib ローダ（test_skill_reachability）経由の単独実行 collection error を封鎖。Task 3 Step 3 ＋ Step 7 で実証。
+- 致命#2: staleness を `check_platform_staleness` に関数分離（時間依存）。template 検査 `check_platform_manifest` は決定論＝clean-template テストが壁時計非依存に。Task 3 Step 1/4/5 反映。
+- 要検討#1: staleness を framework root（`scripts/platform_manifest.py` 存在）のみで発火させ二重発火を防止。`test_staleness_skipped_when_not_framework_root` でガード。
+- YAGNI: KNOWN_TOOL_NAMES を template 参照トークンのみに trim（Read/Task 除去）。
+- import hoist: Task 3 テストの `import json` / `import check_reference_drift` を先頭へ。
+
+**実装中に確認する残点:**
+- STALENESS_DAYS=180 の妥当性（モデル世代更新頻度）— 実装中に固定でよい、後から定数調整可。
+- FORBIDDEN_MODELS 置換後のメッセージ文言を固定 assert する既存テストが無いか（Task 5 Step 2 の full suite が最終担保）。
 - CLAUDE.md 注記が `MAX_CLAUDE_WORDS=650` を超えないか（Task 4 Step 2 で実証）。
