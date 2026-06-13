@@ -163,15 +163,24 @@ git rm docs/handover/.gitkeep docs/requirements/.gitkeep docs/decisions/.gitkeep
 Run: `ls docs/*.md`
 Expected（8 件のみ）: STATUS.md, LEARNINGS.md, MIGRATION-FROM-v7.md, architecture-overview.md, evidence-archive.md, hook-failure-policy.md, perf-baseline.md, full-review-2026-06-13-context-futureproof.md
 
-- [ ] **Step 4: contract / drift が緑のままであることを確認**
+- [ ] **Step 4: 移動対象を指すコメントを archive パスへ更新（grill 要検討1）**
+
+`tests/test_hook_output_schema.py:1264-1265` のコメントが移動するファイルを指すため stale 化する。以下に更新（assert ではないので機能影響なし＝純粋な参照鮮度維持）:
+
+```python
+# deploy word-boundary. See docs/archive/reviews/audit-report-2026-06-06.md and
+# docs/archive/plans/2026-06-06-v1-audit-fixforward-p1p2-plan.md.
+```
+
+- [ ] **Step 5: contract / drift が緑のままであることを確認**
 
 Run: `python3 scripts/check_framework_contract.py && python3 scripts/check_reference_drift.py`
 Expected: 両方 PASS（requirements ref＝context-futureproof は root 維持で解決可）
 
-- [ ] **Step 5: コミット**
+- [ ] **Step 6: コミット**
 
 ```bash
-git add -A docs
+git add -A docs tests/test_hook_output_schema.py
 git commit -m "docs(P3): archive top-level review history + remove empty scaffold dirs"
 ```
 
@@ -193,7 +202,7 @@ git commit -m "docs(P3): archive top-level review history + remove empty scaffol
 - `current_refs.requirements`: `docs/full-review-2026-06-13-context-futureproof.md`（据え置き）
 - `current_refs.review/qa/security/deploy`: v162 据え置き（移動していない）
 - `next_action`: P3 完了の要約（archive 構造・移動数・backlog 完済）
-- `session_history`: 2026-06-14 の P3 エントリを prepend し、**最古エントリを 1 件削除して 3 件以内**に保つ（contract が max 3 を enforce）
+- `session_history`: 2026-06-14 の P3（iteration 29）エントリを prepend し、**最古の iteration 26 エントリを削除して 3 件（iter29/28/27）に保つ**（contract が max 3 を enforce）
 
 - [ ] **Step 2: STATUS が contract を通ることを確認**
 
@@ -203,7 +212,7 @@ Expected: `PASS: aegis contract is aligned`（session_history ≤ 3・current_re
 - [ ] **Step 3: example ミラー差分ゼロを確認**
 
 Run: `make example && git status --short`
-Expected: docs/archive は root のみ＝`examples/minimal-project/` に差分が出ない（archive 系の変更が example に波及しない）
+Expected: `examples/minimal-project/` 配下に差分が出ない（archive は root のみ＝example に波及しない）。この時点で `docs/STATUS.md` が `M` 表示なのは想定内（Step1 で編集・未コミット）＝見るのは「example 配下に差分が無いこと」。
 
 - [ ] **Step 4: 全回帰**
 
@@ -219,13 +228,15 @@ Expected: contract PASS / drift PASS / pytest `1 failed, 750 passed, 1 skipped`�
 
 - [ ] **Step 5: ワークスペース MEMORY.md の history パスを更新**
 
-ワークスペース `/Users/miyagakiyuuya/.claude/projects/-Users-miyagakiyuuya-Desktop-personal-superpowers-gstack-antigravitykit-urtorapowers/memory/MEMORY.md` 内で、移動した history docs を参照している箇所を `docs/archive/reviews/...` に置換:
-- `aegis/docs/behavioral-review-report-2026-06-12.md` → `aegis/docs/archive/reviews/behavioral-review-report-2026-06-12.md`
+ワークスペース `/Users/miyagakiyuuya/.claude/projects/-Users-miyagakiyuuya-Desktop-personal-superpowers-gstack-antigravitykit-urtorapowers/memory/MEMORY.md` 内で、移動した history docs を参照している箇所を `aegis/docs/archive/reviews/...` に置換（grill 要検討2＝実参照は次の6件のみ・grep で確定済み）:
+- `aegis/docs/audit-charter-2026-06-06.md` → `aegis/docs/archive/reviews/audit-charter-2026-06-06.md`
+- `aegis/docs/audit-report-2026-06-06.md` → `aegis/docs/archive/reviews/audit-report-2026-06-06.md`
 - `aegis/docs/evolution-review-2026-06-10.md` → `aegis/docs/archive/reviews/evolution-review-2026-06-10.md`
-- `aegis/docs/audit-charter-2026-06-06.md` / `audit-report-2026-06-06.md` → `docs/archive/reviews/...`
-- `aegis/docs/functional-integrity-audit-charter-2026-06-07.md` / `report` → `docs/archive/reviews/...`
-- `aegis/docs/full-review-charter-2026-06-12.md` / `full-review-2026-06-12.md` → `docs/archive/reviews/...`
-- 据え置き（root のまま）: `docs/full-review-2026-06-13-context-futureproof.md`（requirements ref）, `docs/architecture-overview.md` 等 load-bearing 8
+- `aegis/docs/functional-integrity-audit-charter-2026-06-07.md` → `aegis/docs/archive/reviews/functional-integrity-audit-charter-2026-06-07.md`
+- `aegis/docs/functional-integrity-audit-report-2026-06-07.md` → `aegis/docs/archive/reviews/functional-integrity-audit-report-2026-06-07.md`
+- `aegis/docs/behavioral-review-report-2026-06-12.md` → `aegis/docs/archive/reviews/behavioral-review-report-2026-06-12.md`
+- 据え置き（root のまま＝置換しない）: `aegis/docs/full-review-2026-06-13-context-futureproof.md`（requirements ref）, `architecture-overview` 等 load-bearing 8
+- 実行後に同パターンの取りこぼしが無いか `grep -nE "aegis/docs/(audit|evolution|behavioral|functional-integrity|full-review-2026-06-1[23]|v0[67])" MEMORY.md` で確認（context-futureproof のみ root に残ること）。
 
 （MEMORY.md は aegis repo 外＝git コミット対象外。ファイル編集のみ。）
 
