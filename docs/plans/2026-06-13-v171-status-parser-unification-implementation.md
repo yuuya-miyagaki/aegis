@@ -116,6 +116,15 @@ class TestGateValue(unittest.TestCase):
             p = self._write(Path(d), "---\ngate_approvals:\n  plan_extra: approved\n  plan: pending\n---\n")
             rc, out = run_fn("gate_value", str(p), "plan")
             self.assertEqual(out, "pending\n")
+
+    def test_gate_bare_snapshot(self):
+        # grill 致命1: --- 無し .gate-snapshot からも読める（raw_section fallback）
+        with tempfile.TemporaryDirectory() as d:
+            p = Path(d) / ".gate-snapshot"
+            p.write_text("gate_approvals:\n  plan: approved\n  qa: pending\nphase: implement\n",
+                         encoding="utf-8")
+            rc, out = run_fn("gate_value", str(p), "plan")
+            self.assertEqual(out, "approved\n")
 ```
 
 - [ ] **Step 2: テストを実行して失敗を確認**
@@ -142,13 +151,18 @@ frontmatter_value() {
 
 # gate_value <file> <gate>
 #   stdout: the value of `<gate>:` under the gate_approvals section.
+#   frontmatter_section || raw_section: works on BOTH ---delimited STATUS.md
+#   AND bare .gate-snapshot (no ---), same as frontmatter_value handles both.
 #   2-space anchor prevents substring matches (e.g. `plan` vs `plan_extra`).
 #   Empty stdout + RC 0 when absent.
 gate_value() {
   local file="$1" gate="$2"
-  frontmatter_section "$file" gate_approvals | grep -m1 "  ${gate}:" | sed "s/.*${gate}:[[:space:]]*//" | sed 's/^"//;s/"$//' || true
+  { frontmatter_section "$file" gate_approvals 2>/dev/null || raw_section "$file" gate_approvals; } \
+    | grep -m1 "  ${gate}:" | sed "s/.*${gate}:[[:space:]]*//" | sed 's/^"//;s/"$//' || true
 }
 ```
+
+> grill 致命1: 当初の frontmatter_section-only 版は bare `.gate-snapshot` で silent-empty になり frontmatter_value と非対称＝罠。fallback 連鎖で両対応にする（既存 post-status-audit `extract_gate` と同形）。
 
 - [ ] **Step 4: テストを実行して緑を確認**
 
@@ -451,10 +465,13 @@ EOF
 
 ---
 
-## Task 4: post-status-audit.sh の scalar×7 を rewire
+## Task 4: post-status-audit.sh の scalar×7 ＋ gate 読取を rewire
 
 **Files:**
-- Modify: `hooks/post-status-audit.sh:70,71,100,101,118,119,164`
+- Modify: `hooks/post-status-audit.sh:70,71,100,101,118,119,164`（scalar×7）
+- Modify: `hooks/post-status-audit.sh:79-83,89,90,123-126,129,136`（gate readers＝grill 致命2）
+
+> grill 致命2: post-status-audit は独自の gate-reader を**2つ**持つ — `extract_gate`（line 79-83、両対応 fallback）と `extract_gate_from_status`（line 123-126、STATUS 専用）。robust `gate_value`（Task1）はこの両方の真の drop-in。両定義を削除し全呼出を `gate_value` へ。これが M3「gate 一本化」の本丸。既存の改ざん検知テストがガード。
 
 - [ ] **Step 1: snapshot/STATUS の scalar 読取を frontmatter_value へ**
 
@@ -473,6 +490,18 @@ EOF
 | 164 | `TASK_TYPE=$(grep -m1 "^task_type:" "$STATUS_FILE" \| sed ...)` | `TASK_TYPE=$(frontmatter_value "$STATUS_FILE" "task_type")` |
 
 各置換は、対応する行の完全一致で Edit する（旧の完全形は `git show HEAD:hooks/post-status-audit.sh` で確認可）。
+
+- [ ] **Step 1b: gate-reader 2関数を gate_value へ統一（grill 致命2）**
+
+`extract_gate` 定義（line 79-83）を削除し、呼出を置換:
+- line 89 `OLD=$(extract_gate "$SNAPSHOT_FILE" "$gate")` → `OLD=$(gate_value "$SNAPSHOT_FILE" "$gate")`
+- line 90 `NEW=$(extract_gate "$STATUS_FILE" "$gate")` → `NEW=$(gate_value "$STATUS_FILE" "$gate")`
+
+`extract_gate_from_status` 定義（line 123-126）を削除し、呼出を置換:
+- line 129 `BOUNDARY_GATE=$(extract_gate_from_status "client_ready_for_dev")` → `BOUNDARY_GATE=$(gate_value "$STATUS_FILE" "client_ready_for_dev")`
+- line 136 `BOUNDARY_GATE=$(extract_gate_from_status "dev_ready_for_client")` → `BOUNDARY_GATE=$(gate_value "$STATUS_FILE" "dev_ready_for_client")`
+
+注: `extract_gate` の `frontmatter_section || raw_section` fallback ＋ unanchored grep を、`gate_value` の同 fallback ＋ 2スペース anchor が置換。実 gate_approvals データ（2スペース indent）で同結果＝挙動不変。tamper 比較ループの OLD/NEW は同値性が保たれる。
 
 - [ ] **Step 2: post-status-audit テストと snapshot 系で挙動不変を確認**
 
