@@ -23,6 +23,7 @@ ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 STATUS_FILE="${ROOT}/docs/STATUS.md"
 
 source "${SCRIPT_DIR}/lib/emit.sh"
+source "${SCRIPT_DIR}/lib/frontmatter.sh"
 
 # If STATUS.md doesn't exist, allow silently.
 if [ ! -f "$STATUS_FILE" ]; then
@@ -30,15 +31,9 @@ if [ ! -f "$STATUS_FILE" ]; then
   exit 0
 fi
 
-# Extract a scalar value from YAML frontmatter.
-extract_value() {
-  local key="$1"
-  grep -m1 "^${key}:" "$STATUS_FILE" | sed "s/^${key}:[[:space:]]*//" | sed 's/^"//;s/"$//' || true
-}
-
-MODE=$(extract_value "mode")
-PHASE=$(extract_value "phase")
-NEXT_ACTION=$(extract_value "next_action")
+MODE=$(frontmatter_value "$STATUS_FILE" "mode")
+PHASE=$(frontmatter_value "$STATUS_FILE" "phase")
+NEXT_ACTION=$(frontmatter_value "$STATUS_FILE" "next_action")
 
 # Staleness check: block compaction if STATUS.md was not recently updated.
 # Default: 5 minutes (300 seconds). Override with AEGIS_PRECOMPACT_INTERVAL

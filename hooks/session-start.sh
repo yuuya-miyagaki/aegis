@@ -36,16 +36,10 @@ _AEGIS_SNAP_TMP="${SNAPSHOT_FILE}.tmp.$$"
 source "${SCRIPT_DIR}/lib/evidence.sh"
 rotate_evidence_log "$ROOT" || true
 
-# Extract a scalar value from YAML frontmatter.
-extract_value() {
-  local key="$1"
-  grep -m1 "^${key}:" "$STATUS_FILE" | sed "s/^${key}:[[:space:]]*//" | sed 's/^"//;s/"$//' || true
-}
-
-MODE=$(extract_value "mode")
-PHASE=$(extract_value "phase")
-TASK_TYPE=$(extract_value "task_type")
-NEXT_ACTION=$(extract_value "next_action")
+MODE=$(frontmatter_value "$STATUS_FILE" "mode")
+PHASE=$(frontmatter_value "$STATUS_FILE" "phase")
+TASK_TYPE=$(frontmatter_value "$STATUS_FILE" "task_type")
+NEXT_ACTION=$(frontmatter_value "$STATUS_FILE" "next_action")
 # R2/C1: neutralize + bound untrusted project free-text before it enters context.
 # next_action is framework guidance (stays inline below), so it is sanitized but
 # NOT fenced; blockers/learnings (descriptive, may transcribe upstream text) are
@@ -74,7 +68,7 @@ if [ -n "$GATE_SECTION" ]; then
 fi
 
 # Extract task_size for hook profile hint.
-TASK_SIZE=$(extract_value "task_size")
+TASK_SIZE=$(frontmatter_value "$STATUS_FILE" "task_size")
 
 # Build context message.
 CONTEXT="[Aegis] mode=${MODE} phase=${PHASE}"
