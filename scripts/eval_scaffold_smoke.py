@@ -263,6 +263,24 @@ def verify_settings_project_dir(target: Path, profile: str) -> tuple[bool, str]:
     return True, f"{profile}: all hook commands use CLAUDE_PROJECT_DIR"
 
 
+def verify_settings_nudge_env(target: Path, profile: str) -> tuple[bool, str]:
+    """Profile-linked nudge default (P2-a): minimal/standard default
+    env.AEGIS_NUDGE=off; full leaves it unset (nudges on). settings env
+    propagates to the hook process env, so session-start reads it."""
+    settings_path = target / ".claude" / "settings.local.json"
+    if not settings_path.exists():
+        return True, f"{profile}: no settings.local.json (nothing to verify)"
+    data = json.loads(settings_path.read_text(encoding="utf-8"))
+    nudge = data.get("env", {}).get("AEGIS_NUDGE")
+    if profile in ("minimal", "standard"):
+        if nudge != "off":
+            return False, f"{profile}: env.AEGIS_NUDGE expected 'off', got {nudge!r}"
+        return True, f"{profile}: env.AEGIS_NUDGE=off"
+    if nudge is not None:
+        return False, f"full: env.AEGIS_NUDGE must be unset (on), got {nudge!r}"
+    return True, "full: env.AEGIS_NUDGE unset (nudges on)"
+
+
 def verify_skill_reachability(target: Path, profile: str) -> tuple[bool, str]:
     """Installed skills must each have a boot path inside the install target."""
     failures, _warnings = check_skill_reachability(target)
@@ -351,6 +369,11 @@ def run_scaffold_test(profile: str, target: Path) -> tuple[str, str]:
 
     # Generated-settings reference-form validation (P3-6).
     ok, detail = verify_settings_project_dir(target, profile)
+    if not ok:
+        return "FAIL", detail
+
+    # Profile-linked nudge default (P2-a).
+    ok, detail = verify_settings_nudge_env(target, profile)
     if not ok:
         return "FAIL", detail
 
