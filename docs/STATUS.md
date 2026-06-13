@@ -6,10 +6,10 @@ mode: Dev
 phase: deploy
 task_type: framework
 task_size: L
-task_size_rationale: "確定（brainstorm→writing-plans→grill-plan→TDD 実装→grill-code）: 第7回全力レビュー §2 P2『volatile-truth マニフェスト』。新規 scripts/platform_manifest.py＋2 テスト＋checker 2 本改修＋CLAUDE.md＋版数4＝6+ ファイルで L。platform_manifest が ALLOWED/FORBIDDEN/EFFORT/OPUS_ONLY/KNOWN_HOOK_EVENTS/KNOWN_TOOL_NAMES/検証日 を単一所有し、check_framework_contract（model 照合）/check_reference_drift（event drift・tool registry・staleness）が import 消費。emit.sh は不可侵（schema は検証日のみ）。"
-iteration: 28
+task_size_rationale: "確定（brainstorm→writing-plans→grill-plan→実装→grill-code）: 第7回全力レビュー §2 P3/M2『過程 docs の archive 化・空 scaffold 削除』。docs-only 再編（コード挙動ゼロ変更・版据え置き v1.8.0）。git mv で plans 履歴 61・qa-reports 履歴 55・top-level 審査履歴 16 を docs/archive/{plans,qa-reports,reviews} へ＋空 .gitkeep dir 3 削除＝~135 ファイル操作で L。current_refs 被参照（v162・context-futureproof）は不動＝breakage ゼロ。"
+iteration: 29
 ui_surface: false
-last_updated: "2026-06-14T12:30:00Z"
+last_updated: "2026-06-14T13:30:00Z"
 gate_approvals:
   client_ready_for_dev: n/a
   brainstorm: approved
@@ -22,8 +22,8 @@ gate_approvals:
 current_refs:
   requirements:
     - docs/full-review-2026-06-13-context-futureproof.md
-  plan: docs/plans/2026-06-14-v180-volatile-truth-manifest-implementation.md
-  spec: docs/plans/2026-06-14-volatile-truth-manifest-design.md
+  plan: docs/plans/2026-06-14-docs-archive-implementation.md
+  spec: docs/plans/2026-06-14-docs-archive-design.md
   review: docs/qa-reports/v162-review.md
   qa: docs/qa-reports/v162-qa.md
   security: docs/qa-reports/v162-security.md
@@ -42,10 +42,14 @@ external_evidence:
     scope: "v0.12.2 実装後 4 ラウンドレビュー"
     findings: "Round 6 (P1×2, P2×1: pre-compact exit 2 / minimal-project / test rc), Round 7 (P1×1, P3×1: git add 漏れ / テスト件数表記), Round 8 (P2×1, P3×1: stale last_updated / grep 自己マッチ), Round 9 (P3×2: コメント不整合)"
     resolution: "9件全反映。tier 1/2 PASS、134 tests PASS、本体と minimal-project 完全同期確認済み。"
-next_action: "iteration 28（v1.8.0 P2: volatile-truth マニフェスト）実装完了: 新規 scripts/platform_manifest.py（root 専用・非ミラー）が ALLOWED_MODELS/FORBIDDEN_MODELS(haiku)/EFFORT_LEVELS/OPUS_ONLY_EFFORTS/KNOWN_HOOK_EVENTS/KNOWN_TOOL_NAMES/PLATFORM_VERIFIED(検証日)/stale_keys() を単一所有。check_framework_contract が原子を import し model/effort を照合＋新規 check_model_policy_manifest_consistency が MODEL_EFFORT_POLICY を許容集合に照合（新モデル系統の単一更新点）。check_reference_drift が自己 bootstrap 付き import で check_platform_manifest（template event∈既知集合=FAIL／tool token∈registry=WARN／SessionStart の session-source は除外）と check_platform_staleness（検証日超過=WARN・framework root のみ発火）を ALL_CHECKS に追加（12→14）。emit.sh 不可侵（schema は検証日のみ）。設計判断: 機械強制（内部整合）＋人手検証日（現実整合）の2層で『沈黙する第3ミラー』を回避。grill-plan 致命2（importlib ローダ用 self-bootstrap／staleness 関数分離で壁時計依存テスト排除）を着手前反映、grill-code 🟡1（malformed template で crash→報告化）を fix-forward。make example で example 差分ゼロ＝新ミラー面無しを実証。750 passed/1 skip（+18 新規）/ 既知の順序依存 flake test_python3_absent は単独緑 / contract 全 profile / drift / v162 18 PoC / v163 5 PoC 全 PASS。残: tag v1.8.0 付与＋origin push（ユーザ判断）。backlog: P3 過程 docs archive 化・空 scaffold 削除（最後の未消化項目）。"
+next_action: "iteration 29（P3/M2: 過程 docs アーカイブ・docs-only・版据え置き v1.8.0）実装完了: root docs/ の履歴を docs/archive/{plans(61),qa-reports(55),reviews(16)} へ git mv＋空 .gitkeep dir 3（handover/requirements/decisions）削除。root=運用ドキュ＋現イテレーション active ref／archive=履歴 の不変条件を確立。current_refs 被参照（v162 qa-reports 4・requirements=context-futureproof）は不動＝breakage ゼロ。plan/spec は P3 docs へ通常ローテ（被参照ファイル無移動）。test-strength.drill は LIVE artifact として root 維持、keep-list 8 load-bearing（STATUS/LEARNINGS/MIGRATION/architecture-overview/evidence-archive/hook-failure-policy/perf-baseline/context-futureproof）も root 維持。grill-plan で stale コメント更新（test_hook_output_schema）・メモリ更新リスト是正・session_history iter26 削除を反映。各カテゴリ移動後に contract/drift 緑を確認、最終 full suite 750 passed/1 skip（既知 flake のみ＝新規回帰ゼロ）/ make example 差分ゼロ / contract 全 profile / PoC 18+5 PASS。MEMORY.md の history パス 6 件を docs/archive/reviews へ更新。**第7回レビュー §2 のバックログ（P0-a/b/c・P1・P2-a・M3・M1・P2・P3）を全消化＝完済。次タスク未定。** 残: tag/push はユーザ判断（版据え置きのため tag 任意）。"
 blockers: []
 failure_tracking: null
 session_history:
+  - date: "2026-06-14"
+    mode: Dev
+    phase: "deploy"
+    note: "iteration 29（P3/M2: 過程 docs アーカイブ・docs-only・版据え置き v1.8.0）実装完了: 第7回全力レビュー §2 P3『過程 docs の archive 化・空 scaffold 削除』＝最後の未消化項目。root docs/ の過程成果物を docs/archive/{plans,qa-reports,reviews} へ git mv（履歴保全）: plans 履歴 61・qa-reports 履歴 55・top-level 審査履歴 16＝計 132 移動＋空 .gitkeep dir 3（handover/requirements/decisions）削除。確立した不変条件は『root=運用ドキュ＋現イテレーションの active ref／archive=履歴』。設計の核は breakage ゼロ: current_refs が指す被参照ファイル（v162 qa-reports 4＋requirements=full-review-2026-06-13-context-futureproof）を一切動かさない＝契約（every declared ref exists）を編集せず満たす。plan/spec のみ P3 docs へ通常ローテ（P3 docs は元から root＝無移動）。test-strength.drill は run-test-strength-drill.py/test が参照する LIVE artifact のため *.md glob＋case 二重除外で root 温存。keep-list 8 load-bearing（STATUS/LEARNINGS/MIGRATION-FROM-v7/architecture-overview/evidence-archive/hook-failure-policy/perf-baseline/context-futureproof）root 維持。参照監査で『移動で壊れるのは root current_refs 6＋example 4 のみ』を事前確定、README/arch-overview に specific link 無し・placeholder 検査は example のみ走査・drill テストは tmp 使用を実証。grill-plan 要検討4件（①test_hook_output_schema の stale コメント2行を docs/archive パスへ更新②メモリ更新を実参照6件に是正③make example の git status 期待明確化④session_history iter26 削除明示）を着手前反映。各カテゴリ移動ごとに contract/drift 緑を確認、最終 full suite 750 passed/1 skip（既知の順序依存 flake test_python3_absent のみ＝Task1 ベースラインと同一＝新規回帰ゼロ）/ contract 全 profile / drift / make example 差分ゼロ（archive は root のみ＝example 非波及）/ PoC 18+5 全 PASS。MEMORY.md の history 参照 6 件（audit-charter/report-2026-06-06・evolution-review-2026-06-10・functional-integrity-audit-charter/report-2026-06-07・behavioral-review-report-2026-06-12）を docs/archive/reviews へ更新（context-futureproof は root 据え置き）。版は据え置き（コード挙動ゼロ変更＝SemVer 的に版を消費しない）。**これで第7回全力レビュー §2 のバックログを全消化＝完済。次タスク未定。**"
   - date: "2026-06-14"
     mode: Dev
     phase: "deploy"
@@ -54,10 +58,6 @@ session_history:
     mode: Dev
     phase: "deploy"
     note: "iteration 27（v1.7.2 M1: example ミラー自動生成）実装完了: 第7回全力レビュー §1 M1『example ミラー 520K の手動同期＝最大の保守税』。新規 scripts/sync_example_mirror.py が check_reference_drift から MIRROR_DIRS/MIRROR_FILES/MIRROR_ALLOWLIST を import（生成と検証が同一マニフェスト共有＝原理的に乖離不能）し、root→examples/minimal-project を shutil.copy2（mode 保持）で同期。allowlist（validate.md/retro.md）skip、MIRROR_DIRS＋MIRROR_FILES 両方の stale 除去、分岐ファイル（CLAUDE.md/STATUS.md/docs/requirements・specs・qa-reports 等＝MIRROR_DIRS 外）は不可侵。make example ターゲットで実行、制御ファイル編集後の手動 cp（M3 で9ファイル cp の痛みを実感）を消す。検証は既存 check_mirror_identity に委任し安全網（drift/contract/scaffold smoke）は一切改廃しない additive＝committed ミラーの物理除去（smoke-only 化）は browsable（北極星=非エンジニア向け見本）維持のため非ゴール。スコープ確定時に Python 側 mirror が ~380K・分岐 ~240K と実測。grill-plan が MIRROR_FILES の stale 非対称を指摘→着手前に対称化（step3）。grill-code は 🔴/🟡 ゼロ、🟢3件（空ディレクトリ残置/出力冗長/非原子性）は全 YAGNI（git/drift が空dir無視・手動冪等ツール）で fix なし。実 repo で sync 実行→git diff 空＝現状 example を byte/mode 再現（回帰なし）を実証。734 tests OK（726→734・新規8）/ contract 全 profile / drift / scaffold smoke / v162 18 PoC / v163 5 PoC 全 PASS。残 backlog: P2 volatile マニフェスト / P3 過程 docs archive 化。"
-  - date: "2026-06-13"
-    mode: Dev
-    phase: "deploy"
-    note: "iteration 26（v1.7.1 M3: STATUS パーサ bash 一本化）実装完了: 第7回全力レビュー §1 M3『STATUS パーサ二重化』。調査で Python 側（check_status.py が extract_* を所有・status_doctor が再利用）は既に一本化済みと判明し、実重複は bash のみ＝スコープを正しく絞った。frontmatter.sh に frontmatter_value（whole-file grep で STATUS.md・bare .gate-snapshot 両対応）と gate_value（frontmatter_section||raw_section fallback＋2スペース anchor）を追加。散在する extract_value 2定義（session-start/pre-compact）＋インライン scalar 約11箇所＋gate 抽出（check-gate/check-task-created）＋post-status-audit のローカル extract_gate/extract_gate_from_status 2関数を単一所有者へ集約。挙動不変は equivalence テスト（旧3段パイプ vs 新関数を scalar/gate/bare-snapshot の3軸で全キー一致）＋既存 tamper/snapshot テスト緑で実証。control-plane/task-completed/client-info/pre-compact に frontmatter.sh source 追加（前3者は fail-closed require＝コメント明記）。grill-plan が致命2件（gate_value の frontmatter_section-only では bare snapshot で silent-empty＝frontmatter_value と非対称／post-status-audit の extract_gate を取りこぼし）を指摘→着手前に gate_value を両対応化＋extract_gate も統一に含める形で反映。実装中に control-plane fixture（frontmatter.sh 非copy）の fail-closed リグレッションを検知し fixture 修正。grill-code 🟡1（frontmatter.sh が standard のみ required＝minimal/full 未ピン、複数 hook が hard-depend）を fix-forward（REQUIRED_LIBS＋minimal/full.json に追加）。版数4箇所（定数/template/example STATUS/本体 STATUS）を 1.7.1 統一。726 tests OK（711→726・新規15）/ contract 全 profile / drift / scaffold smoke / v162 18 PoC / v163 5 PoC 全 PASS。残 backlog: P2 volatile マニフェスト / P3 ミラー自動生成・docs archive。"
 ---
 
 ## Summary
