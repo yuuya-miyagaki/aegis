@@ -65,11 +65,22 @@ CLIENT_ARTIFACT_MIN_BYTES = 200
 
 def _client_artifact_issues(root: Path) -> list[str]:
     """Return human-readable issues, empty list if all 6 artifacts pass."""
+    # K-12 (v1.6.2 / JNY-07): emit the source template alongside each issue
+    # so the non-engineer reader can copy templates/X.template.md → docs/Y.md
+    # without guessing the naming. ARTIFACT_TO_TEMPLATE is the single source.
+    try:
+        from _artifact_template_map import ARTIFACT_TO_TEMPLATE
+    except ImportError:
+        ARTIFACT_TO_TEMPLATE = {}
     issues: list[str] = []
     for rel, sentinel in CLIENT_GATE_ARTIFACTS:
         p = root / rel
+        template_hint = ""
+        tmpl = ARTIFACT_TO_TEMPLATE.get(rel)
+        if tmpl:
+            template_hint = f"（テンプレ: {tmpl}）"
         if not p.exists():
-            issues.append(f"- {rel}: 不在")
+            issues.append(f"- {rel}: 不在 {template_hint}")
             continue
         try:
             text = p.read_text(encoding="utf-8")
@@ -79,13 +90,13 @@ def _client_artifact_issues(root: Path) -> list[str]:
         if len(text.encode("utf-8")) < CLIENT_ARTIFACT_MIN_BYTES:
             issues.append(
                 f"- {rel}: 内容が {CLIENT_ARTIFACT_MIN_BYTES} バイト未満 "
-                f"（テンプレを実際に埋めてください）")
+                f"（テンプレを実際に埋めてください） {template_hint}")
             continue
         marker = f"<!-- aegis-required-section: {sentinel} -->"
         if marker not in text:
             issues.append(
                 f"- {rel}: 必須 sentinel `{marker}` が見つかりません "
-                f"（テンプレ末尾のコメントを残してください）")
+                f"（テンプレ末尾のコメントを残してください） {template_hint}")
     return issues
 
 REQUIRED_APPROVAL_KEYS = [

@@ -63,6 +63,28 @@ bash scripts/update-gate.sh <gate> approve --ack "理由"   # 🟡（要確認�
 
 承認時の signal: **🟢=そのまま承認可／🟡=要確認（--ack で承認）／🔴=機械事実と矛盾＝ブロック**。
 
+### 🟡 を ack していい例／ダメな例（K-13 / v1.6.2）
+
+「LLM が大丈夫って言ってるから」を根拠に ack 連打すると、judge カードの
+「機械が見た事実」という安全装置を**人間側で無効化**する経路になる
+（第6回レビュー JNY-12）。下表を基準に、あなた（オーナー）が事実を
+読んで判断できるときだけ ack する。
+
+| 状況 | ack 可否 | 理由 |
+| --- | --- | --- |
+| **qa**: テスト未記録（marker_verified=false） | ❌ 不可 | テストが実際に走ったかが機械的に未確認。`pytest -v` 等を実行→`record-test-result.py` で記録してから再判定 |
+| **review**: 第2意見が未取得 + 規模 S（1 ファイル・差分 30 行未満） | ✅ 可 | state-machine 規約で省略可。影響が局所的 |
+| **review**: 第2意見が未取得 + 規模 M / L | ❌ 不可 | 影響範囲が大きい変更は外部視点を取る（IDE chat / `second-opinion.md`） |
+| **security**: 漏洩キー目視確認（`grep -rE 'sk-[A-Za-z0-9]{20,}'` 等）未実施 | ❌ 不可 | check-secrets が deny しなくても、自分で確認した記録を `docs/qa-reports/v*-security.md` に残してから ack |
+| **deploy**: rollback 手順が `TBD` のまま | ❌ 不可 | 障害時の戻し手順が無いまま deploy は禁止。`RUNBOOK.md` / `DEPLOY-CHECKLIST.md` に具体手順を書く |
+
+**根本ルール**: 判断が付かない 🟡 は止めて `second-opinion.md` を書く。
+3 失敗で停止のルール（`CLAUDE.md` 完了条件）と整合する。
+
+> 注: v1.6.1 まではテスト 0 件実行（`pytest -k __NEVER__` 等）も 🟡 で
+> ack 可能だったが、v1.6.2 K-1 修正で `collected 0 items` 等を構造的に
+> 検出して `marker_verified=false` 直行になるため、本表からは除外。
+
 ---
 
 ## hook：なぜ止まるか（決定論的ガード）
