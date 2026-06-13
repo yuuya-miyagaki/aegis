@@ -1,15 +1,15 @@
 ---
 framework: aegis
-framework_version: "1.6.1"
+framework_version: "1.6.2"
 project_name: "Aegis"
 mode: Dev
 phase: deploy
 task_type: framework
 task_size: L
-task_size_rationale: "確定（brainstorm→plan→grill-plan）: 第5回全力レビュー（full-review-2026-06-12.md）で実証された Critical 7 件 + S-3/S-11 の fix-forward バッチ（v1.6.1 patch）。実装は計画通り 9 commit、grill-code A/B が指摘した残 Critical 4 件（marker forge、WRITE_OP 不完全、var-built filename、git commit GIT_PRE_OPTS）を追加 3 commit で吸収、合計 12 commit + release。"
-iteration: 22
+task_size_rationale: "確定（brainstorm→plan→grill-plan→実装→grill-code）: 第6回全力レビュー（full-review-2026-06-13.md、6 軸並列）で実証された Critical 16 件のうち機械 moat + 配布パス + UX の 13 件（K-1〜K-13）+ S-1/DIST-12 前倒し。実装は計画通り 7 task + 9 commit、grill-code が指摘した残 Critical 2 件（Path B 全 redirect 走査・evidence.sh head+tail 抽出）を追加 1 commit で吸収。合計 10 commit + release。"
+iteration: 23
 ui_surface: false
-last_updated: "2026-06-13T01:00:00Z"
+last_updated: "2026-06-13T06:50:00Z"
 gate_approvals:
   client_ready_for_dev: n/a
   brainstorm: approved
@@ -21,13 +21,13 @@ gate_approvals:
   dev_ready_for_client: pending
 current_refs:
   requirements:
-    - docs/full-review-2026-06-12.md
-  plan: docs/plans/v1.6.1-fix-forward-plan.md
+    - docs/full-review-2026-06-13.md
+  plan: docs/plans/2026-06-13-v162-improvement-plan.md
   spec: null
-  review: docs/qa-reports/v161-review.md
-  qa: docs/qa-reports/v161-qa.md
-  security: docs/qa-reports/v161-security.md
-  deploy: docs/qa-reports/v161-deploy-checklist.md
+  review: docs/qa-reports/v162-review.md
+  qa: docs/qa-reports/v162-qa.md
+  security: docs/qa-reports/v162-security.md
+  deploy: docs/qa-reports/v162-deploy-checklist.md
   translation: null
 external_evidence:
   - type: "second-opinion-v1-foundation-r1-r2"
@@ -42,10 +42,14 @@ external_evidence:
     scope: "v0.12.2 実装後 4 ラウンドレビュー"
     findings: "Round 6 (P1×2, P2×1: pre-compact exit 2 / minimal-project / test rc), Round 7 (P1×1, P3×1: git add 漏れ / テスト件数表記), Round 8 (P2×1, P3×1: stale last_updated / grep 自己マッチ), Round 9 (P3×2: コメント不整合)"
     resolution: "9件全反映。tier 1/2 PASS、134 tests PASS、本体と minimal-project 完全同期確認済み。"
-next_action: "iteration 22（v1.6.1 全力レビュー由来 fix-forward）完了: 12 commit + release で全 Critical 9 件 + S-3 + S-11 + grill-code A/B 残 Critical 4 件を消化、606 tests / contract / drift / smoke 全 PASS。残: tag v1.6.1 付与＋origin push（ユーザ判断）。"
+next_action: "iteration 23（v1.6.2 全力レビュー fix-forward）完了: 10 commit + release で Critical 13 件（K-1〜K-13）+ S-1/DIST-12 前倒し + grill-code Critical 2 件を消化、683 tests / contract / drift / smoke / 18 PoC 全 PASS。残: tag v1.6.2 付与＋origin push（ユーザ判断）。"
 blockers: []
 failure_tracking: null
 session_history:
+  - date: "2026-06-13"
+    mode: Dev
+    phase: "deploy"
+    note: "iteration 23（v1.6.2 第6回全力レビュー fix-forward）完了: 6 軸並列レビュー（敵対バイパス再 PoC + 障害モード + パフォーマンス + 配布パス + 競合比較 + 非エンジニア E2E）で Critical 16 件抽出。grill-plan で致命 5 件反映、Task 1〜7 を TDD 実装（K-1 3 軸 zero-run gate / K-2-4 cmdsub + quoted-var fail-closed / K-5-7 safety.sh + atomic snapshot + timeout / K-8-11 配布パス破壊抑止 + version stamp / K-10 prereq + K-12 ARTIFACT_TO_TEMPLATE + K-13 cheatsheet 🟡 ack 例）。grill-code が Path B 単一 redirect 走査と evidence.sh tail-only 抽出の 2 Critical を発見、追加 1 commit で吸収。18 PoC 全 PASS、683 tests OK（unittest discover）、contract / drift / smoke 全 PASS。配布パスは framework_version stamp + atomic snapshot + ユーザ設定保存 + framework_root self-install abort + python3 prereq で F6 / DIST 系統を根治。S-1 と DIST-12 は v1.7 計画から前倒し。残 K-14（PERF-1）/ K-15（PERF-2）/ K-16（README）は v1.7 へ送り。"
   - date: "2026-06-12"
     mode: Dev
     phase: "implement"
@@ -54,10 +58,6 @@ session_history:
     mode: Dev
     phase: "deploy"
     note: "iteration 21（v1.6.0 fix-forward P1×4）: behavioral-review-report-2026-06-12 §5.1 の P1×4 を Task 1〜15 TDD で完走（479→508 tests）。P1-A=skill 構造起動（phase-skills.sh 単一所有＋SessionStart/phase 遷移 additionalContext 注入＋BFS 到達性の drift/smoke 契約化＋path 形式正規化 14 箇所）、P1-B=full への skill 参照テンプレ 6 件配布＋参照実在契約、P1-C=judge card 承認時 transcript push＋scanner decode 耐性、P1-D=client_ready_for_dev 6 成果物の承認側＋完了側対称検査。計画乖離 2 件は強化方向（SKILL_REF_EXCLUDE=存在マニフェストの root 化除外・tier0 timeout 300s 追従）。grill-code 独立 2 本（A=マージ可 🟡3/🟢3、B=S1 修正後マージ 🟡4/🟢3）: 合流点 S1=names regex のコメント横断偽 root（vacuous CLEAN 再演リスク）→ 非コメント行 anchor＋テストで充足（a8411fb・実 repo トークン 15 件ちょうどを実測）。B-S2/S3/S4・A🟡2/3 は理由付き記録（v160-review.md）・B-S3 は security 残余 #4 に統合。テスト記録 manual green（信頼ランナー・fp=HEAD 一致）・4 ゲート --ack 承認＝ユーザー委任の代行（証跡 v160-*.md）。v1.6.0 minor で締め・tag v1.6.0。origin push は別途ユーザー判断。"
-  - date: "2026-06-11"
-    mode: Dev
-    phase: "deploy"
-    note: "iteration 20（v1.5.2 残余全消化バッチ）: v151-security.md 記録の残余 5 系統を Task 1〜9 TDD で完走（461→479 tests）。T1=クォート span の Q 置換マスク（false-RED 根治。置換であって削除でない＝green 偽装封鎖、sed/python re バイト一致パリティ、len(strips)!=2→unverified の fail-closed ガード、deny 系 3 hook 不波及を TestMaskScopeBoundary で契約化）、T2=入れ子 ( アンカー (\\( *)*、T3=\\/ fidelity ルーティング、T4=孤児 claim 復元＋pid なしロックの O_EXCL 採用（年齢ゲート -mmin +1・削除しない採用方式）、T5=待機窓 10s（light ゲート競合は両者成功の意図的仕様変更・3 contenders×15 回ドリル クリーン）。grill-code 独立 2 本（A=条件付きマージ可 🟡1/🟢3、B=マージ可 🟢3）: A J1=マスク置換が production 消費者で未ピン（削除変異が全テスト素通し・forge PoC 付き）→ mutation-killer テストで充足（b79184a、変異 RED→正実装 GREEN 両方向実証）。B は 5 実装の revert 検証・プロモーション攻撃実走で偽装ベクトルなしを独立確認。受容残余（混在クォート横断・SIGSTOP >2分窓・PID 再利用、全て unverified/可用性方向）は v152-security.md に記録。479 tests・contract full/standard・drift・smoke・--strict 全 PASS。テスト記録 manual green（fp=HEAD 一致）・4 ゲート --ack 承認（証跡 v152-*.md）。v1.5.2 patch で締め・tag v1.5.2。origin push は別途ユーザー判断。"
 ---
 
 ## Summary
