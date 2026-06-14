@@ -57,6 +57,14 @@ class TestCheck(unittest.TestCase):
         failures = context_budget.check(self.tmp)
         self.assertTrue(any("rules/r.md" in f for f in failures), failures)
 
+    def test_malformed_registry_reports_not_crashes(self):
+        _mk(self.tmp, ".claude/skills/foo/SKILL.md", 10)
+        (self.tmp / "scripts").mkdir(parents=True, exist_ok=True)
+        (self.tmp / "scripts" / "context-budgets.json").write_text(
+            "{ not valid json", encoding="utf-8")
+        failures = context_budget.check(self.tmp)  # must not raise
+        self.assertTrue(any("invalid JSON" in f for f in failures), failures)
+
 
 class TestRatchet(unittest.TestCase):
     def setUp(self):

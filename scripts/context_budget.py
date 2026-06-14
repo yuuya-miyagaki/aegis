@@ -59,7 +59,13 @@ def budget_for(rel: str, data: dict) -> int:
 
 def check(root: Path = ROOT) -> list[str]:
     root = Path(root)
-    data = load_budgets(root)
+    # Fail-graceful on a corrupt registry: report it as a contract failure
+    # rather than crashing the whole contract run (matches how the framework
+    # hardens against malformed manifests/templates).
+    try:
+        data = load_budgets(root)
+    except json.JSONDecodeError as e:
+        return [f"scripts/context-budgets.json is invalid JSON: {e}"]
     failures: list[str] = []
     for p in iter_targets(root):
         rel = str(p.relative_to(root))
