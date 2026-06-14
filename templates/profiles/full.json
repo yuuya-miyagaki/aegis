@@ -87,6 +87,7 @@
     "templates/DEPLOY-CHECKLIST.template.md",
     "templates/HANDOVER-TO-CLIENT.template.md",
     "templates/HANDOVER-TO-DEV.template.md",
+    "templates/CHANGES.template.md",
     "templates/NFR.template.md",
     "templates/PLAN.template.md",
     "templates/PRD.template.md",

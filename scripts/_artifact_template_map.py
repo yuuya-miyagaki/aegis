@@ -28,6 +28,7 @@ ARTIFACT_TO_TEMPLATE: dict[str, str] = {
     "docs/requirements/NFR.md":        "templates/NFR.template.md",
     "docs/requirements/ACCEPTANCE.md": "templates/ACCEPTANCE.template.md",
     "docs/handover/TO-DEV.md":         "templates/HANDOVER-TO-DEV.template.md",
+    "docs/handover/CHANGES.md":        "templates/CHANGES.template.md",
     "docs/translation/mapping.md":     "templates/TRANSLATION-MAPPING.template.md",
     # Dev gate boundary / handover
     "docs/handover/TO-CLIENT.md":      "templates/HANDOVER-TO-CLIENT.template.md",

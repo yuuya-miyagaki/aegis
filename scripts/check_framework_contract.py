@@ -108,6 +108,7 @@ REQUIRED_TEMPLATE_FILES = [
     ROOT / "templates/QA-REPORT.template.md",
     ROOT / "templates/SECURITY-REVIEW.template.md",
     ROOT / "templates/HANDOVER-TO-DEV.template.md",
+    ROOT / "templates/CHANGES.template.md",
     ROOT / "templates/HANDOVER-TO-CLIENT.template.md",
     ROOT / "templates/LEARNINGS.template.md",
     ROOT / "templates/BRAINSTORM-RECORD.template.md",
