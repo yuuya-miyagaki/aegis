@@ -26,6 +26,10 @@ clears dev gates to `pending`, sets non-requirements refs to null,
 increments `iteration`, keeps `current_refs.requirements`.
 Archive external_evidence older than latest 3 entries to `docs/evidence-archive.md`.
 
+When re-entering `Client` to revise requirements, also `reset`
+`client_ready_for_dev` before re-requesting it; an approved gate short-circuits
+re-approval and skips the spec-delta check (`docs/handover/CHANGES.md`).
+
 Phase transition: get approval -> update gates/refs -> update phase/next_action -> invoke next route.
 
 Phase gates:

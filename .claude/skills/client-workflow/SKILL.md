@@ -25,7 +25,7 @@ user-invocable: false
 | 3 | **requirements** | `docs/requirements/PRD.md` | PRD の全セクションが埋まり、機能要件が列挙され、ユーザーが内容を承認 | PRD 承認後 `scope` へ |
 | 4 | **scope** | `docs/requirements/SCOPE.md`, `docs/requirements/NFR.md` | スコープ境界が明確で、NFR が定義され、ユーザーが承認 | SCOPE + NFR 承認後 `acceptance` へ |
 | 5 | **acceptance** | `docs/requirements/ACCEPTANCE.md` | 受入条件が機能要件・非機能要件と紐付き、判定基準が明確で、ユーザーが承認 | ACCEPTANCE 承認後 `handover` へ |
-| 6 | **handover** | `docs/handover/TO-DEV.md`, `docs/translation/mapping.md` | 引き渡し文書が正本ドキュメントを参照し、優先順位・リスク・未解決事項が記載され、ユーザーが承認。translation mapping が作成済みであること | HANDOVER 承認後、`client_ready_for_dev` ゲートを申請 |
+| 6 | **handover** | `docs/handover/TO-DEV.md`, `docs/translation/mapping.md`（反復2回目以降は `docs/handover/CHANGES.md` も） | 引き渡し文書が正本ドキュメントを参照し、優先順位・リスク・未解決事項が記載され、ユーザーが承認。translation mapping が作成済みであること | HANDOVER 承認後、`client_ready_for_dev` ゲートを申請 |
 
 ## Translation Artifact
 
@@ -36,6 +36,18 @@ mapping.md はクライアント用語 → 機能仕様 → 実装ヒントの 3
 - 支援 Agent: `translation-specialist`（mapping 作成・更新を委任可能）
 - 支援 Skill: `translation-mapping`（手順ガイド）
 - Gate 契約: `client_ready_for_dev` 承認時に mapping.md の存在がチェックされる
+
+## Spec Delta（反復2回目以降）
+
+要件改訂で Client モードに再入し `client_ready_for_dev` を申請するときは、
+`docs/handover/CHANGES.md` を作成すること。前回ゲート承認時点からの要件差分を、
+コードを読まなくても分かる平易な日本語で記し、依頼者が「何がどう変わるか」を確認・承認できるようにする。
+
+- まず `client_ready_for_dev` を `reset` する（approved 据え置きだと再承認が短絡し検査が走らない）
+- テンプレート: `templates/CHANGES.template.md`
+- 書き方: `git log -- docs/requirements/` と `git diff` で前回からの変化を把握して埋める
+- 要件を変えない反復では、テンプレ冒頭「変更なし」にチェックし各セクションを「該当なし」にする
+- Gate 契約: `iteration > 1` のとき存在＋200バイト＋sentinel を検査（初回・iteration 無しは不要）
 
 ### 関連ディレクトリ
 

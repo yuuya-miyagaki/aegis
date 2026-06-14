@@ -188,5 +188,56 @@ class TestCompletionPathDoesNotRequireDelta(unittest.TestCase):
                 f"completion check must not demand CHANGES.md. out=\n{combined}")
 
 
+UPDATE_GATE = ROOT / "scripts" / "update-gate.sh"
+
+
+def _run_gate(root: Path, action: str) -> tuple[int, str]:
+    # update-gate.sh resolves root via SCRIPT_DIR/..; symlink read-only trees.
+    # .claude must be a REAL dir (not a symlink) so the gate snapshot/lock do
+    # not leak into the framework repo's live .claude (order-dependent flake).
+    for d in ("scripts", "hooks", "templates"):
+        if not (root / d).exists():
+            (root / d).symlink_to(ROOT / d)
+    (root / ".claude").mkdir(exist_ok=True)
+    r = subprocess.run(
+        ["bash", str(root / "scripts" / "update-gate.sh"),
+         "client_ready_for_dev", action, "--ack", "test"],
+        capture_output=True, text=True, cwd=str(root))
+    return r.returncode, r.stdout + r.stderr
+
+
+class TestReEntryResetWorkflow(unittest.TestCase):
+    """C2: sticky-approved gate short-circuits; after reset the gate-time
+    spec-delta check fires. Exercises the real update-gate.sh path."""
+
+    def test_sticky_approved_then_reset_enforces_delta(self):
+        with tempfile.TemporaryDirectory() as td:
+            p = Path(td)
+            # iteration 2, gate already approved (post first-cycle), no CHANGES.
+            _make_project(p, 2, changes=None, gate="approved")
+
+            # 1) approve while already approved => short-circuit, no check.
+            rc, out = _run_gate(p, "approve")
+            self.assertEqual(rc, 0,
+                f"already-approved approve must short-circuit. out=\n{out}")
+
+            # 2) reset => pending.
+            rc, out = _run_gate(p, "reset")
+            self.assertEqual(rc, 0, f"reset must succeed. out=\n{out}")
+
+            # 3) approve now runs the check; iteration>1 + no CHANGES => DENY.
+            rc, out = _run_gate(p, "approve")
+            self.assertNotEqual(rc, 0,
+                f"post-reset approve must DENY w/o CHANGES. out=\n{out}")
+            self.assertIn("docs/handover/CHANGES.md", out)
+
+            # 4) add CHANGES => approve succeeds.
+            (p / "docs" / "handover" / "CHANGES.md").write_text(
+                _filled("spec-delta"), encoding="utf-8")
+            rc, out = _run_gate(p, "approve")
+            self.assertEqual(rc, 0,
+                f"approve with filled CHANGES must succeed. out=\n{out}")
+
+
 if __name__ == "__main__":
     unittest.main()
