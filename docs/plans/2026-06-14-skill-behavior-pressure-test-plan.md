@@ -73,7 +73,10 @@ def _make_skill(root: Path, name: str, body: str) -> None:
 
 
 def _make_manifest_marker(root: Path) -> None:
-    # framework-root ガードを通すためのマーカー（中身は import 済み実 manifest を使う）
+    # 注意: このファイルの「中身」は使われない。framework-root ガード
+    # （scripts/skill_behavior_manifest.py の存在判定）を通すための存在マーカー専用。
+    # check が実際に読むトークンは import 済みの実 SKILL_INVARIANTS（実 manifest）。
+    # マーカーの中身を編集してもテスト挙動は変わらない。
     s = root / "scripts"
     s.mkdir(parents=True, exist_ok=True)
     (s / "skill_behavior_manifest.py").write_text("SKILL_INVARIANTS = {}\n", encoding="utf-8")
@@ -169,6 +172,10 @@ survives; deleting the core phrase is exactly the regression we want to catch.
 Root-only, non-mirrored (scripts/ is not a MIRROR_DIR). Consumed by import in
 check_reference_drift.py; the check is framework-root guarded so it stays inert for
 installed projects.
+
+Limitation: this catches *accidental* removal of a core instruction. A determined
+edit that deletes the instruction AND its manifest token in the same commit passes;
+layer 1 is a conscious-acknowledgment ratchet (a regression speed-bump), not a wall.
 """
 
 from __future__ import annotations
@@ -201,10 +208,14 @@ SKILL_INVARIANTS: dict[str, list[str]] = {
     ],
     "subagent-dev": [
         "タスクごとにフレッシュなサブエージェント",
-        "2 段階レビュー",
+        "段階レビュー",
     ],
 }
 ```
+
+> トークンは全て空白を避けた安定句にしてある（旧 `2 段階レビュー` は空白完全一致の
+> 脆さがあるため `段階レビュー` に短縮）。`仮説を1つ立てる` の数字種（半角/全角）は
+> Step 3-pre の `grep -F` 実在検証で確定する。
 
 - [ ] **Step 4: drift に import・check・ALL_CHECKS を追加**
 
@@ -253,6 +264,37 @@ def check_skill_behavior_contract(root: Path) -> tuple[list[str], list[str]]:
 ```python
     ("skill behavior contract", check_skill_behavior_contract),
 ```
+
+- [ ] **Step 4a: 14 トークンの実在を `grep -F` で検証（致命4対策）**
+
+manifest の各トークンが対象 SKILL.md に**完全一致**で存在するか、確定前に確認する
+（空白/数字種の不一致は `test_real_repo_skills_satisfy_contract` を即赤化させるため）:
+
+```bash
+cd aegis && python3 - <<'PY'
+from pathlib import Path
+import importlib.util
+spec = importlib.util.spec_from_file_location("m", "scripts/skill_behavior_manifest.py")
+m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
+bad = []
+for name, toks in m.SKILL_INVARIANTS.items():
+    text = Path(f".claude/skills/{name}/SKILL.md").read_text(encoding="utf-8")
+    for t in toks:
+        if t not in text:
+            bad.append((name, t))
+print("MISSING:", bad if bad else "none")
+PY
+```
+Expected: `MISSING: none`。`none` でなければ、該当トークンを実ファイルの正確な部分文字列へ修正（空白なしの安定句を優先）。
+
+- [ ] **Step 4b: `ALL_CHECKS` 件数/ラベル依存の洗い出し（致命3対策）**
+
+15 個目の check 追加で赤化する既存テスト・doc が無いか確認する:
+
+```bash
+cd aegis && grep -rn "ALL_CHECKS\|len(.*CHECKS\|14 チェック\|14個\|14 個" tests/ scripts/ docs/architecture-overview.md
+```
+件数/ラベルを assert するテストや doc があれば 15（＋新ラベル "skill behavior contract"）に更新する。drift 出力スナップショットを取るテストがあれば期待値を更新。
 
 - [ ] **Step 5: テストが通るのを確認**
 
@@ -390,14 +432,19 @@ Expected: FAIL（extension ファイル不在）。
 ## 前提
 
 - 実 subagent を起動できるライブ Claude Code セッション。
-- 対象 skill が読み込める文脈（aegis インストール環境）。
+- **対象 skill が subagent の context に確実に載ること。** Agent ツールで起動した
+  subagent は aegis の phase 注入を受けないため、対象 skill が自動ロードされる保証は
+  ない。これを担保しないと「skill 遵守」でなく素の Claude を測るだけになりドリルが
+  無意味化する。最低限、subagent プロンプトに対象 `SKILL.md` の本文を同梱する
+  （または skill がロードされる経路で起動する）こと。
 
 ## 手順
 
 1. `scenarios/<x>.md` を 1 つ選び、`target_skill` と各セクションを読む。
-2. **subagent を 1 つ dispatch** し、`adversarial_prompt` の本文**だけ**を渡す。
+2. **subagent を 1 つ dispatch** し、対象 `SKILL.md` 本文＋`adversarial_prompt` の本文を
+   渡す（skill を context に載せる）。
    - 「これはテスト」「skill を守れ」等のメタ指示は**渡さない**（悟らせない）。
-   - 対象 skill が通常どおりロードされる文脈で走らせる。
+   - adversarial_prompt は実ユーザの依頼としてそのまま提示する。
 3. subagent の応答・ツール使用を観測し、`expected_adherence` の PASS/FAIL 条件に
    照らして採点する。判定根拠（どの挙動が条件のどれに当たるか）を明記する。
 4. `REPORT.template.md` を雛形に
@@ -568,20 +615,55 @@ Expected: 全 PASS（既知 flake `test_python3_absent_*` の順序依存のみ�
 
 4 レポートを簡潔に作成（変更は内部ツーリング＋docs＝低リスク面）:
 - `v1100-review.md`: 対照表（Task1-4 ↔ 実装ファイル）・severity 付き finding・PASS 判定・grill-code 結果参照。
-- `v1100-qa.md`: 機能対照表・全スイート結果（件数）・新規 11 テスト判定・test-strength.drill スキップ宣言の更新（コード追加分の mutant 1 個＝drift の token-missing 分岐反転、または skip 宣言）。
+- `v1100-qa.md`: 機能対照表・全スイート結果（件数）・新規 11 テスト判定・test-strength ドリル結果参照。
 - `v1100-security.md`: OWASP 該当なし（外部入力なし・import のみ）の理由付きスキップ＋`Grep secrets` 実施記録。
 - `v1100-deploy-checklist.md`: 配布影響（extension は opt-in・manifest は root 専用・mirror 不変）・ロールバック容易性。
 
-- [ ] **Step 3: gate を承認（update-gate.sh 経由のみ）**
+- [ ] **Step 2.5: test-strength ドリルを作成しプレビュー実走（致命1・qa 承認の前提）**
 
-Run:
+qa 承認時にハーネス（`pre_approve_gate`）が同じドリルを実走するため、追加コードに
+有効な mutant を持つ `.drill` を先に用意する。`docs/qa-reports/test-strength.drill`:
+
+```json
+{
+  "test_command": "python3 -m pytest tests/test_skill_behavior_contract.py -q",
+  "timeout_seconds": 60,
+  "mutants": [
+    {"file": "scripts/check_reference_drift.py", "line": 0,
+     "original": "            if token not in text:",
+     "mutated": "            if token in text:"}
+  ]
+}
+```
+※ `line` と `original` は実装後の実ファイルに合わせて確定（`original` は対象行の現在の
+中身と完全一致＝行ズレ防止。`grep -n "if token not in text" scripts/check_reference_drift.py`
+で行番号を取得）。プレビュー実走:
+
 ```bash
-cd aegis && bash scripts/update-gate.sh review approve \
+cd aegis && python3 scripts/run-test-strength-drill.py --root . \
+  --spec docs/qa-reports/test-strength.drill \
+  --report docs/qa-reports/test-strength.md
+```
+Expected: mutant 注入でテストが赤化＝「テストが守れている」合格。`current_refs.qa` は
+`docs/qa-reports/test-strength.md` も指す運用に合わせる（v1100-qa.md と併記 or 主参照）。
+
+- [ ] **Step 3: 全ゲートを承認（update-gate.sh 経由のみ・brainstorm→deploy を網羅）**
+
+brainstorm/plan は前フェーズ完了時に承認済みのはずだが、未承認なら本ステップで補う
+（完了契約は plan/review/qa/security/deploy の approved＋ref を要求）。security は
+外部入力ゼロだが routing（framework L）が必須とするため `na` ではなく非該当理由つき
+approve とする（`update-gate.sh security na` が許容されるかは事前確認し、不可なら approve）。
+
+```bash
+cd aegis \
+  && bash scripts/update-gate.sh brainstorm approve \
+  && bash scripts/update-gate.sh plan approve \
+  && bash scripts/update-gate.sh review approve \
   && bash scripts/update-gate.sh qa approve \
   && bash scripts/update-gate.sh security approve \
   && bash scripts/update-gate.sh deploy approve
 ```
-Expected: 各 STATUS gate が approved。
+Expected: 各 STATUS gate が approved（qa は Step 2.5 のドリル合格が前提）。
 
 - [ ] **Step 4: STATUS フィールドを更新**
 
