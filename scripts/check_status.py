@@ -62,42 +62,102 @@ CLIENT_GATE_ARTIFACTS = (
 
 CLIENT_ARTIFACT_MIN_BYTES = 200
 
+# P2 (v1.9.0): spec delta review. On the 2nd+ iteration the client must review
+# what changed since the last cycle before client_ready_for_dev re-approves.
+# Enforced at the GATE ONLY (see _spec_delta_issues) — kept OUT of
+# CLIENT_GATE_ARTIFACTS and _client_artifact_issues so the task-completion
+# symmetric check (which fires while client_ready_for_dev stays approved) does
+# not demand a delta on every later Dev iteration. Same existence + min-bytes +
+# sentinel contract as the 6.
+SPEC_DELTA_ARTIFACT = ("docs/handover/CHANGES.md", "spec-delta")
+
+
+def _artifact_content_issue(
+    root: Path, rel: str, sentinel: str, template_map: dict
+) -> str | None:
+    """Existence + min-bytes + sentinel check for one artifact.
+
+    Returns a human-readable issue string, or None if it passes. template_map
+    (ARTIFACT_TO_TEMPLATE) supplies the deny-message template hint (K-12) so the
+    non-engineer reader can copy templates/X.template.md → docs/Y.md without
+    guessing the naming.
+    """
+    template_hint = ""
+    tmpl = template_map.get(rel)
+    if tmpl:
+        template_hint = f"（テンプレ: {tmpl}）"
+    p = root / rel
+    if not p.exists():
+        return f"- {rel}: 不在 {template_hint}"
+    try:
+        text = p.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError):
+        return f"- {rel}: 読み取り失敗"
+    if len(text.encode("utf-8")) < CLIENT_ARTIFACT_MIN_BYTES:
+        return (f"- {rel}: 内容が {CLIENT_ARTIFACT_MIN_BYTES} バイト未満 "
+                f"（テンプレを実際に埋めてください） {template_hint}")
+    marker = f"<!-- aegis-required-section: {sentinel} -->"
+    if marker not in text:
+        return (f"- {rel}: 必須 sentinel `{marker}` が見つかりません "
+                f"（テンプレ末尾のコメントを残してください） {template_hint}")
+    return None
+
 
 def _client_artifact_issues(root: Path) -> list[str]:
-    """Return human-readable issues, empty list if all 6 artifacts pass."""
-    # K-12 (v1.6.2 / JNY-07): emit the source template alongside each issue
-    # so the non-engineer reader can copy templates/X.template.md → docs/Y.md
-    # without guessing the naming. ARTIFACT_TO_TEMPLATE is the single source.
+    """Return human-readable issues, empty list if all 6 artifacts pass.
+
+    The 6 CLIENT_GATE_ARTIFACTS only. SPEC_DELTA_ARTIFACT is NOT checked here
+    (gate-only via _spec_delta_issues) so the task-completion symmetric caller
+    is unaffected.
+    """
     try:
         from _artifact_template_map import ARTIFACT_TO_TEMPLATE
     except ImportError:
         ARTIFACT_TO_TEMPLATE = {}
     issues: list[str] = []
     for rel, sentinel in CLIENT_GATE_ARTIFACTS:
-        p = root / rel
-        template_hint = ""
-        tmpl = ARTIFACT_TO_TEMPLATE.get(rel)
-        if tmpl:
-            template_hint = f"（テンプレ: {tmpl}）"
-        if not p.exists():
-            issues.append(f"- {rel}: 不在 {template_hint}")
-            continue
-        try:
-            text = p.read_text(encoding="utf-8")
-        except (OSError, UnicodeDecodeError):
-            issues.append(f"- {rel}: 読み取り失敗")
-            continue
-        if len(text.encode("utf-8")) < CLIENT_ARTIFACT_MIN_BYTES:
-            issues.append(
-                f"- {rel}: 内容が {CLIENT_ARTIFACT_MIN_BYTES} バイト未満 "
-                f"（テンプレを実際に埋めてください） {template_hint}")
-            continue
-        marker = f"<!-- aegis-required-section: {sentinel} -->"
-        if marker not in text:
-            issues.append(
-                f"- {rel}: 必須 sentinel `{marker}` が見つかりません "
-                f"（テンプレ末尾のコメントを残してください） {template_hint}")
+        issue = _artifact_content_issue(root, rel, sentinel, ARTIFACT_TO_TEMPLATE)
+        if issue:
+            issues.append(issue)
     return issues
+
+
+def _spec_delta_required(root: Path) -> bool:
+    """True when STATUS.md iteration > 1 (a prior cycle exists, so the client
+    must review what changed). iteration absent / non-integer / <=1 => False
+    (fail-open). Never raises. Value is stripped before the digit test so a
+    trailing space does not silently disable the check."""
+    status_path = root / "docs" / "STATUS.md"
+    if not status_path.exists():
+        return False
+    try:
+        fm = extract_frontmatter(status_path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError):
+        return False
+    if not fm:
+        return False
+    it = extract_scalar_value(fm, "iteration")
+    if it is None:
+        return False
+    it = it.strip()
+    if not it.isdigit():
+        return False
+    return int(it) > 1
+
+
+def _spec_delta_issues(root: Path) -> list[str]:
+    """Gate-only: when iteration > 1, require docs/handover/CHANGES.md with the
+    same existence + min-bytes + sentinel contract. Returns [] when not
+    required. Intentionally separate from _client_artifact_issues (C1)."""
+    if not _spec_delta_required(root):
+        return []
+    try:
+        from _artifact_template_map import ARTIFACT_TO_TEMPLATE
+    except ImportError:
+        ARTIFACT_TO_TEMPLATE = {}
+    rel, sentinel = SPEC_DELTA_ARTIFACT
+    issue = _artifact_content_issue(root, rel, sentinel, ARTIFACT_TO_TEMPLATE)
+    return [issue] if issue else []
 
 REQUIRED_APPROVAL_KEYS = [
     "client_ready_for_dev",
@@ -948,6 +1008,7 @@ def check_gate_prerequisites(
         # → fill body → save" flow keeps it. `touch`-created empty files,
         # sentinel-removed files, and < 200-byte files all DENY.
         issues = _client_artifact_issues(root)
+        issues.extend(_spec_delta_issues(root))  # P2: gate-only spec delta (iteration>1)
         if issues:
             print("ERROR: client_ready_for_dev に必要な引き渡し成果物が不足しています:")
             for issue in issues:
