@@ -58,5 +58,43 @@ class TestCheck(unittest.TestCase):
         self.assertTrue(any("rules/r.md" in f for f in failures), failures)
 
 
+class TestRatchet(unittest.TestCase):
+    def setUp(self):
+        self.tmp = Path(tempfile.mkdtemp(prefix="aegis-ctxbudget-r-"))
+        self.addCleanup(shutil.rmtree, self.tmp, ignore_errors=True)
+
+    def _read(self):
+        return json.loads(
+            (self.tmp / "scripts" / "context-budgets.json").read_text())
+
+    def test_tighten_lowers_to_current(self):
+        _mk(self.tmp, ".claude/skills/foo/SKILL.md", 30)
+        _registry(self.tmp, {"budgets": {".claude/skills/foo/SKILL.md": 100}})
+        context_budget.tighten(self.tmp)
+        self.assertEqual(self._read()["budgets"][".claude/skills/foo/SKILL.md"], 30)
+
+    def test_tighten_never_raises(self):
+        _mk(self.tmp, ".claude/skills/foo/SKILL.md", 80)
+        _registry(self.tmp, {"budgets": {".claude/skills/foo/SKILL.md": 50}})
+        context_budget.tighten(self.tmp)
+        self.assertEqual(self._read()["budgets"][".claude/skills/foo/SKILL.md"], 50)
+
+    def test_tighten_adds_new_file_at_current(self):
+        _mk(self.tmp, ".claude/skills/new/SKILL.md", 42)
+        _registry(self.tmp, {"budgets": {}})
+        context_budget.tighten(self.tmp)
+        self.assertEqual(self._read()["budgets"][".claude/skills/new/SKILL.md"], 42)
+
+    def test_seed_uses_headroom_and_skips_existing(self):
+        _mk(self.tmp, ".claude/skills/foo/SKILL.md", 100)
+        _mk(self.tmp, ".claude/skills/bar/SKILL.md", 50)
+        _registry(self.tmp, {"budgets": {".claude/skills/foo/SKILL.md": 999}})
+        context_budget.seed(self.tmp, headroom=1.1)
+        data = self._read()
+        self.assertEqual(data["budgets"][".claude/skills/foo/SKILL.md"], 999)
+        self.assertEqual(data["budgets"][".claude/skills/bar/SKILL.md"], 55)
+        self.assertIn("default_skill_words", data)
+
+
 if __name__ == "__main__":
     unittest.main()

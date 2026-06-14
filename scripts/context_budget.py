@@ -68,3 +68,61 @@ def check(root: Path = ROOT) -> list[str]:
         if count > budget:
             failures.append(f"{rel} is too large: {count} words > {budget}")
     return failures
+
+
+def tighten(root: Path = ROOT) -> list[tuple[str, int]]:
+    """Lower budgets to current word count (never raise). New files get an
+    explicit entry at their current count. Returns changed (rel, new)."""
+    root = Path(root)
+    data = load_budgets(root)
+    budgets = data.setdefault("budgets", {})
+    changed: list[tuple[str, int]] = []
+    for p in iter_targets(root):
+        rel = str(p.relative_to(root))
+        count = word_count(p.read_text(encoding="utf-8"))
+        if rel not in budgets or count < budgets[rel]:
+            budgets[rel] = count
+            changed.append((rel, count))
+    save_budgets(root, data)
+    return changed
+
+
+def seed(root: Path = ROOT, headroom: float = 1.1) -> list[tuple[str, int]]:
+    """Populate budgets for targets that lack an explicit entry, at
+    ceil(current * headroom). Existing entries and defaults untouched if set."""
+    root = Path(root)
+    data = load_budgets(root)
+    budgets = data.setdefault("budgets", {})
+    data.setdefault("default_skill_words", DEFAULT_SKILL_WORDS)
+    data.setdefault("default_rule_words", DEFAULT_RULE_WORDS)
+    added: list[tuple[str, int]] = []
+    for p in iter_targets(root):
+        rel = str(p.relative_to(root))
+        if rel in budgets:
+            continue
+        count = word_count(p.read_text(encoding="utf-8"))
+        # round() first: float math like 50 * 1.1 == 55.00000000000001 would
+        # otherwise ceil to 56. We want the intended +10%, not float noise.
+        budgets[rel] = math.ceil(round(count * headroom, 6))
+        added.append((rel, budgets[rel]))
+    save_budgets(root, data)
+    return added
+
+
+def main(argv: list[str]) -> int:
+    if "--tighten" in argv:
+        for rel, new in tighten():
+            print(f"tightened {rel} -> {new}")
+        return 0
+    if "--seed" in argv:
+        for rel, new in seed():
+            print(f"seeded {rel} -> {new}")
+        return 0
+    failures = check()
+    for f in failures:
+        print(f"FAIL: {f}")
+    return 1 if failures else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))
