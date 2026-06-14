@@ -339,6 +339,8 @@ Expected: `seeded .claude/skills/... -> N` の行が各 skill/rule 分出る。`
 Run: `cat scripts/context-budgets.json` と `python3 scripts/context_budget.py`（引数なし=check）
 Expected: check は exit 0（FAIL 出力なし）。registry に `default_skill_words`=1500 / `default_rule_words`=500 ＋ 各 skill/rule の明示 budget（現状 word 数の ceil(×1.1)）が入っていること。seed は全現存ファイルに明示 budget を与えるため、仮に現状が default を超える大きな skill があっても explicit budget が優先され check は緑になる（default は将来追加される新規ファイル用のガード）。
 
+**DEFAULT 妥当性の照合（grill-plan 反映）**: 実測の最大 skill word 数と最大 rule word 数を確認し、`DEFAULT_SKILL_WORDS(1500) ≥ 実測最大 skill` / `DEFAULT_RULE_WORDS(500) ≥ 実測最大 rule` であることを確かめる。Run: `for f in .claude/skills/*/SKILL.md; do wc -w "$f"; done | sort -rn | head -1` と `for f in .claude/rules/*.md; do wc -w "$f"; done | sort -rn | head -1`。万一 default を超える既存ファイルがあれば、default を「実測最大＋余裕」に引き上げて `context_budget.py` の定数と registry の default を合わせる（既存は explicit budget で緑だが、新規ガードの意味を保つため）。
+
 - [ ] **Step 3: コミット**
 
 ```bash
@@ -354,56 +356,50 @@ git commit -m "feat(context-budget): seed registry from current skills/rules (+1
 - Modify: `scripts/check_framework_contract.py`
 - Test: `tests/test_context_budget.py`
 
-- [ ] **Step 1: 実リポ緑を保証するテストを追加**
+> grill-plan 反映: 弱い `test_contract_includes_budget_check`（hasattr＋risky import）は**削除**。配線は Step 4 の「実 contract が PASS」で担保。実リポ緑は回帰ガードとして残す。
+
+- [ ] **Step 1: 実リポ緑の回帰ガードを追加**
 
 `tests/test_context_budget.py` の末尾（`if __name__` の前）に追加:
 
 ```python
-class TestRealRepoAndContract(unittest.TestCase):
+class TestRealRepo(unittest.TestCase):
     def test_real_repo_check_is_green(self):
-        # seed 済み registry で実リポの全 skill/rule が予算内であること。
+        # seed 済み（committed）registry で実リポの全 skill/rule が予算内であること。
+        # 予算超過の skill 追加や registry 破損があれば、このテストが FAIL する。
         self.assertEqual(context_budget.check(ROOT), [])
-
-    def test_contract_includes_budget_check(self):
-        # contract が budget 違反を failures に合流すること（一時 root で検証）。
-        import check_framework_contract as cfc
-        tmp = Path(tempfile.mkdtemp(prefix="aegis-ctxbudget-c-"))
-        self.addCleanup(shutil.rmtree, tmp, ignore_errors=True)
-        # cfc.check_budget は ROOT 固定なので、ここでは context_budget 経由の
-        # 合流口が存在することだけを確認する（直接 check_budget を呼ぶ）。
-        self.assertTrue(hasattr(cfc, "context_budget"))
 ```
 
-> 注: contract 本体は ROOT 固定で自己検査する設計のため、tmp root での E2E は行わず「合流口の存在」と「実リポ緑」で担保する。
+- [ ] **Step 2: テストが通ることを確認（Task 3 で seed 済み）**
 
-- [ ] **Step 2: テストが失敗することを確認**
-
-Run: `python3 -m pytest tests/test_context_budget.py::TestRealRepoAndContract -q`
-Expected: `test_contract_includes_budget_check` が FAIL（`cfc` に `context_budget` 属性なし）。`test_real_repo_check_is_green` は PASS（Task 3 で seed 済み）。
+Run: `python3 -m pytest tests/test_context_budget.py::TestRealRepo -q`
+Expected: PASS
 
 - [ ] **Step 3: contract に self-bootstrap import と呼び出しを追加**
 
-`scripts/check_framework_contract.py` の import 群の直後（`ROOT = ...` 定義より後の任意のトップレベル）に追加:
+`scripts/check_framework_contract.py` の import 群の直後（トップレベル・`sys` は既存 import を利用）に追加:
 
 ```python
-import sys as _sys
-_sys.path.insert(0, str(Path(__file__).resolve().parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 import context_budget  # noqa: E402  (single owner of context-budget logic)
 ```
 
-そして `TEMPLATE_WORD_LIMITS` の for ループ（`f"{tpl_path.relative_to(ROOT)} is too large..."` を append する箇所）の**直後**に追加:
+`main()` 内、`TEMPLATE_WORD_LIMITS` の for ループ（`f"{tpl_path.relative_to(ROOT)} is too large..."` を append する箇所）の**直後**に追加:
 
 ```python
     # Context budget: skills/rules word budgets (roadmap P1).
     failures.extend(context_budget.check(ROOT))
 ```
 
-- [ ] **Step 4: テストとフルスイートが通ることを確認**
+> 配置の根拠（grill-plan 確認済み）: このブロックは `main()` 内の `if args.profile != "full": return run_profile_check(...)` 早期 return **より後**＝framework-root のフル自己検査時のみ実行。`failures` も同 scope に実在。`check_framework_contract.py` は setup 非配布のため import 追加で下流は壊れない。
+
+- [ ] **Step 4: 配線とフルスイートを確認**
 
 Run: `python3 -m pytest tests/test_context_budget.py -q`
-Expected: PASS（全 10 tests）
+Expected: PASS（全 9 tests: TestCheck 4 + TestRatchet 4 + TestRealRepo 1）
 Run: `python3 scripts/check_framework_contract.py`
-Expected: `PASS: aegis contract is aligned`（exit 0）
+Expected: `PASS: aegis contract is aligned`（exit 0）＝contract が `context_budget.check` を呼んで緑＝配線実証。
+（任意の追加確認: 一時的に任意 skill へ大量語を足すと contract が FAIL することを1度確認してもよい。**確認後は必ず `git checkout` で復元**。）
 
 - [ ] **Step 5: コミット**
 
