@@ -1,8 +1,74 @@
 # Migration History
 
-aegis のバージョン間アップグレード注記。README から移設（2026-06-14・docs-only）。各版見出しを h2 に昇格した以外、本文は無改変。
+aegis のバージョン間アップグレード注記。v1.6.0 までは README から移設（2026-06-14・docs-only。各版見出しを h2 に昇格した以外、本文は無改変）。v1.6.1〜v1.8.0 は事後に git 履歴から再構成した（2026-06-14）。
 
-> 収録範囲: v0.5.0 → v1.6.0。v1.7.0 以降は未収録 — `git log` と `docs/STATUS.md` を参照のこと。
+> 収録範囲: v0.5.0 → v1.8.0。以降の版は `git log` と `docs/STATUS.md` を参照のこと。
+
+## From v1.7.2 to v1.8.0
+
+**Non-breaking — P2 volatile-truth マニフェスト（プラットフォーム結合値の単一所有）。**
+
+プラットフォーム依存の揮発値（モデル id/effort・hook event 名・tool 名・schema 検証日）を新規 `scripts/platform_manifest.py`（framework root 専用・example へは非ミラー）に集約し、生成と検証が同一マニフェストを import する構造にした。
+
+- **モデル/effort ポリシーの値源が platform_manifest に移動。** `check_framework_contract.py` が許容モデル・禁止集合（haiku）・effort・opus-only ルールを manifest から import 照合する。`CLAUDE.md` の Model Policy は「モデル系統の更新は `platform_manifest.py` で行う」と明記（インラインで増やさない）。
+- **drift lint にチェック追加（ALL_CHECKS 12→14）**: template の hook event が既知集合の部分か（FAIL）、tool-matcher トークンが既知レジストリ内か（WARN）、`platform_manifest.py` を持つ root の検証日 staleness（advisory）。
+- 下流プロジェクトへの作業は基本不要（framework 内部の契約・drift 強化）。framework を保守する場合のみ、モデル系統や event/tool を増やすときは manifest を更新する。
+
+## From v1.7.1 to v1.7.2
+
+**Non-breaking（framework 開発者向け）— M1 example ミラー自動生成。**
+
+- 新規 `scripts/sync_example_mirror.py` と `make example` ターゲットを追加。root の制御ファイルから `examples/minimal-project/` ミラーを再生成する。
+- 制御ファイル（`hooks/`・`scripts/`・`.claude/` 等）編集後の `make example` 忘れは `check_reference_drift.py` のミラー同一性チェックが検出する。
+- 下流プロジェクトへの作業は不要（framework リポジトリの開発フロー専用）。
+
+## From v1.7.0 to v1.7.1
+
+**Non-breaking — M3 STATUS パーサの bash 一本化。**
+
+- `hooks/lib/frontmatter.sh` に `frontmatter_value`/`gate_value` アクセサを追加し、`session-start`・`pre-compact`・`post-status-audit` ほかの STATUS スカラ/ゲート読み取りをこれに統一した（実装ばらつきの解消）。
+- **`frontmatter.sh` が全プロファイルの required に昇格。** 既存インストールは `bash bin/setup.sh --profile=<profile>` を再実行して `frontmatter.sh` を配布すること。
+- 挙動の変更はなし（内部リファクタ）。`examples/minimal-project/` ミラーも byte-identical に更新。
+
+## From v1.6.3 to v1.7.0
+
+**Non-breaking — P2-a 段階 HINT（phase nudge）のオプトアウト。**
+
+- **`minimal`/`standard` プロファイルは phase HINT nudge を既定オフ**にした（インストール時に `AEGIS_NUDGE=off` を settings の `env` に書き込む）。`full` は従来どおり表示。
+- 任意のプロファイルで `AEGIS_NUDGE=off`（小文字のみ）によりセッション単位で抑止可。抑止されるのは phase HINT の sermon のみで、ゲート・skill 起動経路・blockers・failure-tracking・unknown-phase 診断・安全警告は常に残る。
+- unknown-phase 診断は nudge ゲートの外へ移動（nudge オフでも診断は出る）。setup は既存の `AEGIS_NUDGE` 値を保持（key-level setdefault）。
+- 既存インストールで nudge を戻すには `.claude/settings.local.json` の `env.AEGIS_NUDGE` キーを削除する。
+
+## From v1.6.2 to v1.6.3
+
+**Non-breaking — 第7回全力レビュー由来の fail-closed 強化（R1–R4）。**
+
+- `emit.sh` の JSON エスケープが C0 制御バイトを squash（fail-open な deny 経路を封鎖, R1）。
+- session-start が信頼できない STATUS/LEARNINGS テキストを fence＋上限 cap してコンテキストに載せる（注入対策, R2/C1）。
+- 入力抽出失敗時は fail-closed（R3）、再帰削除の検出が大文字小文字非依存に（R4）。
+- 既存インストールは `bash bin/setup.sh --profile=<profile>` を再実行して `emit.sh`・session-start を更新する。挙動はセキュリティ強化方向のみ。
+
+## From v1.6.1 to v1.6.2
+
+**Non-breaking — K シリーズ（配布完全性・安全性・原子性）。**
+
+- **新規 `hooks/lib/safety.sh`**、各 hook の timeout 宣言、`.gate-snapshot` の原子的書き込み（K-5/6/7）。
+- secrets deny の回避経路を追加封鎖: コマンド置換・クォート変数形（K-2/3/4）。
+- 配布経路（install 出力）の堅牢化と setup の前提チェック（K-8〜11）。
+- handover 成果物→テンプレートのマッピング、`full` プロファイル整備、早見表（K-12/13）。
+- zero-run テストマーカー gate を 3 軸化（K-1）。
+- 既存インストールは `bash bin/setup.sh --profile=<profile>` を再実行（新 lib・timeout・原子的 snapshot を反映）。
+
+## From v1.6.0 to v1.6.1
+
+**Non-breaking — 機能整合／フルレビュー fix バッチ（C/S シリーズ）。**
+
+- **新規 `hooks/lib/secrets-patterns.sh`（secrets パターンの単一所有）** を追加し `check-secrets.sh` をこれ経由に（C-9）。`lib/phase-skills.sh`・`lib/secrets-patterns.sh` を REQUIRED に登録（S-11）。
+- 変数で組み立てた control-plane 書き込み・git stage ファイル名の deny（C-1 / grill-code A-Crit）、`.env` の `--git-dir`/`-C`/`stage`/`update-index` 経由ステージングの deny（S-3）、WRITE_OP regex の bypass 封鎖。
+- **`client_ready_for_dev` が handover 成果物 6 点の内容を機械検査**（sentinel＋≥200 bytes, C-3）。
+- **green テスト判定に `AEGIS_TEST_PASS_MARKER` を要求**（C-2）＋ zero-run flag guard。
+- SessionStart matcher に `resume` を追加（C-4）、arch-overview の drift 是正と counts 固定（C-5/C-6）。
+- 既存インストールは `bash bin/setup.sh --profile=<profile>` を再実行（新 lib・更新 hook を反映）。
 
 ## From v1.5.2 to v1.6.0
 
