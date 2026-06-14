@@ -59,17 +59,20 @@ class TestSkillBehaviorContract(unittest.TestCase):
         self.assertEqual(failures, [], failures)
         self.assertEqual(warnings, [])
 
-    def test_missing_token_fails(self):
+    def test_missing_token_fails_for_every_skill_and_token(self):
+        # 全 skill に「トークンを含まない本文」を与え、全 skill・全 token の
+        # 欠落が漏れなく報告されることを検証する（最初の1件だけでなく網羅）。
+        # 本文は意図的にどのトークンも含まないダミーにする。
         _make_manifest_marker(self.root)
-        target, tokens = next(iter(drift.SKILL_INVARIANTS.items()))
-        for name, toks in drift.SKILL_INVARIANTS.items():
-            body = "\n".join(toks[1:]) if name == target else "\n".join(toks)
-            _make_skill(self.root, name, body=body)
+        for name in drift.SKILL_INVARIANTS:
+            _make_skill(self.root, name, body="（圧力テスト用ダミー本文・命令文なし）")
         failures, _ = drift.check_skill_behavior_contract(self.root)
-        self.assertTrue(
-            any(target in f and tokens[0] in f for f in failures),
-            f"expected missing-token failure for {target}/{tokens[0]!r}, got {failures}",
-        )
+        for name, tokens in drift.SKILL_INVARIANTS.items():
+            for tok in tokens:
+                self.assertTrue(
+                    any(name in f and tok in f for f in failures),
+                    f"missing-token not reported for {name}/{tok!r}; got {failures}",
+                )
 
     def test_guard_inert_without_manifest(self):
         # tmp root に scripts/skill_behavior_manifest.py が無い＝installed 相当＝inert
