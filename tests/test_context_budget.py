@@ -96,5 +96,12 @@ class TestRatchet(unittest.TestCase):
         self.assertIn("default_skill_words", data)
 
 
+class TestRealRepo(unittest.TestCase):
+    def test_real_repo_check_is_green(self):
+        # seed 済み（committed）registry で実リポの全 skill/rule が予算内であること。
+        # 予算超過の skill 追加や registry 破損があれば、このテストが FAIL する。
+        self.assertEqual(context_budget.check(ROOT), [])
+
+
 if __name__ == "__main__":
     unittest.main()

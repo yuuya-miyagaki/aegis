@@ -9,6 +9,7 @@ import subprocess
 import sys
 from pathlib import Path
 
+import context_budget
 from check_status import validate_status_file
 from platform_manifest import (
     ALLOWED_MODELS,
@@ -642,6 +643,10 @@ def main() -> int:
                 failures.append(
                     f"{tpl_path.relative_to(ROOT)} is too large: {tpl_count} words > {limit}"
                 )
+
+    # Context budget: skills/rules word budgets (roadmap P1). Runs only here in
+    # the framework-root full self-check (after main()'s profile early-return).
+    failures.extend(context_budget.check(ROOT))
 
     # Failure rule sync check: the block starting with "Stop after 3 failures"
     # must be identical across all CLAUDE.md variants.
