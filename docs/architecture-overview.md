@@ -402,7 +402,7 @@ TaskCreated / TaskCompleted
 
 | スクリプト | 用途 |
 |-----------|------|
-| `check_framework_contract.py` | フレームワーク契約検証（ファイル存在、CLAUDE.md 語数、スキル/エージェント/コマンド/フック整合性、model/effort policy、name lint、プロファイル検証、example placeholder/mirror） |
+| `check_framework_contract.py` | フレームワーク契約検証（ファイル存在、CLAUDE.md/skill/rule 語数予算（`context_budget.py`・tighten-only ratchet）、スキル/エージェント/コマンド/フック整合性、model/effort policy、name lint、プロファイル検証、example placeholder/mirror） |
 | `check_status.py` | STATUS.md YAML frontmatter 検証（必須フィールド、ゲート整合性、tri-state pre-approve、完了 evidence） |
 | `check_reference_drift.py` | 参照名ドリフト検出（14 チェック。本体↔example の mirror-identity を byte 比較。platform_manifest による event/tool ドリフトと検証日 staleness を含む） |
 | `lint_names.py` | 名前クロスリファレンス lint（種別ごとの抽出器） |
