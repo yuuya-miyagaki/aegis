@@ -1,15 +1,15 @@
 ---
 framework: aegis
-framework_version: "1.8.0"
+framework_version: "1.10.0"
 project_name: "Aegis"
 mode: Dev
 phase: deploy
 task_type: framework
 task_size: L
-task_size_rationale: "確定（brainstorm→writing-plans→grill-plan→実装→grill-code）: 第7回全力レビュー §2 P3/M2『過程 docs の archive 化・空 scaffold 削除』。docs-only 再編（コード挙動ゼロ変更・版据え置き v1.8.0）。git mv で plans 履歴 61・qa-reports 履歴 55・top-level 審査履歴 16 を docs/archive/{plans,qa-reports,reviews} へ＋空 .gitkeep dir 3 削除＝~135 ファイル操作で L。current_refs 被参照（v162・context-futureproof）は不動＝breakage ゼロ。"
-iteration: 29
+task_size_rationale: "確定（brainstorm→spec→writing-plans→grill-plan→TDD→grill-code）: 進化ロードマップ P3『skill 挙動圧力テスト』。2 層実装＝層1 決定論 skill behavior contract（新 manifest＋drift check＋RED-GREEN テスト）＋層2 opt-in adversarial drill 足場（extension）。新規 8＋改変 6＝~14 ファイルで L。feature MINOR（1.9.0→1.10.0）。"
+iteration: 30
 ui_surface: false
-last_updated: "2026-06-14T13:30:00Z"
+last_updated: "2026-06-14T16:30:00Z"
 gate_approvals:
   client_ready_for_dev: n/a
   brainstorm: approved
@@ -22,12 +22,12 @@ gate_approvals:
 current_refs:
   requirements:
     - docs/full-review-2026-06-13-context-futureproof.md
-  plan: docs/plans/2026-06-14-docs-archive-implementation.md
-  spec: docs/plans/2026-06-14-docs-archive-design.md
-  review: docs/qa-reports/v162-review.md
-  qa: docs/qa-reports/v162-qa.md
-  security: docs/qa-reports/v162-security.md
-  deploy: docs/qa-reports/v162-deploy-checklist.md
+  plan: docs/plans/2026-06-14-skill-behavior-pressure-test-plan.md
+  spec: docs/specs/2026-06-14-skill-behavior-pressure-test-design.md
+  review: docs/qa-reports/v1100-review.md
+  qa: docs/qa-reports/v1100-qa.md
+  security: docs/qa-reports/v1100-security.md
+  deploy: docs/qa-reports/v1100-deploy-checklist.md
   translation: null
 external_evidence:
   - type: "second-opinion-v1-foundation-r1-r2"
@@ -42,10 +42,14 @@ external_evidence:
     scope: "v0.12.2 実装後 4 ラウンドレビュー"
     findings: "Round 6 (P1×2, P2×1: pre-compact exit 2 / minimal-project / test rc), Round 7 (P1×1, P3×1: git add 漏れ / テスト件数表記), Round 8 (P2×1, P3×1: stale last_updated / grep 自己マッチ), Round 9 (P3×2: コメント不整合)"
     resolution: "9件全反映。tier 1/2 PASS、134 tests PASS、本体と minimal-project 完全同期確認済み。"
-next_action: "iteration 29（P3/M2: 過程 docs アーカイブ・docs-only・版据え置き v1.8.0）実装完了: root docs/ の履歴を docs/archive/{plans(61),qa-reports(55),reviews(16)} へ git mv＋空 .gitkeep dir 3（handover/requirements/decisions）削除。root=運用ドキュ＋現イテレーション active ref／archive=履歴 の不変条件を確立。current_refs 被参照（v162 qa-reports 4・requirements=context-futureproof）は不動＝breakage ゼロ。plan/spec は P3 docs へ通常ローテ（被参照ファイル無移動）。test-strength.drill は LIVE artifact として root 維持、keep-list 8 load-bearing（STATUS/LEARNINGS/MIGRATION/architecture-overview/evidence-archive/hook-failure-policy/perf-baseline/context-futureproof）も root 維持。grill-plan で stale コメント更新（test_hook_output_schema）・メモリ更新リスト是正・session_history iter26 削除を反映。各カテゴリ移動後に contract/drift 緑を確認、最終 full suite 750 passed/1 skip（既知 flake のみ＝新規回帰ゼロ）/ make example 差分ゼロ / contract 全 profile / PoC 18+5 PASS。MEMORY.md の history パス 6 件を docs/archive/reviews へ更新。**第7回レビュー §2 のバックログ（P0-a/b/c・P1・P2-a・M3・M1・P2・P3）を全消化＝完済。次タスク未定。** 残: tag/push はユーザ判断（版据え置きのため tag 任意）。"
+next_action: "iteration 30（進化ロードマップ P3: skill 挙動圧力テスト・v1.10.0）実装完了: 層1＝決定論 skill behavior contract。新規 scripts/skill_behavior_manifest.py（判断系 7 skill→load-bearing トークン・root 専用・非ミラー）＋check_reference_drift.check_skill_behavior_contract（ALL_CHECKS 14→15・framework-root ガードで installed inert）＋RED-GREEN テスト（全 skill/トークンの欠落検知を実証）。層2＝extensions/skill-pressure-drill/（README/WORKFLOW/REPORT/scenarios×2）＝実 subagent 用 adversarial drill 足場（手動 opt-in・CI 非搭載）＋形式のみ決定論テスト。版 1.9.0→1.10.0（contract/template/example/live STATUS 統一）。2段グリル消化（grill-plan 致命4・grill-code 🟡1 fix-forward）。test-strength.drill は framework 混在 diff＋committed コードで B1 適用不能のため skip 宣言（代替＝全 skill/トークンの mutation 同等テスト）。full suite 779 passed/1 skip・contract 全 profile・drift 15・Tier2/3・make example 差分ゼロ＝全 PASS。**残: ユーザー確認の上 push（自動 push しない）。進化ロードマップ次は P4（実ブラウザ QA・someday）/P5（positioning・配布時）。**"
 blockers: []
 failure_tracking: null
 session_history:
+  - date: "2026-06-14"
+    mode: Dev
+    phase: "deploy"
+    note: "iteration 30（進化ロードマップ P3: skill 挙動圧力テスト・v1.10.0）実装完了: 比較レビュー由来の進化ロードマップ P3。Aegis の skill 検証が静的（reachability/frontmatter）のみで『skill 指示文が実際に遵守されるか』の空白を、hook で強制できない判断系 skill に限定して埋める（hook 強制済みの hard gate はテストせず＝重複回避）。2 層: 層1＝決定論 skill behavior contract。新規 scripts/skill_behavior_manifest.py（判断系 7 skill＝aegis-brainstorm/tdd/bug-diagnosis/aegis-review-gate/aegis-security-gate/qa-verification/subagent-dev → load-bearing 不変条件トークン 14・platform_manifest と同じ単一オーナー／root 専用／非ミラー流儀）＋check_reference_drift.check_skill_behavior_contract（sibling import・ALL_CHECKS 14→15・scripts/skill_behavior_manifest.py 存在ガードで installed/example は inert）＝skill 編集で核心命令が消えると FAIL（リグレッションガード）。layer1 は『accidental 削除を捕まえる ratchet（manifest 同時編集で回避可）』と限界を docstring に明記。層2＝extensions/skill-pressure-drill/（CONVENTIONS Rule1/2/5 準拠の手動 opt-in addon・contract 非登録・新 core skill 作らず churn ゼロ）に実 subagent 用 adversarial drill 足場（README/WORKFLOW/REPORT テンプレ/シード scenario×2）＋tests/test_skill_drill_format.py（シナリオ/テンプレ形式のみ決定論検査＝エージェント非実行で flake ゼロ）。版 1.9.0→1.10.0（contract 定数/template/example/live STATUS 統一）。arch-overview の drift-check 数を 14→15 同期（test_arch_overview_currency が機械突合）。file-count summary は既存 stale・未テスト・基準曖昧のため意図的に不変更。フロー全工程: brainstorm→設計書→writing-plans→grill-plan→TDD（RED 実証: 実装前 6 テスト FAIL）→grill-code。grill-plan 致命4（①14 トークンを grep -F 実在検証＋空白入り `2 段階レビュー`→`段階レビュー` に安定化②ALL_CHECKS 件数依存テスト洗い出し→arch-overview 15 同期③qa ドリル具体化④brainstorm/plan 含む全ゲート承認網羅）を着手前反映。grill-code 🔴0（install 配布経路 F6 死角を実査＝profile は check_status.py のみ配布で drift/manifest は installed 非配布＝import crash 不成立を確認）・🟡1（中核リグレッションテストを全 skill/全トークン網羅に強化＝bb40ed2）fix-forward・🟢3 許容。test-strength.drill は framework 混在 diff＋committed コードで B1 適用不能のため skip 宣言（代替＝test_missing_token_fails_for_every_skill_and_token が contract の守る回帰を全 7 skill・全 14 トークンで mutation 同等実証）。full suite 779 passed/1 skip（773→779＝新規 11・既知 flake 非発火）・contract 全 profile・drift 15・Tier2 scaffold smoke・Tier3 eval_scenario・make example 差分ゼロ＝全 PASS。コミット 6575d75（層1）/caf4e0e（層2）/848ae55（版）/bb40ed2（grill-code）＋close-out。**残: ユーザー確認の上 push（自動 push しない）。進化ロードマップ次は P4（実ブラウザ QA・someday）/P5（positioning・配布時）。**"
   - date: "2026-06-14"
     mode: Dev
     phase: "deploy"
@@ -54,10 +58,6 @@ session_history:
     mode: Dev
     phase: "deploy"
     note: "iteration 28（v1.8.0 P2: volatile-truth マニフェスト）実装完了: 第7回全力レビュー §2 P2。プラットフォーム結合値（model id/effort・hook event 名・tool 名・hook 出力 schema 検証日）を新規 scripts/platform_manifest.py に隔離し『追従トレッドミルの税』を1箇所へ集約。M1 で実証した『生成と検証が同一マニフェストを import＝原理的に乖離不能』パターンの横展開。設計の核は2層分離: 機械強制できる内部整合（散在リテラルを import/drift で束ねる）＋機械強制できない現実整合（人手の検証日 PLATFORM_VERIFIED＋staleness advisory）。これで過去セカンドオピニオン R1/J-1 が警告した『沈黙する第3 declarative ミラー』を回避（実 import 消費者あり・現実検証は人手と明示）。スコープ: model（強制 import）/event（drift FAIL）/tool（registry WARN）/schema（検証日のみ＝emit.sh のフィールド名は移さず pure-bash 単一ソースを不可侵）。check_framework_contract が ALLOWED/FORBIDDEN/EFFORT/OPUS_ONLY を import 消費しリテラル置換＋新規 check_model_policy_manifest_consistency が MODEL_EFFORT_POLICY（aegis 設計）を許容集合に照合（platform 真実 vs aegis 設計の分離）。check_reference_drift が自己 bootstrap 付き import で check_platform_manifest（template event∈KNOWN_HOOK_EVENTS=FAIL／matcher token∈KNOWN_TOOL_NAMES=WARN／TOOL_MATCHING_EVENTS 限定で SessionStart の startup|resume を tool 誤検知しない）と check_platform_staleness（検証日超過=WARN・platform_manifest.py を持つ framework root のみ発火で二重発火防止）を追加（ALL_CHECKS 12→14・architecture-overview 同期）。CLAUDE.md Model Policy に値出典の一本化を明記（語数 599/650）。非ミラー checker のみが import＝新ミラー面ゼロを make example で実証。grill-plan が致命2件（①importlib ローダ test_skill_reachability 用に check_reference_drift へ self-bootstrap sys.path.insert を追加＝単独実行 collection error を封鎖／②staleness を check_platform_staleness に関数分離し template 検査を決定論化＝壁時計依存テストの時限爆弾を排除）を指摘→着手前反映。grill-code は 🔴ゼロ・🟡1（malformed template の null/非dict matcher で crash→報告に倒す＋sys.path 冪等化）を fix-forward。版数4箇所（contract 定数/template STATUS/example STATUS/本体 STATUS）を 1.8.0 統一。750 passed/1 skip（734→752・新規18）/ contract 全 profile / drift / v162 18 PoC / v163 5 PoC 全 PASS。既知の順序依存 flake test_python3_absent_advisory_hooks_do_not_crash（post-status-audit が実 docs/STATUS.md と .gate-snapshot の gate 差を tamper 検知＝共有状態のテスト分離問題）は単独実行で緑・本変更とは無関係（baseline でも同失敗）。残 backlog: P3 過程 docs archive 化・空 scaffold 削除（第7回レビュー最後の未消化項目）。"
-  - date: "2026-06-13"
-    mode: Dev
-    phase: "deploy"
-    note: "iteration 27（v1.7.2 M1: example ミラー自動生成）実装完了: 第7回全力レビュー §1 M1『example ミラー 520K の手動同期＝最大の保守税』。新規 scripts/sync_example_mirror.py が check_reference_drift から MIRROR_DIRS/MIRROR_FILES/MIRROR_ALLOWLIST を import（生成と検証が同一マニフェスト共有＝原理的に乖離不能）し、root→examples/minimal-project を shutil.copy2（mode 保持）で同期。allowlist（validate.md/retro.md）skip、MIRROR_DIRS＋MIRROR_FILES 両方の stale 除去、分岐ファイル（CLAUDE.md/STATUS.md/docs/requirements・specs・qa-reports 等＝MIRROR_DIRS 外）は不可侵。make example ターゲットで実行、制御ファイル編集後の手動 cp（M3 で9ファイル cp の痛みを実感）を消す。検証は既存 check_mirror_identity に委任し安全網（drift/contract/scaffold smoke）は一切改廃しない additive＝committed ミラーの物理除去（smoke-only 化）は browsable（北極星=非エンジニア向け見本）維持のため非ゴール。スコープ確定時に Python 側 mirror が ~380K・分岐 ~240K と実測。grill-plan が MIRROR_FILES の stale 非対称を指摘→着手前に対称化（step3）。grill-code は 🔴/🟡 ゼロ、🟢3件（空ディレクトリ残置/出力冗長/非原子性）は全 YAGNI（git/drift が空dir無視・手動冪等ツール）で fix なし。実 repo で sync 実行→git diff 空＝現状 example を byte/mode 再現（回帰なし）を実証。734 tests OK（726→734・新規8）/ contract 全 profile / drift / scaffold smoke / v162 18 PoC / v163 5 PoC 全 PASS。残 backlog: P2 volatile マニフェスト / P3 過程 docs archive 化。"
 ---
 
 ## Summary

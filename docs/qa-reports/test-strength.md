@@ -1,0 +1,6 @@
+# テスト強度ドリル結果（機械ブロック・ハーネス生成）
+
+```
+verdict: SKIP
+reason: 実走不能（構造的制約・framework タスク）: P3 skill 挙動圧力テスト（task_size=L）の本体コード（scripts/skill_behavior_manifest.py・check_reference_drift.check_skill_behavior_contract）は既にコミット済みで、qa 承認時の working tree diff（git diff HEAD）には現れない＝B1 ドリルが要求する『追加(+)行上の mutant』を置けない。さらに当イテレーションの diff は design/plan/extension(.md)・STATUS 簿記など非コード hunk を多数含み、coverage floor（全追加ハンクに mutant 必須）は prose に mutant を要求するため原理的に充足不能（v1.3.3 で LEARNINGS に記録済みの framework 混在 diff 制約と同型）。代替エビデンス（手動 mutation 同等）: tests/test_skill_behavior_contract.py が RED-GREEN を実証＝実装前に 6 テスト全 FAIL（manifest/check 不在）、特に test_missing_token_fails_for_every_skill_and_token が『各 skill の load-bearing トークンを 1 つでも落とすと check が必ず検知する』ことを全 7 skill・全 14 トークンで実証＝skill behavior contract が守る回帰そのものを mutation した検証。加えて test_skill_drill_format.py（層2 形式・5 件）、full suite 779 passed/1 skip、contract 全 profile、drift（15 チェック・新 skill behavior contract 含む）、Tier2 scaffold smoke、Tier3 eval_scenario すべて PASS。
+```
