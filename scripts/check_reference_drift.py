@@ -28,6 +28,7 @@ from platform_manifest import (  # noqa: E402  (import follows sys.path bootstra
     TOOL_MATCHING_EVENTS,
     stale_keys,
 )
+from skill_behavior_manifest import SKILL_INVARIANTS  # noqa: E402  (sibling import)
 
 
 # ---------------------------------------------------------------------------
@@ -437,6 +438,37 @@ def check_skill_reachability(root: Path) -> tuple[list[str], list[str]]:
     return failures, warnings
 
 
+def check_skill_behavior_contract(root: Path) -> tuple[list[str], list[str]]:
+    """#15: 各判断系 skill が load-bearing 不変条件トークンを保持しているか
+    （skill behavior contract）。manifest は root 専用・非ミラーのため、
+    scripts/skill_behavior_manifest.py を持つ framework root でのみ発火し、
+    installed project では inert。"""
+    failures: list[str] = []
+    warnings: list[str] = []
+
+    if not (root / "scripts" / "skill_behavior_manifest.py").exists():
+        return failures, warnings
+
+    skills_dir = root / ".claude" / "skills"
+    for skill_name, tokens in sorted(SKILL_INVARIANTS.items()):
+        skill_md = skills_dir / skill_name / "SKILL.md"
+        if not skill_md.is_file():
+            failures.append(
+                "skill behavior contract: manifest skill '%s' has no SKILL.md "
+                "(expected .claude/skills/%s/SKILL.md)" % (skill_name, skill_name)
+            )
+            continue
+        text = _read(skill_md)
+        for token in tokens:
+            if token not in text:
+                failures.append(
+                    "skill behavior contract: skill '%s' is missing load-bearing "
+                    "invariant token %r" % (skill_name, token)
+                )
+
+    return failures, warnings
+
+
 def check_example_readme_counts(root: Path) -> tuple[list[str], list[str]]:
     """#9: examples/minimal-project/README.md counts vs actual example files"""
     failures: list[str] = []
@@ -637,6 +669,7 @@ ALL_CHECKS = [
     ("README counts", check_readme_counts),
     ("template version", check_template_version),
     ("skill reachability", check_skill_reachability),
+    ("skill behavior contract", check_skill_behavior_contract),
     ("template references", check_template_references),
     ("example README counts", check_example_readme_counts),
     ("example commands", check_example_commands),
