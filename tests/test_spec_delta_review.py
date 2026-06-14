@@ -147,6 +147,23 @@ class TestLaterIterationRequiresDelta(unittest.TestCase):
             self.assertEqual(rc, 0,
                 f"no-change valve must APPROVE. out=\n{out}")
 
+    def test_non_ascii_digit_iteration_failopen_no_crash(self):
+        # iteration "²" (superscript): str.isdigit() is True but int() raises.
+        # _spec_delta_required must fail-open (not required), not crash the gate.
+        with tempfile.TemporaryDirectory() as td:
+            p = Path(td)
+            (p / "docs").mkdir(parents=True, exist_ok=True)
+            (p / "docs" / "STATUS.md").write_text(
+                _status_md("²"), encoding="utf-8")
+            for rel, sentinel in SIX_ARTIFACTS:
+                (p / rel).parent.mkdir(parents=True, exist_ok=True)
+                (p / rel).write_text(_filled(sentinel), encoding="utf-8")
+            rc, out = _pre_approve(p)
+            # No CHANGES.md present; fail-open means the 6 artifacts approve.
+            self.assertEqual(rc, 0,
+                f"non-ascii iteration must fail-open (no crash). out=\n{out}")
+            self.assertNotIn("Traceback", out)
+
     def test_iteration_with_trailing_space_strips_and_requires(self):
         # iteration "2 " (trailing space): strip => digit => required.
         with tempfile.TemporaryDirectory() as td:

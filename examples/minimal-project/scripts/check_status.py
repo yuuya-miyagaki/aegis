@@ -140,7 +140,9 @@ def _spec_delta_required(root: Path) -> bool:
     if it is None:
         return False
     it = it.strip()
-    if not it.isdigit():
+    # isascii() guard: str.isdigit() is True for non-ASCII digits (e.g. "²"),
+    # but int("²") raises. ascii + digit => [0-9]+ => int() is safe.
+    if not (it.isascii() and it.isdigit()):
         return False
     return int(it) > 1
 
