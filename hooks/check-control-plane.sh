@@ -16,7 +16,8 @@
 #   they contain no chaining operators and no write indicators.
 #
 # Control plane paths: STATUS.md, CLAUDE.md, .claude/, hooks/, scripts/
-# Allowlist: update-gate.sh, check_status.py, check_framework_contract.py
+# Allowlist: update-gate.sh, check_status.py, check_framework_contract.py,
+#            record-test-result.py, run-test-strength-drill.py (evidence scripts)
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -211,8 +212,13 @@ is_allowlisted() {
     return 1
   fi
   # Match: the command is exactly an allowlisted script call (with args).
+  # record-test-result.py / run-test-strength-drill.py are evidence-recording
+  # scripts the agent runs during normal project work (OBS-018). They only
+  # append to the evidence log / write a drill report through their own logic,
+  # never via a shell write the user cannot audit — and the no-chain guard above
+  # still denies `record-test-result.py && evil` or a `> hooks/...` redirect.
   case "$cmd" in
-    *scripts/check_framework_contract.py*|*scripts/check_status.py*|*scripts/update-gate.sh*)
+    *scripts/check_framework_contract.py*|*scripts/check_status.py*|*scripts/update-gate.sh*|*scripts/record-test-result.py*|*scripts/run-test-strength-drill.py*)
       return 0
       ;;
   esac
