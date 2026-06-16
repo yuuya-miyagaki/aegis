@@ -9,7 +9,7 @@ task_size: L
 task_size_rationale: "暫定（brainstorm/plan は dogfood セッションで完了済み・本リポで承認取得予定）: ドッグフード由来 改善（OBS-001〜022）。Batch1=control-plane フック精度+git baseline 6 タスク／Batch2=skill/契約/配布整合 5／Batch3=Client 書込み 2＋横断 X.1/X.2。hooks/scripts/skills/tests 多数で 6+ ファイル＝L。plan: docs/plans/2026-06-15-dogfood-driven-improvements-plan.md。"
 iteration: 31
 ui_surface: false
-last_updated: "2026-06-15T00:00:00Z"
+last_updated: "2026-06-16T00:00:00Z"
 gate_approvals:
   client_ready_for_dev: n/a
   brainstorm: approved
@@ -42,7 +42,7 @@ external_evidence:
     scope: "v0.12.2 実装後 4 ラウンドレビュー"
     findings: "Round 6 (P1×2, P2×1: pre-compact exit 2 / minimal-project / test rc), Round 7 (P1×1, P3×1: git add 漏れ / テスト件数表記), Round 8 (P2×1, P3×1: stale last_updated / grep 自己マッチ), Round 9 (P3×2: コメント不整合)"
     resolution: "9件全反映。tier 1/2 PASS、134 tests PASS、本体と minimal-project 完全同期確認済み。"
-next_action: "iteration 31（ドッグフード由来 改善）開始。スタジオ・ナギ予約LP で v1.10.0 を Client→Dev 一周ドッグフードして見つかったハーネス自身の摩擦（OBS-001〜022）を本リポで修正。brainstorm/plan は dogfood セッション（~/Desktop/personal/aegis-dogfood-reservation-lp の docs/specs/2026-06-15-aegis-dogfood-improvements-{brainstorm-record,design}.md）で完了済み＝本リポ plan docs/plans/2026-06-15-dogfood-driven-improvements-plan.md を成果物として扱い、このリポのルールでゲート承認取得（承認→ref→phase 前進）。**現在: brainstorm ゲート承認待ち（ユーザー承認が必要・自動承認しない）。** 承認後 plan ゲート（spec-delta 作成）→ implement で Batch1 から TDD（各タスク Step0 で HEAD 再検証→失敗テスト→実装→緑→commit）。Batch1.5/1.6 は control-plane フック変更でセキュリティ感応度高＝security 盲検2次必須。残すべき勝ち OBS-010/014/016/019/021/022 をリグレッションさせない。push は明示承認まで禁止。"
+next_action: "iteration 31（ドッグフード由来 改善）implement 進行中。**Batch1（配布ブロッカー＝control-plane フック精度＋git baseline）6 タスク完了・6 コミット（9177854 起動／52dff43 1.1／864786f 1.2／801bbaf 1.3／c4db78d 1.4／6895cbf 1.5／6d1b938 1.6）。** 各タスク Step0→TDD→commit、全 moat 回帰（var_expansion・patterns_parity・secrets・REDTEAM 18/18＋5/5）緑、フルスイート 821 passed/1 skip、contract 全 profile・drift・mirror・scaffold smoke 全 PASS。TDD が 2 つの穴を着手前に捕捉（1.5 パイプ最終セグメント fail-open＝`|| [ -n ]`／1.6 空マスク＝`local s=$1 n=${#s}` の同一行展開、＋クォート write-util 宛先穴をステップ(c)で封鎖）。**判断ポイント: (A) Batch1 を先に review→qa→security ゲート（1.5/1.6 の盲検2次をフレッシュなうちに）か (B) Batch2（skill/契約/配布整合5）+Batch3（Client書込み2）+X.1/X.2 を実装してから一括ゲートか — ユーザー確認待ち。** 残すべき勝ち OBS-010/014/016/019/021/022 維持。ハードゲート（review/qa/security/deploy）と push は明示承認まで禁止。"
 blockers: []
 failure_tracking: null
 session_history:
