@@ -225,6 +225,36 @@ is_allowlisted() {
   return 1
 }
 
+# OBS-017 catch-22: a fresh non-framework project must stage the installed
+# framework files for its baseline commit, but `git add hooks scripts templates
+# .claude CLAUDE.md docs` was denied outright. `git add` only STAGES — it does
+# not modify control-plane file CONTENT (Edit/Write are still required, and a
+# write redirect / chained mutation is excluded below) — so a plain staging
+# command is routed to ASK (user confirms) rather than DENY. Excluded, so they
+# keep denying (fail-closed):
+#   - broad/forced staging: -A/--all/-f/--force (can stage tree-wide deletions
+#     or force-add ignored secrets);
+#   - any chain/redirect operator (a later mutation rides along);
+#   - content-writing subcommands: only `add`/`stage` qualify, never `apply`.
+is_bare_git_stage() {
+  local cmd="$1"
+  # Must be a git add/stage invocation (optionally `git -C <dir> add`).
+  printf '%s' "$cmd" | grep -qE \
+    '(^|[^A-Za-z0-9_])git[[:space:]]+(-C[[:space:]]+[^[:space:]]+[[:space:]]+)?(add|stage)([[:space:]]|$)' \
+    || return 1
+  # Reject any chain/redirect operator (same guard the allowlist uses).
+  if printf '%s' "$cmd" | grep -qE "$CHAIN_OPS"; then
+    return 1
+  fi
+  # Reject broad/forced staging flags. The short-cluster alt catches -A, -f and
+  # combinations (-Af, -vfA); the long forms are matched explicitly.
+  if printf '%s' "$cmd" | grep -qE \
+       '(^|[[:space:]])(--all|--force|-[A-Za-z]*[Af][A-Za-z]*)([[:space:]]|$)'; then
+    return 1
+  fi
+  return 0
+}
+
 # Check extracted command (already full fidelity).
 if [ -n "$CMD" ] && is_allowlisted "$CMD"; then
   emit_allow
@@ -262,6 +292,14 @@ if [ -n "$CHECK_CMD" ]; then
       exit 0
     fi
   fi
+fi
+
+# --- Bare `git add <paths>` staging carve-out (OBS-017 catch-22) ---
+# Staging the framework files for a baseline commit is legitimate and is not a
+# content write to control plane, so ASK rather than DENY.
+if [ -n "$CMD" ] && is_bare_git_stage "$CMD"; then
+  emit_ask "[integrity] git add で制御プレーン (hooks/scripts/.claude 等) を staging しようとしています。ファイル内容は変更しません（baseline コミット等の正当な操作の可能性）。意図を確認してください。"
+  exit 0
 fi
 
 # Default: deny. Control plane path present, not allowlisted, not read-only.

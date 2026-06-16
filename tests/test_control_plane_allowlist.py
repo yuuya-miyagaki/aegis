@@ -60,6 +60,10 @@ def _denied(out: str) -> bool:
     return '"permissionDecision":"deny"' in out
 
 
+def _asked(out: str) -> bool:
+    return '"permissionDecision":"ask"' in out
+
+
 class TestEvidenceScriptsAllowlisted(unittest.TestCase):
 
     @classmethod
@@ -102,6 +106,51 @@ class TestEvidenceScriptsAllowlisted(unittest.TestCase):
             "> hooks/lib/emit.sh")
         self.assertTrue(_denied(out),
                         f"write redirect must still deny: {out[:200]!r}")
+
+
+class TestBareGitAddStaging(unittest.TestCase):
+    """Task 1.4 (OBS-017 catch-22): a fresh non-framework project needs to stage
+    the framework files for its baseline commit, but `git add hooks scripts
+    templates .claude CLAUDE.md docs` was denied outright. Staging is not a
+    content write to a control-plane file (Edit/Write are still required for
+    that), so a bare `git add <paths>` should ASK (user confirms), while broad/
+    forced staging (-A/--all/-f/--force), chained commands, and content-writing
+    git subcommands (apply) keep denying (fail-closed)."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls._tmp = _scratch_root()
+        cls.root = Path(cls._tmp.name)
+
+    @classmethod
+    def tearDownClass(cls):
+        cls._tmp.cleanup()
+
+    def test_bare_git_add_control_plane_dirs_is_ask(self):
+        out = _hook(self.root,
+                    "git add hooks scripts templates .claude CLAUDE.md docs")
+        self.assertTrue(_asked(out),
+                        f"bare baseline staging must ASK, not deny: {out[:200]!r}")
+
+    def test_git_add_force_control_plane_still_denied(self):
+        out = _hook(self.root, "git add -f .claude/settings.local.json")
+        self.assertTrue(_denied(out),
+                        f"-f forced staging must still deny: {out[:200]!r}")
+
+    def test_git_add_all_control_plane_still_denied(self):
+        out = _hook(self.root, "git add -A hooks/")
+        self.assertTrue(_denied(out),
+                        f"-A broad staging must still deny: {out[:200]!r}")
+
+    def test_git_add_chained_still_denied(self):
+        out = _hook(self.root, "git add hooks && rm hooks/lib/emit.sh")
+        self.assertTrue(_denied(out),
+                        f"chained git add must still deny: {out[:200]!r}")
+
+    def test_git_apply_control_plane_still_denied(self):
+        out = _hook(self.root, "git apply hooks/evil.patch")
+        self.assertTrue(_denied(out),
+                        f"git apply (content write) must still deny: {out[:200]!r}")
 
 
 if __name__ == "__main__":
