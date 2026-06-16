@@ -44,14 +44,24 @@ def _drill():
 # state never perturb the code fingerprint or trip the stub/secret scanners.
 NONCODE_PREFIXES = ("docs/", ".claude/")
 
+# STUB scan only: the harness control-plane CODE (hooks/scripts/templates) is not
+# the project's reviewed product code. OBS-017: a fresh install diffs the WHOLE
+# framework as added, so the stub scanner would read build-judge-card.py's own
+# STUB_PATTERN literal ("TODO|FIXME|...") and self-match into a framework-origin
+# false 🔴. These dirs are deliberately NOT added to the secret-scan exclusion:
+# a secret committed into a framework script must still be caught at the security
+# gate (no security backsliding — scan_secrets keeps full coverage).
+STUB_NONCODE_PREFIXES = NONCODE_PREFIXES + ("hooks/", "scripts/", "templates/")
 
-def _changed_code_files(root: Path) -> dict:
-    """Map changed CODE files -> set of added line numbers (docs/ excluded)."""
+
+def _changed_code_files(root: Path, exclude: tuple = NONCODE_PREFIXES) -> dict:
+    """Map changed CODE files -> set of added line numbers, dropping paths whose
+    rel-path starts with any prefix in `exclude` (default: docs/ + .claude/)."""
     drill = _drill()
     ref = drill.resolve_diff_ref(root)
     added = drill.added_lines_by_file(root, ref)
     return {rel: lines for rel, lines in added.items()
-            if not rel.startswith(NONCODE_PREFIXES)}
+            if not rel.startswith(exclude)}
 
 
 def current_fingerprint(root: Path) -> str:
@@ -84,7 +94,7 @@ def scan_stubs(root: Path) -> list[str]:
     """Scan ONLY changed (added) CODE lines for stub markers. Returns a list of
     'file:line' hits (empty = clean)."""
     hits: list[str] = []
-    for rel, lines in _changed_code_files(root).items():
+    for rel, lines in _changed_code_files(root, STUB_NONCODE_PREFIXES).items():
         try:
             content = (root / rel).read_text(encoding="utf-8").split("\n")
         except (OSError, UnicodeDecodeError):

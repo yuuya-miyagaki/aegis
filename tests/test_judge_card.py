@@ -305,6 +305,29 @@ class TestStubPrecision(unittest.TestCase):
                                           name="docs/notes.md")
             self.assertEqual(judge.scan_stubs(root), [])
 
+    def test_control_plane_changes_are_not_scanned_for_stubs(self):
+        # OBS-017: a fresh install diffs the WHOLE framework as added, so the
+        # stub scanner reads control-plane sources — including build-judge-card.py
+        # itself, whose STUB_PATTERN literal ("TODO|FIXME|...") self-matches and
+        # produces a framework-origin false 🔴. hooks/scripts/templates are harness
+        # control-plane, not the project's reviewed code, so they are excluded.
+        for name in ("scripts/x.py", "hooks/x.sh", "templates/x.md"):
+            with self.subTest(name=name):
+                with tempfile.TemporaryDirectory() as d:
+                    root = self._repo_with_change(
+                        d, "x = 1  # TODO: finish\n", name=name)
+                    self.assertEqual(
+                        judge.scan_stubs(root), [],
+                        f"{name} is control-plane and must not be stub-scanned")
+
+    def test_app_code_stub_is_still_flagged(self):
+        # The exclusion must NOT leak into product code: a stub in app/ still 🔴.
+        with tempfile.TemporaryDirectory() as d:
+            root = self._repo_with_change(d, "x = 1  # TODO: finish\n",
+                                          name="app/feature.py")
+            self.assertTrue(judge.scan_stubs(root),
+                            "app/ product code stubs must still be flagged")
+
 
 class TestSecretScanScope(unittest.TestCase):
     def _git(self, root, *a):
@@ -333,6 +356,23 @@ class TestSecretScanScope(unittest.TestCase):
                 'api_key = "abcd1234efgh"\nunrelated = 1\n', encoding="utf-8")
             self.assertEqual(judge.scan_secrets(root), [],
                              "pre-existing secret on an unchanged line must not block")
+
+    def test_secret_in_control_plane_script_still_flagged(self):
+        # No security backsliding (Task 1.2): excluding hooks/scripts/templates
+        # from the STUB scan must NOT also drop them from the SECRET scan. A
+        # secret committed into a framework script is still caught at security.
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            self._git(root, "init", "-q"); self._git(root, "config", "user.email", "t@t")
+            self._git(root, "config", "user.name", "t")
+            (root / "seed.py").write_text("s = 0\n", encoding="utf-8")
+            self._git(root, "add", "-A"); self._git(root, "commit", "-qm", "i")
+            (root / "scripts").mkdir()
+            (root / "scripts" / "cfg.py").write_text(
+                'api_key = "abcd1234efgh"\n', encoding="utf-8")
+            self.assertTrue(
+                judge.scan_secrets(root),
+                "a secret in a control-plane script must still be flagged")
 
 
 class TestResolveReport(unittest.TestCase):
