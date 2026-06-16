@@ -268,29 +268,56 @@ if [ "$TASK_TYPE" = "framework" ]; then
   exit 0
 fi
 
-# --- Read-only simple command check ---
-# Allow purely read-only commands with no chaining and no write indicators.
+# --- Read-only command checks ---
+# Allow read-only inspection of control plane (reading is not mutation). Two
+# forms: (a) a single read-only command, (b) a `|`-only pipeline whose every
+# segment is read-only. Both share the WRITE_INDICATORS source below.
 CHECK_CMD="$CMD"
-if [ -n "$CHECK_CMD" ]; then
-  # Must not contain chain operators.
-  if ! printf '%s' "$CHECK_CMD" | grep -qE "$CHAIN_OPS"; then
-    READ_ONLY_STARTS='^(cat|head|tail|less|more|grep|egrep|fgrep|rg|find|ls|wc|diff|file|stat|md5sum|sha256sum) '
-    # unlink/remove/rename/truncate require a call form `(` — bare substrings
-    # false-positived on read-only greps like `grep -r "remove" hooks/` (P3-4).
-    # Word-form indicators carry a left boundary (T5a v1.5.1): without it,
-    # `grep "confirm " hooks/x.sh` matched rm\s inside "confirm ". find's
-    # write-capable action flags are listed with the same boundary (T5b):
-    # `find hooks/ -exec dd of={} +` passed READ_ONLY_STARTS and (no `;`)
-    # CHAIN_OPS — a real write bypass. The boundary also keeps filename
-    # mentions (pre-exec.log) allowed, and concatenating after `|` avoids a
-    # leading `-` pattern, which BSD grep would parse as an option (rc=2 →
-    # the `!` negation would turn that crash into fail-open).
-    WRITE_INDICATORS='(^|[^A-Za-z0-9_])sed\s+-i|>\s*[^&]|>>\s|(^|[^A-Za-z0-9_])(tee|cp|mv|chmod|rm|mkdir|touch|install|ln)\s|write_text|write_bytes|open\(.*[wax]|\.write\(|Path\(.*\.write|(unlink|remove|rename|truncate)[[:space:]]*\(|(^|[^A-Za-z0-9_])-(exec|execdir|ok|okdir|delete|fprint0?|fprintf|fls)($|[^A-Za-z0-9_])'
-    if printf '%s' "$CHECK_CMD" | grep -qE "$READ_ONLY_STARTS" && \
-       ! printf '%s' "$CHECK_CMD" | grep -qE "$WRITE_INDICATORS"; then
-      emit_allow
-      exit 0
+READ_ONLY_STARTS='^(cat|head|tail|less|more|grep|egrep|fgrep|rg|find|ls|wc|diff|file|stat|md5sum|sha256sum) '
+# unlink/remove/rename/truncate require a call form `(` — bare substrings
+# false-positived on read-only greps like `grep -r "remove" hooks/` (P3-4).
+# Word-form indicators carry a left boundary (T5a v1.5.1): without it,
+# `grep "confirm " hooks/x.sh` matched rm\s inside "confirm ". find's
+# write-capable action flags are listed with the same boundary (T5b):
+# `find hooks/ -exec dd of={} +` passed READ_ONLY_STARTS and (no `;`)
+# CHAIN_OPS — a real write bypass. The boundary also keeps filename
+# mentions (pre-exec.log) allowed, and concatenating after `|` avoids a
+# leading `-` pattern, which BSD grep would parse as an option (rc=2 →
+# the `!` negation would turn that crash into fail-open).
+WRITE_INDICATORS='(^|[^A-Za-z0-9_])sed\s+-i|>\s*[^&]|>>\s|(^|[^A-Za-z0-9_])(tee|cp|mv|chmod|rm|mkdir|touch|install|ln)\s|write_text|write_bytes|open\(.*[wax]|\.write\(|Path\(.*\.write|(unlink|remove|rename|truncate)[[:space:]]*\(|(^|[^A-Za-z0-9_])-(exec|execdir|ok|okdir|delete|fprint0?|fprintf|fls)($|[^A-Za-z0-9_])'
+
+# (a) single read-only command: no chain/redirect operators at all.
+if [ -n "$CHECK_CMD" ] && ! printf '%s' "$CHECK_CMD" | grep -qE "$CHAIN_OPS"; then
+  if printf '%s' "$CHECK_CMD" | grep -qE "$READ_ONLY_STARTS" && \
+     ! printf '%s' "$CHECK_CMD" | grep -qE "$WRITE_INDICATORS"; then
+    emit_allow
+    exit 0
+  fi
+fi
+
+# (b) read-only PIPELINE (OBS-003): a `|`-only pipe whose EVERY segment is an
+# independently read-only command (read-only starter + no write indicator) is
+# safe against control plane. Only `|` is tolerated — `;`, `&` (so `&&`), `||`,
+# `<`, `>`, `$()`, `` ` `` all keep disqualifying (fail-closed), so a write
+# segment (`... -exec rm`, `| tee`) or any redirect/cmdsub still denies.
+if [ -n "$CHECK_CMD" ] && printf '%s' "$CHECK_CMD" | grep -q '|' \
+   && ! printf '%s' "$CHECK_CMD" | grep -qE '[;&<>]|\$\(|`|\|\|'; then
+  READ_ONLY_SEG='^[[:space:]]*(cat|head|tail|less|more|grep|egrep|fgrep|rg|find|ls|wc|diff|file|stat|md5sum|sha256sum)([[:space:]]|$)'
+  pipe_all_ro=yes
+  # `|| [ -n "$_seg" ]` processes the FINAL segment too: tr leaves the last
+  # segment without a trailing newline, and a bare `read` returns non-zero
+  # there and would SKIP it — which is exactly the dangerous tail of a pipe
+  # (`| tee`, `| sh`). Dropping it would fail OPEN.
+  while IFS= read -r _seg || [ -n "$_seg" ]; do
+    if ! printf '%s' "$_seg" | grep -qE "$READ_ONLY_SEG" \
+       || printf '%s' "$_seg" | grep -qE "$WRITE_INDICATORS"; then
+      pipe_all_ro=no
+      break
     fi
+  done < <(printf '%s' "$CHECK_CMD" | tr '|' '\n')
+  if [ "$pipe_all_ro" = "yes" ]; then
+    emit_allow
+    exit 0
   fi
 fi
 

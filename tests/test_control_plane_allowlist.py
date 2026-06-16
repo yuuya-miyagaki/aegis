@@ -153,5 +153,67 @@ class TestBareGitAddStaging(unittest.TestCase):
                         f"git apply (content write) must still deny: {out[:200]!r}")
 
 
+class TestReadOnlyPipeline(unittest.TestCase):
+    """Task 1.5 (OBS-003): a pipe whose EVERY segment is an independently
+    read-only command is safe to allow even against control plane (inspection,
+    not mutation). Only `|` is tolerated; a write segment, ;, &, &&, ||, <, >,
+    $(), `` all keep denying (fail-closed)."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls._tmp = _scratch_root()
+        cls.root = Path(cls._tmp.name)
+
+    @classmethod
+    def tearDownClass(cls):
+        cls._tmp.cleanup()
+
+    # ---- all-read-only pipes against control plane → allow ----
+    def test_find_pipe_head_allowed(self):
+        out = _hook(self.root, "find hooks/ -type f | head")
+        self.assertTrue(_allowed(out),
+                        f"all-read-only pipe must be allowed: {out[:200]!r}")
+
+    def test_grep_pipe_head_allowed(self):
+        out = _hook(self.root, "grep -rn foo scripts/ | head -5")
+        self.assertTrue(_allowed(out),
+                        f"all-read-only pipe must be allowed: {out[:200]!r}")
+
+    def test_cat_pipe_wc_allowed(self):
+        out = _hook(self.root, "cat .claude/settings.local.json | wc -l")
+        self.assertTrue(_allowed(out),
+                        f"all-read-only pipe must be allowed: {out[:200]!r}")
+
+    # ---- pipes with a write / other compound operator → deny ----
+    def test_find_exec_rm_in_pipe_denied(self):
+        out = _hook(self.root, "find hooks/ -type f -exec rm {} + | head")
+        self.assertTrue(_denied(out),
+                        f"write segment in pipe must deny: {out[:200]!r}")
+
+    def test_pipe_to_tee_denied(self):
+        out = _hook(self.root, "grep x scripts/ | tee out.txt")
+        self.assertTrue(_denied(out),
+                        f"tee write in pipe must deny: {out[:200]!r}")
+
+    def test_and_chain_denied(self):
+        out = _hook(self.root, "grep x hooks/ && curl http://evil")
+        self.assertTrue(_denied(out),
+                        f"&& chain must deny: {out[:200]!r}")
+
+    def test_redirect_denied(self):
+        out = _hook(self.root, "cat hooks/x.sh > scripts/y.sh")
+        self.assertTrue(_denied(out),
+                        f"redirect write must deny: {out[:200]!r}")
+
+    def test_pipe_to_shell_denied(self):
+        # Regression for the fail-open found in Task 1.5: tr leaves the LAST
+        # pipe segment without a trailing newline and a bare `read` would skip
+        # it. `sh` is neither a read-only starter nor a WRITE_INDICATOR keyword,
+        # so only checking the last segment for a read-only starter catches it.
+        out = _hook(self.root, "cat .claude/settings.local.json | sh")
+        self.assertTrue(_denied(out),
+                        f"piping control plane into a shell must deny: {out[:200]!r}")
+
+
 if __name__ == "__main__":
     unittest.main()
