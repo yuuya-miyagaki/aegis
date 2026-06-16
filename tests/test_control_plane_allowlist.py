@@ -215,5 +215,109 @@ class TestReadOnlyPipeline(unittest.TestCase):
                         f"piping control plane into a shell must deny: {out[:200]!r}")
 
 
+class TestWriteTargetVsMention(unittest.TestCase):
+    """Task 1.6 (OBS-006): a control-plane path mentioned only inside a quoted
+    string literal (a commit message, an echo argument) that is NOT a write
+    target must not be denied. Denial keys on the WRITE TARGET being control
+    plane, not on a bare mention. Variable/command-substitution-built targets
+    stay fail-closed (ask / broad deny)."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls._tmp = _scratch_root()
+        cls.root = Path(cls._tmp.name)
+
+    @classmethod
+    def tearDownClass(cls):
+        cls._tmp.cleanup()
+
+    # ---- quoted CP mention, not a write target → allow (false positives) ----
+    def test_commit_message_mentioning_status_allowed(self):
+        out = _hook(self.root, 'git commit -m "update STATUS.md handling"')
+        self.assertTrue(_allowed(out),
+                        f"CP in a quoted commit message must allow: {out[:200]!r}")
+
+    def test_commit_message_mentioning_scripts_allowed(self):
+        out = _hook(self.root, 'git commit -m "fix scripts/foo bug"')
+        self.assertTrue(_allowed(out),
+                        f"CP in a quoted commit message must allow: {out[:200]!r}")
+
+    def test_echo_quoted_cp_redirect_to_noncp_allowed(self):
+        out = _hook(self.root, "echo 'see hooks/ for details' >> notes.txt")
+        self.assertTrue(_allowed(out),
+                        f"CP in a quoted arg, write target non-CP must allow: {out[:200]!r}")
+
+    def test_echo_quoted_cp_no_redirect_allowed(self):
+        out = _hook(self.root, 'echo "edit scripts/foo.py please"')
+        self.assertTrue(_allowed(out),
+                        f"CP in a quoted echo arg must allow: {out[:200]!r}")
+
+    # ---- write target IS control plane → deny ----
+    def test_bare_redirect_to_cp_denied(self):
+        out = _hook(self.root, "> hooks/x.sh")
+        self.assertTrue(_denied(out),
+                        f"redirect to CP must deny: {out[:200]!r}")
+
+    def test_quoted_redirect_target_cp_denied(self):
+        out = _hook(self.root, 'echo x > "hooks/lib/emit.sh"')
+        self.assertTrue(_denied(out),
+                        f"quoted CP write target must deny: {out[:200]!r}")
+
+    def test_unquoted_cp_destination_denied(self):
+        out = _hook(self.root, "cp safe.txt hooks/dest.sh")
+        self.assertTrue(_denied(out),
+                        f"unquoted CP destination must deny: {out[:200]!r}")
+
+    def test_quoted_cp_destination_of_write_util_denied(self):
+        # The hole masking could open: a write utility's destination is a QUOTED
+        # CP path. Masking hides the CP and it is not a redirect, so a write
+        # utility + any raw CP mention must deny (fail-closed).
+        out = _hook(self.root, 'cp safe.txt "hooks/dest.sh"')
+        self.assertTrue(_denied(out),
+                        f"quoted CP write destination must deny: {out[:200]!r}")
+
+    def test_quoted_cp_tee_target_denied(self):
+        out = _hook(self.root, 'tee "scripts/evil.py"')
+        self.assertTrue(_denied(out),
+                        f"quoted CP tee target must deny: {out[:200]!r}")
+
+    def test_sed_inplace_quoted_cp_denied(self):
+        out = _hook(self.root, 'sed -i "s/a/b/" "hooks/lib/emit.sh"')
+        self.assertTrue(_denied(out),
+                        f"sed -i on quoted CP must deny: {out[:200]!r}")
+
+    # ---- adversarial: must NOT open a hole ----
+    def test_cmdsub_in_quotes_writing_cp_denied(self):
+        # CRITICAL: $(...) inside double quotes is STILL executed. Masking the
+        # quoted span would hide a destructive cmdsub — so any cmdsub/backtick
+        # bails to the broad (fail-closed) check, which denies on the mention.
+        out = _hook(self.root, 'echo "$(rm hooks/lib/emit.sh)"')
+        self.assertTrue(_denied(out),
+                        f"cmdsub writing CP inside quotes must deny: {out[:200]!r}")
+
+    def test_bash_c_redirect_in_quotes_denied(self):
+        # `bash -c "... > hooks/x"` executes the quoted redirect, so the raw
+        # redirect-target scan keeps it denied (fail-closed over the contrived
+        # benign `echo "literal > hooks/x"` case).
+        out = _hook(self.root, 'bash -c "validator && malicious > hooks/x"')
+        self.assertTrue(_denied(out),
+                        f"bash -c with CP redirect must deny: {out[:200]!r}")
+
+    def test_unbalanced_quote_denied(self):
+        out = _hook(self.root, 'echo "hooks/')
+        self.assertTrue(_denied(out),
+                        f"unbalanced quote must fail closed (deny): {out[:200]!r}")
+
+    def test_chain_after_quoted_message_denied(self):
+        out = _hook(self.root, "git commit -m 'msg' && rm hooks/lib/emit.sh")
+        self.assertTrue(_denied(out),
+                        f"unquoted CP after a chain must deny: {out[:200]!r}")
+
+    def test_var_built_redirect_target_still_ask(self):
+        out = _hook(self.root, "> $(echo hooks)/lib/emit.sh")
+        self.assertTrue(_asked(out) or _denied(out),
+                        f"cmdsub-built write target must stay ask/deny: {out[:200]!r}")
+
+
 if __name__ == "__main__":
     unittest.main()

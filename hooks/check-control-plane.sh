@@ -76,21 +76,107 @@ CONTROL_PLANE="${CONTROL_PLANE}|\\\$[A-Za-z_{][A-Za-z0-9_}]*/(${CP_DIRS})/"
 # well as `${VAR:-hooks/lib/...}` (path inside the braces).
 CONTROL_PLANE="${CONTROL_PLANE}|:[-=+](${CP_DIRS})}?/"
 
-# True when the command references this project's control plane, including
-# literal absolute paths under the project root (logical and physical forms —
-# the boundary regex intentionally skips /-preceded names, so absolute paths
-# need the fixed-string pass).
-cmd_mentions_control_plane() {
-  local cmd="$1" base
-  if printf '%s' "$cmd" | grep -qE "$CONTROL_PLANE"; then
+# True when TEXT references this project's control plane (regex form + literal
+# absolute paths under the project root — the boundary regex intentionally skips
+# /-preceded names, so absolute paths need the fixed-string pass). Shared by the
+# raw (fail-closed) and the masked (precise) passes of the mention check.
+_text_mentions_cp() {
+  local text="$1" base
+  if printf '%s' "$text" | grep -qE "$CONTROL_PLANE"; then
     return 0
   fi
   for base in "$ROOT" "$ROOT_REAL"; do
-    if printf '%s' "$cmd" | grep -qF \
+    if printf '%s' "$text" | grep -qF \
         -e "${base}/hooks/" -e "${base}/scripts/" -e "${base}/templates/"; then
       return 0
     fi
   done
+  return 1
+}
+
+# Mask the CONTENT of every '...' / "..." quoted span with 'x', preserving the
+# quote characters and everything outside quotes. Single quotes take no escapes;
+# inside double quotes a backslash escapes the next char (so \" does not end the
+# span). Prints the masked string; returns 1 on an UNBALANCED quote so the
+# caller fails closed. Only safe to call when the command has NO $(...)/backtick:
+# a command substitution inside double quotes is still executed, so masking it
+# would hide a real write (e.g. `echo "$(rm hooks/x)"`).
+mask_quoted() {
+  local s="$1"
+  # NB: ${#s} is taken in the while-condition, not a sibling `local n=${#s}` on
+  # the same line as `s="$1"` — a single `local` expands ${#s} against the OUTER
+  # s (still empty), yielding 0 and an empty mask (a silent fail).
+  local out="" i=0 ch state=none
+  while [ "$i" -lt "${#s}" ]; do
+    ch="${s:$i:1}"
+    case "$state" in
+      none)
+        case "$ch" in
+          "'") state=sq; out="${out}'" ;;
+          '"') state=dq; out="${out}\"" ;;
+          *)   out="${out}${ch}" ;;
+        esac ;;
+      sq)
+        if [ "$ch" = "'" ]; then state=none; out="${out}'"; else out="${out}x"; fi ;;
+      *)  # dq
+        if [ "$ch" = '\' ]; then out="${out}xx"; i=$((i + 1))
+        elif [ "$ch" = '"' ]; then state=none; out="${out}\""
+        else out="${out}x"; fi ;;
+    esac
+    i=$((i + 1))
+  done
+  [ "$state" = none ] || return 1
+  printf '%s' "$out"
+}
+
+# True when the command WRITES to (not merely mentions) this project's control
+# plane. OBS-006: a CP path inside a quoted literal that is not a write target
+# (`git commit -m "...STATUS.md..."`, `echo 'see hooks/' >> notes.txt`) is NOT a
+# write and must be allowed. Strategy:
+#   - $(...) / backtick present → masking is unsafe (active spans inside double
+#     quotes) → fall back to the raw fail-closed mention check.
+#   - else mask quoted literals; an unquoted CP path anywhere → deny-eligible;
+#     a redirect target (quote-stripped, taken from the RAW command so a quoted
+#     `> "hooks/x"` and a `bash -c "... > hooks/x"` both count) that is CP →
+#     deny-eligible.
+# Variable-built write targets that are not literally CP fall through and are
+# caught downstream by cmd_var_built_write (ask, fail-closed).
+cmd_mentions_control_plane() {
+  local cmd="$1" masked redir target
+  # Write UTILITIES whose destination can be a QUOTED CP path that masking would
+  # hide (cp/mv/tee/sed -i/git add/...). Redirects are handled separately by the
+  # target scan below, and plain message commands (git commit, echo) match none
+  # of these — so they still get the quoted-literal relaxation.
+  local WRITE_UTIL_RE='(^|[^A-Za-z0-9_])(tee|cp|mv|install|dd|truncate|ln|rm|chmod|chown|mkdir|touch|rsync|tar|curl|wget)([[:space:]]|$)|sed[[:space:]]+-i|(^|[^A-Za-z0-9_])git[[:space:]]+(apply|add|mv|rm|stage|update-index)([[:space:]]|$)|python3?[[:space:]]+-c|(^|[^A-Za-z0-9_])(bash|sh|eval)[[:space:]]'
+  # Command substitution present → cannot safely mask → raw fail-closed check.
+  if printf '%s' "$cmd" | grep -qE '\$\(|`'; then
+    _text_mentions_cp "$cmd"
+    return $?
+  fi
+  # Mask quoted literals; unbalanced quotes → fail closed (treat as mention).
+  masked=$(mask_quoted "$cmd") || return 0
+  # (a) Unquoted CP path anywhere in the masked command.
+  if _text_mentions_cp "$masked"; then
+    return 0
+  fi
+  # (b) A redirect target (quote-stripped) that is control plane — even when the
+  # CP path sat inside the quotes of the target token.
+  while IFS= read -r redir || [ -n "$redir" ]; do
+    target=$(printf '%s' "$redir" | sed -E 's/^[[:space:]]*>>?[[:space:]]*//')
+    case "$target" in
+      \"*\") target="${target#\"}"; target="${target%\"}" ;;
+      \'*\') target="${target#\'}"; target="${target%\'}" ;;
+    esac
+    [ -n "$target" ] || continue
+    if _text_mentions_cp "$target"; then
+      return 0
+    fi
+  done < <(printf '%s' "$cmd" | grep -oE ">>?[[:space:]]*(\"[^\"]*\"|'[^']*'|[^[:space:]|&;<>]+)")
+  # (c) A write utility is present and the raw command mentions CP anywhere
+  # (its destination may be a quoted CP path that masking hid). Fail closed.
+  if printf '%s' "$cmd" | grep -qE "$WRITE_UTIL_RE" && _text_mentions_cp "$cmd"; then
+    return 0
+  fi
   return 1
 }
 

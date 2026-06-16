@@ -16,7 +16,8 @@
 #   they contain no chaining operators and no write indicators.
 #
 # Control plane paths: STATUS.md, CLAUDE.md, .claude/, hooks/, scripts/
-# Allowlist: update-gate.sh, check_status.py, check_framework_contract.py
+# Allowlist: update-gate.sh, check_status.py, check_framework_contract.py,
+#            record-test-result.py, run-test-strength-drill.py (evidence scripts)
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -75,21 +76,107 @@ CONTROL_PLANE="${CONTROL_PLANE}|\\\$[A-Za-z_{][A-Za-z0-9_}]*/(${CP_DIRS})/"
 # well as `${VAR:-hooks/lib/...}` (path inside the braces).
 CONTROL_PLANE="${CONTROL_PLANE}|:[-=+](${CP_DIRS})}?/"
 
-# True when the command references this project's control plane, including
-# literal absolute paths under the project root (logical and physical forms —
-# the boundary regex intentionally skips /-preceded names, so absolute paths
-# need the fixed-string pass).
-cmd_mentions_control_plane() {
-  local cmd="$1" base
-  if printf '%s' "$cmd" | grep -qE "$CONTROL_PLANE"; then
+# True when TEXT references this project's control plane (regex form + literal
+# absolute paths under the project root — the boundary regex intentionally skips
+# /-preceded names, so absolute paths need the fixed-string pass). Shared by the
+# raw (fail-closed) and the masked (precise) passes of the mention check.
+_text_mentions_cp() {
+  local text="$1" base
+  if printf '%s' "$text" | grep -qE "$CONTROL_PLANE"; then
     return 0
   fi
   for base in "$ROOT" "$ROOT_REAL"; do
-    if printf '%s' "$cmd" | grep -qF \
+    if printf '%s' "$text" | grep -qF \
         -e "${base}/hooks/" -e "${base}/scripts/" -e "${base}/templates/"; then
       return 0
     fi
   done
+  return 1
+}
+
+# Mask the CONTENT of every '...' / "..." quoted span with 'x', preserving the
+# quote characters and everything outside quotes. Single quotes take no escapes;
+# inside double quotes a backslash escapes the next char (so \" does not end the
+# span). Prints the masked string; returns 1 on an UNBALANCED quote so the
+# caller fails closed. Only safe to call when the command has NO $(...)/backtick:
+# a command substitution inside double quotes is still executed, so masking it
+# would hide a real write (e.g. `echo "$(rm hooks/x)"`).
+mask_quoted() {
+  local s="$1"
+  # NB: ${#s} is taken in the while-condition, not a sibling `local n=${#s}` on
+  # the same line as `s="$1"` — a single `local` expands ${#s} against the OUTER
+  # s (still empty), yielding 0 and an empty mask (a silent fail).
+  local out="" i=0 ch state=none
+  while [ "$i" -lt "${#s}" ]; do
+    ch="${s:$i:1}"
+    case "$state" in
+      none)
+        case "$ch" in
+          "'") state=sq; out="${out}'" ;;
+          '"') state=dq; out="${out}\"" ;;
+          *)   out="${out}${ch}" ;;
+        esac ;;
+      sq)
+        if [ "$ch" = "'" ]; then state=none; out="${out}'"; else out="${out}x"; fi ;;
+      *)  # dq
+        if [ "$ch" = '\' ]; then out="${out}xx"; i=$((i + 1))
+        elif [ "$ch" = '"' ]; then state=none; out="${out}\""
+        else out="${out}x"; fi ;;
+    esac
+    i=$((i + 1))
+  done
+  [ "$state" = none ] || return 1
+  printf '%s' "$out"
+}
+
+# True when the command WRITES to (not merely mentions) this project's control
+# plane. OBS-006: a CP path inside a quoted literal that is not a write target
+# (`git commit -m "...STATUS.md..."`, `echo 'see hooks/' >> notes.txt`) is NOT a
+# write and must be allowed. Strategy:
+#   - $(...) / backtick present → masking is unsafe (active spans inside double
+#     quotes) → fall back to the raw fail-closed mention check.
+#   - else mask quoted literals; an unquoted CP path anywhere → deny-eligible;
+#     a redirect target (quote-stripped, taken from the RAW command so a quoted
+#     `> "hooks/x"` and a `bash -c "... > hooks/x"` both count) that is CP →
+#     deny-eligible.
+# Variable-built write targets that are not literally CP fall through and are
+# caught downstream by cmd_var_built_write (ask, fail-closed).
+cmd_mentions_control_plane() {
+  local cmd="$1" masked redir target
+  # Write UTILITIES whose destination can be a QUOTED CP path that masking would
+  # hide (cp/mv/tee/sed -i/git add/...). Redirects are handled separately by the
+  # target scan below, and plain message commands (git commit, echo) match none
+  # of these — so they still get the quoted-literal relaxation.
+  local WRITE_UTIL_RE='(^|[^A-Za-z0-9_])(tee|cp|mv|install|dd|truncate|ln|rm|chmod|chown|mkdir|touch|rsync|tar|curl|wget)([[:space:]]|$)|sed[[:space:]]+-i|(^|[^A-Za-z0-9_])git[[:space:]]+(apply|add|mv|rm|stage|update-index)([[:space:]]|$)|python3?[[:space:]]+-c|(^|[^A-Za-z0-9_])(bash|sh|eval)[[:space:]]'
+  # Command substitution present → cannot safely mask → raw fail-closed check.
+  if printf '%s' "$cmd" | grep -qE '\$\(|`'; then
+    _text_mentions_cp "$cmd"
+    return $?
+  fi
+  # Mask quoted literals; unbalanced quotes → fail closed (treat as mention).
+  masked=$(mask_quoted "$cmd") || return 0
+  # (a) Unquoted CP path anywhere in the masked command.
+  if _text_mentions_cp "$masked"; then
+    return 0
+  fi
+  # (b) A redirect target (quote-stripped) that is control plane — even when the
+  # CP path sat inside the quotes of the target token.
+  while IFS= read -r redir || [ -n "$redir" ]; do
+    target=$(printf '%s' "$redir" | sed -E 's/^[[:space:]]*>>?[[:space:]]*//')
+    case "$target" in
+      \"*\") target="${target#\"}"; target="${target%\"}" ;;
+      \'*\') target="${target#\'}"; target="${target%\'}" ;;
+    esac
+    [ -n "$target" ] || continue
+    if _text_mentions_cp "$target"; then
+      return 0
+    fi
+  done < <(printf '%s' "$cmd" | grep -oE ">>?[[:space:]]*(\"[^\"]*\"|'[^']*'|[^[:space:]|&;<>]+)")
+  # (c) A write utility is present and the raw command mentions CP anywhere
+  # (its destination may be a quoted CP path that masking hid). Fail closed.
+  if printf '%s' "$cmd" | grep -qE "$WRITE_UTIL_RE" && _text_mentions_cp "$cmd"; then
+    return 0
+  fi
   return 1
 }
 
@@ -211,12 +298,47 @@ is_allowlisted() {
     return 1
   fi
   # Match: the command is exactly an allowlisted script call (with args).
+  # record-test-result.py / run-test-strength-drill.py are evidence-recording
+  # scripts the agent runs during normal project work (OBS-018). They only
+  # append to the evidence log / write a drill report through their own logic,
+  # never via a shell write the user cannot audit — and the no-chain guard above
+  # still denies `record-test-result.py && evil` or a `> hooks/...` redirect.
   case "$cmd" in
-    *scripts/check_framework_contract.py*|*scripts/check_status.py*|*scripts/update-gate.sh*)
+    *scripts/check_framework_contract.py*|*scripts/check_status.py*|*scripts/update-gate.sh*|*scripts/record-test-result.py*|*scripts/run-test-strength-drill.py*)
       return 0
       ;;
   esac
   return 1
+}
+
+# OBS-017 catch-22: a fresh non-framework project must stage the installed
+# framework files for its baseline commit, but `git add hooks scripts templates
+# .claude CLAUDE.md docs` was denied outright. `git add` only STAGES — it does
+# not modify control-plane file CONTENT (Edit/Write are still required, and a
+# write redirect / chained mutation is excluded below) — so a plain staging
+# command is routed to ASK (user confirms) rather than DENY. Excluded, so they
+# keep denying (fail-closed):
+#   - broad/forced staging: -A/--all/-f/--force (can stage tree-wide deletions
+#     or force-add ignored secrets);
+#   - any chain/redirect operator (a later mutation rides along);
+#   - content-writing subcommands: only `add`/`stage` qualify, never `apply`.
+is_bare_git_stage() {
+  local cmd="$1"
+  # Must be a git add/stage invocation (optionally `git -C <dir> add`).
+  printf '%s' "$cmd" | grep -qE \
+    '(^|[^A-Za-z0-9_])git[[:space:]]+(-C[[:space:]]+[^[:space:]]+[[:space:]]+)?(add|stage)([[:space:]]|$)' \
+    || return 1
+  # Reject any chain/redirect operator (same guard the allowlist uses).
+  if printf '%s' "$cmd" | grep -qE "$CHAIN_OPS"; then
+    return 1
+  fi
+  # Reject broad/forced staging flags. The short-cluster alt catches -A, -f and
+  # combinations (-Af, -vfA); the long forms are matched explicitly.
+  if printf '%s' "$cmd" | grep -qE \
+       '(^|[[:space:]])(--all|--force|-[A-Za-z]*[Af][A-Za-z]*)([[:space:]]|$)'; then
+    return 1
+  fi
+  return 0
 }
 
 # Check extracted command (already full fidelity).
@@ -232,30 +354,65 @@ if [ "$TASK_TYPE" = "framework" ]; then
   exit 0
 fi
 
-# --- Read-only simple command check ---
-# Allow purely read-only commands with no chaining and no write indicators.
+# --- Read-only command checks ---
+# Allow read-only inspection of control plane (reading is not mutation). Two
+# forms: (a) a single read-only command, (b) a `|`-only pipeline whose every
+# segment is read-only. Both share the WRITE_INDICATORS source below.
 CHECK_CMD="$CMD"
-if [ -n "$CHECK_CMD" ]; then
-  # Must not contain chain operators.
-  if ! printf '%s' "$CHECK_CMD" | grep -qE "$CHAIN_OPS"; then
-    READ_ONLY_STARTS='^(cat|head|tail|less|more|grep|egrep|fgrep|rg|find|ls|wc|diff|file|stat|md5sum|sha256sum) '
-    # unlink/remove/rename/truncate require a call form `(` — bare substrings
-    # false-positived on read-only greps like `grep -r "remove" hooks/` (P3-4).
-    # Word-form indicators carry a left boundary (T5a v1.5.1): without it,
-    # `grep "confirm " hooks/x.sh` matched rm\s inside "confirm ". find's
-    # write-capable action flags are listed with the same boundary (T5b):
-    # `find hooks/ -exec dd of={} +` passed READ_ONLY_STARTS and (no `;`)
-    # CHAIN_OPS — a real write bypass. The boundary also keeps filename
-    # mentions (pre-exec.log) allowed, and concatenating after `|` avoids a
-    # leading `-` pattern, which BSD grep would parse as an option (rc=2 →
-    # the `!` negation would turn that crash into fail-open).
-    WRITE_INDICATORS='(^|[^A-Za-z0-9_])sed\s+-i|>\s*[^&]|>>\s|(^|[^A-Za-z0-9_])(tee|cp|mv|chmod|rm|mkdir|touch|install|ln)\s|write_text|write_bytes|open\(.*[wax]|\.write\(|Path\(.*\.write|(unlink|remove|rename|truncate)[[:space:]]*\(|(^|[^A-Za-z0-9_])-(exec|execdir|ok|okdir|delete|fprint0?|fprintf|fls)($|[^A-Za-z0-9_])'
-    if printf '%s' "$CHECK_CMD" | grep -qE "$READ_ONLY_STARTS" && \
-       ! printf '%s' "$CHECK_CMD" | grep -qE "$WRITE_INDICATORS"; then
-      emit_allow
-      exit 0
-    fi
+READ_ONLY_STARTS='^(cat|head|tail|less|more|grep|egrep|fgrep|rg|find|ls|wc|diff|file|stat|md5sum|sha256sum) '
+# unlink/remove/rename/truncate require a call form `(` — bare substrings
+# false-positived on read-only greps like `grep -r "remove" hooks/` (P3-4).
+# Word-form indicators carry a left boundary (T5a v1.5.1): without it,
+# `grep "confirm " hooks/x.sh` matched rm\s inside "confirm ". find's
+# write-capable action flags are listed with the same boundary (T5b):
+# `find hooks/ -exec dd of={} +` passed READ_ONLY_STARTS and (no `;`)
+# CHAIN_OPS — a real write bypass. The boundary also keeps filename
+# mentions (pre-exec.log) allowed, and concatenating after `|` avoids a
+# leading `-` pattern, which BSD grep would parse as an option (rc=2 →
+# the `!` negation would turn that crash into fail-open).
+WRITE_INDICATORS='(^|[^A-Za-z0-9_])sed\s+-i|>\s*[^&]|>>\s|(^|[^A-Za-z0-9_])(tee|cp|mv|chmod|rm|mkdir|touch|install|ln)\s|write_text|write_bytes|open\(.*[wax]|\.write\(|Path\(.*\.write|(unlink|remove|rename|truncate)[[:space:]]*\(|(^|[^A-Za-z0-9_])-(exec|execdir|ok|okdir|delete|fprint0?|fprintf|fls)($|[^A-Za-z0-9_])'
+
+# (a) single read-only command: no chain/redirect operators at all.
+if [ -n "$CHECK_CMD" ] && ! printf '%s' "$CHECK_CMD" | grep -qE "$CHAIN_OPS"; then
+  if printf '%s' "$CHECK_CMD" | grep -qE "$READ_ONLY_STARTS" && \
+     ! printf '%s' "$CHECK_CMD" | grep -qE "$WRITE_INDICATORS"; then
+    emit_allow
+    exit 0
   fi
+fi
+
+# (b) read-only PIPELINE (OBS-003): a `|`-only pipe whose EVERY segment is an
+# independently read-only command (read-only starter + no write indicator) is
+# safe against control plane. Only `|` is tolerated — `;`, `&` (so `&&`), `||`,
+# `<`, `>`, `$()`, `` ` `` all keep disqualifying (fail-closed), so a write
+# segment (`... -exec rm`, `| tee`) or any redirect/cmdsub still denies.
+if [ -n "$CHECK_CMD" ] && printf '%s' "$CHECK_CMD" | grep -q '|' \
+   && ! printf '%s' "$CHECK_CMD" | grep -qE '[;&<>]|\$\(|`|\|\|'; then
+  READ_ONLY_SEG='^[[:space:]]*(cat|head|tail|less|more|grep|egrep|fgrep|rg|find|ls|wc|diff|file|stat|md5sum|sha256sum)([[:space:]]|$)'
+  pipe_all_ro=yes
+  # `|| [ -n "$_seg" ]` processes the FINAL segment too: tr leaves the last
+  # segment without a trailing newline, and a bare `read` returns non-zero
+  # there and would SKIP it — which is exactly the dangerous tail of a pipe
+  # (`| tee`, `| sh`). Dropping it would fail OPEN.
+  while IFS= read -r _seg || [ -n "$_seg" ]; do
+    if ! printf '%s' "$_seg" | grep -qE "$READ_ONLY_SEG" \
+       || printf '%s' "$_seg" | grep -qE "$WRITE_INDICATORS"; then
+      pipe_all_ro=no
+      break
+    fi
+  done < <(printf '%s' "$CHECK_CMD" | tr '|' '\n')
+  if [ "$pipe_all_ro" = "yes" ]; then
+    emit_allow
+    exit 0
+  fi
+fi
+
+# --- Bare `git add <paths>` staging carve-out (OBS-017 catch-22) ---
+# Staging the framework files for a baseline commit is legitimate and is not a
+# content write to control plane, so ASK rather than DENY.
+if [ -n "$CMD" ] && is_bare_git_stage "$CMD"; then
+  emit_ask "[integrity] git add で制御プレーン (hooks/scripts/.claude 等) を staging しようとしています。ファイル内容は変更しません（baseline コミット等の正当な操作の可能性）。意図を確認してください。"
+  exit 0
 fi
 
 # Default: deny. Control plane path present, not allowlisted, not read-only.
