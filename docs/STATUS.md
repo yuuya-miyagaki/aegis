@@ -3,31 +3,31 @@ framework: aegis
 framework_version: "1.10.0"
 project_name: "Aegis"
 mode: Dev
-phase: deploy
+phase: implement
 task_type: framework
 task_size: L
-task_size_rationale: "確定（brainstorm→spec→writing-plans→grill-plan→TDD→grill-code）: 進化ロードマップ P3『skill 挙動圧力テスト』。2 層実装＝層1 決定論 skill behavior contract（新 manifest＋drift check＋RED-GREEN テスト）＋層2 opt-in adversarial drill 足場（extension）。新規 8＋改変 6＝~14 ファイルで L。feature MINOR（1.9.0→1.10.0）。"
-iteration: 30
+task_size_rationale: "暫定（brainstorm/plan は dogfood セッションで完了済み・本リポで承認取得予定）: ドッグフード由来 改善（OBS-001〜022）。Batch1=control-plane フック精度+git baseline 6 タスク／Batch2=skill/契約/配布整合 5／Batch3=Client 書込み 2＋横断 X.1/X.2。hooks/scripts/skills/tests 多数で 6+ ファイル＝L。plan: docs/plans/2026-06-15-dogfood-driven-improvements-plan.md。"
+iteration: 31
 ui_surface: false
-last_updated: "2026-06-14T16:30:00Z"
+last_updated: "2026-06-15T00:00:00Z"
 gate_approvals:
   client_ready_for_dev: n/a
   brainstorm: approved
   plan: approved
-  review: approved
-  qa: approved
-  security: approved
-  deploy: approved
+  review: pending
+  qa: pending
+  security: pending
+  deploy: pending
   dev_ready_for_client: pending
 current_refs:
   requirements:
     - docs/full-review-2026-06-13-context-futureproof.md
-  plan: docs/plans/2026-06-14-skill-behavior-pressure-test-plan.md
-  spec: docs/specs/2026-06-14-skill-behavior-pressure-test-design.md
-  review: docs/qa-reports/v1100-review.md
-  qa: docs/qa-reports/v1100-qa.md
-  security: docs/qa-reports/v1100-security.md
-  deploy: docs/qa-reports/v1100-deploy-checklist.md
+  plan: docs/plans/2026-06-15-dogfood-driven-improvements-plan.md
+  spec: docs/specs/2026-06-16-dogfood-driven-improvements-spec-delta.md
+  review: null
+  qa: null
+  security: null
+  deploy: null
   translation: null
 external_evidence:
   - type: "second-opinion-v1-foundation-r1-r2"
@@ -42,7 +42,7 @@ external_evidence:
     scope: "v0.12.2 実装後 4 ラウンドレビュー"
     findings: "Round 6 (P1×2, P2×1: pre-compact exit 2 / minimal-project / test rc), Round 7 (P1×1, P3×1: git add 漏れ / テスト件数表記), Round 8 (P2×1, P3×1: stale last_updated / grep 自己マッチ), Round 9 (P3×2: コメント不整合)"
     resolution: "9件全反映。tier 1/2 PASS、134 tests PASS、本体と minimal-project 完全同期確認済み。"
-next_action: "iteration 30（進化ロードマップ P3: skill 挙動圧力テスト・v1.10.0）実装完了: 層1＝決定論 skill behavior contract。新規 scripts/skill_behavior_manifest.py（判断系 7 skill→load-bearing トークン・root 専用・非ミラー）＋check_reference_drift.check_skill_behavior_contract（ALL_CHECKS 14→15・framework-root ガードで installed inert）＋RED-GREEN テスト（全 skill/トークンの欠落検知を実証）。層2＝extensions/skill-pressure-drill/（README/WORKFLOW/REPORT/scenarios×2）＝実 subagent 用 adversarial drill 足場（手動 opt-in・CI 非搭載）＋形式のみ決定論テスト。版 1.9.0→1.10.0（contract/template/example/live STATUS 統一）。2段グリル消化（grill-plan 致命4・grill-code 🟡1 fix-forward）。test-strength.drill は framework 混在 diff＋committed コードで B1 適用不能のため skip 宣言（代替＝全 skill/トークンの mutation 同等テスト）。full suite 779 passed/1 skip・contract 全 profile・drift 15・Tier2/3・make example 差分ゼロ＝全 PASS。**残: ユーザー確認の上 push（自動 push しない）。進化ロードマップ次は P4（実ブラウザ QA・someday）/P5（positioning・配布時）。**"
+next_action: "iteration 31（ドッグフード由来 改善）開始。スタジオ・ナギ予約LP で v1.10.0 を Client→Dev 一周ドッグフードして見つかったハーネス自身の摩擦（OBS-001〜022）を本リポで修正。brainstorm/plan は dogfood セッション（~/Desktop/personal/aegis-dogfood-reservation-lp の docs/specs/2026-06-15-aegis-dogfood-improvements-{brainstorm-record,design}.md）で完了済み＝本リポ plan docs/plans/2026-06-15-dogfood-driven-improvements-plan.md を成果物として扱い、このリポのルールでゲート承認取得（承認→ref→phase 前進）。**現在: brainstorm ゲート承認待ち（ユーザー承認が必要・自動承認しない）。** 承認後 plan ゲート（spec-delta 作成）→ implement で Batch1 から TDD（各タスク Step0 で HEAD 再検証→失敗テスト→実装→緑→commit）。Batch1.5/1.6 は control-plane フック変更でセキュリティ感応度高＝security 盲検2次必須。残すべき勝ち OBS-010/014/016/019/021/022 をリグレッションさせない。push は明示承認まで禁止。"
 blockers: []
 failure_tracking: null
 session_history:
