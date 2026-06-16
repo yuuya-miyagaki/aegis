@@ -347,6 +347,69 @@ $entries
 EOF_GI
 }
 
+# --- Create a one-time framework baseline commit (OBS-017) ---
+# Without an initial commit, the first dogfood review gate treats the freshly
+# installed framework files as new uncommitted code and emits a framework-origin
+# stub 🔴. Best-effort: every git failure degrades to a skip (never aborts the
+# install). Acts ONLY on a repo with zero commits (fresh dir or empty repo); a
+# repo that already has history is left untouched. Staging is scoped to the
+# installed framework paths — never `git add -A`/`-f` — so unrelated files in
+# the target stay unstaged.
+create_framework_baseline() {
+  local target="$1"
+
+  if ! command -v git >/dev/null 2>&1; then
+    echo "  (skipped: git not found)"
+    return 0
+  fi
+
+  # Initialise a repo only when the target is not already under git.
+  if ! git -C "$target" rev-parse --git-dir >/dev/null 2>&1; then
+    if ! git -C "$target" init -q >/dev/null 2>&1; then
+      echo "  (skipped: git init failed)"
+      return 0
+    fi
+  fi
+
+  # No-op when the repo already has any commit (existing project history).
+  if git -C "$target" rev-parse --verify -q HEAD >/dev/null 2>&1; then
+    echo "  (skipped: repo already has commits)"
+    return 0
+  fi
+
+  # Stage ONLY the framework artifacts that were actually installed. `git add`
+  # (without -f) honours the .gitignore written above, so runtime artifacts
+  # (.gate-snapshot, evidence-log) are excluded automatically.
+  local candidate
+  local present=()
+  for candidate in hooks scripts templates .claude CLAUDE.md docs; do
+    [ -e "$target/$candidate" ] && present+=("$candidate")
+  done
+  if [ ${#present[@]} -eq 0 ]; then
+    echo "  (skipped: no framework files to commit)"
+    return 0
+  fi
+  if ! git -C "$target" add -- "${present[@]}" >/dev/null 2>&1; then
+    echo "  (skipped: git add failed)"
+    return 0
+  fi
+
+  # Use the user's configured identity when present; otherwise fall back to an
+  # aegis identity so a fresh repo without any git config still commits.
+  local ident=()
+  if ! git -C "$target" config user.email >/dev/null 2>&1 \
+     || ! git -C "$target" config user.name >/dev/null 2>&1; then
+    ident=(-c user.name="Aegis Setup" -c user.email="setup@aegis.local")
+  fi
+  if git -C "$target" ${ident[@]+"${ident[@]}"} commit -q \
+       -m "chore: Aegis framework baseline (installed by setup.sh)" \
+       >/dev/null 2>&1; then
+    echo "  Created baseline commit."
+  else
+    echo "  (skipped: git commit failed)"
+  fi
+}
+
 # --- Main ---
 echo "Aegis Setup"
 echo "  Profile: $PROFILE"
@@ -392,6 +455,11 @@ generate_settings "$PROFILE_JSON" "$TARGET"
 # user may downgrade by re-running with an older setup.sh).
 mkdir -p "$TARGET/.claude"
 printf '%s\n' "$FRAMEWORK_VERSION" > "$TARGET/.claude/.aegis-install-version"
+
+# 5. Create a one-time framework baseline commit (OBS-017)
+echo ""
+echo "--- Framework baseline commit ---"
+create_framework_baseline "$TARGET"
 
 echo ""
 echo "Setup complete."
