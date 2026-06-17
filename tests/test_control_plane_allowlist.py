@@ -310,6 +310,29 @@ class TestWriteTargetVsMention(unittest.TestCase):
         self.assertTrue(_denied(out),
                         f"unknown writer with quoted CP must deny: {out[:200]!r}")
 
+    # Review finding (reviewer): an embedded NEWLINE is a command separator. A
+    # benign first line (echo/printf/git commit) must NOT relax a writer with a
+    # quoted control-plane target on a later line. The hook normalizes \n -> ;.
+    def test_newline_separated_writer_after_echo_denied(self):
+        out = _hook(self.root, 'echo ok\ncp a "hooks/dest.sh"')
+        self.assertTrue(_denied(out),
+                        f"newline-separated writer must deny: {out[:200]!r}")
+
+    def test_newline_separated_perl_after_printf_denied(self):
+        out = _hook(self.root, 'printf hi\nperl -i -pe "s/a/b/" "hooks/lib/emit.sh"')
+        self.assertTrue(_denied(out),
+                        f"newline-separated perl -i must deny: {out[:200]!r}")
+
+    def test_newline_separated_writer_after_git_commit_denied(self):
+        out = _hook(self.root, 'git commit -m m\ncp a "hooks/dest.sh"')
+        self.assertTrue(_denied(out),
+                        f"newline-separated writer after git commit must deny: {out[:200]!r}")
+
+    def test_newline_separated_writer_after_readonly_pipe_denied(self):
+        out = _hook(self.root, 'cat "scripts/x" | head\nperl -i -pe "s/a/b/" "hooks/y"')
+        self.assertTrue(_denied(out),
+                        f"newline writer after a read-only pipe must deny: {out[:200]!r}")
+
     # ---- adversarial: must NOT open a hole ----
     def test_cmdsub_in_quotes_writing_cp_denied(self):
         # CRITICAL: $(...) inside double quotes is STILL executed. Masking the

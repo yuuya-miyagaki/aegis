@@ -175,9 +175,11 @@ cmd_mentions_control_plane() {
   # DESTINATION for many commands (cp/mv/tee/sed -i/perl -i/patch/awk/ed/...), so
   # the relaxation is an ALLOWLIST of known no-write "message" commands — NEVER a
   # blocklist of write utilities, which always leaks (a writer not on the list
-  # would bypass). echo/printf/`git commit` cannot write to a path argument; their
-  # only write path is a redirect, already checked in (b). Anything else, or any
-  # command separator (;, &, |) that could introduce a writer, is fail-closed.
+  # would bypass). echo/printf/`git commit` cannot write FILE CONTENT to a path
+  # argument (git commit mutates the repo index/objects, not a working-tree file);
+  # their only working-tree write path is a redirect, already checked in (b).
+  # Anything else, or any command separator (;, &, |; newline already normalized
+  # to ; at extraction) that could introduce a writer, is fail-closed.
   if _text_mentions_cp "$cmd"; then
     if printf '%s' "$cmd" | grep -qE '[;&|]'; then
       return 0
@@ -267,6 +269,17 @@ cmd_var_built_write() {
 CMD=$(printf '%s' "$INPUT" | python3 -c 'import sys,json; print(json.loads(sys.stdin.read()).get("tool_input",{}).get("command",""))' 2>/dev/null || true)
 if [ -z "$CMD" ] && ! printf '%s' "$INPUT" | grep -q '\\"'; then
   CMD=$(extract_command "$INPUT")
+fi
+# Treat embedded newlines/CR as command separators: a multi-line command is
+# multiple commands. This matches the framework convention (post-bash hook and
+# build-judge-card.py normalize \n -> ;). Without it, the line-oriented greps
+# below (read-only pipeline check, the quoted-mention allowlist) would let a
+# writer on a LATER line ride along behind a benign first line — e.g.
+# `echo ok⏎cp x "hooks/y"` would mask the quoted target and the `^echo` allowlist
+# would match line 1, returning allow. Normalizing once, here, covers every
+# downstream check on $CMD.
+if [ -n "$CMD" ]; then
+  CMD=$(printf '%s' "$CMD" | tr '\n\r' ';;')
 fi
 
 # Match control plane against the extracted command, NOT the raw input: real
