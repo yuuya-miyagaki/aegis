@@ -8,6 +8,8 @@
 <!-- category: tech -->
 
 - [confidence:8] `CLAUDE.md` は薄く保ち、詳細ルールは pull-based にした方が Claude Code では安定しやすい。
+- [confidence:9] シェルコマンドの control-plane 判定を「正規表現＋クォート span マスク」でやると、シェルの**クォート除去＋隣接トークン連結**（`hooks""/lib`→語 `hooks/lib`）を再現できず分割トークン書込みを取りこぼす。正しくは**語単位にトークン化→各語の literal value を再構成→書込み先語のみ判定**。詳細・OPEN 課題は `docs/security-followups.md` SF-001。
+- [confidence:9] 書込み先が安全かの判定は「**安全コマンドのアロウリスト**（echo/printf/git commit 等）」で行う。「write ユーティリティのブロックリスト」は列挙漏れ（perl -i/patch/awk/sponge…）で必ず漏れる。改行は区切りとして扱う（`\n`→`;` 正規化）＝line-oriented grep の取りこぼし防止。
 
 ## プロセス
 
