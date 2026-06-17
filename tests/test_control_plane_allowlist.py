@@ -286,6 +286,30 @@ class TestWriteTargetVsMention(unittest.TestCase):
         self.assertTrue(_denied(out),
                         f"sed -i on quoted CP must deny: {out[:200]!r}")
 
+    # Review finding (reviewer): the relaxation must be an ALLOWLIST of known
+    # no-write commands, not a blocklist of write utilities — otherwise any
+    # in-place writer not on the list (perl -i, patch, awk, sponge, ed, ...) with
+    # a QUOTED control-plane target silently bypasses the moat (it denied before).
+    def test_perl_inplace_quoted_cp_denied(self):
+        out = _hook(self.root, 'perl -i -pe "s/a/b/" "hooks/lib/emit.sh"')
+        self.assertTrue(_denied(out),
+                        f"perl -i on quoted CP must deny: {out[:200]!r}")
+
+    def test_patch_quoted_cp_denied(self):
+        out = _hook(self.root, 'patch "scripts/foo.py" /tmp/p.diff')
+        self.assertTrue(_denied(out),
+                        f"patch on quoted CP must deny: {out[:200]!r}")
+
+    def test_awk_quoted_cp_denied(self):
+        out = _hook(self.root, 'awk "{print}" "templates/x.md"')
+        self.assertTrue(_denied(out),
+                        f"awk with quoted CP arg must deny (fail-closed): {out[:200]!r}")
+
+    def test_unknown_writer_quoted_cp_denied(self):
+        out = _hook(self.root, 'sponge "hooks/lib/emit.sh"')
+        self.assertTrue(_denied(out),
+                        f"unknown writer with quoted CP must deny: {out[:200]!r}")
+
     # ---- adversarial: must NOT open a hole ----
     def test_cmdsub_in_quotes_writing_cp_denied(self):
         # CRITICAL: $(...) inside double quotes is STILL executed. Masking the

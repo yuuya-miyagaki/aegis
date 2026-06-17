@@ -139,15 +139,13 @@ mask_quoted() {
 #     a redirect target (quote-stripped, taken from the RAW command so a quoted
 #     `> "hooks/x"` and a `bash -c "... > hooks/x"` both count) that is CP →
 #     deny-eligible.
+#   - a CP path that survives only inside a quoted literal is relaxed ONLY for an
+#     ALLOWLIST of no-write commands (echo/printf/git commit) — never a blocklist
+#     of write utilities, which leaks (a writer not on the list bypasses).
 # Variable-built write targets that are not literally CP fall through and are
 # caught downstream by cmd_var_built_write (ask, fail-closed).
 cmd_mentions_control_plane() {
   local cmd="$1" masked redir target
-  # Write UTILITIES whose destination can be a QUOTED CP path that masking would
-  # hide (cp/mv/tee/sed -i/git add/...). Redirects are handled separately by the
-  # target scan below, and plain message commands (git commit, echo) match none
-  # of these — so they still get the quoted-literal relaxation.
-  local WRITE_UTIL_RE='(^|[^A-Za-z0-9_])(tee|cp|mv|install|dd|truncate|ln|rm|chmod|chown|mkdir|touch|rsync|tar|curl|wget)([[:space:]]|$)|sed[[:space:]]+-i|(^|[^A-Za-z0-9_])git[[:space:]]+(apply|add|mv|rm|stage|update-index)([[:space:]]|$)|python3?[[:space:]]+-c|(^|[^A-Za-z0-9_])(bash|sh|eval)[[:space:]]'
   # Command substitution present → cannot safely mask → raw fail-closed check.
   if printf '%s' "$cmd" | grep -qE '\$\(|`'; then
     _text_mentions_cp "$cmd"
@@ -172,10 +170,22 @@ cmd_mentions_control_plane() {
       return 0
     fi
   done < <(printf '%s' "$cmd" | grep -oE ">>?[[:space:]]*(\"[^\"]*\"|'[^']*'|[^[:space:]|&;<>]+)")
-  # (c) A write utility is present and the raw command mentions CP anywhere
-  # (its destination may be a quoted CP path that masking hid). Fail closed.
-  if printf '%s' "$cmd" | grep -qE "$WRITE_UTIL_RE" && _text_mentions_cp "$cmd"; then
-    return 0
+  # (c) The only remaining CP is inside a quoted literal (a/b already cleared the
+  # unquoted forms and redirect targets). A quoted token can still be a WRITE
+  # DESTINATION for many commands (cp/mv/tee/sed -i/perl -i/patch/awk/ed/...), so
+  # the relaxation is an ALLOWLIST of known no-write "message" commands — NEVER a
+  # blocklist of write utilities, which always leaks (a writer not on the list
+  # would bypass). echo/printf/`git commit` cannot write to a path argument; their
+  # only write path is a redirect, already checked in (b). Anything else, or any
+  # command separator (;, &, |) that could introduce a writer, is fail-closed.
+  if _text_mentions_cp "$cmd"; then
+    if printf '%s' "$cmd" | grep -qE '[;&|]'; then
+      return 0
+    fi
+    if ! printf '%s' "$cmd" \
+         | grep -qE '^[[:space:]]*(echo|printf|git[[:space:]]+commit)([[:space:]]|$)'; then
+      return 0
+    fi
   fi
   return 1
 }
