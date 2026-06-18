@@ -9,14 +9,14 @@ task_size: L
 task_size_rationale: "暫定（brainstorm/plan は dogfood セッションで完了済み・本リポで承認取得予定）: ドッグフード由来 改善（OBS-001〜022）。Batch1=control-plane フック精度+git baseline 6 タスク／Batch2=skill/契約/配布整合 5／Batch3=Client 書込み 2＋横断 X.1/X.2。hooks/scripts/skills/tests 多数で 6+ ファイル＝L。plan: docs/plans/2026-06-15-dogfood-driven-improvements-plan.md。"
 iteration: 31
 ui_surface: false
-last_updated: "2026-06-16T00:00:00Z"
+last_updated: "2026-06-18T00:00:00Z"
 gate_approvals:
   client_ready_for_dev: n/a
   brainstorm: approved
   plan: approved
   review: approved
   qa: approved
-  security: pending
+  security: approved
   deploy: pending
   dev_ready_for_client: pending
 current_refs:
@@ -42,7 +42,7 @@ external_evidence:
     scope: "v0.12.2 実装後 4 ラウンドレビュー"
     findings: "Round 6 (P1×2, P2×1: pre-compact exit 2 / minimal-project / test rc), Round 7 (P1×1, P3×1: git add 漏れ / テスト件数表記), Round 8 (P2×1, P3×1: stale last_updated / grep 自己マッチ), Round 9 (P3×2: コメント不整合)"
     resolution: "9件全反映。tier 1/2 PASS、134 tests PASS、本体と minimal-project 完全同期確認済み。"
-next_action: "iteration 31（ドッグフード由来 改善）implement 進行中。**Batch1（配布ブロッカー＝control-plane フック精度＋git baseline）6 タスク完了・6 コミット（9177854 起動／52dff43 1.1／864786f 1.2／801bbaf 1.3／c4db78d 1.4／6895cbf 1.5／6d1b938 1.6）。** 各タスク Step0→TDD→commit、全 moat 回帰（var_expansion・patterns_parity・secrets・REDTEAM 18/18＋5/5）緑、フルスイート 821 passed/1 skip、contract 全 profile・drift・mirror・scaffold smoke 全 PASS。TDD が 2 つの穴を着手前に捕捉（1.5 パイプ最終セグメント fail-open＝`|| [ -n ]`／1.6 空マスク＝`local s=$1 n=${#s}` の同一行展開、＋クォート write-util 宛先穴をステップ(c)で封鎖）。**判断ポイント: (A) Batch1 を先に review→qa→security ゲート（1.5/1.6 の盲検2次をフレッシュなうちに）か (B) Batch2（skill/契約/配布整合5）+Batch3（Client書込み2）+X.1/X.2 を実装してから一括ゲートか — ユーザー確認待ち。** 残すべき勝ち OBS-010/014/016/019/021/022 維持。ハードゲート（review/qa/security/deploy）と push は明示承認まで禁止。"
+next_action: "iteration 31（ドッグフード由来 改善）。**Batch1（配布ブロッカー＝control-plane フック精度＋git baseline）6 タスク完了。review・qa・security ゲート全承認**（ユーザー選択 A＝Batch1 先行ゲート）。コミット: 52dff43(1.1)/864786f(1.2)/801bbaf(1.3)/c4db78d(1.4)/6895cbf(1.5)/6d1b938(1.6)＋review fix 76112bc/8f85a5b＋枠組み/evidence。review=3 ラウンド盲検 break-attempt で Batch1 由来 Critical 2 件検出→修正、security=1次＋盲検2次とも approve_with_notes（新規 WRITE バイパス ゼロを orig vs new 実走確認）。qa=B1 drill は committed-code 構造制約で skip 宣言＋手動 4-mutant 実証(4/4 CAUGHT)。full suite 830 passed/1 skip・REDTEAM 18/18＋5/5・contract/drift/mirror/smoke 全 PASS。**SF-001（control-plane の literal `hooks/` 一致回避＝quote分割/backslash/bare-dir。pre-existing・Critical・deploy blocker 非該当）を docs/security-followups.md に durable 記録＝最優先 follow-up（繰延合意）。** 残: Batch2（skill/契約/配布整合5）+Batch3（Client書込み2）+X.1/X.2 未実装。**判断待ち: (i) deploy→ship→docs で Batch1 を iteration31 として締め（Batch2/3=iteration32）か (ii) security で止め Batch2/3 を続行し最後に一括 deploy/ship/docs か。** 残すべき勝ち OBS-010/014/016/019/021/022 維持。push は明示承認まで禁止。"
 blockers: []
 failure_tracking: null
 session_history:

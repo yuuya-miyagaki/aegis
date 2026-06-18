@@ -18,3 +18,6 @@
 
 ## あなたが取るアクション
 （LLM が平易日本語で記述）
+
+## ACK
+- 1次(security)＋盲検2次とも実フック実行で approve_with_notes に収束: 新規WRITEバイパス ゼロ（SF-001系は orig/new とも allow＝pre-existing 実走確認）・scan_secret カバレッジ維持・fail-closed堅持。テスト結果🟡=harness環境由来(full suite 830 passed実走済)。依存監査🟡=本diffに依存manifest変更なしでN/A。1次2次相違=SF-001(Critical残存・deploy blocker非該当)＋意図的緩和OBS-003/006/017のnotesのみで両者ship同意。詳細 docs/qa-reports/iter31-batch1-security.md （2026-06-18 12:08）
