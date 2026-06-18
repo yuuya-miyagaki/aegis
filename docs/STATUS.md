@@ -3,7 +3,7 @@ framework: aegis
 framework_version: "1.11.0"
 project_name: "Aegis"
 mode: Dev
-phase: ship
+phase: docs
 task_type: framework
 task_size: L
 task_size_rationale: "暫定（brainstorm/plan は dogfood セッションで完了済み・本リポで承認取得予定）: ドッグフード由来 改善（OBS-001〜022）。Batch1=control-plane フック精度+git baseline 6 タスク／Batch2=skill/契約/配布整合 5／Batch3=Client 書込み 2＋横断 X.1/X.2。hooks/scripts/skills/tests 多数で 6+ ファイル＝L。plan: docs/plans/2026-06-15-dogfood-driven-improvements-plan.md。"
@@ -42,10 +42,14 @@ external_evidence:
     scope: "v0.12.2 実装後 4 ラウンドレビュー"
     findings: "Round 6 (P1×2, P2×1: pre-compact exit 2 / minimal-project / test rc), Round 7 (P1×1, P3×1: git add 漏れ / テスト件数表記), Round 8 (P2×1, P3×1: stale last_updated / grep 自己マッチ), Round 9 (P3×2: コメント不整合)"
     resolution: "9件全反映。tier 1/2 PASS、134 tests PASS、本体と minimal-project 完全同期確認済み。"
-next_action: "iteration 31（ドッグフード由来 改善）。**Batch1（配布ブロッカー＝control-plane フック精度＋git baseline）6 タスク完了。review・qa・security ゲート全承認**（ユーザー選択 A＝Batch1 先行ゲート）。コミット: 52dff43(1.1)/864786f(1.2)/801bbaf(1.3)/c4db78d(1.4)/6895cbf(1.5)/6d1b938(1.6)＋review fix 76112bc/8f85a5b＋枠組み/evidence。review=3 ラウンド盲検 break-attempt で Batch1 由来 Critical 2 件検出→修正、security=1次＋盲検2次とも approve_with_notes（新規 WRITE バイパス ゼロを orig vs new 実走確認）。qa=B1 drill は committed-code 構造制約で skip 宣言＋手動 4-mutant 実証(4/4 CAUGHT)。full suite 830 passed/1 skip・REDTEAM 18/18＋5/5・contract/drift/mirror/smoke 全 PASS。**SF-001（control-plane の literal `hooks/` 一致回避＝quote分割/backslash/bare-dir。pre-existing・Critical・deploy blocker 非該当）を docs/security-followups.md に durable 記録＝最優先 follow-up（繰延合意）。** 残: Batch2（skill/契約/配布整合5）+Batch3（Client書込み2）+X.1/X.2 未実装。**判断待ち: (i) deploy→ship→docs で Batch1 を iteration31 として締め（Batch2/3=iteration32）か (ii) security で止め Batch2/3 を続行し最後に一括 deploy/ship/docs か。** 残すべき勝ち OBS-010/014/016/019/021/022 維持。push は明示承認まで禁止。"
+next_action: "**dev_ready_for_client ゲート申請待ち**（iteration 31 Batch1 締め・v1.11.0）。Batch1（配布ブロッカー＝control-plane フック精度＋git baseline）6 タスク完了、全ゲート（brainstorm/plan/review/qa/security/deploy）approved。ship 確定（版 1.11.0 統一・TO-CLIENT 作成・MANUAL/RUNBOOK/UAT は N/A）。docs 完了（LEARNINGS 追記・docs-sync drift なし）。**最優先 follow-up: SF-001（control-plane の literal `hooks/` 一致回避＝quote分割/backslash/bare-dir・pre-existing・Critical・deploy blocker 非該当）＝docs/security-followups.md。** 残実装: Batch2（5）+Batch3（2）+X.1/X.2＝iteration 32。**残: dev_ready_for_client 承認 → push（いずれも明示承認まで保留）。**"
 blockers: []
 failure_tracking: null
 session_history:
+  - date: "2026-06-18"
+    mode: Dev
+    phase: "docs"
+    note: "iteration 31（ドッグフード由来 改善・Batch1 / v1.11.0）完了: スタジオ・ナギ予約LP で v1.10.0 を Client→Dev 一周ドッグフードして見つかったハーネス自身の摩擦（OBS-001〜022）のうち配布ブロッカー 6 タスクを修正。1.1 setup.sh が新規 install に baseline commit（fresh のみ・既存リポ no-op・scoped add・identity fallback／OBS-017）、1.2 judge stub 走査のみ control-plane 除外・secret 走査は全走査維持（後退ゼロ）、1.3 証拠スクリプト allowlist、1.4 bare git add staging→ask、1.5 read-only パイプ allow（最終セグメント fail-open を TDD で捕捉）、1.6 書込み先 path のみ deny（pure-bash mask_quoted＋redirect target＋no-write コマンドのアロウリスト・cmdsub/改行 fail-closed）。設計核心: write-target 判定は安全コマンドのアロウリスト（echo/printf/git commit）で行いブロックリストは使わない（列挙漏れ）。全タスク Step0→TDD→commit。ユーザー選択 A（Batch1 先行ゲート）で review→qa→security→deploy 全承認。review=3 ラウンド盲検 break-attempt が Batch1 由来 Critical 2 件（write-util ブロックリスト穴 76112bc・改行バイパス 8f85a5b）を検出→fix-forward。security=1次（security エージェント）＋盲検2次とも approve_with_notes、新規 WRITE バイパス ゼロを orig(8f8eb2d) vs new HEAD 実走で確認。qa=B1 mutation drill は committed-code 構造制約（working-tree diff 空）で skip 宣言＋手動 4-mutant 実証（4/4 CAUGHT）。版 1.10.0→1.11.0（contract/template/example/live STATUS 統一）。full suite 830 passed/1 skip・REDTEAM 18/18＋5/5・contract 全 profile・drift・mirror・scaffold smoke・distribution 全 PASS。コミット 52dff43〜6d1b938＋76112bc/8f85a5b＋evidence/版 367e1f0。**SF-001（control-plane の literal `hooks/` 一致回避＝quote分割/backslash/bare-dir。pre-existing＝orig でも同一 allow を実走確認・Critical・deploy blocker 非該当）を docs/security-followups.md に durable 記録＝最優先 follow-up（繰延合意）。** 残: Batch2（skill/契約/配布整合5）+Batch3（Client書込み2）+X.1/X.2＝iteration 32。**残: dev_ready_for_client 承認 → push（明示承認まで保留・自動 push しない）。**"
   - date: "2026-06-14"
     mode: Dev
     phase: "deploy"
