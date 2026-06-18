@@ -7,15 +7,14 @@
 - 未完成マーカー(変更行): なし
 
 ## ティア2: 🔍 第2意見（self-attested・自己申告・低信頼）
-- なし
+- あり: approve_with_notes
 
 ## 🟡 要確認
 - テスト結果が未検証（記録なし/コード変更後）
-- claims 未提出（要確認）
-- 第2意見なし（self-attested・要確認）
+- 1次/2次レビューの相違（self-attested）: 1次=approve / 2次=approve_with_notes
 
 ## あなたが取るアクション
 （LLM が平易日本語で記述）
 
 ## ACK
-- grill-code を独立実装レビュー（第2意見）として実施＝🔴0/🟡1 fix-forward(bb40ed2)。テスト結果は v1100-qa.md に記録（full suite 779 passed/1 skip・新規 11・contract 全 profile・drift 15・Tier2/3 PASS）。claims は review/qa レポートに文書化。 （2026-06-14 22:15）
+- テスト: full suite 830 passed/1 skip 実走（fp一致）。marker自動検証はharnessがPostToolUseにtool_response.outputを渡さない環境由来で不可（合成入力でロジック正常を確認）。1次/2次相違=SF-001(pre-existing)繰延のみで両者ともBatch1後退ゼロに一致。詳細 docs/qa-reports/iter31-batch1-review.md （2026-06-17 18:48）
