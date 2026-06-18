@@ -18,7 +18,7 @@ gate_approvals:
   qa: approved
   security: approved
   deploy: approved
-  dev_ready_for_client: pending
+  dev_ready_for_client: approved
 current_refs:
   requirements:
     - docs/full-review-2026-06-13-context-futureproof.md
@@ -42,7 +42,7 @@ external_evidence:
     scope: "v0.12.2 実装後 4 ラウンドレビュー"
     findings: "Round 6 (P1×2, P2×1: pre-compact exit 2 / minimal-project / test rc), Round 7 (P1×1, P3×1: git add 漏れ / テスト件数表記), Round 8 (P2×1, P3×1: stale last_updated / grep 自己マッチ), Round 9 (P3×2: コメント不整合)"
     resolution: "9件全反映。tier 1/2 PASS、134 tests PASS、本体と minimal-project 完全同期確認済み。"
-next_action: "**dev_ready_for_client ゲート申請待ち**（iteration 31 Batch1 締め・v1.11.0）。Batch1（配布ブロッカー＝control-plane フック精度＋git baseline）6 タスク完了、全ゲート（brainstorm/plan/review/qa/security/deploy）approved。ship 確定（版 1.11.0 統一・TO-CLIENT 作成・MANUAL/RUNBOOK/UAT は N/A）。docs 完了（LEARNINGS 追記・docs-sync drift なし）。**最優先 follow-up: SF-001（control-plane の literal `hooks/` 一致回避＝quote分割/backslash/bare-dir・pre-existing・Critical・deploy blocker 非該当）＝docs/security-followups.md。** 残実装: Batch2（5）+Batch3（2）+X.1/X.2＝iteration 32。**残: dev_ready_for_client 承認 → push（いずれも明示承認まで保留）。**"
+next_action: "**iteration 31 Batch1 完了（v1.11.0）＝全ゲート approved（dev_ready_for_client 含む）。** Batch1（配布ブロッカー＝control-plane フック精度＋git baseline）6 タスク・全ゲート・版 1.11.0・TO-CLIENT・LEARNINGS 完了。**残: 未 push コミット群（iteration 30 分＋iteration 31 分）の push をユーザー明示承認の上で実行（自動 push しない）。** 次タスク: **iteration 32＝Batch2（skill/契約/配布整合 5）+Batch3（Client 書込み 2）+X.1/X.2**（新 brainstorm から）。**最優先 follow-up: SF-001（control-plane の literal `hooks/` 一致回避・pre-existing・Critical・deploy blocker 非該当）＝docs/security-followups.md。** 残すべき勝ち OBS-010/014/016/019/021/022 維持。"
 blockers: []
 failure_tracking: null
 session_history:
