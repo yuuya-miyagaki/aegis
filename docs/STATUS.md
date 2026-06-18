@@ -1,33 +1,33 @@
 ---
 framework: aegis
-framework_version: "1.11.0"
+framework_version: "1.12.0"
 project_name: "Aegis"
 mode: Dev
-phase: docs
+phase: implement
 task_type: framework
 task_size: L
-task_size_rationale: "暫定（brainstorm/plan は dogfood セッションで完了済み・本リポで承認取得予定）: ドッグフード由来 改善（OBS-001〜022）。Batch1=control-plane フック精度+git baseline 6 タスク／Batch2=skill/契約/配布整合 5／Batch3=Client 書込み 2＋横断 X.1/X.2。hooks/scripts/skills/tests 多数で 6+ ファイル＝L。plan: docs/plans/2026-06-15-dogfood-driven-improvements-plan.md。"
-iteration: 31
+task_size_rationale: "確定（plan 移行時）: iteration 32 = SF-001（control-plane フックの quote/escape/bare-dir トークン分割バイパス・Critical pre-existing）を Augment で閉じる。改修面: hooks/check-control-plane.sh（token-aware チェック inline 追加）＋mirror examples/minimal-project/hooks/check-control-plane.sh 同期＋TDD テスト群＋framework 版 bump（contract 定数/template STATUS/example STATUS/本体）＋security-followups.md SF-001 CLOSED 化＝6+ ファイル＝L（全ゲート: review+qa+security+deploy）。セキュリティ境界＝security 盲検2次必須。設計: docs/specs/2026-06-18-sf-001-cp-token-bypass-design.md。"
+iteration: 32
 ui_surface: false
-last_updated: "2026-06-18T00:00:00Z"
+last_updated: "2026-06-18T03:00:00Z"
 gate_approvals:
   client_ready_for_dev: n/a
   brainstorm: approved
   plan: approved
-  review: approved
-  qa: approved
-  security: approved
-  deploy: approved
-  dev_ready_for_client: approved
+  review: pending
+  qa: pending
+  security: pending
+  deploy: pending
+  dev_ready_for_client: pending
 current_refs:
   requirements:
     - docs/full-review-2026-06-13-context-futureproof.md
-  plan: docs/plans/2026-06-15-dogfood-driven-improvements-plan.md
-  spec: docs/specs/2026-06-16-dogfood-driven-improvements-spec-delta.md
-  review: docs/qa-reports/iter31-batch1-review.md
-  qa: docs/qa-reports/iter31-batch1-qa.md
-  security: docs/qa-reports/iter31-batch1-security.md
-  deploy: docs/qa-reports/iter31-batch1-deploy-checklist.md
+  plan: docs/plans/2026-06-18-sf-001-cp-token-bypass-implementation-plan.md
+  spec: docs/specs/2026-06-18-sf-001-cp-token-bypass-design.md
+  review: null
+  qa: null
+  security: null
+  deploy: null
   translation: null
 external_evidence:
   - type: "second-opinion-v1-foundation-r1-r2"
@@ -42,7 +42,7 @@ external_evidence:
     scope: "v0.12.2 実装後 4 ラウンドレビュー"
     findings: "Round 6 (P1×2, P2×1: pre-compact exit 2 / minimal-project / test rc), Round 7 (P1×1, P3×1: git add 漏れ / テスト件数表記), Round 8 (P2×1, P3×1: stale last_updated / grep 自己マッチ), Round 9 (P3×2: コメント不整合)"
     resolution: "9件全反映。tier 1/2 PASS、134 tests PASS、本体と minimal-project 完全同期確認済み。"
-next_action: "**iteration 31 Batch1 完了・push 済み（v1.11.0・origin/main = e0ff517）。** 次は **iteration 32＝SF-001 を潰す**（ユーザー合意・優先順位変更）: control-plane の literal `hooks/` 一致回避（quote分割 `hooks\"\"/lib`／backslash `hooks\\/`／bare-dir `find hooks -exec rm`・`rm -rf hooks`・`cp x hooks`）＝Critical・フル moat 崩壊。**ブリーフ正典＝`docs/security-followups.md` SF-001**（repro・根本原因・修正方針まで自己完結）。修正方針: python `shlex` で語単位トークン化＋bash fail-closed フォールバック→書込み先の語が CP なら deny、メッセージ語（git commit -m/echo/printf）の救済は維持。実装対象は `hooks/check-control-plane.sh`（＋ミラー）。新 iteration として state-machine 規則どおり dev ゲート pending リセット→iteration++→brainstorm から（設計重いので security 盲検2次必須・既存 moat テスト/REDTEAM 緑維持）。**その後 iteration 33+＝Batch2（配布整合 P2-7/2-8 等 5）+Batch3（2）+X.1/X.2**（plan: docs/plans/2026-06-15-dogfood-driven-improvements-plan.md）。残すべき勝ち OBS-010/014/016/019/021/022 維持。push は明示承認まで禁止。"
+next_action: "**iteration 32 開始（state-machine リセット完了: 全 dev/mode gate → pending、iteration 31→32、plan/spec/review/qa/security/deploy refs → null、requirements ref 維持）。** タスク＝**SF-001 を潰す**（control-plane フックの quote分割 `hooks\"\"/lib`／backslash `hooks\\/`／bare-dir operand `find hooks`・`rm -rf hooks`・`cp x hooks` トークン分割バイパス＝Critical・pre-existing・フル moat 崩壊）。**ブリーフ正典＝`docs/security-followups.md` SF-001**（repro・根本原因・修正方針まで自己完結）。現在 **phase=plan**: brainstorm 完了（gate approved）。設計合意済（**Augment**＝`cmd_mentions_control_plane` 末尾に token-aware チェックを1本 inline 追加・既存パス無改変・deny を足すだけ）。BRAINSTORM-RECORD＝`docs/specs/2026-06-18-sf-001-cp-token-bypass-brainstorm-record.md`／SPEC＝`docs/specs/2026-06-18-sf-001-cp-token-bypass-design.md`。次: writing-plans で実装計画→grill-plan→plan gate 承認→TDD 実装。修正方針: python `shlex(posix)` で語分割（redirect-target/operand 分類）＋bash fail-closed フォールバック→語の literal value が CP 解決なら mention（redirect-target は常に・operand は echo/printf/git commit 救済）。bare-dir は pure-bash 厳密一致。実装対象 `hooks/check-control-plane.sh`＋mirror（`examples/minimal-project/hooks/check-control-plane.sh`）。設計重い＝security 盲検2次必須・既存 moat テスト/REDTEAM(18/18+5/5) 緑維持。**その後 iteration 33+＝Batch2（配布整合 P2-7/2-8 等 5）+Batch3（2）+X.1/X.2**（plan: docs/plans/2026-06-15-dogfood-driven-improvements-plan.md）。残すべき勝ち OBS-010/014/016/019/021/022 維持。push は明示承認まで禁止。"
 blockers: []
 failure_tracking: null
 session_history:
@@ -58,10 +58,6 @@ session_history:
     mode: Dev
     phase: "deploy"
     note: "iteration 29（P3/M2: 過程 docs アーカイブ・docs-only・版据え置き v1.8.0）実装完了: 第7回全力レビュー §2 P3『過程 docs の archive 化・空 scaffold 削除』＝最後の未消化項目。root docs/ の過程成果物を docs/archive/{plans,qa-reports,reviews} へ git mv（履歴保全）: plans 履歴 61・qa-reports 履歴 55・top-level 審査履歴 16＝計 132 移動＋空 .gitkeep dir 3（handover/requirements/decisions）削除。確立した不変条件は『root=運用ドキュ＋現イテレーションの active ref／archive=履歴』。設計の核は breakage ゼロ: current_refs が指す被参照ファイル（v162 qa-reports 4＋requirements=full-review-2026-06-13-context-futureproof）を一切動かさない＝契約（every declared ref exists）を編集せず満たす。plan/spec のみ P3 docs へ通常ローテ（P3 docs は元から root＝無移動）。test-strength.drill は run-test-strength-drill.py/test が参照する LIVE artifact のため *.md glob＋case 二重除外で root 温存。keep-list 8 load-bearing（STATUS/LEARNINGS/MIGRATION-FROM-v7/architecture-overview/evidence-archive/hook-failure-policy/perf-baseline/context-futureproof）root 維持。参照監査で『移動で壊れるのは root current_refs 6＋example 4 のみ』を事前確定、README/arch-overview に specific link 無し・placeholder 検査は example のみ走査・drill テストは tmp 使用を実証。grill-plan 要検討4件（①test_hook_output_schema の stale コメント2行を docs/archive パスへ更新②メモリ更新を実参照6件に是正③make example の git status 期待明確化④session_history iter26 削除明示）を着手前反映。各カテゴリ移動ごとに contract/drift 緑を確認、最終 full suite 750 passed/1 skip（既知の順序依存 flake test_python3_absent のみ＝Task1 ベースラインと同一＝新規回帰ゼロ）/ contract 全 profile / drift / make example 差分ゼロ（archive は root のみ＝example 非波及）/ PoC 18+5 全 PASS。MEMORY.md の history 参照 6 件（audit-charter/report-2026-06-06・evolution-review-2026-06-10・functional-integrity-audit-charter/report-2026-06-07・behavioral-review-report-2026-06-12）を docs/archive/reviews へ更新（context-futureproof は root 据え置き）。版は据え置き（コード挙動ゼロ変更＝SemVer 的に版を消費しない）。**これで第7回全力レビュー §2 のバックログを全消化＝完済。次タスク未定。**"
-  - date: "2026-06-14"
-    mode: Dev
-    phase: "deploy"
-    note: "iteration 28（v1.8.0 P2: volatile-truth マニフェスト）実装完了: 第7回全力レビュー §2 P2。プラットフォーム結合値（model id/effort・hook event 名・tool 名・hook 出力 schema 検証日）を新規 scripts/platform_manifest.py に隔離し『追従トレッドミルの税』を1箇所へ集約。M1 で実証した『生成と検証が同一マニフェストを import＝原理的に乖離不能』パターンの横展開。設計の核は2層分離: 機械強制できる内部整合（散在リテラルを import/drift で束ねる）＋機械強制できない現実整合（人手の検証日 PLATFORM_VERIFIED＋staleness advisory）。これで過去セカンドオピニオン R1/J-1 が警告した『沈黙する第3 declarative ミラー』を回避（実 import 消費者あり・現実検証は人手と明示）。スコープ: model（強制 import）/event（drift FAIL）/tool（registry WARN）/schema（検証日のみ＝emit.sh のフィールド名は移さず pure-bash 単一ソースを不可侵）。check_framework_contract が ALLOWED/FORBIDDEN/EFFORT/OPUS_ONLY を import 消費しリテラル置換＋新規 check_model_policy_manifest_consistency が MODEL_EFFORT_POLICY（aegis 設計）を許容集合に照合（platform 真実 vs aegis 設計の分離）。check_reference_drift が自己 bootstrap 付き import で check_platform_manifest（template event∈KNOWN_HOOK_EVENTS=FAIL／matcher token∈KNOWN_TOOL_NAMES=WARN／TOOL_MATCHING_EVENTS 限定で SessionStart の startup|resume を tool 誤検知しない）と check_platform_staleness（検証日超過=WARN・platform_manifest.py を持つ framework root のみ発火で二重発火防止）を追加（ALL_CHECKS 12→14・architecture-overview 同期）。CLAUDE.md Model Policy に値出典の一本化を明記（語数 599/650）。非ミラー checker のみが import＝新ミラー面ゼロを make example で実証。grill-plan が致命2件（①importlib ローダ test_skill_reachability 用に check_reference_drift へ self-bootstrap sys.path.insert を追加＝単独実行 collection error を封鎖／②staleness を check_platform_staleness に関数分離し template 検査を決定論化＝壁時計依存テストの時限爆弾を排除）を指摘→着手前反映。grill-code は 🔴ゼロ・🟡1（malformed template の null/非dict matcher で crash→報告に倒す＋sys.path 冪等化）を fix-forward。版数4箇所（contract 定数/template STATUS/example STATUS/本体 STATUS）を 1.8.0 統一。750 passed/1 skip（734→752・新規18）/ contract 全 profile / drift / v162 18 PoC / v163 5 PoC 全 PASS。既知の順序依存 flake test_python3_absent_advisory_hooks_do_not_crash（post-status-audit が実 docs/STATUS.md と .gate-snapshot の gate 差を tamper 検知＝共有状態のテスト分離問題）は単独実行で緑・本変更とは無関係（baseline でも同失敗）。残 backlog: P3 過程 docs archive 化・空 scaffold 削除（第7回レビュー最後の未消化項目）。"
 ---
 
 ## Summary

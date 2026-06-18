@@ -189,6 +189,138 @@ cmd_mentions_control_plane() {
       return 0
     fi
   fi
+  # SF-001 augment: token-aware split/escaped/bare-dir CP write target that the
+  # regex+mask passes above miss because the shell reconstructs the CP path.
+  if cmd_token_mentions_cp "$cmd"; then
+    return 0
+  fi
+  return 1
+}
+
+# --- SF-001 AUGMENT: token-aware control-plane WRITE-TARGET detection ---------
+# (a)(b)(c) above key on a LITERAL `hooks/`|`scripts/`|`templates/`|`STATUS.md`|...
+# substring, so they miss every form where the shell reconstructs the CP path it
+# never appears literally in the command:
+#   quote split / adjacent concat:  hooks""/lib   "ho""oks/lib"   'hoo'ks/
+#   backslash escape:                hooks\/lib
+#   trailing-slash-less bare operand: rm -rf hooks   cp x hooks   find hooks
+# These ADD denials only; they never relax an existing decision. A CP path is a
+# WRITE TARGET unless it appears solely as a message argument of a no-write
+# command (echo/printf/git commit) with no chain operator — the (c) allowlist,
+# so OBS-006 message rescue is preserved for split/escaped forms too. Read forms
+# (ls/cat/find without a write indicator) surface as a mention and are correctly
+# allowed downstream by the read-only carve-out (kept purely additive).
+
+# True when CMD is a no-write "message" command (echo/printf/git commit) carrying
+# no chain operator that could introduce a writer — its CP args are not write
+# targets. Mirrors the (c) allowlist.
+_cmd_is_rescued_message() {
+  local cmd="$1"
+  printf '%s' "$cmd" | grep -qE '[;&|]' && return 1
+  printf '%s' "$cmd" | grep -qE '^[[:space:]]*(echo|printf|git[[:space:]]+commit)([[:space:]]|$)'
+}
+
+cmd_token_mentions_cp() {
+  local cmd="$1" verdict rc
+  # cmdsub/backtick are handled by the raw fail-closed branch upstream; shlex
+  # cannot model an executed substitution, so never tokenize them here.
+  printf '%s' "$cmd" | grep -qE '\$\(|`' && return 1
+
+  # Sub-check 1 — bare (unquoted, whitespace-delimited) CP directory operand.
+  # pure-bash (python-independent). Left/right boundaries are whitespace|^|$ so a
+  # QUOTED occurrence (adjacent to a quote char) and a path-qualified name
+  # (src/hooks) never match — only a truly bare top-level dir word.
+  if printf '%s' "$cmd" \
+       | grep -qE '(^|[[:space:]])(\./)?(hooks|scripts|templates)/?([[:space:]]|$)'; then
+    _cmd_is_rescued_message "$cmd" || return 0
+  fi
+
+  # Sub-check 2 gate (perf + domain): a command with no quote/backslash tokenizes
+  # as plain whitespace splitting — bare dirs are already handled by Sub-check 1
+  # and everything else is what the existing regex sees. Skip the python spawn
+  # (this hook fires on every Bash command). The two classes Sub-check 2 catches
+  # (quote split / backslash) by definition contain one of these chars.
+  case "$cmd" in
+    *\'*|*\"*|*\\*) : ;;
+    *) return 1 ;;
+  esac
+
+  # Sub-check 2 — quote-split / backslash reconstruction (python3 shlex). Pass
+  # CONTROL_PLANE and CP_DIRS via env so the regex is NOT duplicated in python
+  # (single source). python3 absent -> skip (Sub-check 1 still covered bare
+  # dirs; quote-split/backslash fall back to the pre-existing mask+regex result.
+  # Known limitation: full coverage of those two classes requires python3, a
+  # framework-wide hard dependency).
+  command -v python3 >/dev/null 2>&1 || return 1
+  verdict=$(AEGIS_CMD="$cmd" AEGIS_CP_RE="$CONTROL_PLANE" AEGIS_CP_DIRS="$CP_DIRS" \
+            AEGIS_ROOT="$ROOT" AEGIS_ROOT_REAL="$ROOT_REAL" \
+            python3 - <<'PY' 2>/dev/null
+import os, re, shlex, sys
+cmd = os.environ.get("AEGIS_CMD", "")
+cp_re = re.compile(os.environ.get("AEGIS_CP_RE", ""))
+cp_dirs = [d for d in os.environ.get("AEGIS_CP_DIRS", "").split("|") if d]
+root = os.environ.get("AEGIS_ROOT", "")
+root_real = os.environ.get("AEGIS_ROOT_REAL", "")
+bare = set()
+for d in cp_dirs:
+    for pre in ("", "./"):
+        for suf in ("", "/"):
+            bare.add(pre + d + suf)
+    for b in (root, root_real):
+        if b:
+            bare.add(b.rstrip("/") + "/" + d)
+
+
+def word_is_cp(w):
+    return bool(cp_re.search(w)) or w in bare
+
+
+try:
+    lex = shlex.shlex(cmd, posix=True, punctuation_chars=True)
+    lex.whitespace_split = True
+    toks = list(lex)
+except ValueError:
+    sys.exit(3)
+CHAIN = {";", "|", "&", "&&", "||", "(", ")"}
+chain = any(t in CHAIN for t in toks)
+words = [t for t in toks if t not in CHAIN and t not in (">", ">>", "<")]
+ci = 0
+while ci < len(words) and re.match(r"^[A-Za-z_][A-Za-z0-9_]*=", words[ci]):
+    ci += 1
+c0 = words[ci] if ci < len(words) else ""
+c1 = words[ci + 1] if ci + 1 < len(words) else ""
+rescued = (not chain) and (c0 in ("echo", "printf") or (c0 == "git" and c1 == "commit"))
+redir = False
+operand_cp = False
+for t in toks:
+    if t in (">", ">>"):
+        redir = True
+        continue
+    if t == "<":
+        redir = False
+        continue
+    if t in CHAIN:
+        redir = False
+        continue
+    if redir:
+        if word_is_cp(t):
+            print("1")
+            sys.exit(0)
+        redir = False
+        continue
+    if word_is_cp(t):
+        operand_cp = True
+print("1" if (operand_cp and not rescued) else "0")
+PY
+)
+  rc=$?
+  # Fail-closed: a clean run printing "0" is the ONLY no-mention path. ValueError
+  # (rc=3, unbalanced quote) and any unexpected non-zero exit, or a "1" verdict,
+  # all deny-eligible. python is gated by `command -v` above, so a non-zero exit
+  # here is an analysis failure — treat it as a mention, never allow through.
+  if [ "$rc" -ne 0 ] || [ "$verdict" = "1" ]; then
+    return 0
+  fi
   return 1
 }
 

@@ -31,7 +31,23 @@
 - **iteration 31 security ゲートでの確認**: 1 次（security エージェント）＋盲検 2 次が独立に、上記全形を orig(8f8eb2d) vs new HEAD で実走し **両者とも allow＝完全に pre-existing**（Batch1 後退ゼロ）と確認。security skill の deploy blocker 列挙（auth bypass/default creds/hardcoded secret/HTTPS）には非該当のため **deploy blocker ではなく Critical 残存リスク**として繰延承認。
 - **なぜ安易に直せないか**: 「クォート除去＋連結」を素朴に適用すると、`git commit -m "update STATUS.md handling"` のような**クォート内メッセージ救済（OBS-006）を再び壊す**（語の値に `STATUS.md` 部分文字列が現れる）。正しくは「シェル忠実なトークン化 → 各語をクォート除去して**語の値**を得る → その語が**書込み先**の control-plane パスか判定」。重い新プリミティブで、セキュリティ境界ゆえ独立した設計＋TDD＋盲検レビューが必要。
 - **修正方針（暫定・非確定）**: コマンドを語単位にトークン化（python の `shlex` 等＝抽出と同様に python 優先＋bash fail-closed フォールバック）し、各語の literal value を再構成してから control-plane 判定。リダイレクト先・write コマンドの宛先語に限定して deny。`git commit -m`/`echo`/`printf` のメッセージ語は「語全体がパスでない」ため救済を維持。
-- **状態**: **OPEN**。iteration 31 では Batch1（後退ゼロ）を先行し、本件は最優先の専用タスクとして後続で消化する（ユーザー合意 2026-06-16）。
+- **状態**: **OPEN**（iteration 32 で対応中）。iteration 31 では Batch1（後退ゼロ）を先行し、本件は最優先の専用タスクとして後続で消化する（ユーザー合意 2026-06-16）。修正計画＝`docs/plans/2026-06-18-sf-001-cp-token-bypass-implementation-plan.md`、設計＝`docs/specs/2026-06-18-sf-001-cp-token-bypass-design.md`。
+
+### SF-002: control-plane フックの glob メタ文字 bare-dir バイパス（High・pre-existing）
+
+- **発見**: iteration 32 / SF-001 修正計画の grill-plan（自己グリル）。2026-06-18。
+- **種別**: **pre-existing**（SF-001 と同じく既存 moat も素通り。SF-001 修正でも**意図的にスコープ外**）。
+- **重大度**: High（bare-dir 破壊と同等の効果。`rm -rf hooks*` で hooks/ を削除可能）。
+- **再現（task_type=feature で allow になる）**:
+  ```
+  rm -rf hooks*        # 末尾 glob。語が厳密 `hooks` でも `hooks/` でもない
+  rm -rf hook?         # ? glob
+  rm -rf [h]ooks       # 文字クラス glob
+  cp evil scripts*     # 同クラス
+  ```
+- **根本原因**: control-plane 判定（SF-001 の token-aware augment 後も）は語の literal value で CP を判定する。glob メタ文字（`* ? [`）を含む語はシェルが実行時にファイル名展開して CP パスに解決するが、判定時点の語は `hooks*` 等で、`CONTROL_PLANE` 正規表現にも bare-name 厳密一致にも当たらない。shlex も glob を展開しない。
+- **修正方針（暫定・非確定）**: bare-name 検出の右境界に glob メタ文字（`*?[`）を許容するか、glob を含む CP 接頭辞語を fail-closed 扱いにする。SF-001 と同じくセキュリティ境界ゆえ独立 TDD＋盲検が要る。
+- **状態**: **OPEN**。SF-001（列挙3クラス）を先行し、本件は別タスクで消化（スコープを膨らませない）。
 
 ## CLOSED
 
