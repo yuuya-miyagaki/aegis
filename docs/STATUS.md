@@ -42,7 +42,7 @@ external_evidence:
     scope: "v0.12.2 実装後 4 ラウンドレビュー"
     findings: "Round 6 (P1×2, P2×1: pre-compact exit 2 / minimal-project / test rc), Round 7 (P1×1, P3×1: git add 漏れ / テスト件数表記), Round 8 (P2×1, P3×1: stale last_updated / grep 自己マッチ), Round 9 (P3×2: コメント不整合)"
     resolution: "9件全反映。tier 1/2 PASS、134 tests PASS、本体と minimal-project 完全同期確認済み。"
-next_action: "**iteration 31 Batch1 完了（v1.11.0）＝全ゲート approved（dev_ready_for_client 含む）。** Batch1（配布ブロッカー＝control-plane フック精度＋git baseline）6 タスク・全ゲート・版 1.11.0・TO-CLIENT・LEARNINGS 完了。**残: 未 push コミット群（iteration 30 分＋iteration 31 分）の push をユーザー明示承認の上で実行（自動 push しない）。** 次タスク: **iteration 32＝Batch2（skill/契約/配布整合 5）+Batch3（Client 書込み 2）+X.1/X.2**（新 brainstorm から）。**最優先 follow-up: SF-001（control-plane の literal `hooks/` 一致回避・pre-existing・Critical・deploy blocker 非該当）＝docs/security-followups.md。** 残すべき勝ち OBS-010/014/016/019/021/022 維持。"
+next_action: "**iteration 31 Batch1 完了・push 済み（v1.11.0・origin/main = e0ff517）。** 次は **iteration 32＝SF-001 を潰す**（ユーザー合意・優先順位変更）: control-plane の literal `hooks/` 一致回避（quote分割 `hooks\"\"/lib`／backslash `hooks\\/`／bare-dir `find hooks -exec rm`・`rm -rf hooks`・`cp x hooks`）＝Critical・フル moat 崩壊。**ブリーフ正典＝`docs/security-followups.md` SF-001**（repro・根本原因・修正方針まで自己完結）。修正方針: python `shlex` で語単位トークン化＋bash fail-closed フォールバック→書込み先の語が CP なら deny、メッセージ語（git commit -m/echo/printf）の救済は維持。実装対象は `hooks/check-control-plane.sh`（＋ミラー）。新 iteration として state-machine 規則どおり dev ゲート pending リセット→iteration++→brainstorm から（設計重いので security 盲検2次必須・既存 moat テスト/REDTEAM 緑維持）。**その後 iteration 33+＝Batch2（配布整合 P2-7/2-8 等 5）+Batch3（2）+X.1/X.2**（plan: docs/plans/2026-06-15-dogfood-driven-improvements-plan.md）。残すべき勝ち OBS-010/014/016/019/021/022 維持。push は明示承認まで禁止。"
 blockers: []
 failure_tracking: null
 session_history:
