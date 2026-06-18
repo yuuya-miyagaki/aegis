@@ -9,16 +9,12 @@
 - 依存監査: unverified
 
 ## ティア2: 🔍 第2意見（self-attested・自己申告・低信頼）
-- なし
+- あり: approve_with_notes
 
 ## 🟡 要確認
 - テスト結果が未検証（記録なし/コード変更後）
 - 依存監査が未検証
-- claims 未提出（要確認）
-- 第2意見なし（self-attested・要確認）
+- 1次/2次レビューの相違（self-attested）: 1次=approve / 2次=approve_with_notes
 
 ## あなたが取るアクション
 （LLM が平易日本語で記述）
-
-## ACK
-- OWASP 各項目 非該当（追加は定数 dict＋純関数のローカルファイル読取のみ・外部入力/認証/ネットワーク/secrets なし）。理由付き根拠は v1100-security.md。第2意見は grill-code（セキュリティ面の指摘なし）。 （2026-06-14 22:15）
