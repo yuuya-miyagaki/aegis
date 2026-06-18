@@ -3,7 +3,7 @@ framework: aegis
 framework_version: "1.10.0"
 project_name: "Aegis"
 mode: Dev
-phase: security
+phase: deploy
 task_type: framework
 task_size: L
 task_size_rationale: "暫定（brainstorm/plan は dogfood セッションで完了済み・本リポで承認取得予定）: ドッグフード由来 改善（OBS-001〜022）。Batch1=control-plane フック精度+git baseline 6 タスク／Batch2=skill/契約/配布整合 5／Batch3=Client 書込み 2＋横断 X.1/X.2。hooks/scripts/skills/tests 多数で 6+ ファイル＝L。plan: docs/plans/2026-06-15-dogfood-driven-improvements-plan.md。"
@@ -27,7 +27,7 @@ current_refs:
   review: docs/qa-reports/iter31-batch1-review.md
   qa: docs/qa-reports/iter31-batch1-qa.md
   security: docs/qa-reports/iter31-batch1-security.md
-  deploy: null
+  deploy: docs/qa-reports/iter31-batch1-deploy-checklist.md
   translation: null
 external_evidence:
   - type: "second-opinion-v1-foundation-r1-r2"
