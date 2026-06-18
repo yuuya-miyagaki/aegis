@@ -12,3 +12,6 @@
 
 ## あなたが取るアクション
 （LLM が平易日本語で記述）
+
+## ACK
+- B1 LIVEドリルは committed-code/coverage-floor 構造制約でSKIP宣言（iter30同型）。代替=手動4-mutant実証で4/4 CAUGHT（各テスト赤化）＋全タスクTDD RED-GREEN＋3ラウンド盲検レビュー。テスト結果🟡はharnessがPostToolUseにoutput非提供の環境由来でfull suite 830 passed/1 skip実走済。詳細 docs/qa-reports/iter31-batch1-qa.md （2026-06-18 10:37）
