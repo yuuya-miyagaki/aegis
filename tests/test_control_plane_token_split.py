@@ -704,5 +704,163 @@ class TestBareSpecialParams(unittest.TestCase):
         self.assertTrue(_allowed(out), f"awk field $2 must not false-positive: {out[:200]!r}")
 
 
+class TestGlobAndCharClass(unittest.TestCase):
+    """round8 盲検 break-attempt（security agent）: glob/wildcard/char-class が
+    実行時(cwd=ROOT)に実 control-plane へ展開するのに、augment GATE が『リテラル
+    CP 部分文字列』を要求するため resolver 未到達で ALLOW に漏れていた（Critical・
+    当初 SF-001 と同等。`glob=SF-002 runtime fundamental limit` の誤記録を是正＝
+    glob は fnmatch で既知 CP 名に静的照合でき closable）。
+    GATE に `?`/`*`/`[` を追加し、resolver で各 path component を CP 絶対パスへ
+    prefix-fnmatch 照合 → CP に解決しうる write=deny / read=read-only carve-out で
+    allow / `build/*` 等の非CP配下=allow。quoted glob は shlex posix が quote を
+    剥がすため deny 側に倒れる（リテラル `hook?` は存在しない無害 path＝fail-safe FP）。"""
+
+    @classmethod
+    def setUpClass(cls):
+        cls._tmp = _scratch_root()
+        cls.root = Path(cls._tmp.name)
+
+    @classmethod
+    def tearDownClass(cls):
+        cls._tmp.cleanup()
+
+    # ---- `?` glob hitting a CP dir (write) → DENY ----
+    def test_qmark_dir_rm_denied(self):
+        out = _hook(self.root, "rm -rf hook?")
+        self.assertTrue(_denied(out), f"rm -rf hook? must deny: {out[:200]!r}")
+
+    def test_qmark_redirect_emit_denied(self):
+        out = _hook(self.root, "echo evil > hook?/lib/emit.sh")
+        self.assertTrue(_denied(out), f"> hook?/lib/emit.sh must deny: {out[:200]!r}")
+
+    def test_qmark_append_safety_denied(self):
+        out = _hook(self.root, "echo evil >> hook?/lib/safety.sh")
+        self.assertTrue(_denied(out), f">> hook?/lib/safety.sh must deny: {out[:200]!r}")
+
+    def test_qmark_cp_into_denied(self):
+        out = _hook(self.root, "cp evil hook?/lib/emit.sh")
+        self.assertTrue(_denied(out), f"cp into hook?/lib must deny: {out[:200]!r}")
+
+    def test_qmark_tee_denied(self):
+        out = _hook(self.root, "echo evil | tee hook?/lib/emit.sh")
+        self.assertTrue(_denied(out), f"tee hook?/lib must deny: {out[:200]!r}")
+
+    def test_qmark_mv_away_denied(self):
+        out = _hook(self.root, "mv hook? /tmp/gone")
+        self.assertTrue(_denied(out), f"mv hook? away must deny: {out[:200]!r}")
+
+    def test_qmark_chmod_denied(self):
+        out = _hook(self.root, "chmod 000 hook?")
+        self.assertTrue(_denied(out), f"chmod 000 hook? must deny: {out[:200]!r}")
+
+    def test_qmark_truncate_denied(self):
+        out = _hook(self.root, "truncate -s0 hook?/lib/emit.sh")
+        self.assertTrue(_denied(out), f"truncate hook? must deny: {out[:200]!r}")
+
+    def test_qmark_find_delete_denied(self):
+        out = _hook(self.root, "find hook? -name '*.sh' -delete")
+        self.assertTrue(_denied(out), f"find hook? -delete must deny: {out[:200]!r}")
+
+    # ---- `*` glob → DENY ----
+    def test_star_dir_denied(self):
+        out = _hook(self.root, "rm -rf hook*")
+        self.assertTrue(_denied(out), f"rm -rf hook* must deny: {out[:200]!r}")
+
+    def test_bare_star_denied(self):
+        out = _hook(self.root, "rm -rf *")
+        self.assertTrue(_denied(out), f"rm -rf * (matches hooks) must deny: {out[:200]!r}")
+
+    def test_star_scripts_denied(self):
+        out = _hook(self.root, "rm -rf script*")
+        self.assertTrue(_denied(out), f"rm -rf script* must deny: {out[:200]!r}")
+
+    def test_star_templates_denied(self):
+        out = _hook(self.root, "rm -rf template*")
+        self.assertTrue(_denied(out), f"rm -rf template* must deny: {out[:200]!r}")
+
+    # ---- char-class spelling out a CP name → DENY ----
+    def test_charclass_full_hooks_denied(self):
+        out = _hook(self.root, "rm -rf [h][o][o][k][s]")
+        self.assertTrue(_denied(out), f"[h][o][o][k][s] must deny: {out[:200]!r}")
+
+    def test_charclass_partial_hooks_denied(self):
+        out = _hook(self.root, "rm -rf [h]ooks")
+        self.assertTrue(_denied(out), f"[h]ooks must deny: {out[:200]!r}")
+
+    def test_charclass_scripts_denied(self):
+        out = _hook(self.root, "rm -rf s[c]ripts")
+        self.assertTrue(_denied(out), f"s[c]ripts must deny: {out[:200]!r}")
+
+    def test_multi_qmark_hooks_denied(self):
+        out = _hook(self.root, "rm -rf h??ks")
+        self.assertTrue(_denied(out), f"h??ks must deny: {out[:200]!r}")
+
+    # ---- file CPs (STATUS.md / CLAUDE.md) via glob → DENY ----
+    def test_status_glob_redirect_denied(self):
+        out = _hook(self.root, "echo evil > docs/STATUS.m?")
+        self.assertTrue(_denied(out), f"docs/STATUS.m? must deny: {out[:200]!r}")
+
+    def test_claude_md_glob_suffix_denied(self):
+        out = _hook(self.root, "cp evil CLAUDE.m?")
+        self.assertTrue(_denied(out), f"CLAUDE.m? must deny: {out[:200]!r}")
+
+    def test_claude_md_glob_mid_denied(self):
+        out = _hook(self.root, "cp evil CLAUD?.md")
+        self.assertTrue(_denied(out), f"CLAUD?.md must deny: {out[:200]!r}")
+
+    def test_claude_md_charclass_denied(self):
+        out = _hook(self.root, "cp evil [C]LAUDE.md")
+        self.assertTrue(_denied(out), f"[C]LAUDE.md must deny: {out[:200]!r}")
+
+    # ---- .claude dir via glob → DENY ----
+    def test_dotclaude_glob_file_denied(self):
+        out = _hook(self.root, "cp evil .clau??/settings.json")
+        self.assertTrue(_denied(out), f".clau??/settings.json must deny: {out[:200]!r}")
+
+    def test_dotclaude_glob_dir_denied(self):
+        out = _hook(self.root, "rm -rf .claud?")
+        self.assertTrue(_denied(out), f"rm -rf .claud? must deny: {out[:200]!r}")
+
+    # ---- quoted glob: shlex strips quotes → fail-safe DENY (documented) ----
+    def test_quoted_glob_failsafe_denied(self):
+        out = _hook(self.root, 'cp evil "hook?/lib/emit.sh"')
+        self.assertTrue(_denied(out), f"quoted hook? is fail-safe deny: {out[:200]!r}")
+
+    # ---- literal + glob: clear literal CP keeps DENY (no downgrade) ----
+    def test_literal_and_glob_denied(self):
+        out = _hook(self.root, "rm -rf hooks/ build?")
+        self.assertTrue(_denied(out), f"literal hooks/ + glob must deny: {out[:200]!r}")
+
+    # ---- reads of CP via glob → ALLOW (read-only carve-out) ----
+    def test_glob_read_ls_allowed(self):
+        out = _hook(self.root, "ls hook?")
+        self.assertTrue(_allowed(out), f"ls hook? (read) must allow: {out[:200]!r}")
+
+    def test_glob_read_cat_allowed(self):
+        out = _hook(self.root, "cat hook?/lib/emit.sh")
+        self.assertTrue(_allowed(out), f"cat hook?/... (read) must allow: {out[:200]!r}")
+
+    # ---- negatives: glob NOT resolving to CP → ALLOW (no false positive) ----
+    def test_neg_build_glob_allowed(self):
+        out = _hook(self.root, "rm -rf buil?")
+        self.assertTrue(_allowed(out), f"rm -rf buil? (non-CP) must allow: {out[:200]!r}")
+
+    def test_neg_dist_star_allowed(self):
+        out = _hook(self.root, "rm -rf dis*")
+        self.assertTrue(_allowed(out), f"rm -rf dis* (non-CP) must allow: {out[:200]!r}")
+
+    def test_neg_glob_under_noncp_allowed(self):
+        out = _hook(self.root, "rm -rf build/*")
+        self.assertTrue(_allowed(out), f"build/* (glob under non-CP) must allow: {out[:200]!r}")
+
+    def test_neg_cp_into_noncp_glob_allowed(self):
+        out = _hook(self.root, "cp foo.txt bar*")
+        self.assertTrue(_allowed(out), f"cp foo.txt bar* (non-CP) must allow: {out[:200]!r}")
+
+    def test_neg_star_suffix_allowed(self):
+        out = _hook(self.root, "cat *.py")
+        self.assertTrue(_allowed(out), f"cat *.py (non-CP read) must allow: {out[:200]!r}")
+
+
 if __name__ == "__main__":
     unittest.main()

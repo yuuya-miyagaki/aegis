@@ -225,14 +225,18 @@ cmd_token_verdict() {
   # opaque sentinel and tokenize/resolve. pwd / $PWD are the agent's cwd = ROOT.
   local cmd="$1" verdict rc
   # Gate: a CP-dir reconstruction names the dir (hooks/scripts/templates), hides
-  # it behind a quote / backslash, or SPLITS it across an expansion — brace
+  # it behind a quote / backslash, SPLITS it across an expansion — brace
   # `${VAR:-..}` / `{a,b}` (both contain `{`), cmdsub `$(..)`, or backtick (round6
-  # C-3: h${X:-ooks}, {h,x}ooks, ho${EMPTY}oks). A command with NONE of these
-  # cannot reconstruct a CP dir, so skip the python spawn (this hook fires on
-  # every Bash command). Patterns with shell-special chars are single-quoted so
-  # the case does not parameter-expand or glob them.
+  # C-3: h${X:-ooks}, {h,x}ooks, ho${EMPTY}oks) — or OBSCURES it behind a glob /
+  # wildcard / char-class (round8: hook?, hook*, [h][o][o][k][s], .clau??), which
+  # the shell expands to the real CP at runtime but carries no literal CP
+  # substring. A command with NONE of these cannot reach the control plane, so
+  # skip the python spawn (this hook fires on every Bash command; a glob char
+  # widens the spawn set but the resolver still costs only one short python run).
+  # Patterns with shell-special chars are single-quoted so the case does not
+  # parameter-expand or glob them.
   case "$cmd" in
-    *hooks*|*scripts*|*templates*|*\'*|*\"*|*\\*|*'{'*|*'$('*|*'`'*) : ;;
+    *hooks*|*scripts*|*templates*|*\'*|*\"*|*\\*|*'{'*|*'$('*|*'`'*|*'?'*|*'*'*|*'['*) : ;;
     *) echo none; return ;;
   esac
 
@@ -242,7 +246,7 @@ cmd_token_verdict() {
   verdict=$(AEGIS_CMD="$cmd" AEGIS_CP_RE="$CONTROL_PLANE" AEGIS_CP_DIRS="$CP_DIRS" \
             AEGIS_ROOT="$ROOT" AEGIS_ROOT_REAL="$ROOT_REAL" \
             python3 - <<'PY' 2>/dev/null
-import os, re, shlex, sys
+import fnmatch, os, re, shlex, sys
 
 
 def decode_ansic(s):
@@ -289,6 +293,17 @@ for base in (root, root_real):
     if base:
         for d in cp_dirs:
             cp_targets.add(os.path.normpath(os.path.join(base, d)))
+# round8: absolute CP paths for GLOB matching — the dirs PLUS the named files and
+# the .claude dir at their real locations. A glob token is compared component-wise
+# (fnmatch) against these as a PATH PREFIX so position is respected: `build/*` is
+# under none of them, but bare `*` and `*/lib` are under hooks. cp_re still covers
+# the LITERAL forms; this set only adds the glob-resolved deny.
+cp_glob = set(cp_targets)
+for base in (root, root_real):
+    if base:
+        cp_glob.add(os.path.normpath(os.path.join(base, ".claude")))
+        cp_glob.add(os.path.normpath(os.path.join(base, "CLAUDE.md")))
+        cp_glob.add(os.path.normpath(os.path.join(base, "docs", "STATUS.md")))
 
 # NB: backticks are written \x60 (hex) — a LITERAL ` inside this $(... <<'PY')
 # heredoc breaks the bash parser (it scans for a matching ` even in the quoted
@@ -339,6 +354,28 @@ cmd = _OLDPWD.sub(SENT, cmd)
 cmd = _VAR.sub(SENT, cmd)
 
 
+def _has_glob(w):
+    return "?" in w or "*" in w or "[" in w
+
+
+def _glob_hits_cp(ap):
+    # ap is a normalized absolute path that still contains glob metachars. It is a
+    # control-plane target when some cp_glob path is a PREFIX of it under
+    # component-wise fnmatch: each CP component must be matched by the aligned ap
+    # component (the glob pattern). fnmatch(name, pattern) -> name = literal CP
+    # component, pattern = ap component. Case sensitivity follows the platform FS
+    # via fnmatch (conservative on a case-insensitive FS: HOOK? -> hooks). The
+    # prefix/position rule keeps build/* out (its first component is the literal
+    # build, matching no CP component) while catching bare * and */lib.
+    ap_parts = ap.split(os.sep)
+    for t in cp_glob:
+        t_parts = t.split(os.sep)
+        if len(ap_parts) >= len(t_parts) and all(
+                fnmatch.fnmatch(t_parts[i], ap_parts[i]) for i in range(len(t_parts))):
+            return True
+    return False
+
+
 def classify_one(w):
     # deny: w resolves to a real CP path. ask: an opaque sentinel (an unresolved
     # cmdsub/$VAR) prefixes a surviving CP dir component (could be cwd/root). no:
@@ -353,6 +390,11 @@ def classify_one(w):
         if cp_re.search(w):
             return "deny"
         if ap in cp_targets or any(ap.startswith(t + os.sep) for t in cp_targets):
+            return "deny"
+        # round8: a glob/wildcard/char-class token whose runtime expansion (cwd=
+        # ROOT) lands on a CP path. Resolved statically via fnmatch against the
+        # known CP names — globs are deterministic, not a runtime-only unknown.
+        if _has_glob(w) and _glob_hits_cp(ap):
             return "deny"
         return "no"
     if any(c in cp_dirs for c in ap.split(os.sep)):
