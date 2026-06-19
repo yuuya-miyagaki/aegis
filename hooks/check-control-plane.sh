@@ -236,13 +236,24 @@ cmd_token_mentions_cp() {
   fi
 
   # Sub-check 2 gate (perf + domain): a command with no quote/backslash tokenizes
-  # as plain whitespace splitting — bare dirs are already handled by Sub-check 1
-  # and everything else is what the existing regex sees. Skip the python spawn
-  # (this hook fires on every Bash command). The two classes Sub-check 2 catches
-  # (quote split / backslash) by definition contain one of these chars.
+  # as plain whitespace splitting — bare relative dirs are already handled by
+  # Sub-check 1 and everything else is what the existing regex sees. Skip the
+  # python spawn (this hook fires on every Bash command). The quote-split /
+  # backslash / ANSI-C $'...' classes by definition contain a quote or backslash.
+  # EXCEPTION: an ABSOLUTE project-root CP path without a trailing slash
+  # (rm -rf ${ROOT}/hooks) carries no quote/backslash, is missed by Sub-check 1's
+  # whitespace-boundary regex AND by _text_mentions_cp's trailing-slash fixed
+  # string — route it to python, whose `bare` set covers ${ROOT}/{hooks,scripts,
+  # templates} and ${ROOT_REAL}/... (a trailing-slash abs form is already denied
+  # upstream, so reaching here with this substring means the bare form).
   case "$cmd" in
     *\'*|*\"*|*\\*) : ;;
-    *) return 1 ;;
+    *)
+      printf '%s' "$cmd" | grep -qF \
+        -e "$ROOT/hooks" -e "$ROOT/scripts" -e "$ROOT/templates" \
+        -e "$ROOT_REAL/hooks" -e "$ROOT_REAL/scripts" -e "$ROOT_REAL/templates" \
+        || return 1
+      ;;
   esac
 
   # Sub-check 2 — quote-split / backslash reconstruction (python3 shlex). Pass
@@ -256,7 +267,43 @@ cmd_token_mentions_cp() {
             AEGIS_ROOT="$ROOT" AEGIS_ROOT_REAL="$ROOT_REAL" \
             python3 - <<'PY' 2>/dev/null
 import os, re, shlex, sys
-cmd = os.environ.get("AEGIS_CMD", "")
+
+
+def decode_ansic(s):
+    # shlex(posix) does NOT expand bash ANSI-C $'...' quoting, so $'hook\x73'
+    # stays literal and a CP path it resolves to is missed. Decode each $'...'
+    # segment to its literal value and re-emit it as a normal single-quoted
+    # word, so the downstream shlex sees the real path. \' inside the segment is
+    # an escaped quote (does not close it).
+    out = []
+    i, n = 0, len(s)
+    while i < n:
+        if s[i] == "$" and i + 1 < n and s[i + 1] == "'":
+            j = i + 2
+            buf = []
+            while j < n:
+                if s[j] == "\\" and j + 1 < n:
+                    buf.append(s[j:j + 2])
+                    j += 2
+                    continue
+                if s[j] == "'":
+                    break
+                buf.append(s[j])
+                j += 1
+            raw = "".join(buf)
+            try:
+                dec = bytes(raw, "utf-8").decode("unicode_escape")
+            except Exception:
+                dec = raw
+            out.append("'" + dec.replace("'", "'\\''") + "'")
+            i = j + 1
+        else:
+            out.append(s[i])
+            i += 1
+    return "".join(out)
+
+
+cmd = decode_ansic(os.environ.get("AEGIS_CMD", ""))
 cp_re = re.compile(os.environ.get("AEGIS_CP_RE", ""))
 cp_dirs = [d for d in os.environ.get("AEGIS_CP_DIRS", "").split("|") if d]
 root = os.environ.get("AEGIS_ROOT", "")

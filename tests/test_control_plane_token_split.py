@@ -212,5 +212,75 @@ class TestPython3Absent(unittest.TestCase):
         self.assertTrue(out.strip() != "", f"hook must emit a decision, not crash: {out[:200]!r}")
 
 
+class TestAbsPathBareDir(unittest.TestCase):
+    """F-1（iter32 1次レビュー break-attempt）: trailing-slash 無しの絶対 root パス
+    bare-dir operand。`rm -rf {ROOT}/hooks/` は deny だが `{ROOT}/hooks`（末尾スラッシュ
+    無し）が allow になっていた。設計 unit C が abs 形を約束していた未配線箇所。"""
+
+    @classmethod
+    def setUpClass(cls):
+        cls._tmp = _scratch_root()
+        cls.root = Path(cls._tmp.name)
+
+    @classmethod
+    def tearDownClass(cls):
+        cls._tmp.cleanup()
+
+    def test_abs_rm_rf_hooks_denied(self):
+        out = _hook(self.root, f"rm -rf {self.root}/hooks")
+        self.assertTrue(_denied(out), f"abs bare hooks rm must deny: {out[:200]!r}")
+
+    def test_abs_cp_to_scripts_denied(self):
+        out = _hook(self.root, f"cp evil {self.root}/scripts")
+        self.assertTrue(_denied(out), f"abs bare scripts cp must deny: {out[:200]!r}")
+
+    def test_abs_mv_hooks_denied(self):
+        out = _hook(self.root, f"mv {self.root}/hooks /tmp/x")
+        self.assertTrue(_denied(out), f"abs bare hooks mv must deny: {out[:200]!r}")
+
+    def test_abs_trailing_slash_still_denied(self):
+        # 既存挙動（trailing slash 形）が後退しないことの確認。
+        out = _hook(self.root, f"rm -rf {self.root}/hooks/")
+        self.assertTrue(_denied(out), f"abs hooks/ must deny: {out[:200]!r}")
+
+
+class TestAnsiCQuoting(unittest.TestCase):
+    """F-2（iter32 1次レビュー break-attempt）: $'...' ANSI-C クォートで再構成される CP。
+    shlex(posix) は $'...' を展開しないため取りこぼしていた。"""
+
+    @classmethod
+    def setUpClass(cls):
+        cls._tmp = _scratch_root()
+        cls.root = Path(cls._tmp.name)
+
+    @classmethod
+    def tearDownClass(cls):
+        cls._tmp.cleanup()
+
+    def test_ansic_hex_rm_denied(self):
+        out = _hook(self.root, "rm -rf $'hook\\x73'")
+        self.assertTrue(_denied(out), f"$'hook\\x73' must deny: {out[:200]!r}")
+
+    def test_ansic_full_hex_cp_denied(self):
+        out = _hook(self.root, "cp evil $'\\x68\\x6f\\x6f\\x6b\\x73'")
+        self.assertTrue(_denied(out), f"$'\\x68..' must deny: {out[:200]!r}")
+
+    def test_ansic_plain_rm_denied(self):
+        out = _hook(self.root, "rm -rf $'hooks'")
+        self.assertTrue(_denied(out), f"$'hooks' must deny: {out[:200]!r}")
+
+    def test_ansic_redirect_denied(self):
+        out = _hook(self.root, "echo evil > $'hoo\\x6bs/lib/emit.sh'")
+        self.assertTrue(_denied(out), f"$'..' redirect target must deny: {out[:200]!r}")
+
+    def test_ansic_printf_noncp_allowed(self):
+        out = _hook(self.root, "printf $'%s\\n' x")
+        self.assertTrue(_allowed(out), f"$'%s\\n' non-CP must allow: {out[:200]!r}")
+
+    def test_ansic_echo_tab_noncp_allowed(self):
+        out = _hook(self.root, "echo $'a\\tb'")
+        self.assertTrue(_allowed(out), f"$'a\\tb' non-CP must allow: {out[:200]!r}")
+
+
 if __name__ == "__main__":
     unittest.main()
