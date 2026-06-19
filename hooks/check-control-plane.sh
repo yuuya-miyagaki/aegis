@@ -423,13 +423,33 @@ def classify_one(w):
 _ORDER = {"no": 0, "ask": 1, "deny": 2}
 
 
+def _seq_range(body, cap):
+    # bash sequence {m..n} / {m..n..step} of ints OR single chars -> list of
+    # strings, or None (not a sequence, or length over cap). round11: a no-comma
+    # brace can still name a CP dir via a range — `hook{s..s}` -> `hooks`,
+    # `hook{r..s}` -> `hookr hooks`, `.clau{d..d}e` -> `.claude`. Padding fidelity
+    # is irrelevant (CP names are non-numeric), so a plain int range suffices.
+    mi = re.match(r"^(-?\d+)\.\.(-?\d+)(?:\.\.(-?\d+))?$", body)
+    mc = re.match(r"^([A-Za-z])\.\.([A-Za-z])(?:\.\.(-?\d+))?$", body)
+    if mi:
+        a, b, sg, chars = int(mi.group(1)), int(mi.group(2)), mi.group(3), False
+    elif mc:
+        a, b, sg, chars = ord(mc.group(1)), ord(mc.group(2)), mc.group(3), True
+    else:
+        return None
+    step = abs(int(sg)) if sg else 1
+    if step == 0 or abs(b - a) // step + 1 > cap:
+        return None
+    rng = range(a, b + 1, step) if a <= b else range(a, b - 1, -step)
+    return [chr(x) for x in rng] if chars else [str(x) for x in rng]
+
+
 def _brace_expand(s, cap=4096):
-    # bash {a,b} comma-group expansion incl. MULTIPLE adjacent groups and NESTING
-    # (round10: classify only parsed a single flat group, so `{h,x}{ooks,uild}` and
-    # `{hoo{ks,X},build}` slipped past — one cross-product arm is the real CP dir).
-    # Returns the expansion list, or None if braces are UNBALANCED or the product
-    # exceeds `cap` (caller treats None conservatively). `{n..m}` sequences have no
-    # comma so they stay literal here (cannot name a CP dir).
+    # bash {a,b} comma-group expansion (MULTIPLE adjacent groups + NESTING) AND
+    # {a..z}/{0..9} sequence expansion (round11). Returns the expansion list, or
+    # None if braces are UNBALANCED or any count exceeds `cap` (caller treats None
+    # conservatively). The cap is checked DURING the comma split and the product
+    # build, so a pathological `{a,a,...,a}` cannot materialize a huge list first.
     i = s.find("{")
     if i == -1:
         return [s]
@@ -453,30 +473,39 @@ def _brace_expand(s, cap=4096):
             depth -= 1; cur += ch
         elif ch == "," and depth == 0:
             parts.append(cur); cur = ""
+            if len(parts) > cap:
+                return None
         else:
             cur += ch
     parts.append(cur)
     post_exp = _brace_expand(post, cap)
     if post_exp is None:
         return None
-    if len(parts) == 1:
-        # No top-level comma -> bash keeps the braces literal, but a NESTED group
-        # inside still expands: {a{b,c}} -> {ab} {ac}.
-        body_exp = _brace_expand(body, cap)
-        if body_exp is None:
-            return None
-        seq = [pre + "{" + b + "}" for b in body_exp]
-    else:
-        seq = []
+    # middles = the expansion of THIS first {...} group (without `pre`).
+    if len(parts) > 1:
+        middles = []
         for part in parts:
             pe = _brace_expand(part, cap)
             if pe is None:
                 return None
-            seq.extend(pre + p for p in pe)
+            middles.extend(pe)
+            if len(middles) > cap:
+                return None
+    else:
+        seq = _seq_range(body, cap)
+        if seq is not None:
+            middles = seq
+        else:
+            # no comma, not a sequence -> bash keeps the braces literal, but a
+            # NESTED group inside still expands: {a{b,c}} -> {ab} {ac}.
+            body_exp = _brace_expand(body, cap)
+            if body_exp is None:
+                return None
+            middles = ["{" + b + "}" for b in body_exp]
     out = []
-    for s0 in seq:
+    for m in middles:
         for po in post_exp:
-            out.append(s0 + po)
+            out.append(pre + m + po)
             if len(out) > cap:
                 return None
     return out
@@ -630,7 +659,7 @@ cmd_var_built_write() {
   # regex never sees. Pair with a write op (same regex as gate 3 below)
   # to avoid over-flagging plain `read x` etc.
   if printf '%s' "$cmd" | grep -qE \
-       '(^|;|&|\|)[[:space:]]*(printf[[:space:]]+-v[[:space:]]+[A-Za-z_]|read[[:space:]]+[A-Za-z_]|eval[[:space:]]+["'\'']|declare[[:space:]]+[A-Za-z_]|local[[:space:]]+[A-Za-z_])' && \
+       '(^|;|&|\|)[[:space:]]*(printf[[:space:]]+-v[[:space:]]+[A-Za-z_]|read[[:space:]]+[A-Za-z_]|mapfile[[:space:]]|readarray[[:space:]]|eval[[:space:]]+["'\'']|declare[[:space:]]+[A-Za-z_]|local[[:space:]]+[A-Za-z_])' && \
      printf '%s' "$cmd" | grep -qE \
        '>>?[[:space:]]*[^&]|(^|[^A-Za-z0-9_])(tee|cp|mv|install|dd|truncate|ln|rm|chmod|chown|mkdir|curl|wget|rsync|tar)([[:space:]]|$)|sed[[:space:]]+-i|python3?[[:space:]]+-c|bash[[:space:]]+-c|git[[:space:]]+(apply|add|mv|rm|stage|update-index)|find[[:space:]]+.*-(exec|delete|fprint|fprintf)'; then
     return 0

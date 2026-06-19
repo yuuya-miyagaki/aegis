@@ -1129,5 +1129,87 @@ class TestOptEqualsTarget(unittest.TestCase):
         self.assertTrue(_allowed(out), f"MYVAR=hook? (env-assign) must allow: {out[:200]!r}")
 
 
+class TestBraceSequenceAndArray(unittest.TestCase):
+    """round11 盲検 break-attempt（4th security agent・partial）: brace SEQUENCE
+    `{a..z}`/`{0..9}` を resolver が展開せず（_brace_expand は comma 群のみ扱い、
+    no-comma を literal 化）`hook{s..s}`→hooks / `hook{r..s}`→`hookr hooks` /
+    `.clau{d..d}e`→.claude 等が ALLOW に漏れていた（実 CP write・静的に決定的）。
+    fix: _brace_expand に `..` シーケンス展開（int/char・step・cap で DoS 回避）を追加。
+    併せて `mapfile`/`readarray` の array 構築（runtime path）を cmd_var_built_write
+    Path C に追加→ask（`read` は既出、`mapfile` のみ漏れていた）。"""
+
+    @classmethod
+    def setUpClass(cls):
+        cls._tmp = _scratch_root()
+        cls.root = Path(cls._tmp.name)
+
+    @classmethod
+    def tearDownClass(cls):
+        cls._tmp.cleanup()
+
+    def _asked(self, out):
+        return '"permissionDecision":"ask"' in out
+
+    # ---- brace sequence resolving to a CP dir → DENY ----
+    def test_seq_single_hooks_denied(self):
+        out = _hook(self.root, "rm -rf hook{s..s}")
+        self.assertTrue(_denied(out), f"hook{{s..s}} must deny: {out[:200]!r}")
+
+    def test_seq_range_hooks_denied(self):
+        out = _hook(self.root, "rm -rf hook{r..s}")
+        self.assertTrue(_denied(out), f"hook{{r..s}} must deny: {out[:200]!r}")
+
+    def test_seq_prefix_hooks_denied(self):
+        out = _hook(self.root, "rm -rf {h..h}ooks")
+        self.assertTrue(_denied(out), f"{{h..h}}ooks must deny: {out[:200]!r}")
+
+    def test_seq_scripts_denied(self):
+        out = _hook(self.root, "rm -rf script{s..s}")
+        self.assertTrue(_denied(out), f"script{{s..s}} must deny: {out[:200]!r}")
+
+    def test_seq_templates_denied(self):
+        out = _hook(self.root, "rm -rf template{s..s}")
+        self.assertTrue(_denied(out), f"template{{s..s}} must deny: {out[:200]!r}")
+
+    def test_seq_claude_denied(self):
+        out = _hook(self.root, "rm -rf .clau{d..d}e")
+        self.assertTrue(_denied(out), f".clau{{d..d}}e must deny: {out[:200]!r}")
+
+    def test_seq_redirect_denied(self):
+        out = _hook(self.root, "echo evil > hook{s..s}/lib/emit.sh")
+        self.assertTrue(_denied(out), f"redirect hook{{s..s}} must deny: {out[:200]!r}")
+
+    def test_seq_two_group_denied(self):
+        out = _hook(self.root, "cp evil hoo{k..k}{s..s}/lib/emit.sh")
+        self.assertTrue(_denied(out), f"hoo{{k..k}}{{s..s}} must deny: {out[:200]!r}")
+
+    # ---- sequence NOT resolving to CP → ALLOW (incl. over-cap stays safe) ----
+    def test_neg_seq_build_allowed(self):
+        out = _hook(self.root, "rm -rf build{1..3}")
+        self.assertTrue(_allowed(out), f"build{{1..3}} (non-CP) must allow: {out[:200]!r}")
+
+    def test_neg_seq_alpha_allowed(self):
+        out = _hook(self.root, "touch log{a..c}")
+        self.assertTrue(_allowed(out), f"log{{a..c}} (non-CP) must allow: {out[:200]!r}")
+
+    def test_neg_seq_huge_allowed(self):
+        out = _hook(self.root, "rm -rf x{1..100000}")
+        self.assertTrue(_allowed(out), f"x{{1..100000}} (over-cap, non-CP) must allow: {out[:200]!r}")
+
+    # ---- mapfile/readarray building a runtime array path → ASK (fail-safe) ----
+    def test_mapfile_array_ask(self):
+        out = _hook(self.root, "mapfile -t a < f; rm -rf ${a[0]}")
+        self.assertTrue(self._asked(out), f"mapfile array path must ask: {out[:200]!r}")
+
+    def test_readarray_array_ask(self):
+        out = _hook(self.root, "readarray a < f; rm -rf ${a[0]}")
+        self.assertTrue(self._asked(out), f"readarray array path must ask: {out[:200]!r}")
+
+    # ---- regression: array literal assignment still caught (Path A) ----
+    def test_array_literal_assign_ask(self):
+        out = _hook(self.root, "a=(hooks); rm -rf ${a[0]}")
+        self.assertTrue(self._asked(out), f"a=(hooks) must ask: {out[:200]!r}")
+
+
 if __name__ == "__main__":
     unittest.main()
