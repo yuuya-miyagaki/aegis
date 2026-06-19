@@ -1018,5 +1018,116 @@ class TestGlobEmptyGlue(unittest.TestCase):
         self.assertTrue(_allowed(out), f"build/${{E}}* (non-CP) must allow: {out[:200]!r}")
 
 
+class TestMultiNestedBrace(unittest.TestCase):
+    """round10 盲検 break-attempt（3rd security agent）class A: classify() が単一 flat
+    brace group `^([^{}]*)\\{([^{}]+)\\}([^{}]*)$` のみ解釈するため、隣接 `{..}{..}`
+    や入れ子 `{a{b,c}}` は正規表現に外れ、ASK 用 literal-CP 検査も名前分割で空振り→
+    classify_one が literal `{` を見て CP 非該当→ALLOW。bash は cross-product を展開し
+    1 arm が実 CP（`{h,x}{ooks,uild}`→hooks 含む）。fix: classify() を再帰 brace 展開
+    （多群・入れ子・予算 cap で DoS 回避）に置換し各 arm を classify_one、worst を取る。"""
+
+    @classmethod
+    def setUpClass(cls):
+        cls._tmp = _scratch_root()
+        cls.root = Path(cls._tmp.name)
+
+    @classmethod
+    def tearDownClass(cls):
+        cls._tmp.cleanup()
+
+    def test_two_group_hooks_denied(self):
+        out = _hook(self.root, "rm -rf {h,x}{ooks,uild}")
+        self.assertTrue(_denied(out), f"{{h,x}}{{ooks,uild}} must deny: {out[:200]!r}")
+
+    def test_two_group_scripts_denied(self):
+        out = _hook(self.root, "rm -rf {scr,zz}{ipts,qq}")
+        self.assertTrue(_denied(out), f"{{scr,zz}}{{ipts,qq}} must deny: {out[:200]!r}")
+
+    def test_two_group_templates_denied(self):
+        out = _hook(self.root, "rm -rf {temp,zz}{lates,qq}")
+        self.assertTrue(_denied(out), f"{{temp,zz}}{{lates,qq}} must deny: {out[:200]!r}")
+
+    def test_two_group_claude_denied(self):
+        out = _hook(self.root, "rm -rf {.cla,zz}{ude,qq}")
+        self.assertTrue(_denied(out), f"{{.cla,zz}}{{ude,qq}} must deny: {out[:200]!r}")
+
+    def test_nested_brace_hooks_denied(self):
+        out = _hook(self.root, "rm -rf {hoo{ks,X},build}")
+        self.assertTrue(_denied(out), f"nested {{hoo{{ks,X}},build}} must deny: {out[:200]!r}")
+
+    def test_two_group_redirect_denied(self):
+        out = _hook(self.root, "echo evil > {h,z}{ooks,zzz}/lib/emit.sh")
+        self.assertTrue(_denied(out), f"redirect {{h,z}}{{ooks,zzz}} must deny: {out[:200]!r}")
+
+    # ---- negatives: cross-product with NO CP arm → ALLOW ----
+    def test_neg_two_group_allowed(self):
+        out = _hook(self.root, "rm -rf {a,b}{c,d}")
+        self.assertTrue(_allowed(out), f"{{a,b}}{{c,d}} (non-CP) must allow: {out[:200]!r}")
+
+    def test_neg_two_group_mkdir_allowed(self):
+        out = _hook(self.root, "mkdir {x,y}{1,2}")
+        self.assertTrue(_allowed(out), f"mkdir {{x,y}}{{1,2}} (non-CP) must allow: {out[:200]!r}")
+
+
+class TestOptEqualsTarget(unittest.TestCase):
+    """round10 class B: `dd of=PATH` / `--output=PATH` / `--target-directory=PATH`
+    では shlex が `of=hook?/lib/emit.sh` を1 operand に保つため、_glob_hits_cp の
+    component 分割で先頭が `of=hook?` となり CP に一致せず取りこぼし（literal の
+    `of=hooks/...` は上流 regex が捕捉、glob 形のみ漏れる）。fix: operand の最初の
+    `=` 以降の値も path 候補として分類（brace 展開も）。ただし**先頭の env 代入**
+    （`FOO=hooks cmd`）は書込みでないため value 抽出しない（コマンド位置を追跡）。"""
+
+    @classmethod
+    def setUpClass(cls):
+        cls._tmp = _scratch_root()
+        cls.root = Path(cls._tmp.name)
+
+    @classmethod
+    def tearDownClass(cls):
+        cls._tmp.cleanup()
+
+    def test_dd_of_glob_denied(self):
+        out = _hook(self.root, "dd if=/dev/zero of=hook?/lib/emit.sh")
+        self.assertTrue(_denied(out), f"dd of=hook? must deny: {out[:200]!r}")
+
+    def test_dd_of_star_denied(self):
+        out = _hook(self.root, "dd if=/dev/zero of=hook*/lib/emit.sh")
+        self.assertTrue(_denied(out), f"dd of=hook* must deny: {out[:200]!r}")
+
+    def test_dd_of_charclass_denied(self):
+        out = _hook(self.root, "dd if=/dev/zero of=[h]ooks/lib/emit.sh")
+        self.assertTrue(_denied(out), f"dd of=[h]ooks must deny: {out[:200]!r}")
+
+    def test_cp_target_dir_glob_denied(self):
+        out = _hook(self.root, "cp --target-directory=hook? evil")
+        self.assertTrue(_denied(out), f"cp --target-directory=hook? must deny: {out[:200]!r}")
+
+    def test_curl_output_glob_denied(self):
+        out = _hook(self.root, "curl --output=hook?/lib/emit.sh http://example.com")
+        self.assertTrue(_denied(out), f"curl --output=hook? must deny: {out[:200]!r}")
+
+    def test_dd_of_brace_combo_denied(self):
+        out = _hook(self.root, "dd of={h,z}{ooks,zz}/lib/emit.sh")
+        self.assertTrue(_denied(out), f"dd of={{h,z}}{{ooks,zz}} must deny: {out[:200]!r}")
+
+    # ---- regression: literal opt= target still denied (upstream) ----
+    def test_dd_of_literal_denied(self):
+        out = _hook(self.root, "dd if=/dev/zero of=hooks/lib/emit.sh")
+        self.assertTrue(_denied(out), f"dd of=hooks (literal) must deny: {out[:200]!r}")
+
+    # ---- negatives: opt= to NON-CP, and LEADING env-assignment → ALLOW ----
+    def test_neg_dd_of_noncp_allowed(self):
+        out = _hook(self.root, "dd if=/dev/zero of=buil?/x")
+        self.assertTrue(_allowed(out), f"dd of=buil? (non-CP) must allow: {out[:200]!r}")
+
+    def test_neg_lead_env_assign_literal_allowed(self):
+        out = _hook(self.root, "FOO=hooks make")
+        self.assertTrue(_allowed(out), f"FOO=hooks make (env-assign) must allow: {out[:200]!r}")
+
+    def test_neg_lead_env_assign_glob_allowed(self):
+        out = _hook(self.root, "MYVAR=hook? make build")
+        self.assertTrue(_allowed(out), f"MYVAR=hook? (env-assign) must allow: {out[:200]!r}")
+
+
 if __name__ == "__main__":
     unittest.main()

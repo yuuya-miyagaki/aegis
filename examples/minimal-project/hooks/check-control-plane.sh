@@ -423,25 +423,93 @@ def classify_one(w):
 _ORDER = {"no": 0, "ask": 1, "deny": 2}
 
 
-def classify(w):
-    # Brace expansion: a single flat {a,b,c} group is the shell's alternatives, so
-    # classify each and take the worst (rm -rf {hooks,build} touches hooks). A
-    # nested / multi-group brace is rare — fall back to: if a CP dir name appears
-    # as a brace/path token, ask (conservative).
-    m = re.match(r"^([^{}]*)\{([^{}]+)\}([^{}]*)$", w)
-    if m and "," in m.group(2):
-        cands = [m.group(1) + opt + m.group(3) for opt in m.group(2).split(",")]
-    elif "{" in w or "}" in w:
-        cands = [w]
-        if any(re.search(r"(^|[{,/])" + re.escape(d) + r"([},/]|$)", w) for d in cp_dirs):
-            return "ask"
+def _brace_expand(s, cap=4096):
+    # bash {a,b} comma-group expansion incl. MULTIPLE adjacent groups and NESTING
+    # (round10: classify only parsed a single flat group, so `{h,x}{ooks,uild}` and
+    # `{hoo{ks,X},build}` slipped past — one cross-product arm is the real CP dir).
+    # Returns the expansion list, or None if braces are UNBALANCED or the product
+    # exceeds `cap` (caller treats None conservatively). `{n..m}` sequences have no
+    # comma so they stay literal here (cannot name a CP dir).
+    i = s.find("{")
+    if i == -1:
+        return [s]
+    depth, j = 0, -1
+    for k in range(i, len(s)):
+        if s[k] == "{":
+            depth += 1
+        elif s[k] == "}":
+            depth -= 1
+            if depth == 0:
+                j = k
+                break
+    if j == -1:
+        return None
+    pre, body, post = s[:i], s[i + 1:j], s[j + 1:]
+    parts, depth, cur = [], 0, ""
+    for ch in body:
+        if ch == "{":
+            depth += 1; cur += ch
+        elif ch == "}":
+            depth -= 1; cur += ch
+        elif ch == "," and depth == 0:
+            parts.append(cur); cur = ""
+        else:
+            cur += ch
+    parts.append(cur)
+    post_exp = _brace_expand(post, cap)
+    if post_exp is None:
+        return None
+    if len(parts) == 1:
+        # No top-level comma -> bash keeps the braces literal, but a NESTED group
+        # inside still expands: {a{b,c}} -> {ab} {ac}.
+        body_exp = _brace_expand(body, cap)
+        if body_exp is None:
+            return None
+        seq = [pre + "{" + b + "}" for b in body_exp]
     else:
-        cands = [w]
+        seq = []
+        for part in parts:
+            pe = _brace_expand(part, cap)
+            if pe is None:
+                return None
+            seq.extend(pre + p for p in pe)
+    out = []
+    for s0 in seq:
+        for po in post_exp:
+            out.append(s0 + po)
+            if len(out) > cap:
+                return None
+    return out
+
+
+def classify(w, extract_eq=False):
+    # Candidate paths for a token: the token itself, plus — for an `opt=PATH`
+    # operand (dd of=, --output=, --target-directory=; round10 class B) — the value
+    # after the FIRST `=`. extract_eq is False for a leading env-assignment
+    # (`FOO=hooks cmd` is not a write) and for redirect targets (a filename, no
+    # opt= semantics). Each candidate is brace-expanded; an unparseable brace
+    # (None) falls back to a conservative ASK when a CP dir name sits adjacent to a
+    # brace/comma/slash, then to a literal classify.
+    targets = [w]
+    if extract_eq and "=" in w:
+        val = w.split("=", 1)[1]
+        if val:
+            targets.append(val)
     best = "no"
-    for c in cands:
-        v = classify_one(c)
-        if _ORDER[v] > _ORDER[best]:
-            best = v
+    for t in targets:
+        if "{" in t or "}" in t:
+            arms = _brace_expand(t)
+            if arms is None:
+                if any(re.search(r"(^|[{,/])" + re.escape(d) + r"([},/]|$)", t)
+                       for d in cp_dirs) and _ORDER["ask"] > _ORDER[best]:
+                    best = "ask"
+                arms = [t]
+        else:
+            arms = [t]
+        for c in arms:
+            v = classify_one(c)
+            if _ORDER[v] > _ORDER[best]:
+                best = v
     return best
 
 
@@ -470,22 +538,35 @@ c1 = words[ci + 1] if ci + 1 < len(words) else ""
 rescued = (not chain) and (c0 in ("echo", "printf") or (c0 == "git" and c1 == "commit"))
 deny = ask = False
 redir = False
+seen_cmd = False  # True once the command word is passed (after leading assignments)
 for t in toks:
     if t in WREDIR:
         redir = True
         continue
-    if t == "<" or t in CHAIN:
+    if t == "<":
         redir = False
         continue
-    c = classify(t)
+    if t in CHAIN:
+        redir = False
+        seen_cmd = False  # a new command starts after a chain operator
+        continue
+    # A leading `IDENT=...` (before the command word) is an env-assignment, not a
+    # write target — do not extract its `=` value (round10 class B false-positive
+    # guard: `FOO=hooks make`). Everything from the command word on is an argument.
+    is_lead = (not seen_cmd) and bool(re.match(r"^[A-Za-z_][A-Za-z0-9_]*=", t))
+    if not is_lead:
+        seen_cmd = True
     if redir:
-        # a redirect target is a write even for echo/printf/git commit.
+        # a redirect target is a write even for echo/printf/git commit; it is a
+        # filename, so no opt= extraction.
+        c = classify(t, extract_eq=False)
         if c == "deny":
             deny = True
         elif c == "ask":
             ask = True
         redir = False
     elif not rescued:
+        c = classify(t, extract_eq=not is_lead)
         if c == "deny":
             deny = True
         elif c == "ask":
