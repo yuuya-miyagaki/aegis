@@ -9,7 +9,7 @@ task_size: L
 task_size_rationale: "確定（plan 移行時）: iteration 32 = SF-001（control-plane フックの quote/escape/bare-dir トークン分割バイパス・Critical pre-existing）を Augment で閉じる。改修面: hooks/check-control-plane.sh（token-aware チェック inline 追加）＋mirror examples/minimal-project/hooks/check-control-plane.sh 同期＋TDD テスト群＋framework 版 bump（contract 定数/template STATUS/example STATUS/本体）＋security-followups.md SF-001 CLOSED 化＝6+ ファイル＝L（全ゲート: review+qa+security+deploy）。セキュリティ境界＝security 盲検2次必須。設計: docs/specs/2026-06-18-sf-001-cp-token-bypass-design.md。"
 iteration: 32
 ui_surface: false
-last_updated: "2026-06-20T13:30:00Z"
+last_updated: "2026-06-20T15:00:00Z"
 gate_approvals:
   client_ready_for_dev: n/a
   brainstorm: approved
@@ -42,12 +42,12 @@ external_evidence:
     scope: "v0.12.2 実装後 4 ラウンドレビュー"
     findings: "Round 6 (P1×2, P2×1: pre-compact exit 2 / minimal-project / test rc), Round 7 (P1×1, P3×1: git add 漏れ / テスト件数表記), Round 8 (P2×1, P3×1: stale last_updated / grep 自己マッチ), Round 9 (P3×2: コメント不整合)"
     resolution: "9件全反映。tier 1/2 PASS、134 tests PASS、本体と minimal-project 完全同期確認済み。"
-next_action: "iteration 32 / phase=review: SF-001 control-plane moat 強化（fix-forward 継続中）。**ユーザー就寝中・自律進行を許可（完全 green と確信した場合のみ push 可）。** セッション復旧後（作業ツリーの `hooks/lib/emit.sh` stub `evil` 破壊→HEAD 復元）、盲検 break-attempt + pre-QA review を反復し bypass クラスを順次閉鎖（各 TDD RED→GREEN・未 push・版 1.12.0）: round5-7=**3c98666**、round8(glob/char-class を fnmatch 静的照合で deny)=**29caac6**、round8b(glob×空展開 `ho${E}ok?`・reviewer BLOCKER)+round9(非bare redirect 演算子 `&>`/`>|`/`&>>`/`>&`/`<>`・2回目の盲検)=**4c65229**、**round10(多群/入れ子 brace cross-product `{h,x}{ooks,uild}`/`{hoo{ks,X},build}` + `opt=PATH`/`dd of=PATH` 書込み先・3回目の盲検)=a9168fd**。設計: 静的 obfuscation は解決して deny、runtime 依存は ask。**収束未確定**: 1〜3回目の盲検と reviewer が毎回新クラス検出（glob/redirect/brace/opt=）。**4回目の盲検 + round10 reviewer を bg 実行中。** **判断ルール: 盲検が CLEAN（新クラスゼロ）を返すまで review gate に進まない／push しない。** clean 後: review→qa→security（盲検2次=red-team 証拠化）→deploy→ship→docs→（full-suite/contract/drift/mirror 全 green で）push。**戦略メモ**: 静的 parse は逓減傾向。収束しない場合は OS/FS レベルの CP 書込み拒否（defense-in-depth）を別途ユーザー提案する（ただし各 class はまだ closable＝原理的限界とは断定しない・実証主義）。証拠: token-split 181 passed/full suite 1011 passed・1 skip/contract・drift・mirror PASS。commits: 4c65229/3899f0c/a9168fd。ツール gotcha: Bash 文字列の ${...}/~+/brace/`{}` で H.replace→python ハーネス FILE と git commit -F。"
+next_action: "iteration 32 / phase=review: SF-001 control-plane moat 強化（**自律ラウンド一段落・ユーザー判断待ち**）。セッション復旧後（作業ツリーの `hooks/lib/emit.sh` stub `evil` 破壊→HEAD 復元）、盲検 break-attempt + pre-QA review を反復し**静的難読化クラスを網羅閉鎖**（各 TDD RED→GREEN・未 push・版 1.12.0）: round5-7=`3c98666`(tilde/入れ子param/special-param/展開分割/.claude末尾)、round8=`29caac6`(glob/char-class＝旧SF-002 を fnmatch 静的照合で deny)、round8b+round9=`4c65229`(glob×空展開/write-redirect演算子族 `&>``>|``&>>``>&``<>`)、round10=`a9168fd`(多群/入れ子 brace cross-product/`opt=`・`dd of=`)、round11=`623201f`(brace SEQUENCE `{a..z}`/`mapfile`・`readarray`/DoS cap)。検証: token-split 195/full suite 1025 passed・1 skip/contract・drift・mirror PASS。網羅性自己検証で exec/eval/procsub/here-string/install/ln/link/sed-i/git config -f/truncate/mv-t・cp-t/mkdir/fd-redirect は**全 DENY/ASK**。**残る静的形は2つだけで別レイヤ案件**: SF-004=interpreter `-c`/`-e` の runtime 構築パス（`python3 -c \"open('hook'+chr(115)+'/x','w')\"`＝**原理的限界・実証済み**）、SF-005=extglob（条件付き・稀）。詳細＋**防御の多層化提言**（案A: 非framework中は CP を物理 write 不可化／案B: PostToolUse 整合性チェック）は `docs/security-followups.md` に durable 記録（SF-001/002 状態更新・SF-004/005 追加）。**push せず**（判断ルール: 盲検が CLEAN を返しておらず＝完全 OK と断定不可。かつ SF-004 で moat の原理的限界が判明＝アーキ方針はユーザー判断）。**ユーザーへの問い**: (1) round5-11 を push してよいか（incremental hardening として correct/tested）、(2) 防御の多層化（案A/B）を着手するか、(3) extglob(SF-005)を静的に閉じるか accept か。review→qa→security ゲートは未実行（承認制）。commits: a9168fd/623201f＋docs。ツール gotcha: Bash 文字列の ${...}/~+/brace/`{}` で H.replace→python FILE と git commit -F。"
 blockers: []
 failure_tracking:
   goal: "SF-001 control-plane moat の修正を review 通過させる（シェル再構成 CP 書込みを網羅捕捉）"
   count: 4
-  last_attempt: "2026-06-20 round8b/9（4c65229）後、3回目の盲検が多群brace + opt= 書込みを検出→round10 で閉鎖（a9168fd）。4回目の盲検 + round10 reviewer 実行中。盲検が CLEAN を返すまで review gate / push しない。"
+  last_attempt: "2026-06-20 round10（a9168fd）後、4回目盲検が brace-sequence、reviewer が DoS MINOR を検出→round11（623201f）で閉鎖。網羅性自己検証で残る静的形は SF-004（interpreter＝原理的限界・実証）と SF-005（extglob・条件付き）のみと確定。判断ルールにより push せず・アーキ方針をユーザーに委ねた（security-followups.md に提言記録）。"
 session_history:
   - date: "2026-06-18"
     mode: Dev
