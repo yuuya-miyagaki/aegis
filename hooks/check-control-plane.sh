@@ -213,26 +213,25 @@ cmd_mentions_control_plane() {
 # downstream by the read-only carve-out. Single detector (no bash/python
 # duplication): bare-name, abs, and normalization all collapse to one resolve.
 
-cmd_token_mentions_cp() {
+cmd_token_verdict() {
+  # Echo one of: deny (a control-plane write target), ask (an UNRESOLVED cmdsub /
+  # $VAR is prefixed to a surviving CP dir component — it could expand to cwd /
+  # root), or none. A cmdsub carrying a CP LITERAL is already denied upstream by
+  # the raw branch of cmd_mentions_control_plane, so a command reaching here has
+  # no CP literal; we may safely replace each remaining cmdsub / $VAR with an
+  # opaque sentinel and tokenize/resolve. pwd / $PWD are the agent's cwd = ROOT.
   local cmd="$1" verdict rc
-  # cmdsub/backtick are handled by the raw fail-closed branch upstream; shlex
-  # cannot model an executed substitution, so never tokenize them here.
-  printf '%s' "$cmd" | grep -qE '\$\(|`' && return 1
-
-  # Gate (bounds the python spawn — this hook fires on every Bash command): run
-  # the analyzer only when the command could reference a CP directory. A CP-path
-  # reconstruction either names the dir (hooks/scripts/templates) literally, or
-  # hides it behind a quote / backslash (quote-split / ANSI-C). A command with
-  # none of these cannot resolve to a CP dir, so skip it.
+  # Gate: a CP-dir reconstruction names the dir (hooks/scripts/templates) or hides
+  # it behind a quote / backslash. A command with none of these cannot resolve to
+  # a CP dir, so skip the python spawn (this hook fires on every Bash command).
   case "$cmd" in
     *hooks*|*scripts*|*templates*|*\'*|*\"*|*\\*) : ;;
-    *) return 1 ;;
+    *) echo none; return ;;
   esac
 
-  # Pass CONTROL_PLANE and CP_DIRS via env so the regex / dir list are NOT
-  # duplicated in python (single source). python3 absent -> skip (resolution
-  # needs it; python3 is a framework-wide hard dependency).
-  command -v python3 >/dev/null 2>&1 || return 1
+  # python3 absent -> skip (resolution needs it; python3 is a framework-wide hard
+  # dependency). A present-but-broken python3 yields rc != 0 below -> fail-closed.
+  command -v python3 >/dev/null 2>&1 || { echo none; return; }
   verdict=$(AEGIS_CMD="$cmd" AEGIS_CP_RE="$CONTROL_PLANE" AEGIS_CP_DIRS="$CP_DIRS" \
             AEGIS_ROOT="$ROOT" AEGIS_ROOT_REAL="$ROOT_REAL" \
             python3 - <<'PY' 2>/dev/null
@@ -242,9 +241,8 @@ import os, re, shlex, sys
 def decode_ansic(s):
     # shlex(posix) does NOT expand bash ANSI-C $'...' quoting, so $'hook\x73'
     # stays literal and a CP path it resolves to is missed. Decode each $'...'
-    # segment to its literal value and re-emit it as a normal single-quoted
-    # word, so the downstream shlex sees the real path. \' inside the segment is
-    # an escaped quote (does not close it).
+    # segment to its literal value and re-emit it as a normal single-quoted word.
+    # \' inside the segment is an escaped quote (does not close it).
     out = []
     i, n = 0, len(s)
     while i < n:
@@ -273,42 +271,49 @@ def decode_ansic(s):
     return "".join(out)
 
 
+SENT = "\x01"  # opaque placeholder for an unresolved cmdsub / $VAR (no slash)
 cmd = decode_ansic(os.environ.get("AEGIS_CMD", ""))
 cp_re = re.compile(os.environ.get("AEGIS_CP_RE", ""))
 cp_dirs = [d for d in os.environ.get("AEGIS_CP_DIRS", "").split("|") if d]
 root = os.environ.get("AEGIS_ROOT", "")
 root_real = os.environ.get("AEGIS_ROOT_REAL", "")
-# Real CP directory absolute paths (logical ROOT + symlink-resolved ROOT_REAL).
 cp_targets = set()
 for base in (root, root_real):
     if base:
         for d in cp_dirs:
             cp_targets.add(os.path.normpath(os.path.join(base, d)))
-_PWD_RE = re.compile(r"\$\{PWD\}|\$PWD(?![A-Za-z0-9_])")
+
+_PWD = re.compile(r"\$\{PWD\}|\$PWD(?![A-Za-z0-9_])|\$\(\s*pwd\s*\)|\x60\s*pwd\s*\x60")
+_CMDSUB = re.compile(r"\$\([^()]*\)|\x60[^\x60]*\x60")
+_VAR = re.compile(r"\$\{[^}]*\}|\$[A-Za-z_][A-Za-z0-9_]*")
+# Substitute on the WHOLE command BEFORE shlex (so punctuation_chars does not
+# split a $(...) on its parens): pwd/$PWD -> ROOT, every other cmdsub/$VAR -> an
+# opaque sentinel carrying no '/'. The loop collapses nested $( $( ) ).
+cmd = _PWD.sub(root, cmd)
+_prev = None
+while _prev != cmd:
+    _prev = cmd
+    cmd = _CMDSUB.sub(SENT, cmd)
+cmd = _VAR.sub(SENT, cmd)
 
 
-def resolves_to_cp_dir(w):
-    # $PWD/${PWD} = the agent's cwd, taken as ROOT (conservative; we do not trust
-    # an in-command cd). Other $VAR is left literal (undecidable here; the
-    # cmd_var_built_write ASK path covers assignment-built targets). Relative
-    # words resolve against ROOT, then normpath collapses . / .. / // so .//hooks,
-    # /./hooks, ${ROOT}/foo/../hooks all reduce to the same target.
-    p = _PWD_RE.sub(root, w)
-    if not p or "\x00" in p:
-        return False
-    base = p if os.path.isabs(p) else os.path.join(root, p)
+def classify(w):
+    # deny: w resolves to a real CP path. ask: an opaque sentinel prefixes a CP
+    # dir component (could be cwd/root). no: neither.
+    if "\x00" in w:
+        return "no"
+    unknown = SENT in w
+    base = w if os.path.isabs(w) else os.path.join(root, w)
     ap = os.path.normpath(base)
-    for t in cp_targets:
-        if ap == t or ap.startswith(t + os.sep):
-            return True
-    return False
-
-
-def word_is_cp(w):
-    # Directory classes via path resolution (normalization-proof); STATUS.md /
-    # CLAUDE.md / .claude via the unanchored regex (a basename match that
-    # normalization cannot hide).
-    return resolves_to_cp_dir(w) or bool(cp_re.search(w))
+    if not unknown:
+        if cp_re.search(w):
+            return "deny"
+        if ap in cp_targets or any(ap.startswith(t + os.sep) for t in cp_targets):
+            return "deny"
+        return "no"
+    if any(c in cp_dirs for c in ap.split(os.sep)):
+        return "ask"
+    return "ask" if cp_re.search(w) else "no"
 
 
 try:
@@ -326,38 +331,42 @@ while ci < len(words) and re.match(r"^[A-Za-z_][A-Za-z0-9_]*=", words[ci]):
 c0 = words[ci] if ci < len(words) else ""
 c1 = words[ci + 1] if ci + 1 < len(words) else ""
 rescued = (not chain) and (c0 in ("echo", "printf") or (c0 == "git" and c1 == "commit"))
+deny = ask = False
 redir = False
-operand_cp = False
 for t in toks:
     if t in (">", ">>"):
         redir = True
         continue
-    if t == "<":
+    if t == "<" or t in CHAIN:
         redir = False
         continue
-    if t in CHAIN:
-        redir = False
-        continue
+    c = classify(t)
     if redir:
-        if word_is_cp(t):
-            print("1")
-            sys.exit(0)
+        # a redirect target is a write even for echo/printf/git commit.
+        if c == "deny":
+            deny = True
+        elif c == "ask":
+            ask = True
         redir = False
-        continue
-    if word_is_cp(t):
-        operand_cp = True
-print("1" if (operand_cp and not rescued) else "0")
+    elif not rescued:
+        if c == "deny":
+            deny = True
+        elif c == "ask":
+            ask = True
+print("deny" if deny else ("ask" if ask else "none"))
 PY
 )
   rc=$?
-  # Fail-closed: a clean run printing "0" is the ONLY no-mention path. ValueError
-  # (rc=3, unbalanced quote) and any unexpected non-zero exit, or a "1" verdict,
-  # all deny-eligible. python is gated by `command -v` above, so a non-zero exit
-  # here is an analysis failure — treat it as a mention, never allow through.
-  if [ "$rc" -ne 0 ] || [ "$verdict" = "1" ]; then
-    return 0
+  # Fail-closed: any non-zero exit (ValueError on an unbalanced quote, or any
+  # unexpected failure) is an analysis failure -> deny, never allow through.
+  if [ "$rc" -ne 0 ]; then
+    echo deny
+    return
   fi
-  return 1
+  case "$verdict" in
+    deny|ask) echo "$verdict" ;;
+    *) echo none ;;
+  esac
 }
 
 # C-1 (v1.6.1): variable-built write target. Static expansion is undecidable,
@@ -464,20 +473,27 @@ if [ -n "$CMD" ]; then
   #   2. cmd_var_built_write — a write target BUILT via variable/cmdsub expansion
   #      that is statically UNRESOLVABLE → ASK (defense in depth, fires before the
   #      task_type=framework allow; covers REDTEAM-02 printf -v / read / eval).
-  #   3. cmd_token_mentions_cp — the path-resolving augment: a CP DIR reconstructed
-  #      via quote-split / backslash / ANSI-C / bare / absolute / normalization
-  #      (.//hooks, $PWD/hooks) → DENY (fall through).
+  #   3. cmd_token_verdict — the path-resolving augment: deny = a CP DIR
+  #      reconstructed via quote-split / backslash / ANSI-C / bare / absolute /
+  #      normalization ($PWD, $(pwd), .//hooks); ask = an unresolved cmdsub/$VAR
+  #      prefixes a surviving CP dir component ($(date)/hooks, $DIR/hooks); none.
   #   4. none → allow.
   if cmd_mentions_control_plane "$CMD"; then
     :
   elif cmd_var_built_write "$CMD"; then
     emit_ask "[integrity] このコマンドは変数で書込み先 path を組み立てています (例: \$D/lib/...) — 制御プレーン (hooks/scripts/.claude) を意図せず上書きする可能性があるため確認してください。"
     exit 0
-  elif cmd_token_mentions_cp "$CMD"; then
-    :
   else
-    emit_allow
-    exit 0
+    case "$(cmd_token_verdict "$CMD")" in
+      deny)
+        : ;;
+      ask)
+        emit_ask "[integrity] このコマンドは未解決の \$(...) / \$VAR で書込み先 path を組み立てており、制御プレーン (hooks/scripts/templates) に解決する可能性があります。意図を確認してください。"
+        exit 0 ;;
+      *)
+        emit_allow
+        exit 0 ;;
+    esac
   fi
 else
   # Extraction failed — fall back to the raw input. A control plane mention

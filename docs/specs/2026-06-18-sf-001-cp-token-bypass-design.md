@@ -104,4 +104,17 @@
 
 - F-1/F-2/F-3 は本タスクで修正（path-resolution に内包）。
 - glob（`rm -rf hooks*`）は引き続き `SF-002` として繰延（別クラス・別タスク）。
-- `$PWD` 以外の外部 `$VAR`（`$FOO/hooks`）は静的に解決不能＝既存 `cmd_var_built_write` の ASK 領域（代入を伴う場合）。残余リスクとして記録。
+
+### 追加改訂（review round3・F-4 cmdsub/var）
+
+round3 の盲検 break-attempt が **F-4: cmdsub 経由 bare-dir**（`rm -rf $(pwd)/hooks`・`` `pwd`/hooks ``・`$(echo hooks)/lib`）を検出。当初「cmdsub は原理的に静的解決不能」と整理したが、**ユーザーの指摘で再検証**した結果これは不正確で、大半は解決可能と判明（プロトタイプで実証）。augment を **3-verdict（deny/ask/none）＋ unknown 展開の sentinel 化**に拡張:
+
+- **cmdsub bail を廃止**。shlex 前に whole-command を置換: `pwd`/`$PWD`/`$(pwd)`/`` `pwd` `` → ROOT（cwd・副作用ゼロ）、その他の `$(...)`/backtick/`$VAR`/`${VAR}` → 不透明 sentinel（`\x01`・`/` を含まない）。これで `$(...)` の括弧で shlex(punctuation_chars) が割れる問題も回避。
+- 各語を classify: 完全解決して実 CP 絶対パス＝**deny**／sentinel（未知前置）の後に CP ディレクトリ名が path component として残る＝**ask**（cwd/root かもしれない）／それ以外＝none。
+- security: CP **リテラル**を含む cmdsub は上流 `cmd_mentions_control_plane` の raw 分岐が先に deny するため、augment に到達する cmdsub コマンドは CP リテラルを持たない＝sentinel 化は実行される書込みを隠さない。
+- main flow: literal-CP(deny) > var-built(ask) > **augment verdict（deny/ask/none）** > allow。python 非ゼロ終了は fail-closed(deny)。
+- python 正規表現内のバックティックは `$(...)` ラップ heredoc 内でリテラル backtick が bash パーサを壊すため `\x60`（hex）で表記。
+
+**真の残余（accepted）**: `$(echo hooks)/lib` ＝ CP ディレクトリ名が**不透明な cmdsub の中に消える**形。静的に名前を復元できず（cmdsub を実行しない限り）、かつ「accidental 書込み防止」という moat の脅威モデル外の**意図的難読化**（どの静的 moat も同じ／敵対エージェントは無限に回避路を持つ）。`docs/security-followups.md` SF-003 に記録。
+
+検証: 全再構成機構の網羅的敵対行列（BLOCK 24＝quote/backslash/ANSI-C/bare/abs/normalize/$PWD/$(pwd)/`pwd`/unknown-ask/$VAR-ask/write-utils/redirect 変種、ALLOW 15＝reads/non-CP/messages/cmdsub-source/residual/~ ）を実走で ALL OK（誤検知ゼロ）。

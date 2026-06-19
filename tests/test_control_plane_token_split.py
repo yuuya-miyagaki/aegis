@@ -338,5 +338,63 @@ class TestPathNormalization(unittest.TestCase):
         self.assertTrue(_allowed(out), f"node_modules must allow: {out[:200]!r}")
 
 
+class TestCmdsubAndVar(unittest.TestCase):
+    """F-4（iter32 review round3 break-attempt）: cmdsub/変数で再構成される CP。
+    pwd/$PWD は cwd=ROOT に解決して deny、未知 cmdsub/$VAR が前置され CP ディレクトリ名が
+    残る形は ASK、CP 名が不透明な cmdsub に消える形（$(echo hooks)/lib）のみ accepted 残余。"""
+
+    @classmethod
+    def setUpClass(cls):
+        cls._tmp = _scratch_root()
+        cls.root = Path(cls._tmp.name)
+
+    @classmethod
+    def tearDownClass(cls):
+        cls._tmp.cleanup()
+
+    def _asked(self, out):
+        return '"permissionDecision":"ask"' in out
+
+    # ---- pwd cmdsub → resolvable → DENY ----
+    def test_pwd_cmdsub_rm_denied(self):
+        out = _hook(self.root, "rm -rf $(pwd)/hooks")
+        self.assertTrue(_denied(out), f"$(pwd)/hooks must deny: {out[:200]!r}")
+
+    def test_pwd_backtick_rm_denied(self):
+        out = _hook(self.root, "rm -rf `pwd`/hooks")
+        self.assertTrue(_denied(out), f"`pwd`/hooks must deny: {out[:200]!r}")
+
+    def test_pwd_cmdsub_quoted_rm_denied(self):
+        out = _hook(self.root, 'rm -rf "$(pwd)"/scripts')
+        self.assertTrue(_denied(out), f'"$(pwd)"/scripts must deny: {out[:200]!r}')
+
+    def test_pwd_cmdsub_redirect_denied(self):
+        out = _hook(self.root, "echo evil > $(pwd)/hooks/lib/emit.sh")
+        self.assertTrue(_denied(out), f"$(pwd) redirect must deny: {out[:200]!r}")
+
+    # ---- unknown cmdsub/$VAR prefix + CP component → ASK ----
+    def test_unknown_cmdsub_prefix_ask(self):
+        out = _hook(self.root, "rm -rf $(date)/hooks")
+        self.assertTrue(self._asked(out), f"$(date)/hooks must ask: {out[:200]!r}")
+
+    def test_external_var_prefix_ask(self):
+        out = _hook(self.root, "rm -rf $DIR/hooks")
+        self.assertTrue(self._asked(out), f"$DIR/hooks must ask: {out[:200]!r}")
+
+    # ---- accepted residual: CP name consumed into an opaque cmdsub → allow ----
+    def test_cp_name_inside_cmdsub_residual_allowed(self):
+        out = _hook(self.root, "rm -rf $(echo hooks)/lib")
+        self.assertTrue(_allowed(out), f"$(echo hooks)/lib residual allow: {out[:200]!r}")
+
+    # ---- regression: cmdsub not touching CP → allow ----
+    def test_cmdsub_noncp_allowed(self):
+        out = _hook(self.root, "cp $(ls *.txt) dest/")
+        self.assertTrue(_allowed(out), f"cmdsub source non-CP must allow: {out[:200]!r}")
+
+    def test_cmdsub_echo_noncp_allowed(self):
+        out = _hook(self.root, "echo $(date)")
+        self.assertTrue(_allowed(out), f"echo $(date) must allow: {out[:200]!r}")
+
+
 if __name__ == "__main__":
     unittest.main()

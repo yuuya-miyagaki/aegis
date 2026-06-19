@@ -3,13 +3,13 @@ framework: aegis
 framework_version: "1.12.0"
 project_name: "Aegis"
 mode: Dev
-phase: implement
+phase: review
 task_type: framework
 task_size: L
 task_size_rationale: "確定（plan 移行時）: iteration 32 = SF-001（control-plane フックの quote/escape/bare-dir トークン分割バイパス・Critical pre-existing）を Augment で閉じる。改修面: hooks/check-control-plane.sh（token-aware チェック inline 追加）＋mirror examples/minimal-project/hooks/check-control-plane.sh 同期＋TDD テスト群＋framework 版 bump（contract 定数/template STATUS/example STATUS/本体）＋security-followups.md SF-001 CLOSED 化＝6+ ファイル＝L（全ゲート: review+qa+security+deploy）。セキュリティ境界＝security 盲検2次必須。設計: docs/specs/2026-06-18-sf-001-cp-token-bypass-design.md。"
 iteration: 32
 ui_surface: false
-last_updated: "2026-06-18T03:00:00Z"
+last_updated: "2026-06-18T06:00:00Z"
 gate_approvals:
   client_ready_for_dev: n/a
   brainstorm: approved
@@ -42,9 +42,12 @@ external_evidence:
     scope: "v0.12.2 実装後 4 ラウンドレビュー"
     findings: "Round 6 (P1×2, P2×1: pre-compact exit 2 / minimal-project / test rc), Round 7 (P1×1, P3×1: git add 漏れ / テスト件数表記), Round 8 (P2×1, P3×1: stale last_updated / grep 自己マッチ), Round 9 (P3×2: コメント不整合)"
     resolution: "9件全反映。tier 1/2 PASS、134 tests PASS、本体と minimal-project 完全同期確認済み。"
-next_action: "**iteration 32 開始（state-machine リセット完了: 全 dev/mode gate → pending、iteration 31→32、plan/spec/review/qa/security/deploy refs → null、requirements ref 維持）。** タスク＝**SF-001 を潰す**（control-plane フックの quote分割 `hooks\"\"/lib`／backslash `hooks\\/`／bare-dir operand `find hooks`・`rm -rf hooks`・`cp x hooks` トークン分割バイパス＝Critical・pre-existing・フル moat 崩壊）。**ブリーフ正典＝`docs/security-followups.md` SF-001**（repro・根本原因・修正方針まで自己完結）。現在 **phase=plan**: brainstorm 完了（gate approved）。設計合意済（**Augment**＝`cmd_mentions_control_plane` 末尾に token-aware チェックを1本 inline 追加・既存パス無改変・deny を足すだけ）。BRAINSTORM-RECORD＝`docs/specs/2026-06-18-sf-001-cp-token-bypass-brainstorm-record.md`／SPEC＝`docs/specs/2026-06-18-sf-001-cp-token-bypass-design.md`。次: writing-plans で実装計画→grill-plan→plan gate 承認→TDD 実装。修正方針: python `shlex(posix)` で語分割（redirect-target/operand 分類）＋bash fail-closed フォールバック→語の literal value が CP 解決なら mention（redirect-target は常に・operand は echo/printf/git commit 救済）。bare-dir は pure-bash 厳密一致。実装対象 `hooks/check-control-plane.sh`＋mirror（`examples/minimal-project/hooks/check-control-plane.sh`）。設計重い＝security 盲検2次必須・既存 moat テスト/REDTEAM(18/18+5/5) 緑維持。**その後 iteration 33+＝Batch2（配布整合 P2-7/2-8 等 5）+Batch3（2）+X.1/X.2**（plan: docs/plans/2026-06-15-dogfood-driven-improvements-plan.md）。残すべき勝ち OBS-010/014/016/019/021/022 維持。push は明示承認まで禁止。"
+next_action: "**iteration 32 / phase=review: SF-001 control-plane moat の path-resolution 修正。** 盲検 break-attempt 3 ラウンドで F-1（abs bare-dir）/F-2（ANSI-C `$'...'`）/F-3（正規化 `.//hooks`・`$PWD`）/F-4（cmdsub `$(pwd)/hooks`・`$(date)/hooks`=ask）を順次検出→全て修正。最終設計＝augment を **path-resolution 単一検出器**化（各語を pwd/$PWD/$(pwd)→ROOT 展開・未知 cmdsub/$VAR は sentinel 化・normpath・実 CP 絶対パス比較／3-verdict deny/ask/none）。main flow 優先順位＝literal-CP(deny)>var-built(ask)>augment(deny/ask)>allow。**唯一の残余＝`$(echo hooks)/lib`（CP 名が不透明 cmdsub に消える）＝SF-003 に accepted residual 記録**（accidental 書込みでは不発生・静的 moat 共通限界）。検証: 全再構成機構の網羅敵対行列 BLOCK24/ALLOW15 ALL OK・REDTEAM 18/18+5/5・CP 152 件・drift/mirror/contract。**次: full suite green 確認→commit→最終コードに盲検レビュー再ディスパッチ（round4）→review gate→qa→security（盲検2次必須）→deploy→ship→docs。** commits: 9c7624f/ec7587e/e0d21d8＋本修正。版 1.12.0。push は明示承認まで禁止。"
 blockers: []
-failure_tracking: null
+failure_tracking:
+  goal: "SF-001 control-plane moat の修正を review 通過させる（シェル再構成 CP 書込みを網羅捕捉）"
+  count: 3
+  last_attempt: "2026-06-18 R2 path-resolution 再設計（e0d21d8）。review round3 が F-4（cmdsub bare-dir）を検出し reject。"
 session_history:
   - date: "2026-06-18"
     mode: Dev

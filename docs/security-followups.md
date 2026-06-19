@@ -49,6 +49,21 @@
 - **修正方針（暫定・非確定）**: bare-name 検出の右境界に glob メタ文字（`*?[`）を許容するか、glob を含む CP 接頭辞語を fail-closed 扱いにする。SF-001 と同じくセキュリティ境界ゆえ独立 TDD＋盲検が要る。
 - **状態**: **OPEN**。SF-001（列挙3クラス）を先行し、本件は別タスクで消化（スコープを膨らませない）。
 
+### SF-003: CP ディレクトリ名が不透明な cmdsub の中に消える残余（Low・accepted residual）
+
+- **発見**: iteration 32 / SF-001 review round3 の break-attempt ＋ ユーザー指摘による再検証。2026-06-18。
+- **種別**: **accepted residual**（静的解析の本質的限界・moat の脅威モデル外の意図的難読化）。
+- **重大度**: Low（accidental 書込みでは発生しない。実用上の現実的攻撃は SF-001 の F-4 修正で閉鎖済み）。
+- **再現（task_type=feature で allow になる唯一の cmdsub 形）**:
+  ```
+  rm -rf $(echo hooks)/lib       # CP 名 hooks が不透明な cmdsub の中
+  rm -rf $(printf hooks)/x       # 同型
+  rm -rf $(cat file_with_hooks)  # CP 名が外部データ由来でコマンド文字列に無い
+  ```
+- **根本原因**: SF-001 の F-4 修正は cmdsub/$VAR を sentinel 化して「未知前置＋残る CP 名」を ask で捕捉するが、CP **名自体が cmdsub の内部に入る**形は sentinel が名前ごと飲み込むため検出できない。cmdsub を実行しない限り出力（=CP 名）を静的に復元できない。
+- **なぜ accept するか**: (1) accidental/casual な書込み（moat の主目的）では発生しない＝`$(echo hooks)` を書く者は `hooks` を直接書ける（それは捕捉される）。(2) 任意の静的 moat が同じ限界を持つ。(3) 敵対エージェントは base64/eval 等で無限に回避でき、静的 moat はサンドボックスではない。完全動的解決を求めるのは YAGNI。
+- **状態**: **OPEN（accepted residual・記録のみ）**。現実的 cmdsub ベクタ（`$(pwd)/hooks` 等）は SF-001 F-4 で閉鎖済み。
+
 ## CLOSED
 
 （なし）
