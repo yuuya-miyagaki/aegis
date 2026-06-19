@@ -282,5 +282,61 @@ class TestAnsiCQuoting(unittest.TestCase):
         self.assertTrue(_allowed(out), f"$'a\\tb' non-CP must allow: {out[:200]!r}")
 
 
+class TestPathNormalization(unittest.TestCase):
+    """F-3（iter32 review round2 break-attempt）: パス正規化（.//・/./・連続スラッシュ）
+    と $PWD 変数で再構成される CP。リテラル正規表現の左境界 `/` 除外と単一 `./` 想定で
+    取りこぼしていた。ROOT 相対 normpath ＋ $PWD→ROOT 展開で塞ぐ。"""
+
+    @classmethod
+    def setUpClass(cls):
+        cls._tmp = _scratch_root()
+        cls.root = Path(cls._tmp.name)
+
+    @classmethod
+    def tearDownClass(cls):
+        cls._tmp.cleanup()
+
+    def test_double_slash_redirect_denied(self):
+        out = _hook(self.root, "echo evil > .//hooks/lib/emit.sh")
+        self.assertTrue(_denied(out), f".//hooks redirect must deny: {out[:200]!r}")
+
+    def test_double_slash_rm_denied(self):
+        out = _hook(self.root, "rm -rf .//hooks")
+        self.assertTrue(_denied(out), f"rm .//hooks must deny: {out[:200]!r}")
+
+    def test_dot_slash_dot_rm_denied(self):
+        out = _hook(self.root, "rm -rf ././hooks")
+        self.assertTrue(_denied(out), f"rm ././hooks must deny: {out[:200]!r}")
+
+    def test_pwd_var_rm_denied(self):
+        out = _hook(self.root, "rm -rf $PWD/hooks")
+        self.assertTrue(_denied(out), f"rm $PWD/hooks must deny: {out[:200]!r}")
+
+    def test_pwd_var_redirect_denied(self):
+        out = _hook(self.root, "echo evil > $PWD/hooks/lib/emit.sh")
+        self.assertTrue(_denied(out), f"$PWD redirect must deny: {out[:200]!r}")
+
+    def test_abs_dot_rm_denied(self):
+        out = _hook(self.root, f"rm -rf {self.root}/./hooks")
+        self.assertTrue(_denied(out), f"abs /./hooks must deny: {out[:200]!r}")
+
+    def test_abs_double_slash_rm_denied(self):
+        out = _hook(self.root, f"rm -rf {self.root}//hooks")
+        self.assertTrue(_denied(out), f"abs //hooks must deny: {out[:200]!r}")
+
+    def test_cp_double_slash_scripts_denied(self):
+        out = _hook(self.root, "cp evil .//scripts")
+        self.assertTrue(_denied(out), f"cp .//scripts must deny: {out[:200]!r}")
+
+    # ---- regression: sibling/parent dirs that are NOT the framework CP ----
+    def test_sibling_src_hooks_allowed(self):
+        out = _hook(self.root, "rm -rf src/hooks")
+        self.assertTrue(_allowed(out), f"src/hooks (not CP) must allow: {out[:200]!r}")
+
+    def test_node_modules_allowed(self):
+        out = _hook(self.root, "rm -rf node_modules")
+        self.assertTrue(_allowed(out), f"node_modules must allow: {out[:200]!r}")
+
+
 if __name__ == "__main__":
     unittest.main()

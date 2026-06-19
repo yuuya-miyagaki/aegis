@@ -189,36 +189,29 @@ cmd_mentions_control_plane() {
       return 0
     fi
   fi
-  # SF-001 augment: token-aware split/escaped/bare-dir CP write target that the
-  # regex+mask passes above miss because the shell reconstructs the CP path.
-  if cmd_token_mentions_cp "$cmd"; then
-    return 0
-  fi
   return 1
 }
 
-# --- SF-001 AUGMENT: token-aware control-plane WRITE-TARGET detection ---------
-# (a)(b)(c) above key on a LITERAL `hooks/`|`scripts/`|`templates/`|`STATUS.md`|...
-# substring, so they miss every form where the shell reconstructs the CP path it
-# never appears literally in the command:
-#   quote split / adjacent concat:  hooks""/lib   "ho""oks/lib"   'hoo'ks/
-#   backslash escape:                hooks\/lib
-#   trailing-slash-less bare operand: rm -rf hooks   cp x hooks   find hooks
-# These ADD denials only; they never relax an existing decision. A CP path is a
-# WRITE TARGET unless it appears solely as a message argument of a no-write
-# command (echo/printf/git commit) with no chain operator — the (c) allowlist,
-# so OBS-006 message rescue is preserved for split/escaped forms too. Read forms
-# (ls/cat/find without a write indicator) surface as a mention and are correctly
-# allowed downstream by the read-only carve-out (kept purely additive).
-
-# True when CMD is a no-write "message" command (echo/printf/git commit) carrying
-# no chain operator that could introduce a writer — its CP args are not write
-# targets. Mirrors the (c) allowlist.
-_cmd_is_rescued_message() {
-  local cmd="$1"
-  printf '%s' "$cmd" | grep -qE '[;&|]' && return 1
-  printf '%s' "$cmd" | grep -qE '^[[:space:]]*(echo|printf|git[[:space:]]+commit)([[:space:]]|$)'
-}
+# --- SF-001 AUGMENT: path-resolving control-plane WRITE-TARGET detection ------
+# (a)(b)(c) above key on a LITERAL `hooks/`|`scripts/`|`templates/`|... substring
+# with a left boundary, so they miss every form where the shell reconstructs a
+# control-plane DIRECTORY path that never appears in that literal shape:
+#   quote split:   hooks""/lib   "ho""oks/lib"      backslash:  hooks\/lib
+#   ANSI-C:        $'hook\x73'                       bare:       rm -rf hooks
+#   absolute:      ${ROOT}/hooks                     normalize:  .//hooks  /./hooks
+#   variable:      $PWD/hooks
+# This augment tokenizes the command (python3 shlex, after decoding $'...') and
+# RESOLVES each operand / redirect target to a normalized ABSOLUTE path — relative
+# paths and $PWD are taken as ROOT-relative, the same conservative assumption the
+# rest of the hook makes (we never trust an in-command `cd`) — then compares
+# against the real CP directory absolute paths. STATUS.md / CLAUDE.md / .claude
+# (file / name classes) stay on the unanchored CONTROL_PLANE regex, which
+# normalization cannot defeat. ADDS denials only. A resolved CP path is a WRITE
+# TARGET unless it is solely a message argument of a no-write command
+# (echo/printf/git commit) with no chain operator (OBS-006 rescue); read forms
+# (ls/cat/find without a write indicator) surface as a mention and are allowed
+# downstream by the read-only carve-out. Single detector (no bash/python
+# duplication): bare-name, abs, and normalization all collapse to one resolve.
 
 cmd_token_mentions_cp() {
   local cmd="$1" verdict rc
@@ -226,42 +219,19 @@ cmd_token_mentions_cp() {
   # cannot model an executed substitution, so never tokenize them here.
   printf '%s' "$cmd" | grep -qE '\$\(|`' && return 1
 
-  # Sub-check 1 — bare (unquoted, whitespace-delimited) CP directory operand.
-  # pure-bash (python-independent). Left/right boundaries are whitespace|^|$ so a
-  # QUOTED occurrence (adjacent to a quote char) and a path-qualified name
-  # (src/hooks) never match — only a truly bare top-level dir word.
-  if printf '%s' "$cmd" \
-       | grep -qE '(^|[[:space:]])(\./)?(hooks|scripts|templates)/?([[:space:]]|$)'; then
-    _cmd_is_rescued_message "$cmd" || return 0
-  fi
-
-  # Sub-check 2 gate (perf + domain): a command with no quote/backslash tokenizes
-  # as plain whitespace splitting — bare relative dirs are already handled by
-  # Sub-check 1 and everything else is what the existing regex sees. Skip the
-  # python spawn (this hook fires on every Bash command). The quote-split /
-  # backslash / ANSI-C $'...' classes by definition contain a quote or backslash.
-  # EXCEPTION: an ABSOLUTE project-root CP path without a trailing slash
-  # (rm -rf ${ROOT}/hooks) carries no quote/backslash, is missed by Sub-check 1's
-  # whitespace-boundary regex AND by _text_mentions_cp's trailing-slash fixed
-  # string — route it to python, whose `bare` set covers ${ROOT}/{hooks,scripts,
-  # templates} and ${ROOT_REAL}/... (a trailing-slash abs form is already denied
-  # upstream, so reaching here with this substring means the bare form).
+  # Gate (bounds the python spawn — this hook fires on every Bash command): run
+  # the analyzer only when the command could reference a CP directory. A CP-path
+  # reconstruction either names the dir (hooks/scripts/templates) literally, or
+  # hides it behind a quote / backslash (quote-split / ANSI-C). A command with
+  # none of these cannot resolve to a CP dir, so skip it.
   case "$cmd" in
-    *\'*|*\"*|*\\*) : ;;
-    *)
-      printf '%s' "$cmd" | grep -qF \
-        -e "$ROOT/hooks" -e "$ROOT/scripts" -e "$ROOT/templates" \
-        -e "$ROOT_REAL/hooks" -e "$ROOT_REAL/scripts" -e "$ROOT_REAL/templates" \
-        || return 1
-      ;;
+    *hooks*|*scripts*|*templates*|*\'*|*\"*|*\\*) : ;;
+    *) return 1 ;;
   esac
 
-  # Sub-check 2 — quote-split / backslash reconstruction (python3 shlex). Pass
-  # CONTROL_PLANE and CP_DIRS via env so the regex is NOT duplicated in python
-  # (single source). python3 absent -> skip (Sub-check 1 still covered bare
-  # dirs; quote-split/backslash fall back to the pre-existing mask+regex result.
-  # Known limitation: full coverage of those two classes requires python3, a
-  # framework-wide hard dependency).
+  # Pass CONTROL_PLANE and CP_DIRS via env so the regex / dir list are NOT
+  # duplicated in python (single source). python3 absent -> skip (resolution
+  # needs it; python3 is a framework-wide hard dependency).
   command -v python3 >/dev/null 2>&1 || return 1
   verdict=$(AEGIS_CMD="$cmd" AEGIS_CP_RE="$CONTROL_PLANE" AEGIS_CP_DIRS="$CP_DIRS" \
             AEGIS_ROOT="$ROOT" AEGIS_ROOT_REAL="$ROOT_REAL" \
@@ -308,18 +278,37 @@ cp_re = re.compile(os.environ.get("AEGIS_CP_RE", ""))
 cp_dirs = [d for d in os.environ.get("AEGIS_CP_DIRS", "").split("|") if d]
 root = os.environ.get("AEGIS_ROOT", "")
 root_real = os.environ.get("AEGIS_ROOT_REAL", "")
-bare = set()
-for d in cp_dirs:
-    for pre in ("", "./"):
-        for suf in ("", "/"):
-            bare.add(pre + d + suf)
-    for b in (root, root_real):
-        if b:
-            bare.add(b.rstrip("/") + "/" + d)
+# Real CP directory absolute paths (logical ROOT + symlink-resolved ROOT_REAL).
+cp_targets = set()
+for base in (root, root_real):
+    if base:
+        for d in cp_dirs:
+            cp_targets.add(os.path.normpath(os.path.join(base, d)))
+_PWD_RE = re.compile(r"\$\{PWD\}|\$PWD(?![A-Za-z0-9_])")
+
+
+def resolves_to_cp_dir(w):
+    # $PWD/${PWD} = the agent's cwd, taken as ROOT (conservative; we do not trust
+    # an in-command cd). Other $VAR is left literal (undecidable here; the
+    # cmd_var_built_write ASK path covers assignment-built targets). Relative
+    # words resolve against ROOT, then normpath collapses . / .. / // so .//hooks,
+    # /./hooks, ${ROOT}/foo/../hooks all reduce to the same target.
+    p = _PWD_RE.sub(root, w)
+    if not p or "\x00" in p:
+        return False
+    base = p if os.path.isabs(p) else os.path.join(root, p)
+    ap = os.path.normpath(base)
+    for t in cp_targets:
+        if ap == t or ap.startswith(t + os.sep):
+            return True
+    return False
 
 
 def word_is_cp(w):
-    return bool(cp_re.search(w)) or w in bare
+    # Directory classes via path resolution (normalization-proof); STATUS.md /
+    # CLAUDE.md / .claude via the unanchored regex (a basename match that
+    # normalization cannot hide).
+    return resolves_to_cp_dir(w) or bool(cp_re.search(w))
 
 
 try:
@@ -466,13 +455,27 @@ fi
 # raw-input match made this early-allow unreachable and denied nearly every
 # Bash command at install targets (P1-1, evolution review 2026-06-10).
 if [ -n "$CMD" ]; then
-  if ! cmd_mentions_control_plane "$CMD"; then
-    # C-1: cannot statically prove the write target stays out of control plane
-    # when the command builds it via variable expansion. Ask rather than allow.
-    if cmd_var_built_write "$CMD"; then
-      emit_ask "[integrity] このコマンドは変数で書込み先 path を組み立てています (例: \$D/lib/...) — 制御プレーン (hooks/scripts/.claude) を意図せず上書きする可能性があるため確認してください。"
-      exit 0
-    fi
+  # Precedence (highest first), so an obfuscated var-built write cannot downgrade
+  # a clear literal control-plane write to a mere ASK, and a bare CP-name DATA
+  # argument cannot upgrade a var-built write past its ASK:
+  #   1. cmd_mentions_control_plane — a CLEAR literal CP write target (incl.
+  #      `$(pwd)/hooks/`, `$VAR/hooks/`, quoted forms) → DENY (fall through to the
+  #      deny path; a literal CP write is never downgraded to ASK).
+  #   2. cmd_var_built_write — a write target BUILT via variable/cmdsub expansion
+  #      that is statically UNRESOLVABLE → ASK (defense in depth, fires before the
+  #      task_type=framework allow; covers REDTEAM-02 printf -v / read / eval).
+  #   3. cmd_token_mentions_cp — the path-resolving augment: a CP DIR reconstructed
+  #      via quote-split / backslash / ANSI-C / bare / absolute / normalization
+  #      (.//hooks, $PWD/hooks) → DENY (fall through).
+  #   4. none → allow.
+  if cmd_mentions_control_plane "$CMD"; then
+    :
+  elif cmd_var_built_write "$CMD"; then
+    emit_ask "[integrity] このコマンドは変数で書込み先 path を組み立てています (例: \$D/lib/...) — 制御プレーン (hooks/scripts/.claude) を意図せず上書きする可能性があるため確認してください。"
+    exit 0
+  elif cmd_token_mentions_cp "$CMD"; then
+    :
+  else
     emit_allow
     exit 0
   fi

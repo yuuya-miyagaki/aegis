@@ -79,3 +79,29 @@
 - テンプレート名: `PLAN.template.md`
 - 本設計ノートのパスを PLAN の「参照設計」に記載すること
 <!-- exit-check: 全セクション記入・自己レビュー完了 → plan へ -->
+
+---
+
+## 改訂（iteration 32 review・盲検 break-attempt 由来）
+
+当初の「リテラル形を正規表現でマッチ」する Sub-check 設計は、盲検レビューの能動的 break-attempt で**3つの追加 Critical**（いずれも pre-existing クラスの取りこぼし）を露呈した。リテラル形の列挙は whack-a-mole で収束しないため、**Sub-check 2 を path-resolution に再設計**（ユーザー合意）。
+
+### 検出された追加 Critical（実走確認）
+
+- **F-1**: 末尾スラッシュ無しの絶対 root パス bare-dir（`rm -rf ${ROOT}/hooks`）が allow。設計 unit C が約束した abs 形が未配線（grill-code で消した `_word_is_cp` が唯一の経路だった）。
+- **F-2**: ANSI-C `$'...'` クォート（`rm -rf $'hook\x73'`）が allow。shlex(posix) は `$'...'` を展開しない。
+- **F-3**: パス正規化（`.//hooks`・`/./hooks`・`foo/../hooks`）と `$PWD/hooks` が allow（ROOT 知識不要・`echo > .//hooks/lib/emit.sh` で moat 全崩壊）。`CONTROL_PLANE` 左境界 `[^A-Za-z0-9_./-]` が `/` を除外し、`(\./)*` が単一 `./` のみ想定だったため。
+
+### 最終アーキテクチャ（path-resolution・単一検出器）
+
+- Sub-check 1（bash 語境界正規表現）と python の `bare` 集合を**廃止し python の単一検出器に統合**（保守性レビューが指摘した二重ロジックの drift を解消）。
+- **ゲート**: `*hooks*|*scripts*|*templates*|*'*|*"*|*\*` を含むときだけ python 実行（CP ディレクトリへ解決し得る命令のみ・per-command spawn を抑制）。
+- **python**: `decode_ansic` で `$'...'` を literal 化 → `shlex` で語分割（redirect-target/operand 分類）→ 各語を **resolve**: `$PWD`/`${PWD}`→ROOT 展開（cwd は信用せず ROOT 相対に固定＝`cd` チェーン耐性）、相対は ROOT 連結、`os.path.normpath` で `.`/`..`/`//` を畳み、**実 CP ディレクトリの絶対パス**（ROOT・ROOT_REAL 配下の hooks/scripts/templates）と一致/配下判定。STATUS.md/CLAUDE.md/.claude は正規化に強い非アンカー正規表現を維持。redirect-target は常に・operand は echo/printf/git commit ＋ chain 無しで救済。
+- **fail-closed**: python 非ゼロ終了（ValueError 含む）/不在は mention 扱い。cmdsub/backtick は上流 raw に委譲。
+- **var-built ASK の順序修正**: `cmd_var_built_write` の ASK を cmd_mentions 判定・`task_type=framework` allow より**前に独立発火**（難読化 CP 書込みは framework でも常に ASK）。path-resolving augment が `printf -v D %s hooks`（REDTEAM-02）の**データ引数** `hooks` を mention と誤認して ASK を短絡する回帰を封じる。
+
+### スコープ
+
+- F-1/F-2/F-3 は本タスクで修正（path-resolution に内包）。
+- glob（`rm -rf hooks*`）は引き続き `SF-002` として繰延（別クラス・別タスク）。
+- `$PWD` 以外の外部 `$VAR`（`$FOO/hooks`）は静的に解決不能＝既存 `cmd_var_built_write` の ASK 領域（代入を伴う場合）。残余リスクとして記録。
