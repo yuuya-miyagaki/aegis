@@ -9,7 +9,7 @@ task_size: L
 task_size_rationale: "確定（plan 移行時）: iteration 32 = SF-001（control-plane フックの quote/escape/bare-dir トークン分割バイパス・Critical pre-existing）を Augment で閉じる。改修面: hooks/check-control-plane.sh（token-aware チェック inline 追加）＋mirror examples/minimal-project/hooks/check-control-plane.sh 同期＋TDD テスト群＋framework 版 bump（contract 定数/template STATUS/example STATUS/本体）＋security-followups.md SF-001 CLOSED 化＝6+ ファイル＝L（全ゲート: review+qa+security+deploy）。セキュリティ境界＝security 盲検2次必須。設計: docs/specs/2026-06-18-sf-001-cp-token-bypass-design.md。"
 iteration: 32
 ui_surface: false
-last_updated: "2026-06-20T09:00:00Z"
+last_updated: "2026-06-20T12:00:00Z"
 gate_approvals:
   client_ready_for_dev: n/a
   brainstorm: approved
@@ -42,12 +42,12 @@ external_evidence:
     scope: "v0.12.2 実装後 4 ラウンドレビュー"
     findings: "Round 6 (P1×2, P2×1: pre-compact exit 2 / minimal-project / test rc), Round 7 (P1×1, P3×1: git add 漏れ / テスト件数表記), Round 8 (P2×1, P3×1: stale last_updated / grep 自己マッチ), Round 9 (P3×2: コメント不整合)"
     resolution: "9件全反映。tier 1/2 PASS、134 tests PASS、本体と minimal-project 完全同期確認済み。"
-next_action: "iteration 32 / phase=review: SF-001 control-plane moat の path-resolution 修正。**セッション復旧済み**（作業ツリーの `hooks/lib/emit.sh` が stub `evil` に破壊→HEAD 復元、safety-lib integrity の全 Bash/Write/Edit deny を解除。task_type=framework 下で moat が許可した手動 break-attempt 書込みが実ツリーに着弾したもの・バイパスではない）。盲検 break-attempt を重ね **static-obfuscation 形を全クラス閉鎖・コミット済（未 push・版 1.12.0）**: round5=tilde-plus(`~+`)/入れ子 param-default/`~-`→ask、round6=展開分割(`h${X:-ooks}`/`{h,x}ooks`)/bare `.claude` 末尾、round7=bare special-param(`$0-9`/`$$`/`$?`/`$#`/`$!`/`$-`/`$*`/`$@`)→ask（HEAD=3c98666）、**round8=glob/wildcard/char-class**（`hook?`/`hook*`/`[h][o][o][k][s]`/`.clau??`/`STATUS.m?`/`mv hook?` 等が実 CP write なのに ALLOW だった Critical を fnmatch 静的照合で deny 化。GATE に `?`/`*`/`[` 追加＋resolver で token の絶対 path を CP 絶対パス集合へ component-wise prefix-fnmatch。read=carve-out で allow、`build/*` 等非CPは allow。HEAD=29caac6）。**重要な是正**: glob は『SF-002 runtime 値依存 fundamental limit』と誤記録されていたが静的に閉じられる＝前 claim 誤り。これで static-obfuscation 全クラス完了、残るは真の runtime（cmdsub=SF-003/$VAR）で ask に収束。証拠: token-split 136 passed(+47)/full suite 966 passed・1 skip/contract・drift・mirror PASS／red-team 全候補 実走再確認。**次: 2回目の盲検 break-attempt（別 security agent・bg 実行中）で新クラスゼロを確認→review gate（要承認）→qa→security（盲検2次）→deploy→ship→docs。** commits: 1644cd3/3c98666/29caac6。push は明示承認まで禁止。failure_tracking は review 通過時 null。ツール gotcha: Bash コマンド文字列の ${...}/~+/brace/`{}` で H.replace エラー→python ハーネス FILE と git commit -F で回避。"
+next_action: "iteration 32 / phase=review: SF-001 control-plane moat の path-resolution 修正（fix-forward 継続中）。**ユーザーは就寝中・自律進行を許可（完全 green と確信した場合のみ push 可）。** セッション復旧後（作業ツリーの `hooks/lib/emit.sh` が stub `evil` に破壊→HEAD 復元）、盲検 break-attempt と pre-QA review を反復し bypass クラスを順次閉鎖・コミット（未 push・版 1.12.0）: round5(tilde `~+`/`~-`・入れ子 param-default)/round6(展開分割・bare `.claude` 末尾)/round7(bare special-param)=**3c98666**、round8(glob/wildcard/char-class を fnmatch 静的照合で deny)=**29caac6**、round8b(glob×空展開 `ho${E}ok?` の fail-open・**reviewer BLOCKER**)+round9(非bare redirect 演算子 `&>`/`>|`/`&>>`/`>&`/`<>`・fd付 `1>|`・**2回目の盲検**検出)=**4c65229**。各 round=TDD RED→GREEN。設計: 静的 obfuscation は解決して deny、runtime 依存は ask に収束。**重要**: 2回目の盲検と reviewer が round8 後も新 Critical（redirect-op / 空glue glob）を検出＝moat は未収束だった（『glob=SF-002 原理的限界』の旧記録も誤りと判明）。**収束未確定**: 3回目の盲検 break-attempt（fresh security）+ round8b/9 の reviewer を bg 実行中。**判断ルール: 盲検が CLEAN（新クラスゼロ）を返すまで review gate に進まない／push しない。** clean 後の手順: review→qa→security（盲検2次=実施済み red-team を証拠化）→deploy→ship→docs→（full-suite/contract/drift/mirror が全 green 確認できたら）push。証拠: token-split 163 passed/full suite 993 passed・1 skip/contract・drift・mirror PASS。commits: 3c98666/29caac6/19035fc/4c65229。failure_tracking は review 通過時 null。ツール gotcha: Bash コマンド文字列の ${...}/~+/brace/`{}` で H.replace エラー→python ハーネス FILE と git commit -F で回避。"
 blockers: []
 failure_tracking:
   goal: "SF-001 control-plane moat の修正を review 通過させる（シェル再構成 CP 書込みを網羅捕捉）"
   count: 4
-  last_attempt: "2026-06-20 round5/6/7（3c98666）に続き、盲検 break-attempt が glob/char-class クラスを検出→round8 で fnmatch 静的照合により閉鎖・TDD green・コミット（29caac6）。static-obfuscation 全クラス完了。2回目の盲検で新クラスゼロを確認後、review gate へ。"
+  last_attempt: "2026-06-20 round8（29caac6）後、2回目の盲検が redirect-op、reviewer が glob×空展開を検出→round8b/round9 で閉鎖（4c65229）。3回目の盲検 + reviewer 実行中。盲検が CLEAN を返すまで review gate に進まない／push しない。"
 session_history:
   - date: "2026-06-18"
     mode: Dev
