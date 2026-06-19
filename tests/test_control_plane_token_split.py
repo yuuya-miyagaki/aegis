@@ -862,5 +862,161 @@ class TestGlobAndCharClass(unittest.TestCase):
         self.assertTrue(_allowed(out), f"cat *.py (non-CP read) must allow: {out[:200]!r}")
 
 
+class TestRedirectOperators(unittest.TestCase):
+    """round9 盲検 break-attempt（2nd security agent）: resolver の redirect 判定が
+    `>`/`>>` トークンのみを redirect marker とするため、非 bare な redirect 演算子
+    （`&>` `&>>` `>|` `>&` `<>` と fd 付き `1>|` 等）の書込み先が operand 経路に落ち、
+    echo/printf/git commit の rescue で skip されて ALLOW に漏れていた（Critical・
+    隠れ CP 先 = glob/char-class と組み合わせ）。bare `>` は正しく deny、cp/tee 等
+    非 rescue writer も deny なので、漏れる条件は rescued-cmd + 非bare redirect +
+    隠れ CP target。fix: write redirect 演算子族を全て marker として同一の target
+    分類に通す。"""
+
+    @classmethod
+    def setUpClass(cls):
+        cls._tmp = _scratch_root()
+        cls.root = Path(cls._tmp.name)
+
+    @classmethod
+    def tearDownClass(cls):
+        cls._tmp.cleanup()
+
+    # ---- non-bare redirect + hidden (glob) CP target under rescue → DENY ----
+    def test_andgt_glob_denied(self):
+        out = _hook(self.root, "echo evil &> hook?/lib/emit.sh")
+        self.assertTrue(_denied(out), f"&> hook? must deny: {out[:200]!r}")
+
+    def test_clobber_glob_denied(self):
+        out = _hook(self.root, "printf evil >| hook?/lib/emit.sh")
+        self.assertTrue(_denied(out), f">| hook? must deny: {out[:200]!r}")
+
+    def test_fd_clobber_glob_denied(self):
+        out = _hook(self.root, "printf x 1>| hook?/lib/emit.sh")
+        self.assertTrue(_denied(out), f"1>| hook? must deny: {out[:200]!r}")
+
+    def test_andgt_append_glob_denied(self):
+        out = _hook(self.root, "printf x &>> hook?/lib/emit.sh")
+        self.assertTrue(_denied(out), f"&>> hook? must deny: {out[:200]!r}")
+
+    def test_andgt_charclass_denied(self):
+        out = _hook(self.root, "echo evil &> [h]ooks/lib/emit.sh")
+        self.assertTrue(_denied(out), f"&> [h]ooks must deny: {out[:200]!r}")
+
+    def test_clobber_star_denied(self):
+        out = _hook(self.root, "echo evil >| hook*/lib/emit.sh")
+        self.assertTrue(_denied(out), f">| hook* must deny: {out[:200]!r}")
+
+    def test_andgt_scripts_denied(self):
+        out = _hook(self.root, "printf x &> script?/check_status.py")
+        self.assertTrue(_denied(out), f"&> script? must deny: {out[:200]!r}")
+
+    def test_clobber_status_denied(self):
+        out = _hook(self.root, "printf x >| docs/STATUS.m?")
+        self.assertTrue(_denied(out), f">| docs/STATUS.m? must deny: {out[:200]!r}")
+
+    def test_andgt_claude_md_denied(self):
+        out = _hook(self.root, "printf x &> CLAUDE.m?")
+        self.assertTrue(_denied(out), f"&> CLAUDE.m? must deny: {out[:200]!r}")
+
+    def test_andgt_nospace_denied(self):
+        out = _hook(self.root, "echo evil &>hook?/lib/emit.sh")
+        self.assertTrue(_denied(out), f"&>hook? (no space) must deny: {out[:200]!r}")
+
+    def test_gtamp_to_file_denied(self):
+        out = _hook(self.root, "echo evil >& hook?/lib/emit.sh")
+        self.assertTrue(_denied(out), f">& hook? (both fd to file) must deny: {out[:200]!r}")
+
+    def test_fd_readwrite_denied(self):
+        out = _hook(self.root, "printf x 1<> hook?/lib/emit.sh")
+        self.assertTrue(_denied(out), f"1<> hook? (fd1 rw = write) must deny: {out[:200]!r}")
+
+    # ---- literal CP via non-bare redirect (caught upstream) stays DENY ----
+    def test_andgt_literal_denied(self):
+        out = _hook(self.root, "printf x &> hooks/lib/emit.sh")
+        self.assertTrue(_denied(out), f"&> literal hooks must deny: {out[:200]!r}")
+
+    # ---- quoted glob target: shlex strips quotes → fail-safe DENY (consistent) ----
+    def test_clobber_quoted_glob_denied(self):
+        out = _hook(self.root, 'printf x >| "hook?/lib/emit.sh"')
+        self.assertTrue(_denied(out), f">| quoted hook? is fail-safe deny: {out[:200]!r}")
+
+    # ---- negatives: non-bare redirect to a NON-CP target → ALLOW ----
+    def test_neg_andgt_noncp_allowed(self):
+        out = _hook(self.root, "printf x &> buil?/log")
+        self.assertTrue(_allowed(out), f"&> buil? (non-CP) must allow: {out[:200]!r}")
+
+    def test_neg_clobber_noncp_allowed(self):
+        out = _hook(self.root, "echo x >| dist*/out")
+        self.assertTrue(_allowed(out), f">| dist* (non-CP) must allow: {out[:200]!r}")
+
+    def test_neg_andgt_tmp_allowed(self):
+        out = _hook(self.root, "printf x &> /tmp/safe.log")
+        self.assertTrue(_allowed(out), f"&> /tmp/safe.log (non-CP) must allow: {out[:200]!r}")
+
+    def test_neg_fd_dup_allowed(self):
+        out = _hook(self.root, "echo hi 2>&1")
+        self.assertTrue(_allowed(out), f"2>&1 (fd dup, no file) must allow: {out[:200]!r}")
+
+
+class TestGlobEmptyGlue(unittest.TestCase):
+    """round8b（reviewer BLOCKER）: round8 の glob 解決（_has_glob/_glob_hits_cp）は
+    NON-unknown 枝のみに在り、glob が空展開しうる `$VAR`/`${X#..}`/`$(..)` と同居すると
+    token が unknown 化→空glue 再判定（sentinel 除去）に回るが、そこは literal
+    membership だけで glob を再適用しない。結果 `ho${E}ok?`（E 未設定で bash は `hooks`
+    に展開）等が ALLOW に漏れていた＝round8 を round6 の空展開で覆った fail-open。
+    空展開は runtime 依存なので fail-safe = ASK（空glue 枝の既定と一致）。非CPは ALLOW。"""
+
+    @classmethod
+    def setUpClass(cls):
+        cls._tmp = _scratch_root()
+        cls.root = Path(cls._tmp.name)
+
+    @classmethod
+    def tearDownClass(cls):
+        cls._tmp.cleanup()
+
+    def _asked(self, out):
+        return '"permissionDecision":"ask"' in out
+
+    # ---- glob + empty-expandable expansion resolving to CP → ASK (fail-safe) ----
+    def test_mid_emptyvar_glob_ask(self):
+        out = _hook(self.root, "rm -rf ho${E}ok?")
+        self.assertTrue(self._asked(out), f"ho${{E}}ok? must ask: {out[:200]!r}")
+
+    def test_suffix_emptyvar_glob_ask(self):
+        out = _hook(self.root, "rm -rf hook${E}?")
+        self.assertTrue(self._asked(out), f"hook${{E}}? must ask: {out[:200]!r}")
+
+    def test_prefix_emptyvar_glob_ask(self):
+        out = _hook(self.root, "rm -rf ${E}hook?")
+        self.assertTrue(self._asked(out), f"${{E}}hook? must ask: {out[:200]!r}")
+
+    def test_emptyvar_star_ask(self):
+        out = _hook(self.root, "rm -rf hoo${E}k*")
+        self.assertTrue(self._asked(out), f"hoo${{E}}k* must ask: {out[:200]!r}")
+
+    def test_strip_glob_ask(self):
+        out = _hook(self.root, "rm -rf ${X#zzz}hook?")
+        self.assertTrue(self._asked(out), f"${{X#zzz}}hook? must ask: {out[:200]!r}")
+
+    def test_emptyvar_glob_redirect_ask(self):
+        out = _hook(self.root, "echo x > ho${E}ok?/lib/emit.sh")
+        self.assertTrue(self._asked(out), f"redirect ho${{E}}ok? must ask: {out[:200]!r}")
+
+    def test_emptyvar_glob_nonbare_redirect_ask(self):
+        # round9 (&>) + round8b (empty-glue glob) combined
+        out = _hook(self.root, "printf x &> ho${E}ok?/lib/emit.sh")
+        self.assertTrue(self._asked(out), f"&> ho${{E}}ok? must ask: {out[:200]!r}")
+
+    # ---- negatives: empty-glue glob NOT resolving to CP → ALLOW ----
+    def test_neg_emptyvar_glob_allowed(self):
+        out = _hook(self.root, "rm -rf bu${E}il?")
+        self.assertTrue(_allowed(out), f"bu${{E}}il? (non-CP) must allow: {out[:200]!r}")
+
+    def test_neg_emptyvar_glob_under_noncp_allowed(self):
+        out = _hook(self.root, "rm -rf build/${E}*")
+        self.assertTrue(_allowed(out), f"build/${{E}}* (non-CP) must allow: {out[:200]!r}")
+
+
 if __name__ == "__main__":
     unittest.main()

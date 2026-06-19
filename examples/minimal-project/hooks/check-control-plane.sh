@@ -412,6 +412,11 @@ def classify_one(w):
         if cp_re.search(we) or ae in cp_targets \
                 or any(ae.startswith(t + os.sep) for t in cp_targets):
             return "ask"
+        # round8b: the empty-glued form may itself be a CP-resolving GLOB
+        # (ho${E}ok? -> hook? -> hooks). The literal re-test above misses it, so
+        # re-apply the glob check here too — runtime-dependent, so ASK.
+        if _has_glob(we) and _glob_hits_cp(ae):
+            return "ask"
     return "no"
 
 
@@ -447,8 +452,16 @@ try:
 except ValueError:
     sys.exit(3)
 CHAIN = {";", "|", "&", "&&", "||", "(", ")"}
+# WRITE redirect operators. shlex(punctuation_chars) tokenizes each as ONE token;
+# a leading fd number (1>|, 2>>) is a SEPARATE preceding token. round9: only `>`
+# and `>>` were recognized, so `&>` `&>>` `>|` `>&` `<>` let their write target
+# fall through to the operand path — which echo/printf/git-commit RESCUE — so a
+# hidden-CP (glob/char-class) target slipped to ALLOW. `<` stays a READ (redir
+# off); `<>` opens the file read-write so it CAN write (fail-safe: treat target
+# as a write). `>&` to a numeric fd resolves to a non-CP token -> harmless.
+WREDIR = {">", ">>", ">|", "&>", "&>>", ">&", "<>"}
 chain = any(t in CHAIN for t in toks)
-words = [t for t in toks if t not in CHAIN and t not in (">", ">>", "<")]
+words = [t for t in toks if t not in CHAIN and t not in WREDIR and t != "<"]
 ci = 0
 while ci < len(words) and re.match(r"^[A-Za-z_][A-Za-z0-9_]*=", words[ci]):
     ci += 1
@@ -458,7 +471,7 @@ rescued = (not chain) and (c0 in ("echo", "printf") or (c0 == "git" and c1 == "c
 deny = ask = False
 redir = False
 for t in toks:
-    if t in (">", ">>"):
+    if t in WREDIR:
         redir = True
         continue
     if t == "<" or t in CHAIN:
