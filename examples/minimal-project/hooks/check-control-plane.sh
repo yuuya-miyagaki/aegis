@@ -63,7 +63,10 @@ fi
 # we cannot statically resolve them, so we treat them as control plane).
 ROOT_REAL="$(cd "$ROOT" && pwd -P)"
 CP_DIRS='hooks|scripts|templates'
-CONTROL_PLANE='STATUS\.md|CLAUDE\.md|\.claude/|\.claude[^A-Za-z0-9_/]'
+# `.claude` needs `/`, a non-name boundary char, OR END-OF-COMMAND after it —
+# without the `$` alt, a bare `rm -rf .claude` (the dir as the final token) slipped
+# (round6 C-2). `.claude/` stays a distinct alt ([^…] excludes `/`).
+CONTROL_PLANE='STATUS\.md|CLAUDE\.md|\.claude/|\.claude([^A-Za-z0-9_/]|$)'
 CONTROL_PLANE="${CONTROL_PLANE}|(^|[^A-Za-z0-9_./-])(\\./)*(${CP_DIRS})/"
 CONTROL_PLANE="${CONTROL_PLANE}|(\\.\\./)+(${CP_DIRS})/"
 CONTROL_PLANE="${CONTROL_PLANE}|/\\./(${CP_DIRS})/"
@@ -221,11 +224,15 @@ cmd_token_verdict() {
   # no CP literal; we may safely replace each remaining cmdsub / $VAR with an
   # opaque sentinel and tokenize/resolve. pwd / $PWD are the agent's cwd = ROOT.
   local cmd="$1" verdict rc
-  # Gate: a CP-dir reconstruction names the dir (hooks/scripts/templates) or hides
-  # it behind a quote / backslash. A command with none of these cannot resolve to
-  # a CP dir, so skip the python spawn (this hook fires on every Bash command).
+  # Gate: a CP-dir reconstruction names the dir (hooks/scripts/templates), hides
+  # it behind a quote / backslash, or SPLITS it across an expansion — brace
+  # `${VAR:-..}` / `{a,b}` (both contain `{`), cmdsub `$(..)`, or backtick (round6
+  # C-3: h${X:-ooks}, {h,x}ooks, ho${EMPTY}oks). A command with NONE of these
+  # cannot reconstruct a CP dir, so skip the python spawn (this hook fires on
+  # every Bash command). Patterns with shell-special chars are single-quoted so
+  # the case does not parameter-expand or glob them.
   case "$cmd" in
-    *hooks*|*scripts*|*templates*|*\'*|*\"*|*\\*) : ;;
+    *hooks*|*scripts*|*templates*|*\'*|*\"*|*\\*|*'{'*|*'$('*|*'`'*) : ;;
     *) echo none; return ;;
   esac
 
@@ -286,23 +293,49 @@ for base in (root, root_real):
 # NB: backticks are written \x60 (hex) — a LITERAL ` inside this $(... <<'PY')
 # heredoc breaks the bash parser (it scans for a matching ` even in the quoted
 # heredoc body), so never put a raw backtick in this python block.
-_PWD = re.compile(r"\$\{PWD\}|\$PWD(?![A-Za-z0-9_])|\$\(\s*pwd\s*\)|\x60\s*pwd\s*\x60")
+# pwd / $PWD / ~+ all expand to the agent's cwd, fixed to ROOT (we never trust an
+# in-command `cd`). ~+ is bash's PWD tilde-prefix: it expands only at a word
+# boundary (start / whitespace / = / :), as ~+ or ~+/path (round5 tilde-plus).
+_PWD = re.compile(
+    r"\$\{PWD\}|\$PWD(?![A-Za-z0-9_])|\$\(\s*pwd\s*\)|\x60\s*pwd\s*\x60"
+    r"|(?<![^\s=:])~\+(?=/|\s|$)")
 # ${VAR:-LIT} / :=LIT / :+LIT / -LIT / +LIT : the expansion CAN be the STATIC
 # default LIT (the common case when VAR is unset), so a CP literal here is plainly
 # visible and must be RESOLVED, never erased to a sentinel (round4 F-5).
 _PARAM = re.compile(r"\$\{[A-Za-z_][A-Za-z0-9_]*:?[-=+]([^{}]*)\}")
+# ~- is bash's OLDPWD tilde-prefix — a runtime value we cannot statically resolve
+# (like $OLDPWD), so it becomes a sentinel and surfaces as ASK, never a missed
+# deny. ~ (HOME) is NOT the project root, so it is left literal (allow).
+_OLDPWD = re.compile(r"(?<![^\s=:])~-(?=/|\s|$)")
 _CMDSUB = re.compile(r"\$\([^()]*\)|\x60[^\x60]*\x60")
-_VAR = re.compile(r"\$\{[^}]*\}|\$[A-Za-z_][A-Za-z0-9_]*")
+# Alt 1/2: ${...} and $NAME (alphanumeric). Alt 3: bash BARE SPECIAL PARAMETERS
+# whose first char after $ is a digit or punctuation ($0-$9 $$ $? $# $! $- $* $@).
+# These never match \$[A-Za-z_], so without alt 3 a CP-adjacent form like
+# `$0/hooks` survived as a literal token and slipped to ALLOW (round7) — the
+# braced `${0}` already matched alt 1. All are runtime values -> sentinel -> ASK,
+# converging the augment on a uniform fail-safe (any unresolved expansion adjacent
+# to a CP dir component asks). Standalone (non-CP-adjacent) stays ALLOW.
+_VAR = re.compile(r"\$\{[^}]*\}|\$[A-Za-z_][A-Za-z0-9_]*|\$[-0-9*@#?$!]")
 # Substitute on the WHOLE command BEFORE shlex (so punctuation_chars does not
-# split a $(...) on its parens): pwd/$PWD -> ROOT, ${VAR:-LIT} -> LIT, every other
-# cmdsub/$VAR -> an opaque sentinel carrying no '/'. The loop collapses nested
-# $( $( ) ).
-cmd = _PWD.sub(root, cmd)
-cmd = _PARAM.sub(lambda m: m.group(1), cmd)
+# split a $(...) on its parens). FIRST resolve statically-visible expansions to a
+# FIXED POINT: pwd/$PWD/~+ -> ROOT and ${VAR:-LIT} -> LIT, looped so a nested
+# ${X:-${Y:-hooks}} unwraps every layer and a ~+ / $PWD exposed inside a default
+# is then resolved too (round5: nested param-default + tilde-plus). Each pass
+# strictly shrinks (param drops ${..} wrappers; pwd/~+ -> a fixed path with no
+# re-trigger), so the loop terminates.
+_prev = None
+while _prev != cmd:
+    _prev = cmd
+    cmd = _PWD.sub(root, cmd)
+    cmd = _PARAM.sub(lambda m: m.group(1), cmd)
+# Everything STILL unresolved is a runtime value -> opaque sentinel (carries no
+# '/'): every remaining cmdsub (loop collapses nested $( $( ) )), ~- (OLDPWD),
+# and $VAR / ${VAR}.
 _prev = None
 while _prev != cmd:
     _prev = cmd
     cmd = _CMDSUB.sub(SENT, cmd)
+cmd = _OLDPWD.sub(SENT, cmd)
 cmd = _VAR.sub(SENT, cmd)
 
 
@@ -324,7 +357,20 @@ def classify_one(w):
         return "no"
     if any(c in cp_dirs for c in ap.split(os.sep)):
         return "ask"
-    return "ask" if cp_re.search(w) else "no"
+    if cp_re.search(w):
+        return "ask"
+    # The unknown expansion MIGHT be empty (unset $VAR, ${X#..}/${X%..} with X
+    # unset, $(echo), ...): drop the sentinel(s), glue the surrounding literals,
+    # and re-test — ho${EMPTY}oks -> hooks, STAT$(echo)US.md -> STATUS.md, and
+    # ${X#zzz}hooks -> hooks (round6 C-3/C-4). Runtime value, so ASK (fail-safe;
+    # never a missed deny). we != w guard avoids re-testing a sentinel-free token.
+    we = w.replace(SENT, "")
+    if we and we != w:
+        ae = os.path.normpath(we if os.path.isabs(we) else os.path.join(root, we))
+        if cp_re.search(we) or ae in cp_targets \
+                or any(ae.startswith(t + os.sep) for t in cp_targets):
+            return "ask"
+    return "no"
 
 
 _ORDER = {"no": 0, "ask": 1, "deny": 2}

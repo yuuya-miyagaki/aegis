@@ -459,5 +459,250 @@ class TestParamDefaultAndBrace(unittest.TestCase):
         self.assertTrue(_allowed(out), f"non-CP brace subdir must allow: {out[:200]!r}")
 
 
+class TestTildeAndNestedParam(unittest.TestCase):
+    """round5 盲検 break-attempt: `~+`(=PWD=ROOT) と入れ子 param-default
+    ${X:-${Y:-hooks}}。どちらも静的に CP に解決するのに取りこぼしていた。
+    `~+` は ROOT 展開して deny、入れ子 param-default は _PARAM/_PWD 置換を
+    fixpoint ループ化して全層を解決。`~-`(=OLDPWD) は runtime 値依存のため
+    $OLDPWD と同じく sentinel→ASK、`~`(=HOME) は CP でない。"""
+
+    @classmethod
+    def setUpClass(cls):
+        cls._tmp = _scratch_root()
+        cls.root = Path(cls._tmp.name)
+
+    @classmethod
+    def tearDownClass(cls):
+        cls._tmp.cleanup()
+
+    def _asked(self, out):
+        return '"permissionDecision":"ask"' in out
+
+    # ---- tilde-plus (~+ = PWD = ROOT) → DENY ----
+    def test_tilde_plus_rm_denied(self):
+        out = _hook(self.root, "rm -rf ~+/hooks")
+        self.assertTrue(_denied(out), f"~+/hooks must deny: {out[:200]!r}")
+
+    def test_tilde_plus_cp_scripts_denied(self):
+        out = _hook(self.root, "cp evil ~+/scripts")
+        self.assertTrue(_denied(out), f"~+/scripts must deny: {out[:200]!r}")
+
+    def test_tilde_plus_redirect_denied(self):
+        out = _hook(self.root, "echo evil > ~+/hooks/lib/emit.sh")
+        self.assertTrue(_denied(out), f"~+ redirect must deny: {out[:200]!r}")
+
+    def test_tilde_plus_noncp_allowed(self):
+        out = _hook(self.root, "rm -rf ~+/build")
+        self.assertTrue(_allowed(out), f"~+/build (non-CP) must allow: {out[:200]!r}")
+
+    # ---- nested parameter-default → DENY (fixpoint resolution) ----
+    def test_nested_param_default_denied(self):
+        out = _hook(self.root, "rm -rf ${X:-${Y:-hooks}}")
+        self.assertTrue(_denied(out), f"nested ${{X:-${{Y:-hooks}}}} must deny: {out[:200]!r}")
+
+    def test_nested_param_default_suffix_denied(self):
+        out = _hook(self.root, "cp evil ${X:-${Y:-hooks}}/lib")
+        self.assertTrue(_denied(out), f"nested param suffix must deny: {out[:200]!r}")
+
+    def test_nested_param_tilde_inside_denied(self):
+        out = _hook(self.root, "rm -rf ${X:-~+}/hooks")
+        self.assertTrue(_denied(out), f"${{X:-~+}}/hooks must deny: {out[:200]!r}")
+
+    def test_nested_param_default_noncp_allowed(self):
+        out = _hook(self.root, "rm -rf ${X:-${Y:-/tmp/safe}}")
+        self.assertTrue(_allowed(out), f"nested non-CP default must allow: {out[:200]!r}")
+
+    # ---- tilde-minus (~- = OLDPWD, runtime-unknown) → ASK ----
+    def test_tilde_minus_oldpwd_ask(self):
+        out = _hook(self.root, "rm -rf ~-/hooks")
+        self.assertTrue(self._asked(out), f"~-/hooks (OLDPWD) must ask: {out[:200]!r}")
+
+    # ---- tilde-home (~ = HOME, not the project CP) → ALLOW ----
+    def test_tilde_home_noncp_allowed(self):
+        out = _hook(self.root, "rm -rf ~/hooks")
+        self.assertTrue(_allowed(out), f"~/hooks (HOME) is not project CP: {out[:200]!r}")
+
+
+class TestExpansionSplitAndBareClaude(unittest.TestCase):
+    """round6 盲検 break-attempt: augment GATE が「リテラル hooks|scripts|templates
+    部分文字列」を要求するため、展開で CP 名を分割すると python リゾルバに到達せず
+    即 ALLOW になっていた（systemic な GATE 弱点）。また `.claude` の境界正規表現が
+    末尾（文字列末）を取りこぼし `rm -rf .claude` が allow だった。
+    - 静的に解決する分割（h${X:-ooks} / {h,x}ooks）→ DENY
+    - runtime 値依存の接着（ho${EMPTY}oks / ${X#zzz}hooks）→ ASK（fail-safe）
+    - `.claude` 末尾 → DENY、read は ALLOW 維持。"""
+
+    @classmethod
+    def setUpClass(cls):
+        cls._tmp = _scratch_root()
+        cls.root = Path(cls._tmp.name)
+
+    @classmethod
+    def tearDownClass(cls):
+        cls._tmp.cleanup()
+
+    def _asked(self, out):
+        return '"permissionDecision":"ask"' in out
+
+    # ---- C-2: bare `.claude` at end-of-command → DENY ----
+    def test_bare_claude_rm_denied(self):
+        out = _hook(self.root, "rm -rf .claude")
+        self.assertTrue(_denied(out), f"rm -rf .claude must deny: {out[:200]!r}")
+
+    def test_bare_claude_cp_denied(self):
+        out = _hook(self.root, "cp evil .claude")
+        self.assertTrue(_denied(out), f"cp evil .claude must deny: {out[:200]!r}")
+
+    def test_bare_claude_read_allowed(self):
+        out = _hook(self.root, "ls .claude")
+        self.assertTrue(_allowed(out), f"ls .claude (read) must allow: {out[:200]!r}")
+
+    def test_claude_slash_still_denied(self):
+        out = _hook(self.root, "rm -rf .claude/")
+        self.assertTrue(_denied(out), f".claude/ regression must deny: {out[:200]!r}")
+
+    # ---- C-3 static: expansion-split CP name resolves → DENY ----
+    def test_param_split_prefix_denied(self):
+        out = _hook(self.root, "rm -rf h${X:-ooks}")
+        self.assertTrue(_denied(out), f"h${{X:-ooks}} must deny: {out[:200]!r}")
+
+    def test_param_split_suffix_denied(self):
+        out = _hook(self.root, "rm -rf hoo${X:-ks}")
+        self.assertTrue(_denied(out), f"hoo${{X:-ks}} must deny: {out[:200]!r}")
+
+    def test_brace_split_denied(self):
+        out = _hook(self.root, "rm -rf {h,x}ooks")
+        self.assertTrue(_denied(out), f"{{h,x}}ooks must deny: {out[:200]!r}")
+
+    # ---- C-3 empty-glue: unknown expansion MIGHT be empty → ASK ----
+    def test_empty_var_glue_ask(self):
+        out = _hook(self.root, "rm -rf ho${EMPTY}oks")
+        self.assertTrue(self._asked(out), f"ho${{EMPTY}}oks must ask: {out[:200]!r}")
+
+    def test_empty_var_prefix_glue_ask(self):
+        out = _hook(self.root, "rm -rf ${E}hooks")
+        self.assertTrue(self._asked(out), f"${{E}}hooks must ask: {out[:200]!r}")
+
+    def test_status_md_cmdsub_glue_ask(self):
+        out = _hook(self.root, "cp evil STAT$(echo)US.md")
+        self.assertTrue(self._asked(out), f"STAT$(echo)US.md must ask: {out[:200]!r}")
+
+    # ---- C-4 strip/pattern-sub glued to literal → ASK (X may be unset) ----
+    def test_strip_prefix_glue_ask(self):
+        out = _hook(self.root, "rm -rf ${X#zzz}hooks")
+        self.assertTrue(self._asked(out), f"${{X#zzz}}hooks must ask: {out[:200]!r}")
+
+    def test_strip_suffix_glue_ask(self):
+        out = _hook(self.root, "rm -rf ${X%zzz}hooks")
+        self.assertTrue(self._asked(out), f"${{X%zzz}}hooks must ask: {out[:200]!r}")
+
+    def test_patsub_glue_ask(self):
+        out = _hook(self.root, "rm -rf ${X//y/z}hooks")
+        self.assertTrue(self._asked(out), f"${{X//y/z}}hooks must ask: {out[:200]!r}")
+
+    # ---- regression: non-CP expansion-split must ALLOW (no false positive) ----
+    def test_noncp_param_split_allowed(self):
+        out = _hook(self.root, "rm -rf h${X:-ome}/cache")
+        self.assertTrue(_allowed(out), f"home/cache (non-CP) must allow: {out[:200]!r}")
+
+    def test_noncp_brace_split_allowed(self):
+        out = _hook(self.root, "rm -rf {a,b}ooks")
+        self.assertTrue(_allowed(out), f"aooks/books (non-CP) must allow: {out[:200]!r}")
+
+    def test_noncp_empty_glue_allowed(self):
+        out = _hook(self.root, "rm -rf build${X}")
+        self.assertTrue(_allowed(out), f"build (non-CP) must allow: {out[:200]!r}")
+
+    def test_echo_var_allowed(self):
+        out = _hook(self.root, "echo $HOME")
+        self.assertTrue(_allowed(out), f"echo $HOME must allow: {out[:200]!r}")
+
+
+class TestBareSpecialParams(unittest.TestCase):
+    """round7 盲検 break-attempt: bare special-parameter（$0-$9 / $$ $? $# $! $- $* $@）が
+    augment の _VAR（`\\$[A-Za-z_]…`）にマッチせず sentinel 化されないため、`$0/hooks` 等が
+    ALLOW に漏れていた（波括弧版 `${0}/hooks` は `\\$\\{…\\}` が拾い正しく ASK）。実害ある
+    書込み（ROOT/hooks への解決）は再現できないが、augment の fail-safe 設計 invariant
+    『静的に解決できない展開が CP 隣接なら ASK』に対する fail-open かつ波括弧版との不整合。
+    bare special-param も sentinel→ASK に揃え、未解決展開を一律 ASK に収束させる。
+    standalone（CP 非隣接）は誤検知ゼロで ALLOW を維持。"""
+
+    @classmethod
+    def setUpClass(cls):
+        cls._tmp = _scratch_root()
+        cls.root = Path(cls._tmp.name)
+
+    @classmethod
+    def tearDownClass(cls):
+        cls._tmp.cleanup()
+
+    def _asked(self, out):
+        return '"permissionDecision":"ask"' in out
+
+    # ---- bare special-param adjacent to a CP dir → ASK (fail-safe) ----
+    def test_dollar0_hooks_ask(self):
+        out = _hook(self.root, "rm -rf $0/hooks")
+        self.assertTrue(self._asked(out), f"$0/hooks must ask: {out[:200]!r}")
+
+    def test_dollar_pid_hooks_ask(self):
+        out = _hook(self.root, "rm -rf $$/hooks")
+        self.assertTrue(self._asked(out), f"$$/hooks must ask: {out[:200]!r}")
+
+    def test_dollar_q_scripts_ask(self):
+        out = _hook(self.root, "cp evil $?/scripts/x")
+        self.assertTrue(self._asked(out), f"$?/scripts must ask: {out[:200]!r}")
+
+    def test_dollar_argc_hooks_ask(self):
+        out = _hook(self.root, "rm -rf $#/hooks")
+        self.assertTrue(self._asked(out), f"$#/hooks must ask: {out[:200]!r}")
+
+    def test_dollar_bang_hooks_ask(self):
+        out = _hook(self.root, "rm -rf $!/hooks")
+        self.assertTrue(self._asked(out), f"$!/hooks must ask: {out[:200]!r}")
+
+    def test_dollar_dash_hooks_ask(self):
+        out = _hook(self.root, "rm -rf $-/hooks")
+        self.assertTrue(self._asked(out), f"$-/hooks must ask: {out[:200]!r}")
+
+    def test_dollar_star_hooks_ask(self):
+        out = _hook(self.root, "rm -rf $*/hooks")
+        self.assertTrue(self._asked(out), f"$*/hooks must ask: {out[:200]!r}")
+
+    def test_dollar_at_hooks_ask(self):
+        out = _hook(self.root, "rm -rf $@/hooks")
+        self.assertTrue(self._asked(out), f"$@/hooks must ask: {out[:200]!r}")
+
+    def test_dollar_digit_templates_ask(self):
+        out = _hook(self.root, "rm -rf $1/templates")
+        self.assertTrue(self._asked(out), f"$1/templates must ask: {out[:200]!r}")
+
+    # ---- redirect target built from a special-param → ASK ----
+    def test_special_redirect_target_ask(self):
+        out = _hook(self.root, "echo evil > $0/hooks/lib/emit.sh")
+        self.assertTrue(self._asked(out), f"$0 redirect target must ask: {out[:200]!r}")
+
+    # ---- braced form regression: still ASK ----
+    def test_braced_zero_hooks_ask(self):
+        out = _hook(self.root, "rm -rf ${0}/hooks")
+        self.assertTrue(self._asked(out), f"${{0}}/hooks must ask: {out[:200]!r}")
+
+    # ---- no false positive: special-param NOT adjacent to CP → ALLOW ----
+    def test_standalone_special_allowed(self):
+        out = _hook(self.root, "echo $$")
+        self.assertTrue(_allowed(out), f"echo $$ must allow: {out[:200]!r}")
+
+    def test_special_noncp_path_allowed(self):
+        out = _hook(self.root, "rm -rf $0/build")
+        self.assertTrue(_allowed(out), f"$0/build (non-CP) must allow: {out[:200]!r}")
+
+    def test_special_arg_allowed(self):
+        out = _hook(self.root, "cp $1 /tmp/dest")
+        self.assertTrue(_allowed(out), f"cp $1 /tmp/dest must allow: {out[:200]!r}")
+
+    def test_awk_field_var_allowed(self):
+        out = _hook(self.root, "awk '{print $2}' notes.txt")
+        self.assertTrue(_allowed(out), f"awk field $2 must not false-positive: {out[:200]!r}")
+
+
 if __name__ == "__main__":
     unittest.main()
