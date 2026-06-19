@@ -396,5 +396,68 @@ class TestCmdsubAndVar(unittest.TestCase):
         self.assertTrue(_allowed(out), f"echo $(date) must allow: {out[:200]!r}")
 
 
+class TestParamDefaultAndBrace(unittest.TestCase):
+    """F-5/F-6（iter32 review round4 break-attempt）: パラメータ展開デフォルト
+    ${VAR:-hooks}（VAR 未設定時に静的リテラル hooks に展開）と brace 展開
+    {hooks,build}。どちらも静的に見える CP 名を sentinel が潰していた。静的部を
+    解決して deny する。"""
+
+    @classmethod
+    def setUpClass(cls):
+        cls._tmp = _scratch_root()
+        cls.root = Path(cls._tmp.name)
+
+    @classmethod
+    def tearDownClass(cls):
+        cls._tmp.cleanup()
+
+    # ---- parameter-expansion default to a CP literal → DENY ----
+    def test_param_default_dash_denied(self):
+        out = _hook(self.root, "rm -rf ${X:-hooks}")
+        self.assertTrue(_denied(out), f"${{X:-hooks}} must deny: {out[:200]!r}")
+
+    def test_param_default_assign_denied(self):
+        out = _hook(self.root, "rm -rf ${X:=scripts}")
+        self.assertTrue(_denied(out), f"${{X:=scripts}} must deny: {out[:200]!r}")
+
+    def test_param_default_plus_denied(self):
+        out = _hook(self.root, "rm -rf ${X:+templates}")
+        self.assertTrue(_denied(out), f"${{X:+templates}} must deny: {out[:200]!r}")
+
+    def test_param_default_quoted_denied(self):
+        out = _hook(self.root, 'rm -rf "${X:-hooks}"')
+        self.assertTrue(_denied(out), f'"${{X:-hooks}}" must deny: {out[:200]!r}')
+
+    def test_param_default_suffix_denied(self):
+        out = _hook(self.root, "cp evil ${X:-hooks}/lib")
+        self.assertTrue(_denied(out), f"${{X:-hooks}}/lib must deny: {out[:200]!r}")
+
+    # ---- brace expansion including a CP dir → DENY ----
+    def test_brace_hooks_denied(self):
+        out = _hook(self.root, "rm -rf {hooks,build}")
+        self.assertTrue(_denied(out), f"{{hooks,build}} must deny: {out[:200]!r}")
+
+    def test_brace_scripts_denied(self):
+        out = _hook(self.root, "rm -rf {dist,scripts}")
+        self.assertTrue(_denied(out), f"{{dist,scripts}} must deny: {out[:200]!r}")
+
+    # ---- regression: non-CP default / brace → ALLOW ----
+    def test_param_default_noncp_allowed(self):
+        out = _hook(self.root, "rm -rf ${X:-/tmp/safe}")
+        self.assertTrue(_allowed(out), f"non-CP default must allow: {out[:200]!r}")
+
+    def test_param_use_only_allowed(self):
+        out = _hook(self.root, "echo ${PATH}")
+        self.assertTrue(_allowed(out), f"plain ${{PATH}} must allow: {out[:200]!r}")
+
+    def test_brace_noncp_allowed(self):
+        out = _hook(self.root, "rm -rf {a,b}")
+        self.assertTrue(_allowed(out), f"non-CP brace must allow: {out[:200]!r}")
+
+    def test_brace_subdir_allowed(self):
+        out = _hook(self.root, "cp x {src,dist}/file")
+        self.assertTrue(_allowed(out), f"non-CP brace subdir must allow: {out[:200]!r}")
+
+
 if __name__ == "__main__":
     unittest.main()

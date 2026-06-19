@@ -283,13 +283,22 @@ for base in (root, root_real):
         for d in cp_dirs:
             cp_targets.add(os.path.normpath(os.path.join(base, d)))
 
+# NB: backticks are written \x60 (hex) — a LITERAL ` inside this $(... <<'PY')
+# heredoc breaks the bash parser (it scans for a matching ` even in the quoted
+# heredoc body), so never put a raw backtick in this python block.
 _PWD = re.compile(r"\$\{PWD\}|\$PWD(?![A-Za-z0-9_])|\$\(\s*pwd\s*\)|\x60\s*pwd\s*\x60")
+# ${VAR:-LIT} / :=LIT / :+LIT / -LIT / +LIT : the expansion CAN be the STATIC
+# default LIT (the common case when VAR is unset), so a CP literal here is plainly
+# visible and must be RESOLVED, never erased to a sentinel (round4 F-5).
+_PARAM = re.compile(r"\$\{[A-Za-z_][A-Za-z0-9_]*:?[-=+]([^{}]*)\}")
 _CMDSUB = re.compile(r"\$\([^()]*\)|\x60[^\x60]*\x60")
 _VAR = re.compile(r"\$\{[^}]*\}|\$[A-Za-z_][A-Za-z0-9_]*")
 # Substitute on the WHOLE command BEFORE shlex (so punctuation_chars does not
-# split a $(...) on its parens): pwd/$PWD -> ROOT, every other cmdsub/$VAR -> an
-# opaque sentinel carrying no '/'. The loop collapses nested $( $( ) ).
+# split a $(...) on its parens): pwd/$PWD -> ROOT, ${VAR:-LIT} -> LIT, every other
+# cmdsub/$VAR -> an opaque sentinel carrying no '/'. The loop collapses nested
+# $( $( ) ).
 cmd = _PWD.sub(root, cmd)
+cmd = _PARAM.sub(lambda m: m.group(1), cmd)
 _prev = None
 while _prev != cmd:
     _prev = cmd
@@ -297,9 +306,11 @@ while _prev != cmd:
 cmd = _VAR.sub(SENT, cmd)
 
 
-def classify(w):
-    # deny: w resolves to a real CP path. ask: an opaque sentinel prefixes a CP
-    # dir component (could be cwd/root). no: neither.
+def classify_one(w):
+    # deny: w resolves to a real CP path. ask: an opaque sentinel (an unresolved
+    # cmdsub/$VAR) prefixes a surviving CP dir component (could be cwd/root). no:
+    # neither. A pre-existing literal \x01 in the input collapses to ask (the
+    # `unknown` branch) — fail-safe (over-eager ask, never a missed deny).
     if "\x00" in w:
         return "no"
     unknown = SENT in w
@@ -314,6 +325,31 @@ def classify(w):
     if any(c in cp_dirs for c in ap.split(os.sep)):
         return "ask"
     return "ask" if cp_re.search(w) else "no"
+
+
+_ORDER = {"no": 0, "ask": 1, "deny": 2}
+
+
+def classify(w):
+    # Brace expansion: a single flat {a,b,c} group is the shell's alternatives, so
+    # classify each and take the worst (rm -rf {hooks,build} touches hooks). A
+    # nested / multi-group brace is rare — fall back to: if a CP dir name appears
+    # as a brace/path token, ask (conservative).
+    m = re.match(r"^([^{}]*)\{([^{}]+)\}([^{}]*)$", w)
+    if m and "," in m.group(2):
+        cands = [m.group(1) + opt + m.group(3) for opt in m.group(2).split(",")]
+    elif "{" in w or "}" in w:
+        cands = [w]
+        if any(re.search(r"(^|[{,/])" + re.escape(d) + r"([},/]|$)", w) for d in cp_dirs):
+            return "ask"
+    else:
+        cands = [w]
+    best = "no"
+    for c in cands:
+        v = classify_one(c)
+        if _ORDER[v] > _ORDER[best]:
+            best = v
+    return best
 
 
 try:

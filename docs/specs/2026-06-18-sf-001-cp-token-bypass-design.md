@@ -118,3 +118,15 @@ round3 の盲検 break-attempt が **F-4: cmdsub 経由 bare-dir**（`rm -rf $(p
 **真の残余（accepted）**: `$(echo hooks)/lib` ＝ CP ディレクトリ名が**不透明な cmdsub の中に消える**形。静的に名前を復元できず（cmdsub を実行しない限り）、かつ「accidental 書込み防止」という moat の脅威モデル外の**意図的難読化**（どの静的 moat も同じ／敵対エージェントは無限に回避路を持つ）。`docs/security-followups.md` SF-003 に記録。
 
 検証: 全再構成機構の網羅的敵対行列（BLOCK 24＝quote/backslash/ANSI-C/bare/abs/normalize/$PWD/$(pwd)/`pwd`/unknown-ask/$VAR-ask/write-utils/redirect 変種、ALLOW 15＝reads/non-CP/messages/cmdsub-source/residual/~ ）を実走で ALL OK（誤検知ゼロ）。
+
+### 追加改訂（review round4・F-5 param-default ＋ F-6 brace）
+
+round4 の盲検 break-attempt が **F-5: パラメータ展開デフォルト**（`rm -rf ${X:-hooks}`＝X 未設定時に静的リテラル `hooks` へ展開）を検出。`hooks` はコマンドに**静的に見えている**のに `_VAR` sentinel が `${X:-hooks}` 全体を潰して取りこぼしていた（SF-003 残余＝名前が動的 cmdsub に消える、より悪い）。ユーザー合意で **静的リテラルを露出する展開形を包括的に閉じる**:
+
+- **param-default**: shlex 前に `${VAR:-LIT}`/`:=`/`:+`/`-`/`+` の **LIT（静的デフォルト）を解決**（sentinel 化しない）。`${X:-hooks}`→`hooks`→deny。`${X:-/tmp/safe}`→none。pwd 展開の後・cmdsub/var sentinel の前に適用。VAR が CP に set される稀形は外部変数残余（既存 `cmd_var_built_write` 領域）。
+- **F-6 brace 展開**: classify を `classify_one`＋brace ラッパに分割。単一 flat `{a,b,c}` を**シェルの alternatives として展開**し各候補を classify して worst を取る（`rm -rf {hooks,build}`→deny／`{a,b}`→none）。nested/multi-brace は保守的に「CP 名が brace/path token に出れば ask」。
+- 保守性 minor 3 件反映: `\x60`（backtick hex）の理由を**インラインコメント**化／sentinel `\x01` 衝突＝over-eager ask（fail-safe）を明記／python 真の不在＝none（framework hard 依存）を `command -v` コメントに明記。
+
+検証: 拡張敵対行列（BLOCK 17＝param-default 5・brace 3・nested cmdsub・`${PWD}`・全前クラス、ALLOW 14＝non-CP default/brace・reads・messages・cmdsub-source・residual・~）を実走で **ALL OK**（誤検知ゼロ）。CP テスト 163 件・REDTEAM 18/18+5/5。
+
+**収束の論拠**: 静的リテラルを露出する再構成形（quoting/escaping/ANSI-C/param-default/brace）は有界で全て閉じた。残るは **runtime 値依存**（cmdsub 出力・外部 $VAR 値・`$(echo hooks)/lib`＝SF-003／glob=SF-002）＝既に ask/sentinel/residual で処理済み。任意の静的 moat が持つ本質的限界で、敵対エージェントは無限に回避路を持つ（moat はサンドボックスではない）。
