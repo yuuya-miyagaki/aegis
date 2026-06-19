@@ -130,3 +130,40 @@ round4 の盲検 break-attempt が **F-5: パラメータ展開デフォルト**
 検証: 拡張敵対行列（BLOCK 17＝param-default 5・brace 3・nested cmdsub・`${PWD}`・全前クラス、ALLOW 14＝non-CP default/brace・reads・messages・cmdsub-source・residual・~）を実走で **ALL OK**（誤検知ゼロ）。CP テスト 163 件・REDTEAM 18/18+5/5。
 
 **収束の論拠**: 静的リテラルを露出する再構成形（quoting/escaping/ANSI-C/param-default/brace）は有界で全て閉じた。残るは **runtime 値依存**（cmdsub 出力・外部 $VAR 値・`$(echo hooks)/lib`＝SF-003／glob=SF-002）＝既に ask/sentinel/residual で処理済み。任意の静的 moat が持つ本質的限界で、敵対エージェントは無限に回避路を持つ（moat はサンドボックスではない）。
+
+---
+
+## 継続メモ（次セッション resume・/clear 後に最初に読む）
+
+> iteration 32 / phase=review の継続。ユーザー判断 = **obscure な静的バイパス形も徹底的に閉じる**（コンテキスト肥大のため /clear or コンパクション後に再開）。現在 HEAD=`1644cd3`・作業ツリー clean・未 push。
+
+### 現状サマリ
+- SF-001（control-plane フックがシェル再構成 CP 書込みを取りこぼす）を path-resolution で修正中。盲検 break-attempt 5 ラウンドで F-1〜F-6 を検出→全閉鎖（commits 9c7624f/ec7587e/e0d21d8/ac0ecac/1644cd3）。
+- 保守性 2 次レビュー(round5)=approve_with_notes（構造健全・minor のみ・反映済 or 任意）。
+- 版 1.12.0（4 箇所: scripts/check_framework_contract.py / templates/STATUS.template.md / examples/minimal-project/docs/STATUS.md / docs/STATUS.md）。
+
+### 今 OPEN（round5 で発見・最優先で閉じる）
+1. **tilde-plus**: `rm -rf ~+/hooks` → ALLOW。bash で `~+`=PWD。修正: `~+`(末尾 `/` or 単独)→ROOT を `_PWD` 正規表現に追加（`~-`=OLDPWD は unknown→sentinel/ask、`~`=HOME は CP でない）。
+2. **入れ子 param-default**: `${X:-${Y:-hooks}}` → ALLOW。`_PARAM.sub` が単一 pass で入れ子を解決しきれない。修正: `_PARAM` 置換を `_CMDSUB` と同様に fixpoint ループ化（while prev != cmd）。
+
+### 次に確認すべき obscure 候補（round6 を先回り）
+- indirect `${!ref}`／`$OLDPWD`・`~-`／`${X#pat}`・`${X%pat}`・`${X/a/b}`（VAR 値依存→sentinel/ask で良いはず・要実走確認）。
+- multi-group brace `{a,b}{hooks,c}` は現状 over-ASK（fail-safe・展開は ahooks/bhooks で実は非CP）＝精緻化は低優先。
+- process substitution `<(...)`/`>(...)`、`exec`/`eval`/`xargs` 経由、ANSI-C × param/brace 組合せ。
+- `${X:?hooks}`=正しく allow（X 未設定でエラー・書込まない）。glob `hooks*`=SF-002。
+
+### 作業手順（各 obscure 形ごと）
+TDD: tests/test_control_plane_token_split.py に RED テスト追加→fix（augment は `cmd_token_verdict`・置換順序 `_PWD`→`_PARAM`→`_CMDSUB`ループ→`_VAR`・`classify_one`+`classify`(brace)）→GREEN→敵対行列→REDTEAM→mirror→full suite→盲検レビュー再ディスパッチ。静的リテラル露出形は**解決**、runtime 値依存は **sentinel→ask**、CP リテラル cmdsub は上流 raw 分岐が deny。
+
+### 検証コマンド
+- 対象: `python3 -m pytest tests/test_control_plane_token_split.py tests/test_control_plane_allowlist.py tests/test_control_plane_var_expansion.py tests/test_destructive_recursive.py "tests/test_check_status.py::TestControlPlaneRealisticInput" -q`
+- REDTEAM: `bash tests/poc/v162-redteam-rerun.sh; bash tests/poc/v163-redteam.sh`（18/18+5/5）
+- mirror: `make example && python3 scripts/check_reference_drift.py`／contract: `python3 scripts/check_framework_contract.py`／status: `python3 scripts/check_status.py --root .`
+- full suite: `python3 -m pytest tests/ -q`（~3min・baseline 892 passed/1 skip・bg 実行推奨）
+- 敵対行列: temp root に task_type=feature の docs/STATUS.md＋hook＋lib(extract-input/emit/safety/frontmatter) symlink を置き JSON stdin で実走する python ハーネス（既存パターン）。
+
+### ツール gotcha（重要）
+Bash ツールの**コマンド文字列**に `${...}`・`~+`・`:-`・brace `{...}` 等を含めると、ツール側パースエラー（"undefined is not an object (evaluating 'H.replace')"）で呼び出しが中断することがある。回避: そうしたコマンド/テストは **python ハーネス FILE**（Write→`python3 /tmp/x.py`）に入れる。git commit は **`git commit -F <msgfile>`**（メッセージは Write で作成）。reviewer サブエージェントにも同 gotcha を伝える。
+
+### gates/phase
+phase=review。brainstorm+plan=approved、review/qa/security/deploy=pending。obscure 形を閉じ切ったら盲検 break-attempt が新形を出さなくなるのを確認→review gate 承認→qa→security（盲検2次必須）→deploy→ship→docs。push は明示承認まで禁止。failure_tracking は review 通過時に null へ。

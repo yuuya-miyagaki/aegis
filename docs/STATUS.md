@@ -9,7 +9,7 @@ task_size: L
 task_size_rationale: "確定（plan 移行時）: iteration 32 = SF-001（control-plane フックの quote/escape/bare-dir トークン分割バイパス・Critical pre-existing）を Augment で閉じる。改修面: hooks/check-control-plane.sh（token-aware チェック inline 追加）＋mirror examples/minimal-project/hooks/check-control-plane.sh 同期＋TDD テスト群＋framework 版 bump（contract 定数/template STATUS/example STATUS/本体）＋security-followups.md SF-001 CLOSED 化＝6+ ファイル＝L（全ゲート: review+qa+security+deploy）。セキュリティ境界＝security 盲検2次必須。設計: docs/specs/2026-06-18-sf-001-cp-token-bypass-design.md。"
 iteration: 32
 ui_surface: false
-last_updated: "2026-06-18T07:00:00Z"
+last_updated: "2026-06-20T00:00:00Z"
 gate_approvals:
   client_ready_for_dev: n/a
   brainstorm: approved
@@ -42,7 +42,7 @@ external_evidence:
     scope: "v0.12.2 実装後 4 ラウンドレビュー"
     findings: "Round 6 (P1×2, P2×1: pre-compact exit 2 / minimal-project / test rc), Round 7 (P1×1, P3×1: git add 漏れ / テスト件数表記), Round 8 (P2×1, P3×1: stale last_updated / grep 自己マッチ), Round 9 (P3×2: コメント不整合)"
     resolution: "9件全反映。tier 1/2 PASS、134 tests PASS、本体と minimal-project 完全同期確認済み。"
-next_action: "**iteration 32 / phase=review: SF-001 control-plane moat の path-resolution 修正。** 盲検 break-attempt 4 ラウンドで F-1（abs bare-dir）/F-2（ANSI-C `$'...'`）/F-3（正規化 `.//hooks`・`$PWD`）/F-4（cmdsub `$(pwd)/hooks`=deny・`$(date)/hooks`=ask）/F-5（param-default `${X:-hooks}`）/F-6（brace `{hooks,build}`）を順次検出→全て修正。最終設計＝augment を **path-resolution 単一検出器**化: shlex 前に pwd/$PWD/$(pwd)→ROOT 展開・`${VAR:-LIT}` の静的 LIT 解決・未知 cmdsub/$VAR は sentinel 化、classify で brace alternatives 展開＋normpath＋実 CP 絶対パス比較（3-verdict deny/ask/none）。main flow 優先順位＝literal-CP(deny)>var-built(ask)>augment(deny/ask)>allow。**唯一の残余＝`$(echo hooks)/lib`（CP 名が不透明 cmdsub に消える・runtime 値依存）＝SF-003 accepted residual**（静的 moat 共通限界・glob=SF-002）。**収束論拠: 静的リテラル露出形は有界で全閉鎖、残るは runtime 値依存のみ。** 検証: 拡張敵対行列 BLOCK17/ALLOW14 ALL OK・REDTEAM 18/18+5/5・CP 163 件・drift/mirror/contract。保守性2次=approve_with_notes(minor3 反映済)。**次: full suite green→commit→盲検レビュー round5→review gate→qa→security（盲検2次必須）→deploy→ship→docs。** commits: 9c7624f/ec7587e/e0d21d8/ac0ecac＋本修正。版 1.12.0。push は明示承認まで禁止。"
+next_action: "**【/clear 後はまず `docs/specs/2026-06-18-sf-001-cp-token-bypass-design.md` の『継続メモ』を読む】** iteration 32 / phase=review: SF-001 control-plane moat の path-resolution 修正。盲検 break-attempt 5 ラウンドで F-1〜F-6 を検出→全閉鎖（HEAD=1644cd3・作業ツリー clean・未 push・版 1.12.0）。**ユーザー判断＝obscure な静的バイパス形も徹底的に閉じる**（コンテキスト肥大のため /clear 後に再開）。**今 OPEN（最優先で閉じる）: ①`rm -rf ~+/hooks`（~+=PWD・_PWD 正規表現に ~+ 追加）②`rm -rf ${X:-${Y:-hooks}}`（入れ子 param-default・_PARAM 置換を fixpoint ループ化）。** 次の obscure 候補（`${!ref}`/`$OLDPWD`/`~-`/process-sub 等）も実走確認。手順・検証コマンド・**ツール gotcha（Bash コマンド文字列に ${...}/~+/brace を含めると H.replace エラー→python ハーネス FILE と git commit -F で回避）**・key files・gates は継続メモに記載。閉じ切ったら盲検 break-attempt が新形を出さないのを確認→review gate→qa→security（盲検2次必須）→deploy→ship→docs。commits: 9c7624f/ec7587e/e0d21d8/ac0ecac/1644cd3。push は明示承認まで禁止。failure_tracking は review 通過時 null。"
 blockers: []
 failure_tracking:
   goal: "SF-001 control-plane moat の修正を review 通過させる（シェル再構成 CP 書込みを網羅捕捉）"
