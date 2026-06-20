@@ -139,6 +139,12 @@ qa ゲート承認の前に実施する。承認時にハーネス（`pre_approv
 ```
 
 理由はユーザーが見る証拠に残る。安易なスキップは避け、コードがあるなら必ずドリルする。
+ただし **framework 自体の改修などコードを per-task でコミット済みのタスク**は、qa 承認時の
+working-tree diff（`git diff HEAD`）が空＝mutant を置く追加行が無く skip になるのは
+*想定どおりの縁ケース（欠陥ではない・撤去しない）*。この場合は skip 理由に**手動 mutation
+同等の代替実証**（RED-first TDD・対象テストへの一時変異→赤化確認・canonical fixture
+パリティ等）を明記する。ドリルの本来のターゲット＝*未コミットのプロダクトコード*では従来
+どおり機能する。
 スキップ時もハーネスがレポートを生成するので、`current_refs.qa` を
 `docs/qa-reports/test-strength.md` にすること（さもないと完了時に証拠不足で弾かれる）。
 
