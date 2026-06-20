@@ -128,6 +128,23 @@ class TestAppendEvidence(unittest.TestCase):
         run_append(self.root, "fail", payload_for("b"))
         self.assertEqual([r["cmd"] for r in self.read_lines()], ["a", "b"])
 
+    def test_non_runner_cmd_skips_fingerprint(self):
+        """M4: 非ランナーは fp 番兵 'skipped' + marker_verified false の安価記録。
+        cmd/payload_sha は維持（cheap・監査値）。reader は非ランナーを無視し、
+        非 hex 番兵は構造的に緑にならない。"""
+        run_append(self.root, "ok", payload_for("ls -la"))
+        d = self.read_lines()[0]
+        self.assertEqual(d["fp"], "skipped")
+        self.assertEqual(d["marker_verified"], False)
+        self.assertEqual(d["cmd"], "ls -la")
+        self.assertRegex(d["payload_sha"], r"^[0-9a-f]{64}$")
+
+    def test_runner_cmd_still_fingerprints(self):
+        """M4: ランナーはフル記録（64-hex fp）を維持＝reader の fp-binding が機能。"""
+        run_append(self.root, "ok", payload_for("pytest tests/"))
+        d = self.read_lines()[0]
+        self.assertRegex(d["fp"], r"^[0-9a-f]{64}$")
+
 
 class TestRotate(unittest.TestCase):
     def setUp(self):

@@ -10,6 +10,9 @@
 #   {"v":1,"ts":"<utc>","src":"observed","cmd":"<first 500 chars>",
 #    "status":"ok|fail","payload_sha":"<sha256 of first 64KB of raw hook
 #    stdin>","fp":"<fingerprint.sh token>"}
+#   For NON-test-runner commands (M4) fp is the literal "skipped" and
+#   marker_verified is false — the reader ignores those entries, so the heavy
+#   fingerprint/marker computation is skipped on the hot path.
 # record-test-result.py appends the same schema with src:"manual".
 #
 # Source: source "$(dirname "$0")/lib/evidence.sh"
@@ -234,9 +237,22 @@ append_evidence() {
   cmd="$(extract_command "$input" 2>/dev/null)" || cmd=""
   cmd="${cmd:0:500}"
   payload_sha="$(printf '%s' "${input:0:65536}" | _fp_sha256 2>/dev/null)" || payload_sha=""
-  fp="$(fingerprint_worktree "$root" 2>/dev/null)" || fp="error"
   ts="$(date -u +%Y-%m-%dT%H:%M:%SZ 2>/dev/null)" || ts=""
-  marker_verified="$(_check_test_marker "$input" 2>/dev/null)" || marker_verified="false"
+  # M4 hot-path cost control: the fingerprint (git subprocesses + file reads)
+  # and the marker check (python3 + greps) are ONLY consumed for test-runner
+  # entries — build-judge-card.read_test_result ignores every other entry.
+  # Compute them only when the command is a test runner (classified on the
+  # truncated, to-be-stored cmd so the decision matches the reader's input
+  # exactly); otherwise record a cheap entry with a non-hex fp sentinel that
+  # can never certify green. A misclassification only fails closed (sentinel
+  # fp != current fp -> 🟡 unverified), never silent-green.
+  if [ "$(is_test_runner_cmd "$cmd")" = "true" ]; then
+    fp="$(fingerprint_worktree "$root" 2>/dev/null)" || fp="error"
+    marker_verified="$(_check_test_marker "$input" 2>/dev/null)" || marker_verified="false"
+  else
+    fp="skipped"
+    marker_verified="false"
+  fi
   printf '{"v":1,"ts":"%s","src":"observed","cmd":"%s","status":"%s","payload_sha":"%s","fp":"%s","marker_verified":%s}\n' \
     "$ts" "$(_aegis_json_escape "$cmd")" "$status" "$payload_sha" "$fp" "$marker_verified" \
     >> "$log" 2>/dev/null || true
