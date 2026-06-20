@@ -207,6 +207,14 @@ class TestObserveToJudgeEndToEnd(unittest.TestCase):
         (self.root / "app.py").write_text("print(1)\n", encoding="utf-8")
         self.assertEqual(judge.read_test_result(self.root), "unverified")
 
+    def test_non_runner_observation_does_not_certify(self):
+        """M4 不変条件: 非ランナーコマンドの観測は read_test_result を緑にしない
+        （reader はランナーエントリのみ判定。fp 番兵 'skipped' は非 hex）。
+        この性質は M4 前後で不変＝feature テストでなく回帰ガード。"""
+        rc, _ = fire("post-bash-observe.sh", bash_payload("ls -la"), self.root)
+        self.assertEqual(rc, 0)
+        self.assertEqual(judge.read_test_result(self.root), "unverified")
+
 
 if __name__ == "__main__":
     unittest.main()
