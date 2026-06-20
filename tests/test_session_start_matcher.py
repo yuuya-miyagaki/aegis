@@ -8,9 +8,8 @@ or conversation-restore the SessionStart hook silently does not fire and
 the v1.6.0 P1-A invariants (STATUS.md additionalContext injection, gate
 snapshot regeneration, evidence-log rotation) all skip.
 
-This test pins the matcher in both the framework template and the
-minimal-project example to include all four events, preventing the
-silent-fail-open regression.
+This test pins the matcher in the framework template to include all four
+events, preventing the silent-fail-open regression.
 """
 from __future__ import annotations
 
@@ -21,7 +20,6 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 
 TEMPLATE = ROOT / "templates" / "hooks.template.json"
-EXAMPLE = ROOT / "examples" / "minimal-project" / ".claude" / "settings.json"
 
 REQUIRED_EVENTS = {"startup", "resume", "clear", "compact"}
 
@@ -39,18 +37,6 @@ class TestSessionStartMatcher(unittest.TestCase):
         self.assertTrue(matchers,
                         f"{TEMPLATE} has no SessionStart hook entries")
         # at least one entry must include all 4 events
-        ok = any(REQUIRED_EVENTS.issubset(set(m.split("|"))) for m in matchers)
-        self.assertTrue(
-            ok,
-            f"None of the SessionStart matchers cover all 4 events "
-            f"({REQUIRED_EVENTS}). matchers={matchers}")
-
-    def test_example_matcher_includes_all_4_events(self):
-        if not EXAMPLE.exists():
-            self.skipTest(f"{EXAMPLE} not present")
-        matchers = _session_start_matchers(EXAMPLE)
-        self.assertTrue(matchers,
-                        f"{EXAMPLE} has no SessionStart hook entries")
         ok = any(REQUIRED_EVENTS.issubset(set(m.split("|"))) for m in matchers)
         self.assertTrue(
             ok,

@@ -60,41 +60,6 @@ class TestHookRequiredCoverage(unittest.TestCase):
             f"REQUIRED_HOOK_FILES (contract cannot track them): {sorted(missing)}",
         )
 
-    def test_example_registered_hooks_are_in_required_example_files(self):
-        """B-2 example: example settings.json registrations ⊆ REQUIRED_EXAMPLE_FILES."""
-        registered = _registered_hooks(
-            ROOT / "examples" / "minimal-project" / ".claude" / "settings.json"
-        )
-        example_hooks_dir = ROOT / "examples" / "minimal-project" / "hooks"
-        required = {
-            p.name
-            for p in contract.REQUIRED_EXAMPLE_FILES
-            if p.parent == example_hooks_dir and p.suffix == ".sh"
-        }
-        missing = registered - required
-        self.assertEqual(
-            missing,
-            set(),
-            f"hooks registered in example settings.json but absent from "
-            f"REQUIRED_EXAMPLE_FILES: {sorted(missing)}",
-        )
-
-    def test_template_registered_hooks_are_registered_in_example(self):
-        """grill-code 🟡2: example は full 相当の参照インストール。template に
-        登録された hook が example settings.json に欠けると参照実装で観測系が
-        死ぬ（E1 observer 欠落＝判定が常時 unverified）。"""
-        template = _registered_hooks(ROOT / "templates" / "hooks.template.json")
-        example = _registered_hooks(
-            ROOT / "examples" / "minimal-project" / ".claude" / "settings.json"
-        )
-        missing = template - example
-        self.assertEqual(
-            missing,
-            set(),
-            f"hooks registered in hooks.template.json but missing from "
-            f"example settings.json: {sorted(missing)}",
-        )
-
 
 def _hook_commands(settings_path: Path) -> list[str]:
     data = json.loads(settings_path.read_text(encoding="utf-8"))
@@ -159,11 +124,6 @@ class TestHookCommandForm(unittest.TestCase):
 
     def test_template_commands_use_fallback_form(self):
         self._assert_fallback_form(ROOT / "templates" / "hooks.template.json")
-
-    def test_example_settings_commands_use_fallback_form(self):
-        self._assert_fallback_form(
-            ROOT / "examples" / "minimal-project" / ".claude" / "settings.json"
-        )
 
 
 if __name__ == "__main__":

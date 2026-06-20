@@ -14,9 +14,8 @@ class of bug as F6 applies: an install missing phase-skills.sh would
 have session-start.sh and post-status-audit.sh fail at source time,
 and the contract test would not catch it.
 
-This test pins phase-skills.sh into REQUIRED_HOOK_FILES (and the example
-mirror counterpart in REQUIRED_EXAMPLE_FILES) at the contract level so
-the F6 lesson stays applied to all subsequent lib additions too.
+This test pins phase-skills.sh into REQUIRED_HOOK_FILES at the contract
+level so the F6 lesson stays applied to all subsequent lib additions too.
 """
 from __future__ import annotations
 
@@ -64,32 +63,11 @@ class TestPhaseSkillsRequired(unittest.TestCase):
             f"Sourced by check-secrets.sh — a missing lib silently fail-opens "
             f"the secret-staging deny path.")
 
-    def test_example_mirror_phase_skills_in_required_example_files(self):
-        m = _load_module()
-        rels = [str(p.relative_to(m.ROOT)) for p in m.REQUIRED_EXAMPLE_FILES]
-        self.assertIn(
-            "examples/minimal-project/hooks/lib/phase-skills.sh", rels,
-            f"examples/minimal-project/hooks/lib/phase-skills.sh missing from "
-            f"REQUIRED_EXAMPLE_FILES.")
-
-    def test_example_mirror_secrets_patterns_in_required_example_files(self):
-        m = _load_module()
-        rels = [str(p.relative_to(m.ROOT)) for p in m.REQUIRED_EXAMPLE_FILES]
-        self.assertIn(
-            "examples/minimal-project/hooks/lib/secrets-patterns.sh", rels,
-            f"examples/minimal-project/hooks/lib/secrets-patterns.sh missing "
-            f"from REQUIRED_EXAMPLE_FILES — mirror byte-identity is not "
-            f"covered for this lib.")
-
     def test_phase_skills_sh_actually_exists(self):
         """Sanity: the file the contract requires must really be there."""
         self.assertTrue(
             (ROOT / "hooks" / "lib" / "phase-skills.sh").exists(),
             "hooks/lib/phase-skills.sh missing from working tree")
-        self.assertTrue(
-            (ROOT / "examples" / "minimal-project" / "hooks" / "lib"
-             / "phase-skills.sh").exists(),
-            "examples/minimal-project/hooks/lib/phase-skills.sh missing")
 
 
 if __name__ == "__main__":

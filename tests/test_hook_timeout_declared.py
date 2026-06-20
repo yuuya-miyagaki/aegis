@@ -17,7 +17,6 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 
 TEMPLATES = [
     ROOT / "templates" / "hooks.template.json",
-    ROOT / "examples" / "minimal-project" / ".claude" / "settings.json",
 ]
 
 # K-6: PreToolUse hooks must declare a timeout.
@@ -76,36 +75,6 @@ class TestPreToolUseTimeouts(unittest.TestCase):
                         t, TIMEOUT_MAX_SEC,
                         f"{path.name}: timeout > {TIMEOUT_MAX_SEC}s: {t}"
                     )
-
-    def test_mirror_templates_match(self):
-        """templates/hooks.template.json と examples mirror の PreToolUse
-        timeout 値が一致する（drift 防止）"""
-        primary = json.loads(TEMPLATES[0].read_text(encoding="utf-8"))
-        mirror = json.loads(TEMPLATES[1].read_text(encoding="utf-8"))
-        # Compare PreToolUse entries' timeout values
-        p_pre = primary.get("hooks", {}).get("PreToolUse", [])
-        m_pre = mirror.get("hooks", {}).get("PreToolUse", [])
-        # Mirror may have a subset of hooks (e.g., minimal profile doesn't
-        # ship all PreToolUse hooks). For each hook in mirror, find the
-        # matching one by command in primary and verify timeout matches.
-        for m_entry in m_pre:
-            for m_sub in m_entry.get("hooks", []):
-                cmd = m_sub.get("command", "")
-                if not cmd:
-                    continue
-                # Find matching command in primary
-                found = False
-                for p_entry in p_pre:
-                    for p_sub in p_entry.get("hooks", []):
-                        if p_sub.get("command", "") == cmd:
-                            self.assertEqual(
-                                p_sub.get("timeout"), m_sub.get("timeout"),
-                                f"timeout mismatch for {cmd!r}"
-                            )
-                            found = True
-                            break
-                    if found:
-                        break
 
 
 if __name__ == "__main__":

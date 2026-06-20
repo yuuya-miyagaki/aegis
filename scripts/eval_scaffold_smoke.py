@@ -443,6 +443,45 @@ def verify_status_doctor(target: Path) -> tuple[bool, str]:
     return True, "full: status_doctor runnable"
 
 
+def _hooks_from_settings(settings_path: Path) -> set[str]:
+    """Extract hook script names (foo.sh) from a settings JSON file."""
+    _hook_re = re.compile(r"hooks/([a-z0-9_-]+\.sh)")
+    data = json.loads(settings_path.read_text(encoding="utf-8"))
+    found: set[str] = set()
+    for entries in data.get("hooks", {}).values():
+        if not isinstance(entries, list):
+            continue
+        for entry in entries:
+            for hook in entry.get("hooks", []):
+                cmd = hook.get("command", "") if isinstance(hook, dict) else ""
+                m = _hook_re.search(cmd)
+                if m:
+                    found.add(m.group(1))
+    return found
+
+
+def verify_full_scaffold_hook_coverage(target: Path) -> tuple[bool, str]:
+    """E1 invariant: full install must register every hook in hooks.template.json.
+
+    Verifies that the real scaffolded settings.local.json hook set is a superset
+    of the template hook set. A missing hook means the full install silently drops
+    an observer or moat hook — the same class of fail-open as audit F6.
+    """
+    template_settings = REPO_ROOT / "templates" / "hooks.template.json"
+    scaffold_settings = target / ".claude" / "settings.local.json"
+    if not scaffold_settings.exists():
+        return False, "full: settings.local.json not found in scaffold output"
+    template_hooks = _hooks_from_settings(template_settings)
+    scaffold_hooks = _hooks_from_settings(scaffold_settings)
+    missing = template_hooks - scaffold_hooks
+    if missing:
+        return False, (
+            f"full scaffold missing hooks that are in hooks.template.json "
+            f"(E1 invariant violated): {sorted(missing)}"
+        )
+    return True, "full: scaffold hook set ⊇ template hook set (E1 ok)"
+
+
 def run_full_hook_exec_test(target: Path) -> tuple[str, str]:
     """full cannot be contract-validated as a scaffold (--profile=full ignores
     --root), so exercise it via hook execution only — this also proves
@@ -467,6 +506,10 @@ def run_full_hook_exec_test(target: Path) -> tuple[str, str]:
     if not ok:
         return "FAIL", detail
     ok, detail = verify_template_references(target, "full")
+    if not ok:
+        return "FAIL", detail
+    # E1 invariant: full scaffold must register all template hooks (Task3 Step4).
+    ok, detail = verify_full_scaffold_hook_coverage(target)
     if not ok:
         return "FAIL", detail
     return "PASS", "full scaffold hooks runnable + command surface ok + status_doctor runnable"
