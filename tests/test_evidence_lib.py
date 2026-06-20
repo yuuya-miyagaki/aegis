@@ -51,6 +51,30 @@ def payload_for(cmd: str) -> str:
     return json.dumps({"tool_name": "Bash", "tool_input": {"command": cmd}})
 
 
+def run_is_test_runner(cmd: str) -> str:
+    """evidence.sh の is_test_runner_cmd を直接呼び、stdout("true"/"false")を返す。"""
+    script = 'source "%s"; is_test_runner_cmd "$(cat)"' % LIB
+    proc = subprocess.run(["bash", "-c", script], input=cmd,
+                          capture_output=True, text=True, timeout=60)
+    return proc.stdout
+
+
+class TestIsTestRunnerCmd(unittest.TestCase):
+    """is_test_runner_cmd は recorder / post-bash.sh / gate reader が共有する
+    単一ソース分類器。消費側 read_test_result と同じ正規化＋パターンで判定する。"""
+
+    def test_runner_commands_true(self):
+        for cmd in ("pytest tests/", "python3 -m unittest",
+                    "npm run test", "cargo test", "go test ./...",
+                    "uv run pytest"):
+            self.assertEqual(run_is_test_runner(cmd), "true", f"cmd={cmd!r}")
+
+    def test_non_runner_commands_false(self):
+        for cmd in ("ls -la", "git status", "echo pytest",
+                    'grep -E "(pytest|jest)" file.txt', "cat pytest.ini"):
+            self.assertEqual(run_is_test_runner(cmd), "false", f"cmd={cmd!r}")
+
+
 class TestAppendEvidence(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()

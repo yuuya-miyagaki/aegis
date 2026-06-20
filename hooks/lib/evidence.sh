@@ -196,6 +196,35 @@ except Exception:
   printf 'true'
 }
 
+# is_test_runner_cmd <cmd> — print "true" if <cmd> is a test-runner invocation,
+# else "false". Single-source classifier shared by the evidence recorder
+# (append_evidence), the ReAct hint (post-bash.sh), and — by construction of the
+# same normalization + patterns — the gate-time reader (build-judge-card.
+# read_test_result). Normalization mirrors the reader: newlines -> ';', quoted
+# spans masked to the inert token Q (DQ then SQ, T1 v1.5.2), then
+# AEGIS_TEST_RUNNER_REGEX. Any drift can only fail-closed: a missed runner
+# records fp="skipped" -> the reader reports 🟡 unverified, never silent-green.
+#
+# Hot-path cost: ONE sed (two -e scripts, DQ then SQ — identical to two piped
+# seds for s///g) + ONE grep (all patterns as -e args = OR, same as the reader's
+# any()). The `[@]:-` default and the _ge-count guard keep it safe under
+# `set -u` on bash 3.2 (macOS) when the array is somehow empty.
+is_test_runner_cmd() {
+  local cmd="$1" norm _re
+  norm=$(printf '%s' "$cmd" | tr '\n' ';' \
+    | sed -E -e "s/${AEGIS_TR_STRIP_DQ}/Q/g" -e "s/${AEGIS_TR_STRIP_SQ}/Q/g")
+  local _ge=()
+  for _re in "${AEGIS_TEST_RUNNER_REGEX[@]:-}"; do
+    [ -n "$_re" ] && _ge+=(-e "$_re")
+  done
+  if [ "${#_ge[@]}" -gt 0 ] && printf '%s' "$norm" | grep -Eq "${_ge[@]}"; then
+    printf 'true'
+    return 0
+  fi
+  printf 'false'
+  return 0
+}
+
 # append_evidence <root> <ok|fail> <raw-hook-input-json>  — always returns 0.
 append_evidence() {
   local root="$1" status="$2" input="$3"
