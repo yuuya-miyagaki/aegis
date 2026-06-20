@@ -3,13 +3,13 @@ framework: aegis
 framework_version: "1.12.0"
 project_name: "Aegis"
 mode: Dev
-phase: review
+phase: implement
 task_type: framework
 task_size: L
-task_size_rationale: "確定（plan 移行時）: iteration 32 = SF-001（control-plane フックの quote/escape/bare-dir トークン分割バイパス・Critical pre-existing）を Augment で閉じる。改修面: hooks/check-control-plane.sh（token-aware チェック inline 追加）＋mirror examples/minimal-project/hooks/check-control-plane.sh 同期＋TDD テスト群＋framework 版 bump（contract 定数/template STATUS/example STATUS/本体）＋security-followups.md SF-001 CLOSED 化＝6+ ファイル＝L（全ゲート: review+qa+security+deploy）。セキュリティ境界＝security 盲検2次必須。設計: docs/specs/2026-06-18-sf-001-cp-token-bypass-design.md。"
-iteration: 32
+task_size_rationale: "iteration 33 = M4（簡素化 WS4・最終）: 観測 hook の fingerprint/marker 計算を全 Bash hot-path からテストランナー検出時のみへ寄せる。改修: hooks/lib/evidence.sh（共有 is_test_runner_cmd 追加＋append_evidence 条件分岐＋schema コメント）＋hooks/post-bash.sh（検出を共有関数へ統合）＋tests/test_evidence_lib.py＋tests/test_evidence_hooks.py＝コア2＋テスト2＝L 相当（実コード変更は小だが唯一コード挙動を変える最高 stakes）。silent-green（未テストコードが緑認証）回避が絶対条件。ゲート: review+qa+security（deploy は solo の push-readiness）。盲検2次必須。計画: docs/plans/2026-06-21-aegis-m4-fingerprint-hotpath-rebuild.md／設計正典: docs/plans/2026-06-20-aegis-simplification-design.md #4。版は 1.12.0 据置（iteration counter と framework_version は直交・他簡素化 WS と同様バンプなし）。"
+iteration: 33
 ui_surface: false
-last_updated: "2026-06-21T07:00:00Z"
+last_updated: "2026-06-21T12:00:00Z"
 gate_approvals:
   client_ready_for_dev: n/a
   brainstorm: approved
@@ -22,8 +22,8 @@ gate_approvals:
 current_refs:
   requirements:
     - docs/full-review-2026-06-13-context-futureproof.md
-  plan: docs/plans/2026-06-18-sf-001-cp-token-bypass-implementation-plan.md
-  spec: docs/specs/2026-06-18-sf-001-cp-token-bypass-design.md
+  plan: docs/plans/2026-06-21-aegis-m4-fingerprint-hotpath-rebuild.md
+  spec: docs/plans/2026-06-20-aegis-simplification-design.md
   review: null
   qa: null
   security: null
@@ -42,7 +42,7 @@ external_evidence:
     scope: "v0.12.2 実装後 4 ラウンドレビュー"
     findings: "Round 6 (P1×2, P2×1: pre-compact exit 2 / minimal-project / test rc), Round 7 (P1×1, P3×1: git add 漏れ / テスト件数表記), Round 8 (P2×1, P3×1: stale last_updated / grep 自己マッチ), Round 9 (P3×2: コメント不整合)"
     resolution: "9件全反映。tier 1/2 PASS、134 tests PASS、本体と minimal-project 完全同期確認済み。"
-next_action: "**【簡素化 3/5 WS 完了・push 済み 2026-06-21】** M3（manifest 層1+2）／examples ミラー廃止／docs 整理＝累計 約43,000行＋自己整合機械の大半を撤去・全層緑（pytest 992・contract・run_eval Tier1・eval_scaffold_smoke・dangling ゼロ）。**残: WS4=M4 rebuild（観測 hook の hot-path コスト削減・*唯一のコード挙動変更*・silent-green 回避が最重要・要慎重）→ WS2=M2 据置（1行明文化）。再開は `docs/plans/2026-06-21-aegis-simplification-m4-m2-handoff.md` ＋正典 `docs/plans/2026-06-20-aegis-simplification-design.md` を読む。** 簡素化は grill フローで進めたため iteration/gate には未反映（M4 を formal iteration として起こすか再開時に判断）。検証教訓: pytest だけでなく `check_framework_contract.py`＋`run_eval.py`(Tier1)＋dangling grep の多層で。Bash gotcha: パスはクォート・commit は -F file。 ——以下は旧 iteration 32 SF-001 の記録—— iteration 32 SF-001 control-plane moat 強化 = **一区切り（push 済み）**。**脅威モデルを『事故防止』と確定（ユーザー 2026-06-20）。** 事故防止には round5-11 で十分以上＝これ以上の静的強化は不要と合意。理由: 難読化形（`{h,x}{ooks,uild}`/`hook{s..s}` 等）は事故では起きず敵対防止用だが、敵対は静的に原理的不可（SF-004 実証済み）。敵対防止が要るなら OS/FS レベルの案A だが、事故防止スコープでは YAGNI と判断し**不採用**。**フル6ゲートも事故防止スコープでは儀式的と判断し省略・push で締め**。実装: round5-11（tilde/special-param/glob/redirect演算子/多群・入れ子brace/brace-seq/`opt=`・`dd of=`/mapfile）commits 3c98666/29caac6/4c65229/a9168fd/623201f。検証: full suite 1025 passed・1 skip/contract・drift・mirror PASS。残課題＝**accept residual**（SF-003 cmdsub / SF-004 interpreter＝原理的限界 / SF-005 extglob 条件付き）は `docs/security-followups.md` に記録（これ以上閉じない方針）。push は yuuya-miyagaki アカウントで実施。**次タスク未定。** ツール gotcha: Bash 文字列の ${...}/~+/brace/`{}` で H.replace→python FILE と git commit -F。"
+next_action: "**【iteration 33 = M4 rebuild 実装中・inline TDD 2026-06-21】** 観測 hook の fingerprint/marker を全 Bash hot-path からテストランナー検出時のみへ寄せる。ゲート時の保証（fail-closed・silent-green 禁止・fp binding）は不変。baseline 全緑（pytest 992・contract・run_eval Tier1・scaffold smoke）＋plan grill-plan 通過済。手順: Task1 共有 is_test_runner_cmd（evidence.sh）→Task2 append_evidence ゲート→Task3 post-bash.sh 統合→Task4 不変条件ガード＋多層検証→grill-code→REDTEAM PoC（tests/poc/v162-redteam-rerun.sh）→盲検2次→review/qa/security→明示承認で push。版 1.12.0 据置。計画 docs/plans/2026-06-21-aegis-m4-fingerprint-hotpath-rebuild.md／設計正典 docs/plans/2026-06-20-aegis-simplification-design.md #4。Bash gotcha: パスはクォート・commit は -F。 ——以下は前タスクの記録—— **【簡素化 3/5 WS 完了・push 済み 2026-06-21】** M3（manifest 層1+2）／examples ミラー廃止／docs 整理＝累計 約43,000行＋自己整合機械の大半を撤去・全層緑（pytest 992・contract・run_eval Tier1・eval_scaffold_smoke・dangling ゼロ）。**残: WS4=M4 rebuild（観測 hook の hot-path コスト削減・*唯一のコード挙動変更*・silent-green 回避が最重要・要慎重）→ WS2=M2 据置（1行明文化）。再開は `docs/plans/2026-06-21-aegis-simplification-m4-m2-handoff.md` ＋正典 `docs/plans/2026-06-20-aegis-simplification-design.md` を読む。** 簡素化は grill フローで進めたため iteration/gate には未反映（M4 を formal iteration として起こすか再開時に判断）。検証教訓: pytest だけでなく `check_framework_contract.py`＋`run_eval.py`(Tier1)＋dangling grep の多層で。Bash gotcha: パスはクォート・commit は -F file。 ——以下は旧 iteration 32 SF-001 の記録—— iteration 32 SF-001 control-plane moat 強化 = **一区切り（push 済み）**。**脅威モデルを『事故防止』と確定（ユーザー 2026-06-20）。** 事故防止には round5-11 で十分以上＝これ以上の静的強化は不要と合意。理由: 難読化形（`{h,x}{ooks,uild}`/`hook{s..s}` 等）は事故では起きず敵対防止用だが、敵対は静的に原理的不可（SF-004 実証済み）。敵対防止が要るなら OS/FS レベルの案A だが、事故防止スコープでは YAGNI と判断し**不採用**。**フル6ゲートも事故防止スコープでは儀式的と判断し省略・push で締め**。実装: round5-11（tilde/special-param/glob/redirect演算子/多群・入れ子brace/brace-seq/`opt=`・`dd of=`/mapfile）commits 3c98666/29caac6/4c65229/a9168fd/623201f。検証: full suite 1025 passed・1 skip/contract・drift・mirror PASS。残課題＝**accept residual**（SF-003 cmdsub / SF-004 interpreter＝原理的限界 / SF-005 extglob 条件付き）は `docs/security-followups.md` に記録（これ以上閉じない方針）。push は yuuya-miyagaki アカウントで実施。**次タスク未定。** ツール gotcha: Bash 文字列の ${...}/~+/brace/`{}` で H.replace→python FILE と git commit -F。"
 blockers: []
 failure_tracking: null
 session_history:
