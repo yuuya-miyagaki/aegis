@@ -404,7 +404,7 @@ TaskCreated / TaskCompleted
 |-----------|------|
 | `check_framework_contract.py` | フレームワーク契約検証（ファイル存在、CLAUDE.md/skill/rule 語数予算（`context_budget.py`・tighten-only ratchet）、スキル/エージェント/コマンド/フック整合性、model/effort policy、name lint、プロファイル検証、example placeholder/mirror） |
 | `check_status.py` | STATUS.md YAML frontmatter 検証（必須フィールド、ゲート整合性、tri-state pre-approve、完了 evidence） |
-| `check_reference_drift.py` | 参照名ドリフト検出（15 チェック。本体↔example の mirror-identity を byte 比較。platform_manifest による event/tool ドリフトと検証日 staleness、skill_behavior_manifest による skill behavior contract を含む） |
+| `check_reference_drift.py` | 参照名ドリフト検出（14 チェック。本体↔example の mirror-identity を byte 比較。platform_manifest による event/tool ドリフトと検証日 staleness を含む） |
 | `lint_names.py` | 名前クロスリファレンス lint（種別ごとの抽出器） |
 | `run_eval.py` | 統合評価ランナー（Tier 0: unittest、Tier 1: 契約、Tier 2: scaffold スモーク、Tier 3: シナリオ） |
 | `eval_scaffold_smoke.py` | scaffold 後に hook/script を実発火して install 経路を検証 |
