@@ -134,6 +134,19 @@ def grep_match(cmd: str, patterns: list[str]) -> bool:
     return False
 
 
+EVIDENCE_LIB = ROOT / "hooks" / "lib" / "evidence.sh"
+
+
+def run_is_test_runner_cmd(cmd: str) -> bool:
+    """evidence.sh の is_test_runner_cmd 実関数（hot-path recorder が使う・単一
+    sed -e -e ＋単一 grep -e -e 実装）を呼ぶ。raw cmd（改行含む）を stdin で渡し、
+    関数内部の正規化（tr+sed マスク）ごと検証する。"""
+    script = 'source "%s"; is_test_runner_cmd "$(cat)"' % EVIDENCE_LIB
+    r = subprocess.run(["bash", "-c", script], input=cmd,
+                       capture_output=True, text=True, timeout=30, check=True)
+    return r.stdout.strip() == "true"
+
+
 class TestTestRunnerParity(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -178,6 +191,17 @@ class TestTestRunnerParity(unittest.TestCase):
             self.assertEqual(normalize_py(cmd, self.strips),
                              normalize_sed(cmd, self.strips_raw),
                              f"mask parity: {cmd!r}")
+
+    def test_fixtures_is_test_runner_cmd(self):
+        """M4: evidence.sh の is_test_runner_cmd 実関数（hot-path recorder が使う・
+        単一 sed -e -e ＋単一 grep -e -e 実装）を canonical FIXTURES 全件で判定し、
+        reader/旧2連パイプ実装と同一分類であることを直接ピン。「単一 sed は2連
+        パイプと byte 等価」の主張を、緑偽装防止の肝（'"echo" pytest'→False・
+        エスケープ quote・入れ子サブシェル）を含む全形で実証する。万一どこかで
+        分岐すれば fail-closed だが false-yellow（UX 劣化）として即検出する。"""
+        for cmd, expected in FIXTURES:
+            self.assertEqual(run_is_test_runner_cmd(cmd), expected,
+                             f"is_test_runner_cmd: {cmd!r}")
 
 
 class TestMaskScopeBoundary(unittest.TestCase):
