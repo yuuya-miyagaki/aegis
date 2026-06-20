@@ -40,7 +40,7 @@ docs 約39k行＋examples ミラー約11k行。North Star に立ち返り、**�
 |---|------|------|----------------|
 | 2 | test-strength-drill | **keep-thin** | end user。テストの*弱さ*を検出する唯一の手段で代替なし。framework タスクで skip するのは構造的縁ケースで、ターゲット用途（未コミットのプロダクトコード）では機能する＝「過剰」は誤診。 |
 | 4 | observation/fingerprint hooks | **rebuild** | end user。AI の自己申告でなく*観測実行*でゲート判定＝代替なし＝機能は必須。ただし保証はゲート時にあるのに全 Bash コマンドで fingerprint 計算を払うのは無駄。テストランナー検出時／ゲート時の遅延計算へ寄せる。重いハーネスは hook 無効化を招く二次被害もある。 |
-| 3 | skill_behavior_manifest | **cut／AI委譲** | 作者のみ。配布先では走らない（封印側）。自認の限界「同コミットで素通り＝壁でなく速度バンプ」。14トークン手動表は進化で*厚く*なる方向で North Star と逆。腐っても緑＝false assurance。要求（skill が機能し続ける）は git diff＋編集時 AI レビューへ委譲。 |
+| 3 | skill_behavior_manifest（層1）＋ skill-pressure-drill（層2） | **cut／AI委譲** | 作者のみ。配布先では走らない（封印側）。層1: 自認の限界「同コミットで素通り＝壁でなく速度バンプ」・14トークン手動表は進化で*厚く*なる方向で North Star と逆・腐っても緑＝false assurance。層2(extensions/skill-pressure-drill): grill 由来で追加 cut＝作成以来一度も実走せず・唯一の自動部分は雛形の体裁検査(QA シアター)・WORKFLOW 自認で無意味化しやすい・他 skill 変更で壊れる地雷。要求（skill が機能し続ける）は git diff＋編集時 AI レビュー／必要時に subagent 即席で委譲。 |
 | 1 | examples/minimal-project ミラー | **廃止（抽出→撤去）** | 作者のみ・配布前の先行投資。byte 完全コピー（99ファイル/約11k行）＋同期/drift/contract 機械（drift 6/15・contract 81参照・専用テスト5本）。ミラーがズレてもユーザーは騙されない。唯一 `bin/setup.sh` が scaffold-safe な `validate.md`/`retro.md`(/settings.json) を examples/ から読む runtime 依存があるため、**先に `templates/` へ抽出してから撤去**。 |
 | 5 | docs 膨張 | **整理・統合** | 履歴は git に残す。203ファイル/約39.6k行のうち `docs/archive/` が74%（132ファイル/約29.3k行）。ユーザーを導く doc は残し磨く、作者の履歴・簿記は作業ツリーから外す。 |
 
@@ -51,8 +51,8 @@ templates。M2/M4 の*保証*は維持（M4 は実装だけ作り替え）。難
 
 ## 5. 実装順序とリスク（小さく1つずつ・暴走しない）
 
-1. **M3 cut** — 独立・最小・低リスク。`skill_behavior_manifest.py` 撤去＋`check_reference_drift.py`
-   の該当チェック＋`tests/test_skill_behavior_contract.py` を除去。
+1. **M3 cut** — 独立・最小・低リスク。層1: `skill_behavior_manifest.py` 撤去＋`check_reference_drift.py`
+   の該当チェック＋`tests/test_skill_behavior_contract.py` を除去。層2(grill 由来追加): `extensions/skill-pressure-drill/`＋`tests/test_skill_drill_format.py` を撤去（コード参照ゼロを実証済み）。
 2. **examples 廃止** — ① `validate.md`/`retro.md`(/settings.json テンプレ) を正規 `templates/` へ
    抽出し `bin/setup.sh` の参照を切替 → ② ミラー本体＋`sync_example_mirror.py`＋`check_mirror_identity`＋
    contract の `REQUIRED_EXAMPLE_FILES`＋ミラー専用テストを撤去。installed-project 検証は**薄い

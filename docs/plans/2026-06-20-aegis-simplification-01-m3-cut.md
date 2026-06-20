@@ -203,6 +203,60 @@ Expected: 作業ツリーがクリーン（簡素化対象に関して）、最�
 
 ---
 
+### Task 5: 層2（skill-pressure-drill）も撤去（grill-code 由来の追加）
+
+**Files:**
+- Delete: `extensions/skill-pressure-drill/`（README.md / WORKFLOW.md / REPORT.template.md / scenarios/*.md = 5ファイル・122行）
+- Delete: `tests/test_skill_drill_format.py`（55行・雛形の体裁検査のみ＝QA シアター）
+
+> **なぜ追加 cut か（grill-code 由来）**: 層2 は層1の敵対補完として作られた対だが、作成コミット `caf4e0e` 以来**一度も実走されず**（`docs/qa-reports/skill-drill-*` レポートはアーカイブ含めゼロ）、唯一の自動部分は雛形の体裁検査、WORKFLOW 自身が「対象 skill を載せ損なうと無意味化」と自認。親基準で「作者のみ・installed 非配布・慢性未実行」＝層1と同根拠。コード参照は自身の format テスト以外**ゼロ**（contract/eval/その他で 0 件）を grep 実証済み＝撤去は他コードに波及しない。
+
+- [ ] **Step 1: 層2 一式を git から削除**
+
+Run:
+```bash
+git rm -r extensions/skill-pressure-drill tests/test_skill_drill_format.py
+```
+Expected: 6ファイル（拡張5＋テスト1）が staged for deletion。
+
+- [ ] **Step 2: full suite が全緑であることを確認**
+
+Run: `python3 -m pytest -q`（または `python3 -m unittest discover -s tests -q`）
+Expected: 全 PASS（失敗0）。`test_skill_drill_format.py` の5ケースが消え、他に減少・失敗なし。
+
+- [ ] **Step 3: dangling 参照ゼロを確認**
+
+Run:
+```bash
+grep -rn "skill_drill_format\|skill-pressure-drill\|skill_pressure" --include='*.py' --include='*.sh' --include='*.json' . | grep -v '.git/'
+```
+Expected: 出力なし（0件）。docs 内の歴史記述（旧 plan/spec/qa-reports・STATUS の iteration30 メモ・extensions を指す arch 記述）はワークストリーム5で掃除。
+
+- [ ] **Step 4: コミット**
+
+Run:
+```bash
+git add docs/plans/2026-06-20-aegis-simplification-design.md docs/plans/2026-06-20-aegis-simplification-01-m3-cut.md
+git commit -m "$(cat <<'EOF'
+refactor(simplification): remove skill-pressure-drill layer-2 (M3 cut 続き)
+
+層1撤去で孤児化した層2を grill-code 由来で追加 cut。作成以来一度も実走
+されず、自動部分は雛形の体裁検査のみ、installed 非配布＝作者のみを守る。
+コード参照ゼロを実証。設計 #3 と M3 計画 Task5 に反映。
+
+Co-Authored-By: Claude Opus 4.7 <noreply@anthropic.com>
+EOF
+)"
+```
+（`git rm -r` の削除は staged 済み。`git add` は設計書・計画の更新分。）
+
+- [ ] **Step 5: コミット成立を確認**
+
+Run: `git status --short && git log --oneline -2`
+Expected: 作業ツリーがクリーン、最新2コミットが M3（5212c25）＋層2撤去。
+
+---
+
 ## Self-Review
 
 - **Spec coverage:** 設計 #3（skill_behavior_manifest = cut／AI委譲）を完全実装。3実体（本体・drift 内 import/関数/登録・専用テスト）すべて除去し、隠れ依存（arch-overview 件数）を同期。
