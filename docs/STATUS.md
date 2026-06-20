@@ -44,10 +44,7 @@ external_evidence:
     resolution: "9件全反映。tier 1/2 PASS、134 tests PASS、本体と minimal-project 完全同期確認済み。"
 next_action: "iteration 32 SF-001 control-plane moat 強化 = **一区切り（push 済み）**。**脅威モデルを『事故防止』と確定（ユーザー 2026-06-20）。** 事故防止には round5-11 で十分以上＝これ以上の静的強化は不要と合意。理由: 難読化形（`{h,x}{ooks,uild}`/`hook{s..s}` 等）は事故では起きず敵対防止用だが、敵対は静的に原理的不可（SF-004 実証済み）。敵対防止が要るなら OS/FS レベルの案A だが、事故防止スコープでは YAGNI と判断し**不採用**。**フル6ゲートも事故防止スコープでは儀式的と判断し省略・push で締め**。実装: round5-11（tilde/special-param/glob/redirect演算子/多群・入れ子brace/brace-seq/`opt=`・`dd of=`/mapfile）commits 3c98666/29caac6/4c65229/a9168fd/623201f。検証: full suite 1025 passed・1 skip/contract・drift・mirror PASS。残課題＝**accept residual**（SF-003 cmdsub / SF-004 interpreter＝原理的限界 / SF-005 extglob 条件付き）は `docs/security-followups.md` に記録（これ以上閉じない方針）。push は yuuya-miyagaki アカウントで実施。**次タスク未定。** ツール gotcha: Bash 文字列の ${...}/~+/brace/`{}` で H.replace→python FILE と git commit -F。"
 blockers: []
-failure_tracking:
-  goal: null
-  count: 0
-  last_attempt: null
+failure_tracking: null
 session_history:
   - date: "2026-06-18"
     mode: Dev
