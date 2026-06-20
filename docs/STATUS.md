@@ -9,7 +9,7 @@ task_size: L
 task_size_rationale: "確定（plan 移行時）: iteration 32 = SF-001（control-plane フックの quote/escape/bare-dir トークン分割バイパス・Critical pre-existing）を Augment で閉じる。改修面: hooks/check-control-plane.sh（token-aware チェック inline 追加）＋mirror examples/minimal-project/hooks/check-control-plane.sh 同期＋TDD テスト群＋framework 版 bump（contract 定数/template STATUS/example STATUS/本体）＋security-followups.md SF-001 CLOSED 化＝6+ ファイル＝L（全ゲート: review+qa+security+deploy）。セキュリティ境界＝security 盲検2次必須。設計: docs/specs/2026-06-18-sf-001-cp-token-bypass-design.md。"
 iteration: 32
 ui_surface: false
-last_updated: "2026-06-20T15:00:00Z"
+last_updated: "2026-06-20T16:00:00Z"
 gate_approvals:
   client_ready_for_dev: n/a
   brainstorm: approved
@@ -42,12 +42,12 @@ external_evidence:
     scope: "v0.12.2 実装後 4 ラウンドレビュー"
     findings: "Round 6 (P1×2, P2×1: pre-compact exit 2 / minimal-project / test rc), Round 7 (P1×1, P3×1: git add 漏れ / テスト件数表記), Round 8 (P2×1, P3×1: stale last_updated / grep 自己マッチ), Round 9 (P3×2: コメント不整合)"
     resolution: "9件全反映。tier 1/2 PASS、134 tests PASS、本体と minimal-project 完全同期確認済み。"
-next_action: "iteration 32 / phase=review: SF-001 control-plane moat 強化（**自律ラウンド一段落・ユーザー判断待ち**）。セッション復旧後（作業ツリーの `hooks/lib/emit.sh` stub `evil` 破壊→HEAD 復元）、盲検 break-attempt + pre-QA review を反復し**静的難読化クラスを網羅閉鎖**（各 TDD RED→GREEN・未 push・版 1.12.0）: round5-7=`3c98666`(tilde/入れ子param/special-param/展開分割/.claude末尾)、round8=`29caac6`(glob/char-class＝旧SF-002 を fnmatch 静的照合で deny)、round8b+round9=`4c65229`(glob×空展開/write-redirect演算子族 `&>``>|``&>>``>&``<>`)、round10=`a9168fd`(多群/入れ子 brace cross-product/`opt=`・`dd of=`)、round11=`623201f`(brace SEQUENCE `{a..z}`/`mapfile`・`readarray`/DoS cap)。検証: token-split 195/full suite 1025 passed・1 skip/contract・drift・mirror PASS。網羅性自己検証で exec/eval/procsub/here-string/install/ln/link/sed-i/git config -f/truncate/mv-t・cp-t/mkdir/fd-redirect は**全 DENY/ASK**。**残る静的形は2つだけで別レイヤ案件**: SF-004=interpreter `-c`/`-e` の runtime 構築パス（`python3 -c \"open('hook'+chr(115)+'/x','w')\"`＝**原理的限界・実証済み**）、SF-005=extglob（条件付き・稀）。詳細＋**防御の多層化提言**（案A: 非framework中は CP を物理 write 不可化／案B: PostToolUse 整合性チェック）は `docs/security-followups.md` に durable 記録（SF-001/002 状態更新・SF-004/005 追加）。**push せず**（判断ルール: 盲検が CLEAN を返しておらず＝完全 OK と断定不可。かつ SF-004 で moat の原理的限界が判明＝アーキ方針はユーザー判断）。**ユーザーへの問い**: (1) round5-11 を push してよいか（incremental hardening として correct/tested）、(2) 防御の多層化（案A/B）を着手するか、(3) extglob(SF-005)を静的に閉じるか accept か。review→qa→security ゲートは未実行（承認制）。commits: a9168fd/623201f＋docs。ツール gotcha: Bash 文字列の ${...}/~+/brace/`{}` で H.replace→python FILE と git commit -F。"
+next_action: "iteration 32 SF-001 control-plane moat 強化 = **一区切り（push 済み）**。**脅威モデルを『事故防止』と確定（ユーザー 2026-06-20）。** 事故防止には round5-11 で十分以上＝これ以上の静的強化は不要と合意。理由: 難読化形（`{h,x}{ooks,uild}`/`hook{s..s}` 等）は事故では起きず敵対防止用だが、敵対は静的に原理的不可（SF-004 実証済み）。敵対防止が要るなら OS/FS レベルの案A だが、事故防止スコープでは YAGNI と判断し**不採用**。**フル6ゲートも事故防止スコープでは儀式的と判断し省略・push で締め**。実装: round5-11（tilde/special-param/glob/redirect演算子/多群・入れ子brace/brace-seq/`opt=`・`dd of=`/mapfile）commits 3c98666/29caac6/4c65229/a9168fd/623201f。検証: full suite 1025 passed・1 skip/contract・drift・mirror PASS。残課題＝**accept residual**（SF-003 cmdsub / SF-004 interpreter＝原理的限界 / SF-005 extglob 条件付き）は `docs/security-followups.md` に記録（これ以上閉じない方針）。push は yuuya-miyagaki アカウントで実施。**次タスク未定。** ツール gotcha: Bash 文字列の ${...}/~+/brace/`{}` で H.replace→python FILE と git commit -F。"
 blockers: []
 failure_tracking:
-  goal: "SF-001 control-plane moat の修正を review 通過させる（シェル再構成 CP 書込みを網羅捕捉）"
-  count: 4
-  last_attempt: "2026-06-20 round10（a9168fd）後、4回目盲検が brace-sequence、reviewer が DoS MINOR を検出→round11（623201f）で閉鎖。網羅性自己検証で残る静的形は SF-004（interpreter＝原理的限界・実証）と SF-005（extglob・条件付き）のみと確定。判断ルールにより push せず・アーキ方針をユーザーに委ねた（security-followups.md に提言記録）。"
+  goal: null
+  count: 0
+  last_attempt: null
 session_history:
   - date: "2026-06-18"
     mode: Dev
