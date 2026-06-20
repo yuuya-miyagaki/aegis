@@ -17,7 +17,8 @@
 **REMOVE（参照ゼロ・current_refs 非参照・履歴 only）:**
 - `docs/archive/`（132ファイル・約29,363行）— ランタイム参照ゼロ。STATUS は note prose のみ、test は comment cite のみ。
 - `docs/reviews/`（4ファイル・927行）— second-opinion 旧 phase スナップショット。参照ゼロ。
-- `docs/qa-reports/{iter31-batch1-,v1100-,v162-}*`（12ファイル）— 旧版審査。現 current_refs（qa/review/security/deploy=null）非参照。
+- `docs/qa-reports/{v1100-,v162-}*`（8ファイル）— 古い版審査。live doc・現行 judge カード非参照・current_refs 非参照。
+  - **訂正（grill-code 由来）**: `iter31-batch1-*`（4ファイル）は当初 REMOVE 予定だったが **KEEP**。`docs/handover/TO-CLIENT.md:27-30` と現行 `docs/qa-reports/judge-*.md` が*直近イテレーション31のゲート証拠*として参照しており、削除すると dangling link 化する。manifest が「コード参照なし」で REMOVABLE としたが doc 参照を見落とした＝過削除を grill-code が検出し復元。
 - `docs/MIGRATION-HISTORY.md`（527行）— 移行履歴。コード参照なし（README/旧 plan/spec の prose link のみ）。
 
 **KEEP（load-bearing または active — 撤去禁止）:**
