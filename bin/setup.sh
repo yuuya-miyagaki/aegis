@@ -120,13 +120,10 @@ resolve_source() {
     "docs/STATUS.md")    echo "$FRAMEWORK_ROOT/templates/STATUS.template.md"; return ;;
     "docs/LEARNINGS.md") echo "$FRAMEWORK_ROOT/templates/LEARNINGS.template.md"; return ;;
     ".claude/commands/validate.md")
-      echo "$FRAMEWORK_ROOT/examples/minimal-project/.claude/commands/validate.md"; return ;;
+      echo "$FRAMEWORK_ROOT/templates/commands/validate.md"; return ;;
     ".claude/commands/retro.md")
-      # Scaffold-safe variant: degrades gracefully when retro_report.py is absent
-      # (no profile ships it). Both validate.md and retro.md are in drift's
-      # MIRROR_ALLOWLIST and MUST be mapped here, or the install ships the
-      # framework variant that hard-runs a missing script (audit F3, 2026-06-07).
-      echo "$FRAMEWORK_ROOT/examples/minimal-project/.claude/commands/retro.md"; return ;;
+      # Scaffold-safe variant: degrades gracefully when retro_report.py is absent.
+      echo "$FRAMEWORK_ROOT/templates/commands/retro.md"; return ;;
     "docs/client/context.md")        echo "$FRAMEWORK_ROOT/templates/CLIENT-CONTEXT.template.md"; return ;;
     "docs/client/glossary.md")       echo "$FRAMEWORK_ROOT/templates/CLIENT-GLOSSARY.template.md"; return ;;
     "docs/client/open-questions.md") echo "$FRAMEWORK_ROOT/templates/CLIENT-OPEN-QUESTIONS.template.md"; return ;;

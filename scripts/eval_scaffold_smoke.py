@@ -296,32 +296,33 @@ def verify_command_surface(target: Path, profile: str) -> tuple[bool, str]:
     """Prove setup.sh delivered the right command surface (audit F2, F3).
 
     Two invariants:
-      - Every MIRROR_ALLOWLIST command the scaffold installs must be the EXAMPLE
-        (scaffold-safe) variant, not the framework variant — i.e. resolve_source
-        must map it. retro must additionally keep its graceful-degradation guard.
+      - Every MIRROR_ALLOWLIST command the scaffold installs must be the
+        scaffold-safe template variant, not the framework variant — i.e.
+        resolve_source must map it. retro must additionally keep its
+        graceful-degradation guard.
       - full must ship /judge (its backing build-judge-card.py is delivered there).
     Failures are collected so a single run surfaces every gap.
     """
     failures: list[str] = []
-    example_root = REPO_ROOT / "examples" / "minimal-project"
+    command_source = REPO_ROOT / "templates" / "commands"
 
     for rel in sorted(MIRROR_ALLOWLIST):
         installed = target / rel
         if not installed.is_file():
             continue  # this profile does not install this command
-        example = example_root / rel
-        if not example.is_file():
-            failures.append(f"example variant missing for {rel}")
+        source = command_source / Path(rel).name
+        if not source.is_file():
+            failures.append(f"scaffold-safe template variant missing for {rel}")
             continue
-        if installed.read_bytes() != example.read_bytes():
+        if installed.read_bytes() != source.read_bytes():
             failures.append(
-                f"{rel} is not the scaffold-safe example variant "
+                f"{rel} is not the scaffold-safe template variant "
                 f"(setup.sh resolve_source must map it)"
             )
 
     # retro must degrade gracefully when retro_report.py is absent (no profile
     # ships it). Match the specific guard line, not a generic word, so this stays
-    # meaningful insurance if the example variant ever silently loses the guard
+    # meaningful insurance if the template variant ever silently loses the guard
     # (byte-identity above would still pass in that case).
     retro = target / ".claude" / "commands" / "retro.md"
     retro_guard = "`scripts/retro_report.py` is available"

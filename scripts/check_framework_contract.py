@@ -124,6 +124,8 @@ REQUIRED_TEMPLATE_FILES = [
     ROOT / "templates/RUNBOOK.template.md",
     ROOT / "templates/UAT-RESULTS.template.md",
     ROOT / "templates/hooks.template.json",
+    ROOT / "templates/commands/validate.md",
+    ROOT / "templates/commands/retro.md",
 ]
 
 REQUIRED_HOOK_FILES = [
