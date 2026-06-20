@@ -176,102 +176,6 @@ REQUIRED_HOOK_FILES = [
     ROOT / "hooks/lib/safety.sh",
 ]
 
-REQUIRED_EXAMPLE_FILES = [
-    ROOT / "examples/minimal-project/CLAUDE.md",
-    ROOT / "examples/minimal-project/README.md",
-    ROOT / "examples/minimal-project/.claude/settings.json",
-    ROOT / "examples/minimal-project/docs/STATUS.md",
-    ROOT / "examples/minimal-project/docs/LEARNINGS.md",
-    ROOT / "examples/minimal-project/docs/requirements/PRD.md",
-    ROOT / "examples/minimal-project/docs/requirements/SCOPE.md",
-    ROOT / "examples/minimal-project/docs/requirements/NFR.md",
-    ROOT / "examples/minimal-project/docs/requirements/ACCEPTANCE.md",
-    ROOT / "examples/minimal-project/docs/handover/TO-DEV.md",
-    ROOT / "examples/minimal-project/docs/handover/TO-CLIENT.md",
-    ROOT / "examples/minimal-project/docs/specs/search-brainstorm-record.md",
-    ROOT / "examples/minimal-project/docs/specs/search-design.md",
-    ROOT / "examples/minimal-project/docs/plans/search-implementation-plan.md",
-    ROOT / "examples/minimal-project/docs/qa-reports/search-review.md",
-    ROOT / "examples/minimal-project/docs/qa-reports/search-qa.md",
-    ROOT / "examples/minimal-project/docs/qa-reports/search-security.md",
-    ROOT / "examples/minimal-project/docs/qa-reports/search-verification.md",
-    ROOT / "examples/minimal-project/docs/qa-reports/search-deploy-checklist.md",
-    # Native .claude structures (Phase 2 v0.6.0)
-    ROOT / "examples/minimal-project/.claude/rules/state-machine.md",
-    ROOT / "examples/minimal-project/.claude/rules/routing.md",
-    ROOT / "examples/minimal-project/.claude/commands/status.md",
-    ROOT / "examples/minimal-project/.claude/commands/gate.md",
-    ROOT / "examples/minimal-project/.claude/commands/next.md",
-    ROOT / "examples/minimal-project/.claude/commands/recover.md",
-    ROOT / "examples/minimal-project/.claude/commands/validate.md",
-    ROOT / "examples/minimal-project/.claude/commands/retro.md",
-    ROOT / "examples/minimal-project/.claude/commands/tutorial.md",
-    ROOT / "examples/minimal-project/.claude/commands/judge.md",
-    ROOT / "examples/minimal-project/.claude/agents/planner.md",
-    ROOT / "examples/minimal-project/.claude/agents/implementer.md",
-    ROOT / "examples/minimal-project/.claude/agents/reviewer.md",
-    ROOT / "examples/minimal-project/.claude/agents/qa.md",
-    ROOT / "examples/minimal-project/.claude/agents/qa-browser.md",
-    ROOT / "examples/minimal-project/.claude/agents/security.md",
-    ROOT / "examples/minimal-project/.claude/agents/ui.md",
-    ROOT / "examples/minimal-project/.claude/agents/reviewer-testing.md",
-    ROOT / "examples/minimal-project/.claude/agents/reviewer-performance.md",
-    ROOT / "examples/minimal-project/.claude/agents/reviewer-maintainability.md",
-    ROOT / "examples/minimal-project/scripts/update-gate.sh",
-    ROOT / "examples/minimal-project/scripts/check_status.py",
-    ROOT / "examples/minimal-project/scripts/status_doctor.py",
-    # Runtime enforcement hooks (referenced by .claude/settings.json)
-    ROOT / "examples/minimal-project/hooks/session-start.sh",
-    ROOT / "examples/minimal-project/hooks/check-gate.sh",
-    ROOT / "examples/minimal-project/hooks/check-destructive.sh",
-    ROOT / "examples/minimal-project/hooks/check-tdd.sh",
-    ROOT / "examples/minimal-project/hooks/post-bash.sh",
-    ROOT / "examples/minimal-project/hooks/post-status-audit.sh",
-    ROOT / "examples/minimal-project/hooks/pre-compact.sh",
-    ROOT / "examples/minimal-project/hooks/check-control-plane.sh",
-    ROOT / "examples/minimal-project/hooks/lib/extract-input.sh",
-    ROOT / "examples/minimal-project/docs/client/context.md",
-    ROOT / "examples/minimal-project/docs/client/glossary.md",
-    ROOT / "examples/minimal-project/docs/client/open-questions.md",
-    ROOT / "examples/minimal-project/docs/translation/mapping.md",
-    ROOT / "examples/minimal-project/hooks/check-client-info.sh",
-    ROOT / "examples/minimal-project/hooks/check-secrets.sh",
-    ROOT / "examples/minimal-project/hooks/check-deploy-gate.sh",
-    ROOT / "examples/minimal-project/hooks/check-deploy-mcp-gate.sh",
-    ROOT / "examples/minimal-project/hooks/check-skill-gate.sh",
-    ROOT / "examples/minimal-project/hooks/check-cron-gate.sh",
-    ROOT / "examples/minimal-project/hooks/check-task-created.sh",
-    ROOT / "examples/minimal-project/hooks/check-task-completed.sh",
-    # E1 activity verification (v1.5.0): presence here is what lets drift's
-    # byte-identity check see the files at all — without it the example copy
-    # can be deleted and contract/drift still pass (grill-code 🟡2).
-    ROOT / "examples/minimal-project/hooks/post-bash-observe.sh",
-    ROOT / "examples/minimal-project/hooks/lib/evidence.sh",
-    ROOT / "examples/minimal-project/hooks/lib/fingerprint.sh",
-    # S-11 (v1.6.1): pin the example mirror for both new libs so drift's
-    # byte-identity check covers them too (same logic as L229-231).
-    ROOT / "examples/minimal-project/hooks/lib/phase-skills.sh",
-    ROOT / "examples/minimal-project/hooks/lib/secrets-patterns.sh",
-    # K-5 (v1.6.2): pin example mirror for safety.sh — same rationale.
-    ROOT / "examples/minimal-project/hooks/lib/safety.sh",
-    ROOT / "examples/minimal-project/.claude/agents/translation-specialist.md",
-    ROOT / "examples/minimal-project/.claude/agents/integration-specialist.md",
-]
-
-# Example skill directories — check SKILL.md exists in each.
-# v0.13.0 Phase 0b: brainstorming/review/security-review を aegis-* に改名
-REQUIRED_EXAMPLE_SKILL_DIRS = [
-    "aegis-brainstorm", "bug-diagnosis", "client-workflow", "deploy",
-    "docs-sync", "qa-verification", "aegis-review-gate", "aegis-security-gate",
-    "session-recovery", "ship-and-docs", "subagent-dev", "tdd",
-    "translation-mapping",
-    "integration-assist",
-    "browser-assist",
-    "user-manual",
-    "maintenance",
-    "uat",
-]
-
 # Legacy skill files that should NOT exist (migrated to .claude/skills/ in v0.6.0).
 LEGACY_SKILL_DIR = ROOT / "docs/skills"
 
@@ -348,8 +252,7 @@ MODEL_EFFORT_POLICY = {
     "integration-specialist.md": ("inherit", "high"),
 }
 _VERSION_ID_RE = re.compile(r"claude-[\w-]*\d")
-# root と example ミラーの両方を同一ポリシーで検証する。
-MODEL_POLICY_ROOTS = [ROOT, ROOT / "examples/minimal-project"]
+MODEL_POLICY_ROOTS = [ROOT]
 
 
 def _frontmatter_section(text: str) -> str:
@@ -590,7 +493,7 @@ def main() -> int:
     # but it always equals ROOT, so the ignored argument is harmless.
     failures: list[str] = []
 
-    for path in REQUIRED_FILES + REQUIRED_AGENT_FILES + REQUIRED_SKILL_FILES + REQUIRED_RULES_FILES + REQUIRED_COMMAND_FILES + REQUIRED_TEMPLATE_FILES + REQUIRED_HOOK_FILES + REQUIRED_EXAMPLE_FILES:
+    for path in REQUIRED_FILES + REQUIRED_AGENT_FILES + REQUIRED_SKILL_FILES + REQUIRED_RULES_FILES + REQUIRED_COMMAND_FILES + REQUIRED_TEMPLATE_FILES + REQUIRED_HOOK_FILES:
         if not path.exists():
             failures.append(f"missing required file: {path.relative_to(ROOT)}")
 
@@ -602,16 +505,9 @@ def main() -> int:
                 " (skills migrated to .claude/skills/ in v0.6.0 — delete this file)"
             )
 
-    # Example project skill directories must each contain SKILL.md.
-    for skill_name in REQUIRED_EXAMPLE_SKILL_DIRS:
-        skill_file = ROOT / "examples/minimal-project/.claude/skills" / skill_name / "SKILL.md"
-        if not skill_file.exists():
-            failures.append(f"missing example skill: {skill_file.relative_to(ROOT)}")
-
     for path in [
         ROOT / "CLAUDE.md",
         ROOT / "templates/CLAUDE.template.md",
-        ROOT / "examples/minimal-project/CLAUDE.md",
     ]:
         if not path.exists():
             continue
@@ -656,7 +552,6 @@ def main() -> int:
     claude_paths = [
         ROOT / "CLAUDE.md",
         ROOT / "templates/CLAUDE.template.md",
-        ROOT / "examples/minimal-project/CLAUDE.md",
     ]
     failure_rules: dict[str, str] = {}
     for path in claude_paths:
@@ -685,7 +580,7 @@ def main() -> int:
             + ", ".join(failure_rules.keys())
         )
 
-    for path in [ROOT / "docs/STATUS.md", ROOT / "examples/minimal-project/docs/STATUS.md"]:
+    for path in [ROOT / "docs/STATUS.md"]:
         if path.exists():
             failures.extend(validate_status_file(path))
 
@@ -876,36 +771,6 @@ def main() -> int:
             if field not in fm:
                 failures.append(f"{rel} missing {field.rstrip(':')} in frontmatter")
 
-    # Example settings.json → hooks integrity: every hook command referenced in
-    # settings.json must have its script file present in the example project.
-    example_settings_path = ROOT / "examples/minimal-project/.claude/settings.json"
-    if example_settings_path.exists():
-        try:
-            example_settings = json.loads(read_text(example_settings_path))
-        except json.JSONDecodeError as e:
-            failures.append(f"example settings.json is not valid JSON: {e}")
-            example_settings = {}
-        example_hooks = example_settings.get("hooks", {}) if isinstance(example_settings, dict) else {}
-        for event, entries in example_hooks.items():
-            if not isinstance(entries, list):
-                continue
-            for entry in entries:
-                if not isinstance(entry, dict):
-                    continue
-                for hook in entry.get("hooks", []):
-                    if not isinstance(hook, dict):
-                        continue
-                    cmd = hook.get("command", "")
-                    if not isinstance(cmd, str) or not cmd:
-                        continue
-                    script_rel = script_rel_from_command(cmd)
-                    script_path = ROOT / "examples/minimal-project" / script_rel
-                    if not script_path.exists():
-                        failures.append(
-                            f"example settings.json references missing hook: {script_rel}"
-                            f" (event: {event})"
-                        )
-
     # Version sync: STATUS.md template and FRAMEWORK_VERSION constant must agree.
     status_template_path = ROOT / "templates/STATUS.template.md"
     if status_template_path.exists():
@@ -921,27 +786,10 @@ def main() -> int:
         else:
             failures.append("templates/STATUS.template.md missing framework_version")
 
-    # Version sync: example STATUS.md must match FRAMEWORK_VERSION (P2-6).
-    # The example is the non-engineer's copy source; drift there ships stale
-    # contracts invisibly (no other drift detector covers it).
-    example_status_path = ROOT / "examples/minimal-project/docs/STATUS.md"
-    if example_status_path.exists():
-        ex_match = re.search(
-            r'^framework_version:\s*"([^"]+)"',
-            read_text(example_status_path), re.M,
-        )
-        if not ex_match or ex_match.group(1) != FRAMEWORK_VERSION:
-            found = ex_match.group(1) if ex_match else "(missing)"
-            failures.append(
-                f"examples/minimal-project/docs/STATUS.md framework_version "
-                f"({found}) != FRAMEWORK_VERSION ({FRAMEWORK_VERSION})"
-            )
-
     # LEARNINGS.md lint: check format and multiline for high-confidence entries.
     # Only applied to framework repo and example (not enforced on general projects).
     LEARNINGS_LINT_TARGETS = [
         ROOT / "docs/LEARNINGS.md",
-        ROOT / "examples/minimal-project/docs/LEARNINGS.md",
     ]
     LEARNINGS_ENTRY_PATTERN = re.compile(
         r"^[^\S\n]*-[^\S\n]*\[confidence:(\d+)\]"
@@ -971,21 +819,6 @@ def main() -> int:
                             f"{rel}:{i} high-confidence learning (confidence:{confidence}) "
                             "spans multiple lines (must be single-line for session-start hook extraction)"
                         )
-
-    # Check example project files for leftover template placeholders.
-    # Shell files are exempt: they are never fill-in templates — drift's
-    # byte-identity mirror is their real contract — and their comments
-    # legitimately use angle-bracket notation (<root>, <utc>, ...).
-    for path in REQUIRED_EXAMPLE_FILES:
-        if not path.exists() or path.suffix == ".sh":
-            continue
-        text = read_text(path)
-        for match in PLACEHOLDER_PATTERN.finditer(text):
-            token = match.group(0)
-            if token not in PLACEHOLDER_ALLOWLIST:
-                failures.append(
-                    f"{path.relative_to(ROOT)} contains template placeholder: {token}"
-                )
 
     # --- Name cross-reference lint ---
     try:

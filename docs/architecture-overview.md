@@ -108,7 +108,7 @@ aegis/
 ├── scripts/                          # バリデータ・ユーティリティ
 │   ├── check_framework_contract.py   # フレームワーク契約検証
 │   ├── check_status.py               # STATUS.md YAML検証
-│   ├── check_reference_drift.py      # 参照名ドリフト検出（mirror-identity 含む）
+│   ├── check_reference_drift.py      # 参照名ドリフト検出
 │   ├── lint_names.py                 # 名前クロスリファレンス lint
 │   ├── eval_scaffold_smoke.py        # scaffold スモーク（hook/script を実発火検証）
 │   ├── eval_scenario.py              # シナリオ評価
@@ -145,13 +145,6 @@ aegis/
 │   └── qa-browser/                   # ブラウザ QA ワークフロー
 │       ├── README.md
 │       └── WORKFLOW.md
-│
-├── examples/minimal-project/         # 自己完結サンプルプロジェクト（本体とミラー）
-│   ├── CLAUDE.md
-│   ├── .claude/ (全構造ミラー)
-│   ├── docs/ (STATUS, LEARNINGS, 要件, 計画, レポート)
-│   ├── hooks/ (全フック + lib)
-│   └── scripts/ (check_status, update-gate, status_doctor, build-judge-card 等)
 │
 ├── docs/                             # フレームワーク自身のドキュメント
 │   ├── STATUS.md                     # 運用状態
@@ -402,9 +395,9 @@ TaskCreated / TaskCompleted
 
 | スクリプト | 用途 |
 |-----------|------|
-| `check_framework_contract.py` | フレームワーク契約検証（ファイル存在、CLAUDE.md/skill/rule 語数予算（`context_budget.py`・tighten-only ratchet）、スキル/エージェント/コマンド/フック整合性、model/effort policy、name lint、プロファイル検証、example placeholder/mirror） |
+| `check_framework_contract.py` | フレームワーク契約検証（ファイル存在、CLAUDE.md/skill/rule 語数予算（`context_budget.py`・tighten-only ratchet）、スキル/エージェント/コマンド/フック整合性、model/effort policy、name lint、プロファイル検証） |
 | `check_status.py` | STATUS.md YAML frontmatter 検証（必須フィールド、ゲート整合性、tri-state pre-approve、完了 evidence） |
-| `check_reference_drift.py` | 参照名ドリフト検出（14 チェック。本体↔example の mirror-identity を byte 比較。platform_manifest による event/tool ドリフトと検証日 staleness を含む） |
+| `check_reference_drift.py` | 参照名ドリフト検出（11 チェック。platform_manifest による event/tool ドリフトと検証日 staleness を含む） |
 | `lint_names.py` | 名前クロスリファレンス lint（種別ごとの抽出器） |
 | `run_eval.py` | 統合評価ランナー（Tier 0: unittest、Tier 1: 契約、Tier 2: scaffold スモーク、Tier 3: シナリオ） |
 | `eval_scaffold_smoke.py` | scaffold 後に hook/script を実発火して install 経路を検証 |
@@ -481,19 +474,7 @@ hook を含む場合は `hooks/lib/*.sh` を全て配布する。
 
 ---
 
-## 12. サンプルプロジェクト
-
-`examples/minimal-project/` は自己完結したサンプルプロジェクトで、
-フレームワークの全構成要素（エージェント、スキル、コマンド、ルール、フック、スクリプト）を含む。
-本体とは制御ファイルが byte 一致でミラーされ、`check_reference_drift.py` の mirror-identity が同期を強制する。
-
-実際のプロジェクト利用例として、「検索機能の実装」シナリオのドキュメント一式
-（要件定義、設計、計画、レビュー、QA、デプロイチェックリスト）を含んでおり、
-Client → Dev の全フローを追跡できる。
-
----
-
-## 13. コンテキスト予算ポリシー
+## 12. コンテキスト予算ポリシー
 
 文書読込は4段階のレベルで制御される:
 
@@ -508,7 +489,7 @@ Client → Dev の全フローを追跡できる。
 
 ---
 
-## 14. セットアップフロー
+## 13. セットアップフロー
 
 ```bash
 # 自動セットアップ（推奨）
@@ -528,7 +509,7 @@ python3 scripts/check_framework_contract.py --profile=standard --root <your-proj
 
 ---
 
-## 15. ファイル数サマリ
+## 14. ファイル数サマリ
 
 | カテゴリ | ファイル数 |
 |----------|----------|
@@ -538,19 +519,18 @@ python3 scripts/check_framework_contract.py --profile=standard --root <your-proj
 | スキル（.claude/skills/） | 19（SKILL.md x18 + platforms.md x1） |
 | コマンド（.claude/commands/） | 8 |
 | フック（hooks/） | 27（メイン 17 + lib/ 10: emit / patterns / extract-input / frontmatter / evidence / fingerprint / phase-skills / secrets-patterns / safety / sanitize） |
-| スクリプト（scripts/） | 14 |
+| スクリプト（scripts/） | 13 |
 | テンプレート（templates/） | 30（.template.md x26 + hooks.template.json + profiles x3） |
 | 拡張（extensions/） | 11 |
-| サンプル（examples/minimal-project/） | 約90（本体ミラー＋検索シナリオ一式・随時増減） |
 | ドキュメント（docs/） | 約96（plans/specs/qa-reports 等を含み随時増減） |
 | その他（README, .gitignore, bin/） | 3 |
-| **合計（.git 除く）** | **約 305** |
+| **合計（.git 除く）** | **約 215** |
 
-> サンプル・ドキュメントは作業に伴い増減する。構造的カテゴリ（エージェント〜テンプレート）の数値が正本。
+> ドキュメントは作業に伴い増減する。構造的カテゴリ（エージェント〜テンプレート）の数値が正本。
 
 ---
 
-## 16. バージョン履歴
+## 15. バージョン履歴
 
 | バージョン | 主な変更 |
 |-----------|---------|

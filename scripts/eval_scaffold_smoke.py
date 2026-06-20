@@ -27,10 +27,10 @@ CONTRACT_PY = SCRIPTS_DIR / "check_framework_contract.py"
 
 # Single source of truth for the intentionally-divergent scaffold-safe command
 # variants. Importing it (rather than hardcoding the list) makes the
-# command-surface check self-extending: adding a command to MIRROR_ALLOWLIST
+# command-surface check self-extending: adding a command to SCAFFOLD_SAFE_COMMANDS
 # automatically requires it to be wired into setup.sh resolve_source.
 sys.path.insert(0, str(SCRIPTS_DIR))
-from check_reference_drift import MIRROR_ALLOWLIST, check_skill_reachability  # noqa: E402
+from check_reference_drift import SCAFFOLD_SAFE_COMMANDS, check_skill_reachability  # noqa: E402
 
 # Profiles validated by file manifest (contract). full --profile validates the
 # framework repo itself (ignores --root), so it cannot be contract-validated as a
@@ -296,7 +296,7 @@ def verify_command_surface(target: Path, profile: str) -> tuple[bool, str]:
     """Prove setup.sh delivered the right command surface (audit F2, F3).
 
     Two invariants:
-      - Every MIRROR_ALLOWLIST command the scaffold installs must be the
+      - Every SCAFFOLD_SAFE_COMMANDS command the scaffold installs must be the
         scaffold-safe template variant, not the framework variant — i.e.
         resolve_source must map it. retro must additionally keep its
         graceful-degradation guard.
@@ -306,7 +306,7 @@ def verify_command_surface(target: Path, profile: str) -> tuple[bool, str]:
     failures: list[str] = []
     command_source = REPO_ROOT / "templates" / "commands"
 
-    for rel in sorted(MIRROR_ALLOWLIST):
+    for rel in sorted(SCAFFOLD_SAFE_COMMANDS):
         installed = target / rel
         if not installed.is_file():
             continue  # this profile does not install this command

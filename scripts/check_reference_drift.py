@@ -437,91 +437,10 @@ def check_skill_reachability(root: Path) -> tuple[list[str], list[str]]:
     return failures, warnings
 
 
-def check_example_readme_counts(root: Path) -> tuple[list[str], list[str]]:
-    """#9: examples/minimal-project/README.md counts vs actual example files"""
-    failures: list[str] = []
-    warnings: list[str] = []
-
-    example_root = root / "examples" / "minimal-project"
-    readme_path = example_root / "README.md"
-    if not readme_path.exists():
-        return failures, warnings
-
-    text = _read(readme_path)
-
-    # Agent count: "(N agents)"
-    agents_dir = example_root / ".claude" / "agents"
-    match = re.search(r"\((\d+)\s+agents?\)", text)
-    if match and agents_dir.is_dir():
-        stated = int(match.group(1))
-        actual = len(list(agents_dir.glob("*.md")))
-        if stated != actual:
-            warnings.append(f"example README says {stated} agents but found {actual}")
-
-    # Skill count: "(N skills)"
-    skills_dir = example_root / ".claude" / "skills"
-    match = re.search(r"\((\d+)\s+skills?\)", text)
-    if match and skills_dir.is_dir():
-        stated = int(match.group(1))
-        actual = len([d for d in skills_dir.iterdir() if d.is_dir() and (d / "SKILL.md").exists()])
-        if stated != actual:
-            warnings.append(f"example README says {stated} skills but found {actual}")
-
-    return failures, warnings
-
-
-def check_example_commands(root: Path) -> tuple[list[str], list[str]]:
-    """#10: example commands exist in root (excluding intentional divergence)"""
-    failures: list[str] = []
-    warnings: list[str] = []
-
-    # Commands that may exist ONLY in the example (not in root). This is
-    # EXISTENCE divergence — a different concept from MIRROR_ALLOWLIST, which
-    # lists commands present in BOTH trees whose CONTENT may differ
-    # (scaffold-safe variants like validate.md / retro.md). No command is
-    # example-only today, so this is empty; do not conflate it with
-    # MIRROR_ALLOWLIST by adding content-divergent commands here.
-    intentional_divergence: set[str] = set()
-
-    example_commands_dir = root / "examples" / "minimal-project" / ".claude" / "commands"
-    root_commands_dir = root / ".claude" / "commands"
-
-    if not example_commands_dir.is_dir() or not root_commands_dir.is_dir():
-        return failures, warnings
-
-    example_commands = _glob_stems(example_commands_dir, "*.md") - intentional_divergence
-    root_commands = _glob_stems(root_commands_dir, "*.md")
-
-    missing_in_root = example_commands - root_commands
-    for name in sorted(missing_in_root):
-        warnings.append(
-            f"example has command '/{name}' but root .claude/commands/{name}.md does not exist"
-        )
-
-    return failures, warnings
-
-
-# Control files copied verbatim into the example scaffold. These must stay
-# byte-identical to the framework root; content drift here is invisible to
-# existence-only contract checks and silently ships a stale example (the very
-# thing a non-engineer copies). Templated files (CLAUDE.md, STATUS.md) and the
-# scaffold-safe command variants are intentionally divergent and excluded.
-MIRROR_DIRS = [
-    Path(".claude") / "agents",
-    Path(".claude") / "rules",
-    Path(".claude") / "skills",
-    Path("hooks"),
-    Path(".claude") / "commands",
-]
-MIRROR_FILES = [
-    Path("scripts") / "check_status.py",
-    Path("scripts") / "update-gate.sh",
-    Path("scripts") / "run-test-strength-drill.py",
-    Path("scripts") / "build-judge-card.py",
-    Path("scripts") / "record-test-result.py",
-    Path("scripts") / "status_doctor.py",
-]
-MIRROR_ALLOWLIST = {
+# Scaffold-safe command variants: commands present in templates/commands/ whose
+# content intentionally diverges from the framework root (e.g. graceful guards
+# for optional scripts). Used by eval_scaffold_smoke.verify_command_surface.
+SCAFFOLD_SAFE_COMMANDS = {
     Path(".claude") / "commands" / "validate.md",
     Path(".claude") / "commands" / "retro.md",
 }
@@ -585,45 +504,6 @@ def check_platform_staleness(root: Path) -> tuple[list[str], list[str]]:
     return [], warnings
 
 
-def check_mirror_identity(root: Path) -> tuple[list[str], list[str]]:
-    """#11: control files mirrored into examples/minimal-project must be
-    byte-identical to the framework root. Compares only files present on BOTH
-    sides (presence is enforced by check_framework_contract); reports content
-    drift as a FAIL."""
-    failures: list[str] = []
-    warnings: list[str] = []
-
-    example_root = root / "examples" / "minimal-project"
-    if not example_root.is_dir():
-        return failures, warnings
-
-    candidates: list[Path] = []
-    for d in MIRROR_DIRS:
-        root_dir = root / d
-        if not root_dir.is_dir():
-            continue
-        for p in sorted(root_dir.rglob("*")):
-            if p.is_file():
-                candidates.append(p.relative_to(root))
-    candidates.extend(MIRROR_FILES)
-
-    for rel in candidates:
-        if rel in MIRROR_ALLOWLIST:
-            continue
-        root_file = root / rel
-        example_file = example_root / rel
-        # Only compare when both exist; presence is enforced elsewhere.
-        if not root_file.is_file() or not example_file.is_file():
-            continue
-        if root_file.read_bytes() != example_file.read_bytes():
-            failures.append(
-                f"mirror drift: examples/minimal-project/{rel} differs from root "
-                f"{rel} (control file must be byte-identical to the framework root)"
-            )
-
-    return failures, warnings
-
-
 # ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
@@ -638,9 +518,6 @@ ALL_CHECKS = [
     ("template version", check_template_version),
     ("skill reachability", check_skill_reachability),
     ("template references", check_template_references),
-    ("example README counts", check_example_readme_counts),
-    ("example commands", check_example_commands),
-    ("mirror identity (root ↔ example)", check_mirror_identity),
     ("platform manifest (events/tools)", check_platform_manifest),
     ("platform verification staleness", check_platform_staleness),
 ]

@@ -163,11 +163,16 @@ Expected: 全 profile PASS（新 E1 不変条件含む）。
 - `MIRROR_DIRS`・`MIRROR_FILES` 定義を削除。
 - `MIRROR_ALLOWLIST` を `SCAFFOLD_SAFE_COMMANDS` に改名（中身＝`.claude/commands/validate.md`・retro.md）。eval の import（:33）も新名に更新。
 
-- [ ] **Step 2: contract から REQUIRED_EXAMPLE_FILES を除去**
+- [ ] **Step 2: contract から example 検証ロジックを*全部*除去（実装時発覚＝REQUIRED_EXAMPLE_FILES だけではない）**
 
-`scripts/check_framework_contract.py`:
-- `REQUIRED_EXAMPLE_FILES` ブロック（177-約258行）を削除。
-- 利用2箇所（:591 の存在ループの連結、:977 のループ）から `REQUIRED_EXAMPLE_FILES` を除去。
+> **重要（grill-plan も見落とした隠れ依存）**: `check_framework_contract.py` は REQUIRED_EXAMPLE_FILES 以外にも example を検証している（計9箇所）。pytest では露見せず、**Tier-1 の `check_framework_contract.py` 直接実行**でのみ FAIL する（`REQUIRED_EXAMPLE_SKILL_DIRS` ループ18件＋`MODEL_POLICY_ROOTS` の example agents dir）。
+
+`scripts/check_framework_contract.py` から以下を除去:
+- `REQUIRED_EXAMPLE_FILES` 定義ブロック＋利用2箇所（存在ループ連結・もう1つのループ）。
+- `REQUIRED_EXAMPLE_SKILL_DIRS` 定義＋利用ループ（skill_file 存在チェック・**ガード無し＝FAIL 源**）。
+- `MODEL_POLICY_ROOTS = [ROOT, ...example]` → `[ROOT]`（**ガード無し＝FAIL 源**）。
+- example を含むリストから example エントリを除去: CLAUDE.md ループ・failure-rule sync・STATUS 検証ループ・LEARNINGS_LINT_TARGETS（いずれも存在ガード有り＝無害だが dangling）。
+- example 専用ブロックを削除: 「example settings.json → hooks integrity」「example STATUS.md version sync (P2-6)」（いずれも存在ガード有り）。
 
 - [ ] **Step 3: ファイル・ターゲット撤去**
 
@@ -178,10 +183,15 @@ git rm "scripts/sync_example_mirror.py" "tests/test_mirror_identity.py" "tests/t
 ```
 `Makefile` の `.PHONY` から `example` を外し `example:` ターゲット2行を削除。`README.md` の examples 参照（ディレクトリツリー行・`make example` 節・`--root examples/minimal-project` 記述）を除去。
 
-- [ ] **Step 4: full suite を走らせ、期待される失敗集合を確認**
+- [ ] **Step 4: pytest ＋ Tier-1 contract の両方で失敗を確認（pytest だけでは不十分）**
+
+> **教訓**: pytest（Tier 0）は contract の full self-check を**走らせない**（CLI 専用）。必ず両方走らせること。
 
 Run: `python3 -m pytest -q`
-Expected RED（**唯一・想定内**）: `tests/test_arch_overview_currency.py` のドリフト件数（"claims 14 ... ALL_CHECKS = 11"）の1件のみ。grill-plan 実証で `check_readme_counts` は examples 非依存・test 側の examples 参照は Task3 で除去済みのため、他の RED は出ない想定。**currency 以外が1件でも RED なら STOP して報告**（examples への隠れ依存の最終網）。
+Expected RED: `tests/test_arch_overview_currency.py` のドリフト件数（"claims 14 ... ALL_CHECKS = 11"）1件。
+
+Run: `python3 scripts/check_framework_contract.py`
+Expected: Step 2 を完了していれば `PASS: aegis contract is aligned`。**未完了なら example 検証の FAIL が多数出る**（これが Step 2 の全 example 検証除去が必要な理由＝pytest では見えない）。currency 以外の pytest 失敗、または contract の想定外 FAIL があれば STOP して報告。
 
 - [ ] **Step 5: arch-overview と README 件数を同期（GREEN へ）**
 
@@ -204,6 +214,9 @@ Expected: 出力なし（0件）。docs の歴史記述はワークストリー�
 
 Run: `python3 scripts/eval_scaffold_smoke.py`
 Expected: 全 profile PASS（実 install 経路は templates/ ベースで健全）。
+
+Run: `python3 scripts/run_eval.py`（Tier 1 包括ゲート＝contract/drift/status/doctor）
+Expected: `Result: PASS`。**この工程は pytest だけで緑判定しないこと**——contract の example 検証は CLI 専用。
 
 - [ ] **Step 7: ステージ確認 → コミット ＋ Aegis ゲート**
 
