@@ -73,7 +73,6 @@ aegis/
 
 - [Onboarding](docs/onboarding/README.md) — guided tutorial, hands-on, and cheat sheet (start here)
 - [Architecture overview](docs/architecture-overview.md) — control flow and how the components fit together
-- [Migration history](docs/MIGRATION-HISTORY.md) — version-to-version upgrade notes
 
 ## Native Feature Mapping
 
@@ -178,8 +177,7 @@ python3 scripts/check_status.py --root . --strict
 ## Migration
 
 Aegis follows semantic versioning against a defined public contract (see the
-**Stability & Versioning** section below). Version-to-version upgrade notes
-live in [docs/MIGRATION-HISTORY.md](docs/MIGRATION-HISTORY.md).
+**Stability & Versioning** section below).
 
 ## Extensions
 

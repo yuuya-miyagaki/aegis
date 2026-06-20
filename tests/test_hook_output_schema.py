@@ -1261,8 +1261,7 @@ class TestCheckSecretsBroadStaging(HookSchemaAssertions):
 
 # ---------------------------------------------------------------------------
 # Audit fix-forward P1 (A1-A4): extraction fidelity, gate fail-closed,
-# deploy word-boundary. See docs/archive/reviews/audit-report-2026-06-06.md and
-# docs/archive/plans/2026-06-06-v1-audit-fixforward-p1p2-plan.md.
+# deploy word-boundary (2026-06-06 audit fix-forward; history in git log).
 # ---------------------------------------------------------------------------
 
 
