@@ -9,7 +9,7 @@
 - 依存監査: unverified
 
 ## ティア2: 🔍 第2意見（self-attested・自己申告・低信頼）
-- あり: approve
+- あり: approve_with_notes
 
 ## 🟡 要確認
 - 依存監査が未検証
@@ -18,4 +18,4 @@
 （LLM が平易日本語で記述）
 
 ## ACK
-- 外部依存 manifest 無し（stdlib python＋bash のみ）で依存監査は適用対象なし＝unverified は N/A の意。本差分は新規依存を追加せず、secrets/stubs スキャン clean・tests green・盲検2次 security 独立レビュー approve。 （2026-06-21 03:14）
+- 新規外部依存ゼロ（cp-lock.sh は pure-bash・python stdlib のみ）＝監査対象の依存パッケージ無し（deps N/A・iteration 33 同様）。adversarial 9 ベクタ遮断・secrets 0・deploy-blocker 無し （2026-06-21 23:52）

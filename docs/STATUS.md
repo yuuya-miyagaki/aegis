@@ -3,7 +3,7 @@ framework: aegis
 framework_version: "1.13.0"
 project_name: "Aegis"
 mode: Dev
-phase: review
+phase: deploy
 task_type: framework
 task_size: L
 task_size_rationale: "iteration 35 = 案A immutable moat（layer-2 OS lock 追加・L）: control-plane 誤書込み防御を多層化。新規 cp-lock.sh（chmod -R a-w / task_type 連動 lock-unlock）＋ session-start 連動を layer-2 として追加。check-control-plane.sh（layer-1・889行）は退役せず存置し chmod-unlock guard を追加。settings*.json を LOCK 側へ移動。安定 CP セットの単一所有 manifest。Windows は layer-1 のみ（chmod no-op）。SF-001〜005 は POSIX/macOS で実務クローズ・Windows 残余。設計レビューで初版『全退役・置換』を撤回し layer-2 追加に修正済（Windows ゼロ保護 / EACCES が chmod+w 自己修復誘発 / hooks-lib は共有インフラ の3点）。SemVer MINOR 候補（1.13.0）。設計 docs/specs/2026-06-21-immutable-moat-design.md（rev.2）。"
@@ -15,9 +15,9 @@ gate_approvals:
   brainstorm: approved
   plan: approved
   review: approved
-  qa: pending
-  security: pending
-  deploy: pending
+  qa: approved
+  security: approved
+  deploy: approved
   dev_ready_for_client: pending
 current_refs:
   requirements:
@@ -25,9 +25,9 @@ current_refs:
   plan: docs/plans/2026-06-21-aegis-iteration35-immutable-moat.md
   spec: docs/specs/2026-06-21-immutable-moat-design.md
   review: docs/qa-reports/iter35-review.md
-  qa: null
-  security: null
-  deploy: null
+  qa: docs/qa-reports/test-strength.md
+  security: docs/qa-reports/iter35-security.md
+  deploy: docs/qa-reports/iter35-deploy.md
   translation: null
 external_evidence:
   - type: "second-opinion-v1-foundation-r1-r2"
@@ -42,14 +42,14 @@ external_evidence:
     scope: "v0.12.2 実装後 4 ラウンドレビュー"
     findings: "Round 6 (P1×2, P2×1: pre-compact exit 2 / minimal-project / test rc), Round 7 (P1×1, P3×1: git add 漏れ / テスト件数表記), Round 8 (P2×1, P3×1: stale last_updated / grep 自己マッチ), Round 9 (P3×2: コメント不整合)"
     resolution: "9件全反映。tier 1/2 PASS、134 tests PASS、本体と minimal-project 完全同期確認済み。"
-next_action: "**【iteration 35 = 案A immutable moat（layer-2 OS lock）/ review ゲート承認済・2026-06-21】** 実装完了（7 commit 1e46e4d〜244c32e・クリーンツリー・full suite 1025 passed/1 skip・contract PASS・版 1.13.0）。設計 rev.2＋grill-plan＋実装（subagent-dev TDD）＋grill-code＋Review Army＋review ゲート approve（judge 🟢・証拠 docs/qa-reports/iter35-review.md・manual record で test green 確立）まで完了。**実装の確定形（grill 反映後・正典）**: layer-2 は『脆い layer-1（889行・5バイパス実績）に対する**事故ケース限定の独立 syscall 保険**』＝**敵対 SF-004 は閉じない**（owner os.chmod 解錠）・SF 項目は CLOSED にせず disposition 追記のみ。`cp-lock.sh`（aegis_cp_paths 単一所有・空 root ガード・CP_DIRS↔cp-lock 相互リンク）＋session-start 連動（fail-warn・`if [ -f ]` ガードで set -e 対応）。**lock 対象**: hooks/scripts/templates/CLAUDE.md/.claude/{rules,skills,commands,agents}（**settings は両方除外**＝ハーネスが書く・layer-1 で保護／root も lock しない）。`chflags uchg` 不採用。テストは WINDOWS＋root skip。**残ゲート: qa・security・deploy（pending）。** **次の一手の推奨: security ゲートを正規に回す**（本件はモート機能＝security エージェントの盲検 adversarial レビューで os.chmod 解錠が唯一の限界か／syscall 強制に穴がないかを独立検証）。qa/deploy は iteration 32/34 同様ユーザー判断で短絡し push で締め可。**follow-up（別 iteration・非ブロッカー）**: NFS/SMB/FUSE で chmod -R が高レイテンシ→ネットワーク FS 検出 skip／lifecycle re-lock 繰延（計画 残課題）。**残: Batch E は別 iteration。** Bash gotcha: パスはクォート・commit は -F・特殊文字は python FILE。push は yuuya-miyagaki アカウント。"
+next_action: "**【iteration 35 = 案A immutable moat（layer-2 OS lock）/ 全6ゲート approved・push 直前・2026-06-22】** brainstorm✓ plan✓ review✓ qa✓ security✓ deploy✓ 全承認。実装7 commit 1e46e4d〜244c32e＋ゲート証拠。full suite 1025 passed/1 skip・contract PASS・版 1.13.0。**実装の確定形（正典）**: layer-2 は『脆い layer-1（889行・5バイパス実績）に対する**事故ケース限定の独立 syscall 保険**』＝**敵対 SF-004 は閉じない**（owner os.chmod 解錠）・SF は CLOSED にせず disposition 追記のみ。`cp-lock.sh`（aegis_cp_paths 単一所有・空 root ガード・CP_DIRS↔cp-lock 相互リンク）＋session-start fail-warn（`if [ -f ]` で set -e 対応）。lock 対象: hooks/scripts/templates/CLAUDE.md/.claude/{rules,skills,commands,agents}（settings 両方除外・root も lock しない）。証拠: iter35-review.md / iter35-security.md（adversarial 9 ベクタ遮断・hardlink 含む）/ test-strength.md / iter35-deploy.md。**security は盲検 adversarial を正規に実施（短絡せず）。** **次の一手: ゲート証拠コミット → push（yuuya-miyagaki）→ ship/docs。** **要対応 follow-up（別 iteration・非ブロッカー）**: (1) **テスト分離バグ**＝full suite 内のどれかが実リポ scripts/check_status.py をモード700 に変更し fingerprint を揺らす（テストは実リポを mutate すべきでない・原因テスト特定要）、(2) NFS/SMB/FUSE で chmod -R 高レイテンシ→FS 検出 skip、(3) lifecycle re-lock 繰延。**残: Batch E は別 iteration。** Bash gotcha: パスはクォート・commit は -F・特殊文字は python FILE。push は yuuya-miyagaki アカウント。"
 blockers: []
 failure_tracking: null
 session_history:
-  - date: "2026-06-21"
+  - date: "2026-06-22"
     mode: Dev
-    phase: "review"
-    note: "iteration 35（案A immutable moat・layer-2 OS lock）review まで完了: 設計を user review→初版『静的 moat 全退役・置換』を撤回し layer-2 追加（rev.2）。**設計レビュー時の暫定案は後段の grill で 3 点 reversed（最終はこちらが正典）**: (a) settings*.json を当初 LOCK 予定→**grill-plan で両方 除外**（Claude Code ハーネスが settings へ permission grant を書く・本リポは hook 登録が settings.local.json で settings.json 不在を実測）、(b) chmod-unlock guard 新規追加予定→**既存 layer-1 が既に deny 済と実測→回帰テストで固定のみ**、(c) mv gap で root 非再帰 a-w 予定→**root は lock しない**（downstream のユーザー root を縛る・mv は layer-1 deny で足る）、(d) SF を『実務クローズ』予定→**敵対 os.chmod 解錠で閉じない＝CLOSED にしない・disposition 追記のみ**、(e) chflags uchg→不採用、(f) lifecycle re-lock→繰延。実装: subagent-dev で Task0-4 per-task TDD（cp-lock.sh 単一所有/session-start fail-warn/layer-1 回帰固定/SF カタログ lock 実証/contract+版1.13.0+docs）→grill-code（🔴0🟡0・🟢 空root ガード/scripts assertion を fix-forward）→Review Army 3（testing rc=1 gap・maintainability drift・performance NFS を fix-forward／NFS は非ブロッカー follow-up）→review ゲート approve（judge 🟢・manual record で test green）。検証: full suite 1025 passed/1 skip・contract PASS・版 1.13.0 同期。コミット 1e46e4d〜244c32e（クリーンツリー）。STATUS rollover は gate-tamper 監査に阻まれ update-gate.sh reset 経由に是正。残ゲート: qa/security/deploy。push は yuuya-miyagaki アカウント。"
+    phase: "deploy"
+    note: "iteration 35（案A immutable moat・layer-2 OS lock）全6ゲート完了: 設計を user review→初版『静的 moat 全退役・置換』を撤回し layer-2 追加（rev.2）。**設計レビュー時の暫定案は後段の grill で 3 点 reversed（最終はこちらが正典）**: (a) settings*.json を当初 LOCK 予定→**grill-plan で両方 除外**（Claude Code ハーネスが settings へ permission grant を書く・本リポは hook 登録が settings.local.json で settings.json 不在を実測）、(b) chmod-unlock guard 新規追加予定→**既存 layer-1 が既に deny 済と実測→回帰テストで固定のみ**、(c) mv gap で root 非再帰 a-w 予定→**root は lock しない**（downstream のユーザー root を縛る・mv は layer-1 deny で足る）、(d) SF を『実務クローズ』予定→**敵対 os.chmod 解錠で閉じない＝CLOSED にしない・disposition 追記のみ**、(e) chflags uchg→不採用、(f) lifecycle re-lock→繰延。実装: subagent-dev で Task0-4 per-task TDD（cp-lock.sh 単一所有/session-start fail-warn/layer-1 回帰固定/SF カタログ lock 実証/contract+版1.13.0+docs）→grill-code（🔴0🟡0・🟢 空root ガード/scripts assertion を fix-forward）→Review Army 3（testing rc=1 gap・maintainability drift・performance NFS を fix-forward／NFS は非ブロッカー follow-up）→review ゲート approve（judge 🟢・manual record で test green）。検証: full suite 1025 passed/1 skip・contract PASS・版 1.13.0 同期。コミット 1e46e4d〜244c32e（実装）。**ゲート（全6 approved）**: review🟢／qa🟡ack（skip-drill＝per-task commit 済の想定縁ケース・手動 mutation 同等で lock 破壊を実証＝chmod no-op 化で lock/SF テスト FAIL→復元で PASS）／**security🟢（短絡せず正規実施）**＝盲検 adversarial で lock 中の CP へ 9 ベクタ実走→全遮断（truncate/O_TRUNC/dd/tee/open(w)/rm/mv/install/**hardlink**＝inode 共有で mode 効く）・唯一の残余 pre-open-FD は os.chmod 解錠と同じ accepted クラス（事故ベクタでない）・secrets0・deps N/A ack・deploy-blocker なし／deploy🟢（framework＝push 締め）。grill-code🔴0🟡0・Review Army3（testing rc=1 gap/maintainability drift/performance NFS）全 fix-forward。証拠: iter35-review/security/deploy.md・test-strength.md。**発見した follow-up（別 iteration）**: テスト分離バグ＝full suite が実リポ scripts/check_status.py をモード700 化し fingerprint を揺らす（要原因特定）。STATUS rollover は gate-tamper 監査に阻まれ update-gate.sh reset 経由に是正。push は yuuya-miyagaki アカウント。"
   - date: "2026-06-21"
     mode: Dev
     phase: "review"
