@@ -10,6 +10,14 @@ source "${SCRIPT_DIR}/lib/emit.sh"
 source "${SCRIPT_DIR}/lib/frontmatter.sh"
 source "${SCRIPT_DIR}/lib/phase-skills.sh"
 source "${SCRIPT_DIR}/lib/sanitize.sh"
+# layer-2 CP OS-lock lib. Sourced safely: a missing/broken lib must NOT
+# fail-close the session (the static moat / layer-1 is always present).
+# NOTE: a bare `source missing.sh || true` does NOT survive `set -e` — sourcing
+# a nonexistent file is fatal and bypasses `||`. Guard with -f so the missing
+# lib path is simply skipped (the command -v check below then emits the warn).
+if [ -f "${SCRIPT_DIR}/lib/cp-lock.sh" ]; then
+  source "${SCRIPT_DIR}/lib/cp-lock.sh" 2>/dev/null || true
+fi
 
 # If STATUS.md doesn't exist, allow silently.
 if [ ! -f "$STATUS_FILE" ]; then
@@ -257,6 +265,18 @@ CONTEXT="${CONTEXT} / ドキュメントは日本語"
 # Surface the disabled TDD backstop each session when AEGIS_TDD_MODE=off (prevents off being silently left on).
 if [ "${AEGIS_TDD_MODE:-}" = "off" ]; then
   CONTEXT="${CONTEXT} | [WARNING] AEGIS_TDD_MODE=off — TDD backstop はこのセッション無効（テスト無しの本番編集でも確認なし）"
+fi
+
+# layer-2: OS/FS write-lock of the stable control-plane, keyed on task_type.
+# Lock failure is non-fatal — warn into CONTEXT; layer-1 static moat stays active.
+if command -v aegis_cp_lock >/dev/null 2>&1 && command -v aegis_cp_unlock >/dev/null 2>&1; then
+  if [ "$TASK_TYPE" = "framework" ]; then
+    aegis_cp_unlock "$ROOT" || CONTEXT="${CONTEXT} | [WARNING] control-plane unlock 一部失敗（framework 編集が EACCES になる場合あり・該当ファイルを手動 chmod u+w）"
+  else
+    aegis_cp_lock "$ROOT" || CONTEXT="${CONTEXT} | [WARNING] control-plane lock 一部失敗（layer-2 未適用・layer-1 静的 moat は有効）"
+  fi
+else
+  CONTEXT="${CONTEXT} | [WARNING] cp-lock.sh 利用不可（layer-2 OS lock skip・layer-1 静的 moat は有効）"
 fi
 
 emit_context SessionStart "$CONTEXT"
