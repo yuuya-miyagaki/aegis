@@ -75,6 +75,9 @@ class TestCpLock:
             assert _bash('aegis_cp_lock "$PWD"', tmp.name).returncode == 0
             cp_file = p / "hooks" / "lib" / "util.sh"
             assert not _can_write(cp_file), "locked CP file must reject append"
+            # all listed CP dirs are locked uniformly, not just hooks/
+            assert not _can_write(p / "scripts" / "tool.py"), \
+                "scripts/ must also be locked"
             assert subprocess.run(
                 ["bash", "-c", f'cp /etc/hostname "{cp_file}"'],
                 capture_output=True).returncode != 0
@@ -127,3 +130,10 @@ class TestCpLock:
         finally:
             subprocess.run(["chmod", "-R", "u+w", tmp.name])
             tmp.cleanup()
+
+
+# Platform-independent (no chmod): runs even on Windows/root CI.
+def test_empty_root_is_rejected():
+    # An empty root must fail loud (rc 1), never silently chmod absolute /hooks etc.
+    assert _bash('aegis_cp_lock ""', ".").returncode == 1
+    assert _bash('aegis_cp_unlock ""', ".").returncode == 1

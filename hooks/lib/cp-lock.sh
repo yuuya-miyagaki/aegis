@@ -32,6 +32,9 @@ aegis_cp_paths() {
 # aegis_cp_lock <root> — make the stable CP read-only. rc 0 all-ok, 1 on any failure.
 aegis_cp_lock() {
   local root="$1" rc=0 p
+  # Guard: an empty root would make aegis_cp_paths emit absolute /hooks /scripts …
+  # ([ -e ] would skip them on a normal system, but fail loud rather than silently).
+  [ -n "$root" ] || return 1
   while IFS= read -r p; do
     [ -n "$p" ] || continue
     chmod -R a-w "$p" 2>/dev/null || rc=1
@@ -42,6 +45,7 @@ aegis_cp_lock() {
 # aegis_cp_unlock <root> — restore owner write on the stable CP. rc 0/1 as above.
 aegis_cp_unlock() {
   local root="$1" rc=0 p
+  [ -n "$root" ] || return 1
   while IFS= read -r p; do
     [ -n "$p" ] || continue
     chmod -R u+w "$p" 2>/dev/null || rc=1
