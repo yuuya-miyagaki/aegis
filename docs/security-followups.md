@@ -128,6 +128,17 @@ SF-001 系の網羅的閉鎖（rounds 5-11）で**実用的なシェル難読化
 - 現行の静的 augment は「層1＝敷居を上げる」として維持（accidental＋多くの意図的難読化を
   捕捉）。案A/B を「層2＝原理的限界の補完」として追加するのが費用対効果が高い。
 
+### 案A PoC findings（2026-06-21・throwaway spike・非 root 実走）
+
+事故防止スコープでは案A は「層2 補完」ではなく **静的 moat の置換** が可能と実証:
+
+- `chmod -R a-w`（CP code/dir）で、`echo>`/`cp`/`rm`/`rm -rf` に加え **`python3 -c open(w)`（SF-004 原理的限界）・`perl -e open(>)`・quote-split `> "hoo""ks/x"`（SF-001）も全て遮断**（CP file は INTACT）。OS は**コマンド文字列を解釈せず syscall で強制**＝形非依存で SF-001〜005 をまとめて閉じる（静的解析では原理的に不可能だった面）。
+- uid≠root・cross-platform（`chmod`）。`chflags uchg`（macOS）は owner の `chmod +w` 後も "Operation not permitted"＝追加硬化（root 不要・macOS のみ）。`chattr +i`（Linux）は root 必要＝不採用。
+- UNLOCK（`chmod -R u+w`）で framework 書込みは即復帰＝lifecycle は task_type 連動で実装可能。
+- **非 sandbox（許容）**: エージェントが `chmod +w` を前置すれば書ける＝事故防止スコープでは許容（事故は chmod を前置しない）。
+- **実装時の必須設計（no-go 回避）**: lock 対象は**安定 CP（hooks/*.sh・scripts/*.py・CLAUDE.md・.claude/rules・.claude/skills・templates）に限定**し、framework が実行時に書く runtime-state（`docs/STATUS.md`・`.claude/.gate-snapshot`・`evidence-log`・settings）は**除外**（さもないと framework 自身が壊れる）。re-lock は default-lock＋積極再施錠で crash 窓を縮小。
+- **結論: GO**。iteration 35 で 案A を実装し、成立すれば `check-control-plane.sh`〜1000行＋SF-001〜005 を層1 ごと退役。設計: `docs/specs/2026-06-21-immutable-moat-design.md`。
+
 ## CLOSED
 
 （なし）
