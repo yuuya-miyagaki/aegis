@@ -3,30 +3,30 @@ framework: aegis
 framework_version: "1.12.0"
 project_name: "Aegis"
 mode: Dev
-phase: security
+phase: implement
 task_type: framework
 task_size: L
 task_size_rationale: "iteration 33 = M4（簡素化 WS4・最終）: 観測 hook の fingerprint/marker 計算を全 Bash hot-path からテストランナー検出時のみへ寄せる。改修: hooks/lib/evidence.sh（共有 is_test_runner_cmd 追加＋append_evidence 条件分岐＋schema コメント）＋hooks/post-bash.sh（検出を共有関数へ統合）＋tests/test_evidence_lib.py＋tests/test_evidence_hooks.py＝コア2＋テスト2＝L 相当（実コード変更は小だが唯一コード挙動を変える最高 stakes）。silent-green（未テストコードが緑認証）回避が絶対条件。ゲート: review+qa+security（deploy は solo の push-readiness）。盲検2次必須。計画: docs/plans/2026-06-21-aegis-m4-fingerprint-hotpath-rebuild.md／設計正典: docs/plans/2026-06-20-aegis-simplification-design.md #4。版は 1.12.0 据置（iteration counter と framework_version は直交・他簡素化 WS と同様バンプなし）。"
-iteration: 33
+iteration: 34
 ui_surface: false
-last_updated: "2026-06-21T12:00:00Z"
+last_updated: "2026-06-21T15:00:00Z"
 gate_approvals:
   client_ready_for_dev: n/a
   brainstorm: approved
   plan: approved
-  review: approved
-  qa: approved
-  security: approved
+  review: pending
+  qa: pending
+  security: pending
   deploy: pending
   dev_ready_for_client: pending
 current_refs:
   requirements:
     - docs/full-review-2026-06-13-context-futureproof.md
-  plan: docs/plans/2026-06-21-aegis-m4-fingerprint-hotpath-rebuild.md
-  spec: docs/plans/2026-06-20-aegis-simplification-design.md
-  review: docs/qa-reports/m4-review.md
-  qa: docs/qa-reports/m4-qa.md
-  security: docs/qa-reports/m4-security.md
+  plan: docs/plans/2026-06-21-aegis-iteration34-review-fixes.md
+  spec: null
+  review: null
+  qa: null
+  security: null
   deploy: null
   translation: null
 external_evidence:
