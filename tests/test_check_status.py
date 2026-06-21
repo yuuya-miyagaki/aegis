@@ -2501,6 +2501,9 @@ class TestCheckCompletionEvidence(unittest.TestCase):
             rc, out = run_check(root, "--check-completion-evidence")
             self.assertIn("EVIDENCE:", out, "approved gate + missing file must violate")
             self.assertIn("missing", out)
+            self.assertEqual(
+                rc, 1,
+                f"missing-file violation must exit non-zero (A9/B3), got rc={rc}")
 
     def test_pending_gate_with_ref_is_stale_violation(self):
         # reuse semantics: a ref present under a pending gate is a stale-ref violation
