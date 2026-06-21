@@ -378,9 +378,17 @@ class TestPreToolUseHooks(HookSchemaAssertions):
             "gate_approvals:\n  plan: approved\n  deploy: pending\n---\n"
         )
         payload = make_pretool_payload("Bash", {"command": "vercel deploy --prod"})
-        rc, out, err = run_hook("check-deploy-gate.sh", payload, cwd=Path(self.tmp))
-        if out:
-            self.assert_pretool_decision(out, "deny", hint="check-deploy-gate.sh vercel deploy")
+        # AEGIS_ROOT_OVERRIDE pins the hook to the scratch STATUS. Without it the
+        # hook resolves ROOT to its own script-parent (the real repo) and reads the
+        # real STATUS.md, so the decision tracked the real task_size (size=S → deploy
+        # phase skipped → ASK, not deny). Assert non-vacuously: deny is required.
+        rc, out, err = run_hook(
+            "check-deploy-gate.sh",
+            payload,
+            cwd=Path(self.tmp),
+            env={"AEGIS_ROOT_OVERRIDE": self.tmp},
+        )
+        self.assert_pretool_decision(out, "deny", hint="check-deploy-gate.sh vercel deploy")
 
 
 # ---------------------------------------------------------------------------

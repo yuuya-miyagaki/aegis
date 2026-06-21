@@ -3,18 +3,18 @@ framework: aegis
 framework_version: "1.13.0"
 project_name: "Aegis"
 mode: Dev
-phase: implement
+phase: ship
 task_type: framework
 task_size: S
 task_size_rationale: "iteration 36 = bugfix（テスト分離）: iteration 35 発見の follow-up。**当初『cp-lock の chmod -R が symlink を辿る』と推測したが直接プローブで反証（chmod -R は非追従＝cp-lock 無罪）**。実機序: test_phase_skills_lib の _scaffold が実 scripts/check_status.py を scratch に symlink → session-start が task_type=feature で aegis_cp_lock を起動し scratch を chmod -R a-w（正しい lock）→ TemporaryDirectory cleanup の rmtree が locked dir で PermissionError → Python の resetperms ハンドラが os.chmod(path,0o700) を実行（os.chmod は symlink を辿る）→ symlink 経由で実 check_status.py を 0o700 化し fingerprint を揺らしていた。修正＝_scaffold の symlink を copy に変更（cleanup の chmod がコピーに当たり実ファイル不変）。cp-lock は変更しない。回帰ガード追加（scaffold の check_status.py が非 symlink）。framework 型（bugfix 型は moat が framework 編集をブロックするため不可＝知見）・S・review のみ必須。"
 iteration: 36
 ui_surface: false
-last_updated: "2026-06-21T18:00:00Z"
+last_updated: "2026-06-22T03:30:00Z"
 gate_approvals:
   client_ready_for_dev: n/a
   brainstorm: approved
   plan: approved
-  review: pending
+  review: approved
   qa: pending
   security: pending
   deploy: pending
@@ -24,7 +24,7 @@ current_refs:
     - docs/full-review-2026-06-13-context-futureproof.md
   plan: docs/plans/2026-06-22-iter36-cp-lock-symlink-fix.md
   spec: null
-  review: null
+  review: docs/qa-reports/iter36-review.md
   qa: null
   security: null
   deploy: null
@@ -42,10 +42,14 @@ external_evidence:
     scope: "v0.12.2 実装後 4 ラウンドレビュー"
     findings: "Round 6 (P1×2, P2×1: pre-compact exit 2 / minimal-project / test rc), Round 7 (P1×1, P3×1: git add 漏れ / テスト件数表記), Round 8 (P2×1, P3×1: stale last_updated / grep 自己マッチ), Round 9 (P3×2: コメント不整合)"
     resolution: "9件全反映。tier 1/2 PASS、134 tests PASS、本体と minimal-project 完全同期確認済み。"
-next_action: "**【iteration 36 = テスト分離バグ・WIP・/clear 用 再開アンカー・2026-06-22】** **task_type=framework**（bugfix 型は moat が framework コード編集を阻むため不可＝それ自体が知見・LEARNINGS 記録済）・size=S・gates: brainstorm✓ plan✓（ref docs/plans/2026-06-22-iter36-cp-lock-symlink-fix.md）／review/qa/security/deploy=pending（bugfix は review のみ必須・qa/security/deploy 短絡可）。**systematic-debugging で root cause 確定（当初の cp-lock 仮説は直接プローブで反証＝chmod -R は symlink 非追従・cp-lock 無罪）。** ◆**バグA（mode-flip）**: session-start テストが実 scripts/check_status.py を scratch に symlink → session-start が task_type=feature で aegis_cp_lock 起動し scratch を chmod -R a-w → テストの TemporaryDirectory cleanup の rmtree が locked dir で PermissionError → **Python resetperms が os.chmod(path,0o700) 実行・os.chmod は symlink を辿る** → 実 check_status.py が 0o700 化し fingerprint 揺れ。**修正＝該当 _scaffold の symlink→shutil.copy2**。**修正済（commit 済・WIP）: tests/test_phase_skills_lib.py（＋回帰テスト test_scaffold_..._not_symlink）・tests/test_session_start_injection.py**。**要確認: 全 mode-flip 修正後、conftest instrument（pytest_runtest_logfinish で scripts/check_status.py mode 監視）を再実行し残 0 件を確認**（instrument は1回1件検出。既に2件直したので3件目以降がないか要再走）。◆**バグB（deploy-gate・別の分離バグ・未着手）**: tests/test_hook_output_schema.py::test_check_deploy_gate_deny_when_gate_pending が scratch STATUS を書くが、run_hook が CLAUDE_PROJECT_DIR を継承するため hook が**実リポ STATUS を読む**＝判定が実 task_size 依存。実 size=S だと check-deploy-gate が ask（L なら deny）→test fail。iter35 は実 size=L で運頼みに pass していた。**修正案＝run_hook かテストで CLAUDE_PROJECT_DIR を scratch に固定し、scratch STATUS に deny 条件（task_size 等）を明示**。◆**スコープ決定済（ユーザー承認）＝A＋B 両方を iteration 36 で修正**（同根の test-isolation クラス・Bは full suite 緑化の必須条件）。◆**残手順**: (1) 3件目以降の mode-flip 有無を再 instrument 確認＆あれば copy 修正、(2) バグB 修正、(3) full suite 緑＋実 check_status.py mode 644 維持を確認、(4) review ゲート（judge・record-test-result で test green）、(5) qa/security/deploy 短絡、(6) commit＋push（yuuya-miyagaki）。**注意: ゲート ref は承認直前に設定（pending+ref で STATUS 検証テスト赤化）。check_status.py mode は手で触らず suite が残す状態に green を bind。** 設計/正典は plan doc。iter35 follow-up（NFS skip・lifecycle re-lock）も別途残。Bash gotcha: パスはクォート・commit は -F・特殊文字は python FILE。"
+next_action: "**【iteration 36 = テスト分離バグ修正・実装完了／push 確認待ち・2026-06-22】** task_type=framework・size=S。バグA（mode-flip：session-start scaffold の symlink→`shutil.copy2`）＋バグB（deploy-gate test の実 STATUS 依存→`AEGIS_ROOT_OVERRIDE` で scratch 固定＋vacuous `if out:` 撤去）の両方を修正。回帰ガード `test_scaffold_check_status_is_regular_file_not_symlink` を 2 scaffold 両方に対称配置。**検証**: full suite 1027 passed/1 skip・実 scripts/check_status.py mode 644 維持（pre/post 計測）・contract PASS・record-test-result green・Bug B は RED(ask!=deny)→GREEN 実証。**ゲート**: review🟢 approved（ref docs/qa-reports/iter36-review.md・judge 🟢・盲検 reviewer-testing 第2意見 approve_with_notes 一致）／qa/security/deploy=pending（S は size-skip で exempt＝短絡）。grill-code 実施（🔴0🟡0／🟡#1 回帰ガード非対称→対称化で解消）。**残**: コミット（review 証拠＋Bug B test＋STATUS/LEARNINGS）＋push（yuuya-miyagaki）。**follow-up（別 iteration・本 diff 外で現状無害）**: 同クラス latent symlink＝test_hook_output_schema.py:1429/1508（scripts/ 丸ごと symlink・cp_lock 不発火で安全・LEARNINGS 記録済）。iter35 follow-up（NFS skip・lifecycle re-lock）も別途残。Bash gotcha: パスはクォート・commit は -F・特殊文字は python FILE。"
 blockers: []
 failure_tracking: null
 session_history:
+  - date: "2026-06-22"
+    mode: Dev
+    phase: "ship"
+    note: "iteration 36（テスト分離バグ修正・S・framework）完了・/clear 後 /recover で復帰し再開。iter35 発見の follow-up を systematic-debugging で根本特定（当初 cp-lock 仮説は直接プローブで反証＝chmod -R は symlink 非追従・cp-lock 無罪）。**バグA（mode-flip）**: session-start scaffold が実 scripts/check_status.py を scratch に symlink→cp_lock が scratch を a-w→TemporaryDirectory cleanup の resetperms が os.chmod(0o700)（symlink 追従）で実ファイルを 700 化し fingerprint を揺らしていた。修正＝該当 2 scaffold（test_phase_skills_lib.py・test_session_start_injection.py）を shutil.copy2 化。回帰ガード test_scaffold_check_status_is_regular_file_not_symlink を **両 scaffold に対称配置**（grill-code 🟡#1 で非対称を是正）。**バグB（deploy-gate）**: test_hook_output_schema.py::test_check_deploy_gate_deny_when_gate_pending が scratch STATUS を書くが check-deploy-gate.sh は ROOT を AEGIS_ROOT_OVERRIDE|script-parent で解決（cwd も CLAUDE_PROJECT_DIR も見ない）→実 STATUS 依存で実 size=S だと ask≠deny。修正＝env={AEGIS_ROOT_OVERRIDE: scratch} 固定＋vacuous if out: 撤去で非 vacuous 化。**検証**: full suite 1027 passed/1 skip・実 check_status.py mode 644 維持（pre/post 計測）・contract PASS・record-test-result green。Bug B は RED(ask!=deny)→GREEN、回帰ガードは symlink で RED を実証。**ゲート**: review🟢 approved（judge 🟢・盲検 reviewer-testing 第2意見 approve_with_notes 一致・ref iter36-review.md）／qa/security/deploy=pending（S は size-skip exempt＝短絡）。**follow-up（別 iteration・現状無害）**: 同クラス latent symlink test_hook_output_schema.py:1429/1508（cp_lock 不発火で安全）。LEARNINGS 3件更新（os.chmod symlink 追従・hook root 解決は env 変数依存・leak 三条件）。push は yuuya-miyagaki。"
   - date: "2026-06-22"
     mode: Dev
     phase: "deploy"
@@ -54,10 +58,6 @@ session_history:
     mode: Dev
     phase: "review"
     note: "iteration 34（レビュー集中修正）完了・push: 全力レビュー（内製5レンズ）＋外部レビュー(E1-E5)の確定 P1/P2 を TDD で修正。A1 emit.sh 利用 6 hook の fail-closed 統一（byte-identity 12 hook・新規 test_hook_emit_failclosed が emit.sh を使う check-*.sh の fallback 必須を動的検査）/ A2 standard で moat4 hook required-registration / C1 setup baseline を実コピー path 限定（INSTALLED_PATHS funnel＋git-ignore skip）/ B1 vacuous safety test 実効化 / B3 missing-ref rc 検証 / D1 README 数字+guarantee 限定 / D2 check-secrets scope / 版 1.12.1。検証: full suite 1006 passed/1 skip・contract(full)・Tier1・各タスク RED→GREEN・盲検3エージェント（2件 infra stall だが核心の fail-closed/normal-path を実走確認・1件 complete=approve_with_notes・Critical0・scope creep0）。grill-plan 致命2（Task0 を update-gate.sh 経路へ・B4 phase↔gate 自動検査は YAGNI＋ロジック不全で Batch E 繰延）と grill-code 🟡1（C1 baseline 完全性テスト）を反映。review gate approve（judge 緑・record-test-result で緑確立）。qa/security/deploy の formal ゲートはユーザー判断で短絡し push で締め（iteration 32 同パターン）。コミット f8aff7a〜dd4c593。push は yuuya-miyagaki アカウント。残=Batch E＋戦略 PoC は別 iteration。"
-  - date: "2026-06-21"
-    mode: Dev
-    phase: "security"
-    note: "iteration 33（M4 rebuild・簡素化 WS4 最終）完了: 観測 hook（E1）の fingerprint/marker 計算を全 Bash hot-path からテストランナー検出時のみへ寄せた。共有 is_test_runner_cmd（evidence.sh・消費側 read_test_result と同一正規化＋AEGIS_TEST_RUNNER_REGEX・単一 sed -e -e/単一 grep -e -e・bash3.2 安全）を新設し append_evidence を条件分岐＝非ランナーは fp 番兵 'skipped'＋marker false の安価記録。post-bash.sh の検出も同関数へ統合（単一ソース化＝recorder/ヒント/reader がドリフト不能）。ゲート時の緑認証ロジック（fail-closed・silent-green 禁止・fp binding）は byte 不変＝『いつ呼ぶか』だけ変更。フロー: brainstorm（設計#4 既承認）→plan→grill-plan（致命2: 検出 grep 畳み込み/契約ベースライン、YAGNI: 版バンプ撤去 を反映）→per-task TDD（各タスク RED 実証）→grill-code（🔴0・🟡1=canonical FIXTURES 40+形を実関数に通すパリティ実証で closed・🟢2 受容）→REDTEAM PoC 18/18（marker forge fail-closed 不変）→盲検2次 security 独立=approve（silent-green 不可能を 64-hex 番兵壁で実証・4方向 fail-close 実走確認）。検証多層: pytest 998 passed/1 skip・contract・Tier1・scaffold smoke・パリティ 9。ゲート: review🟢／qa🟢（B1 は committed-code で working-tree diff 空＝skip 宣言＋手動 mutation 同等実証）／security🟡ack（外部依存 manifest 無し＝deps N/A）。版 1.12.0 据置（iteration counter と framework_version は直交・他簡素化 WS と同様バンプなし）。コミット f02680d/878af23/fb5c5d1/ffd5050/a710328＋ゲート証拠。本 session は observe hook が tool_response.output を hook に渡さない（全 1160 エントリ marker_verified:false）ため tests 緑化は record-test-result.py（trusted manual runner・実行記録・src=manual は marker 不要）で確立。deploy/ship/docs は solo の push で締め。残: 簡素化 WS2=M2 据置（1行明文化）。push は yuuya-miyagaki アカウント。"
 ---
 
 ## Summary

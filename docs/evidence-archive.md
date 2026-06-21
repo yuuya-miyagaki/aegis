@@ -32,3 +32,7 @@ STATUS.md retains only the latest 3 entries; older entries are moved here.
 ### session-history: iteration 20 (v1.5.2 残余消化, 2026-06-11)
 
 v151-security.md 記録の残余 5 系統を Task 1〜9 TDD で完走（461→479 tests）。T1=クォート span の Q 置換マスク（false-RED 根治、置換であって削除でない＝green 偽装封鎖、sed/python re バイト一致パリティ、len(strips)!=2→unverified の fail-closed ガード、deny 系 3 hook 不波及を TestMaskScopeBoundary で契約化）、T2=入れ子 ( アンカー、T3=フィデリティ ルーティング、T4=孤児 claim 復元＋pid なしロックの O_EXCL 採用、T5=待機窓 10s。grill-code 独立 2 本（A=条件付き 🟡1、B=🟢3）: A J1=マスク置換が production 消費者で未ピン → mutation-killer テストで充足（b79184a）。受容残余（混在クォート横断・SIGSTOP >2分窓・PID 再利用）は v152-security.md に記録。v1.5.2 patch・tag v1.5.2。
+
+### session-history: iteration 33 (M4 rebuild・簡素化 WS4 最終, 2026-06-21)
+
+観測 hook（E1）の fingerprint/marker 計算を全 Bash hot-path からテストランナー検出時のみへ寄せた。共有 is_test_runner_cmd（evidence.sh・消費側 read_test_result と同一正規化＋AEGIS_TEST_RUNNER_REGEX・単一 sed -e -e/単一 grep -e -e・bash3.2 安全）を新設し append_evidence を条件分岐＝非ランナーは fp 番兵 'skipped'＋marker false の安価記録。post-bash.sh の検出も同関数へ統合（単一ソース化＝recorder/ヒント/reader がドリフト不能）。ゲート時の緑認証ロジック（fail-closed・silent-green 禁止・fp binding）は byte 不変＝『いつ呼ぶか』だけ変更。grill-code（🔴0・🟡1 closed・🟢2 受容）→REDTEAM PoC 18/18→盲検2次 security 独立 approve。pytest 998 passed/1 skip・contract・Tier1・scaffold smoke・パリティ 9。ゲート review🟢／qa🟢／security🟡ack（deps N/A）。版 1.12.0 据置。コミット f02680d/878af23/fb5c5d1/ffd5050/a710328。tests 緑化は record-test-result.py（trusted manual runner）。

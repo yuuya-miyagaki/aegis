@@ -54,6 +54,21 @@ class TestSessionStartInjection(unittest.TestCase):
         self.assertEqual(r.returncode, 0, r.stderr)
         return json.loads(r.stdout.strip().splitlines()[-1])
 
+    def test_scaffold_check_status_is_regular_file_not_symlink(self):
+        # Regression (iter36 test-isolation bug): _scaffold must COPY (not symlink)
+        # the real check_status.py. session-start locks the scratch (chmod a-w via
+        # cp_lock); TemporaryDirectory cleanup's resetperms onerror does os.chmod,
+        # which FOLLOWS symlinks — a symlink mutated the REAL scripts/check_status.py
+        # (mode → 0o700), drifting the test fingerprint. Mirrors the guard in
+        # test_phase_skills_lib.py so neither session-start scaffold can regress.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._scaffold(Path(tmp), STATUS)
+            cs = root / "scripts" / "check_status.py"
+            self.assertTrue(cs.is_file(), "scaffold must provide check_status.py")
+            self.assertFalse(
+                cs.is_symlink(),
+                "must copy, not symlink, the real check_status.py")
+
     def test_untrusted_text_is_fenced_and_neutralized(self):
         with tempfile.TemporaryDirectory() as tmp:
             out = self._run(self._scaffold(Path(tmp), STATUS))
