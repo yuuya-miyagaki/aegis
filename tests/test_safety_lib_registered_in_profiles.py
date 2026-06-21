@@ -70,30 +70,49 @@ class TestRemovingSafetyLibFailsContract(unittest.TestCase):
     """install 先で safety.sh を消すと contract / scaffold smoke が FAIL"""
 
     def test_contract_fails_when_safety_lib_removed(self):
-        import shutil
         import tempfile
         with tempfile.TemporaryDirectory() as tmp:
             target = pathlib.Path(tmp) / "proj"
-            # Run setup
+            # B1: standard profile を使う。`--profile=full --root` は
+            # check_framework_contract が *常に* ERROR にするため、safety.sh の
+            # 有無に関係なく rc!=0 になり「偽の安心」だった（テストが別理由で通る）。
+            # standard は safety.sh を required に含むので、削除で「missing required
+            # file」として *safety.sh を理由に* 正しく FAIL する。
             r = subprocess.run(
                 [str(ROOT / "bin" / "setup.sh"),
-                 "--profile=full", f"--target={target}"],
+                 "--profile=standard", f"--target={target}"],
                 capture_output=True, text=True,
             )
             self.assertEqual(
                 r.returncode, 0, f"setup failed: {r.stdout}\n{r.stderr}"
             )
-            # Remove safety.sh
-            (target / "hooks" / "lib" / "safety.sh").unlink()
-            # Contract check must fail
-            r = subprocess.run(
-                ["python3", str(ROOT / "scripts" / "check_framework_contract.py"),
-                 "--profile=full", "--root", str(target)],
-                capture_output=True, text=True,
+
+            def _contract():
+                return subprocess.run(
+                    ["python3", str(ROOT / "scripts" / "check_framework_contract.py"),
+                     "--profile=standard", "--root", str(target)],
+                    capture_output=True, text=True,
+                )
+
+            # 因果の固定: safety.sh があるうちは PASS。
+            r_intact = _contract()
+            self.assertEqual(
+                r_intact.returncode, 0,
+                f"健全な standard install は PASS すべき: "
+                f"{r_intact.stdout}\n{r_intact.stderr}"
             )
+
+            # safety.sh を消すと FAIL（しかも safety.sh を理由に）。
+            (target / "hooks" / "lib" / "safety.sh").unlink()
+            r_removed = _contract()
             self.assertNotEqual(
-                r.returncode, 0,
-                f"contract should fail without safety.sh: stdout={r.stdout!r}"
+                r_removed.returncode, 0,
+                f"safety.sh 削除後は FAIL すべき: stdout={r_removed.stdout!r}"
+            )
+            self.assertIn(
+                "safety.sh", r_removed.stdout,
+                f"FAIL は safety.sh を理由にすべき（別理由の偽 FAIL ではない）: "
+                f"{r_removed.stdout!r}"
             )
 
 
