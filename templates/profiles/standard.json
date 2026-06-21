@@ -34,7 +34,11 @@
   "required_hook_scripts": [
     "hooks/session-start.sh",
     "hooks/check-gate.sh",
-    "hooks/post-status-audit.sh"
+    "hooks/post-status-audit.sh",
+    "hooks/check-control-plane.sh",
+    "hooks/check-destructive.sh",
+    "hooks/check-secrets.sh",
+    "hooks/check-deploy-gate.sh"
   ],
   "hooks_include": [
     "session-start.sh",
