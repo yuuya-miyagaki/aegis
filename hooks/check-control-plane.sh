@@ -62,6 +62,11 @@ fi
 # ($(pwd)/hooks/, $VAR/hooks/, ")/hooks/") stay deny-eligible (fail-closed:
 # we cannot statically resolve them, so we treat them as control plane).
 ROOT_REAL="$(cd "$ROOT" && pwd -P)"
+# DRIFT NOTE: this regex is layer-1 (command-token matching). The layer-2 OS lock
+# enumerates the SAME control-plane as filesystem paths in hooks/lib/cp-lock.sh
+# (`aegis_cp_paths`). If you add/remove a control-plane directory here, update
+# aegis_cp_paths too (the two are intentionally separate — different domains — and
+# nothing machine-binds them; tests/test_cp_lock_lib.py pins the cp-lock side).
 CP_DIRS='hooks|scripts|templates'
 # `.claude` needs `/`, a non-name boundary char, OR END-OF-COMMAND after it —
 # without the `$` alt, a bare `rm -rf .claude` (the dir as the final token) slipped

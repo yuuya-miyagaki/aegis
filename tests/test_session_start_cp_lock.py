@@ -84,3 +84,24 @@ class TestSessionStartLock:
                 "should warn that layer-2 was skipped"
         finally:
             subprocess.run(["chmod", "-R", "u+w", tmp.name]); tmp.cleanup()
+
+
+# Standalone (no real chmod): the rc=1 fail-soft branch runs on all platforms,
+# incl. root-CI, so it is not gated by NO_FS_LOCK.
+def test_lock_failure_warns_not_crashes():
+    # cp-lock present but the lock function returns non-zero (e.g. chmod fails on
+    # some path under set -euo pipefail): session-start must still exit 0 and
+    # surface a warn, never abort. Covers the `|| CONTEXT=...warn` branch
+    # (reviewer-testing rc=1 gap).
+    tmp = _install("feature")
+    p = Path(tmp.name)
+    try:
+        (p / "hooks" / "lib" / "cp-lock.sh").write_text(
+            "aegis_cp_paths() { :; }\n"
+            "aegis_cp_lock() { return 1; }\n"
+            "aegis_cp_unlock() { return 1; }\n")
+        r = _run_session_start(tmp.name)
+        assert r.returncode == 0, "lock rc=1 must not abort session-start"
+        assert "一部失敗" in r.stdout, "should warn on partial lock failure"
+    finally:
+        subprocess.run(["chmod", "-R", "u+w", tmp.name]); tmp.cleanup()

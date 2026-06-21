@@ -137,3 +137,15 @@ def test_empty_root_is_rejected():
     # An empty root must fail loud (rc 1), never silently chmod absolute /hooks etc.
     assert _bash('aegis_cp_lock ""', ".").returncode == 1
     assert _bash('aegis_cp_unlock ""', ".").returncode == 1
+
+
+def test_cp_lock_paths_cover_expected_roots():
+    # Drift guard (reviewer-maintainability): aegis_cp_paths must enumerate the
+    # canonical control-plane roots that exist in the framework repo. Catches an
+    # accidental drop from the list (e.g. removing 'scripts'). The layer-1 regex
+    # lives in hooks/check-control-plane.sh (CP_DIRS) — keep the two in sync.
+    out = _bash('aegis_cp_paths "$PWD"', str(ROOT)).stdout
+    basenames = {line.rsplit("/", 1)[-1] for line in out.split() if line}
+    for expected in ("hooks", "scripts", "templates", "CLAUDE.md",
+                     "rules", "skills", "commands", "agents"):
+        assert expected in basenames, f"aegis_cp_paths dropped {expected!r}: {out!r}"
