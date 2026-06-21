@@ -5,6 +5,12 @@
 # High-risk credential file patterns (PEM / SSH keys / credentials*.json /
 # service-account*.json) live in hooks/lib/secrets-patterns.sh as the single
 # source of truth (C-9). New credential types are added there, not here.
+#
+# SCOPE (D2): this is a secret-FILE-NAME gate, not a content scanner. It blocks
+# known credential *file names* (.env, id_*, *.pem, credentials*.json,
+# service-account*.json) from being staged/committed. It does NOT inspect file
+# CONTENT — a secret VALUE written into an arbitrarily-named file (e.g.
+# `echo "AKIA..." > config.yaml`) is out of scope by design.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
