@@ -92,7 +92,7 @@ How Aegis maps to Claude Code's built-in capabilities.
 | Context compaction | Controlled by PreCompact hook | Blocked when STATUS.md is stale |
 | Checkpoints / `/rewind` | (complementary) `session-recovery` | **Keep** — `/rewind` undoes file edits (ephemeral); `session-recovery` rebuilds framework state (phase/gates/refs/partials) from STATUS.md. Different problem. |
 | `/resume` / `--continue` / `--fork` | (complementary) `/recover` + `session-recovery` | **Complement** — `/resume` restores the conversation (may suffice); `session-recovery` reconstructs/verifies state from STATUS.md when the conversation is gone. `/recover` is the discoverable trigger for that protocol, which `/resume` does not run. |
-| Auto Mode | — | **Keep PaC hooks.** aegis's moat is *deterministic* hooks-as-guarantees; a probabilistic permission classifier cannot give the same guarantee (durable reason, independent of Auto Mode's preview status). |
+| Auto Mode | — | **Keep PaC hooks.** Gate blocks and control-plane *path* protection (Edit/Write) are deterministic hard rules a probabilistic classifier cannot match. The Bash *command* moat is a threshold-raising layer with a known static-analysis limit (SF-004 — not a sandbox; see `docs/security-followups.md`), so "guarantee" applies to the path/gate surface, not arbitrary shell. |
 | Routines / scheduling | — | **N/A** — aegis ships no scheduling/cron surface, so there is nothing to delegate or retire here. |
 
 ## Quick Start
@@ -164,7 +164,7 @@ Profile-based validation for scaffold projects:
 python3 scripts/check_framework_contract.py --profile=standard --root <your-project-dir>
 ```
 
-Available profiles: `minimal` (4 core files), `standard` (15 required + 8 recommended). `full` is framework repo root only (do not use with `--root`).
+Available profiles: `minimal` (8 required), `standard` (18 required + 8 recommended). `full` is framework repo root only (do not use with `--root`).
 Profile definitions: `templates/profiles/*.json`.
 
 Optional strict YAML validation (requires PyYAML):
