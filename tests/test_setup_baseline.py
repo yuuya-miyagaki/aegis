@@ -131,6 +131,24 @@ class TestSetupBaseline(unittest.TestCase):
                 "pre-existing docs/user-note.md must NOT be staged into baseline "
                 "(dir-granular `git add docs` swept it in)")
 
+    def test_standard_baseline_includes_installed_framework_files(self):
+        """C1 完全性: scoped staging が installed framework file を取りこぼさない。
+        INSTALLED_PATHS が将来あるカテゴリ（hooks / scripts / .claude）を漏らしても
+        baseline が痩せたまま気づかない退行を防ぐ（grill-code 🟡）。"""
+        with tempfile.TemporaryDirectory() as tmp:
+            proj = pathlib.Path(tmp) / "proj"
+            r = _run_setup(proj, profile="standard")
+            self.assertEqual(
+                r.returncode, 0,
+                f"setup failed: {r.stdout[-400:]} {r.stderr[-400:]}")
+            for rel in ("CLAUDE.md", "docs/STATUS.md",
+                        "hooks/session-start.sh", "scripts/check_status.py",
+                        ".claude/rules/state-machine.md"):
+                with self.subTest(path=rel):
+                    self.assertEqual(
+                        _git(proj, "ls-files", rel).stdout.strip(), rel,
+                        f"standard baseline must include installed {rel}")
+
 
 if __name__ == "__main__":
     unittest.main()
