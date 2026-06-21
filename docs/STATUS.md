@@ -3,7 +3,7 @@ framework: aegis
 framework_version: "1.13.0"
 project_name: "Aegis"
 mode: Dev
-phase: implement
+phase: review
 task_type: framework
 task_size: L
 task_size_rationale: "iteration 35 = 案A immutable moat（layer-2 OS lock 追加・L）: control-plane 誤書込み防御を多層化。新規 cp-lock.sh（chmod -R a-w / task_type 連動 lock-unlock）＋ session-start 連動を layer-2 として追加。check-control-plane.sh（layer-1・889行）は退役せず存置し chmod-unlock guard を追加。settings*.json を LOCK 側へ移動。安定 CP セットの単一所有 manifest。Windows は layer-1 のみ（chmod no-op）。SF-001〜005 は POSIX/macOS で実務クローズ・Windows 残余。設計レビューで初版『全退役・置換』を撤回し layer-2 追加に修正済（Windows ゼロ保護 / EACCES が chmod+w 自己修復誘発 / hooks-lib は共有インフラ の3点）。SemVer MINOR 候補（1.13.0）。設計 docs/specs/2026-06-21-immutable-moat-design.md（rev.2）。"
@@ -14,7 +14,7 @@ gate_approvals:
   client_ready_for_dev: n/a
   brainstorm: approved
   plan: approved
-  review: pending
+  review: approved
   qa: pending
   security: pending
   deploy: pending
@@ -24,7 +24,7 @@ current_refs:
     - docs/full-review-2026-06-13-context-futureproof.md
   plan: docs/plans/2026-06-21-aegis-iteration35-immutable-moat.md
   spec: docs/specs/2026-06-21-immutable-moat-design.md
-  review: null
+  review: docs/qa-reports/iter35-review.md
   qa: null
   security: null
   deploy: null
@@ -42,14 +42,14 @@ external_evidence:
     scope: "v0.12.2 実装後 4 ラウンドレビュー"
     findings: "Round 6 (P1×2, P2×1: pre-compact exit 2 / minimal-project / test rc), Round 7 (P1×1, P3×1: git add 漏れ / テスト件数表記), Round 8 (P2×1, P3×1: stale last_updated / grep 自己マッチ), Round 9 (P3×2: コメント不整合)"
     resolution: "9件全反映。tier 1/2 PASS、134 tests PASS、本体と minimal-project 完全同期確認済み。"
-next_action: "**【iteration 35 = 案A immutable moat（layer-2 OS lock）/ plan ゲート承認済・implement 着手・2026-06-21】** 設計 rev.2＋writing-plans＋grill-plan 完了。plan ゲート approved（計画 docs/plans/2026-06-21-aegis-iteration35-immutable-moat.md）。**grill-plan で致命3点を修正済（重要・実装はこの修正版に従う）**: 【致命1】SF-004 closure は敵対に偽——`chmod`/`chflags` は所有権判定なので owner は a-w 下でも `os.chmod` 解錠でき敵対者は同じ interpreter で回避可→justification を『SF-004 閉鎖』ではなく**『889行・5バイパス実績の脆い layer-1 に対する事故ケース限定の独立 syscall 保険（defense-in-depth）』**へ。`chflags uchg` は不採用（敵対に無力）。SF 項目は CLOSED にしない。【致命2】settings を lock すると Claude Code 本体の permission 永続化を破損（本リポは hook 登録が settings.local.json・settings.json 不在を実測）→`settings.json`/`settings.local.json` を**両方 layer-2 除外**し layer-1 に委ねる。【致命3】root は a-w を無視→全 lock テストに `NO_FS_LOCK`(WINDOWS or geteuid==0) skip。要検討: lock は on-disk 永続（エディタでも read-only）・`git pull` 等 framework 更新は framework mode で→README 注記。**lock 対象**: hooks/scripts/templates/CLAUDE.md/.claude/{rules,skills,commands,agents}（settings は除外・root も lock しない）。SemVer MINOR 1.13.0。**実装（subagent-dev・per-task TDD→2段レビュー）**: Task0 cp-lock.sh（aegis_cp_paths 単一所有/lock/unlock）→Task1 session-start 連動(fail-warn)→Task2 layer-1 chmod-unlock/rename deny 回帰固定（production 無改修）→Task3 lock 下の形非依存阻止実証→Task4 contract 登録+版bump+README+SF disposition。**その後 grill-code→フルゲート（review+qa+security+deploy）。** 設計 rev.2 / findings docs/security-followups.md。**残: Batch E は別 iteration。** Bash gotcha: パスはクォート・commit は -F・特殊文字は python FILE。push は yuuya-miyagaki アカウント。"
+next_action: "**【iteration 35 = 案A immutable moat（layer-2 OS lock）/ review ゲート承認済・2026-06-21】** 実装完了（7 commit 1e46e4d〜244c32e・クリーンツリー・full suite 1025 passed/1 skip・contract PASS・版 1.13.0）。設計 rev.2＋grill-plan＋実装（subagent-dev TDD）＋grill-code＋Review Army＋review ゲート approve（judge 🟢・証拠 docs/qa-reports/iter35-review.md・manual record で test green 確立）まで完了。**実装の確定形（grill 反映後・正典）**: layer-2 は『脆い layer-1（889行・5バイパス実績）に対する**事故ケース限定の独立 syscall 保険**』＝**敵対 SF-004 は閉じない**（owner os.chmod 解錠）・SF 項目は CLOSED にせず disposition 追記のみ。`cp-lock.sh`（aegis_cp_paths 単一所有・空 root ガード・CP_DIRS↔cp-lock 相互リンク）＋session-start 連動（fail-warn・`if [ -f ]` ガードで set -e 対応）。**lock 対象**: hooks/scripts/templates/CLAUDE.md/.claude/{rules,skills,commands,agents}（**settings は両方除外**＝ハーネスが書く・layer-1 で保護／root も lock しない）。`chflags uchg` 不採用。テストは WINDOWS＋root skip。**残ゲート: qa・security・deploy（pending）。** **次の一手の推奨: security ゲートを正規に回す**（本件はモート機能＝security エージェントの盲検 adversarial レビューで os.chmod 解錠が唯一の限界か／syscall 強制に穴がないかを独立検証）。qa/deploy は iteration 32/34 同様ユーザー判断で短絡し push で締め可。**follow-up（別 iteration・非ブロッカー）**: NFS/SMB/FUSE で chmod -R が高レイテンシ→ネットワーク FS 検出 skip／lifecycle re-lock 繰延（計画 残課題）。**残: Batch E は別 iteration。** Bash gotcha: パスはクォート・commit は -F・特殊文字は python FILE。push は yuuya-miyagaki アカウント。"
 blockers: []
 failure_tracking: null
 session_history:
   - date: "2026-06-21"
     mode: Dev
-    phase: "plan"
-    note: "iteration 35（案A immutable moat・layer-2 OS lock）着手: 設計ドキュメント docs/specs/2026-06-21-immutable-moat-design.md を user review → 初版『静的 moat 全退役・OS lock 置換』を撤回し layer-2 追加方針へ rev.2 改訂。確定 P1/P2: ①Windows で chmod/chflags=no-op→check-control-plane(layer-1) 存置で cross-platform 維持 ②EACCES が chmod+w 自己修復を誘発→layer-1 ポリシー停止＋chmod-unlock guard 追加 ③hooks/lib は全 hook 共有インフラ＝退役対象外（曖昧是正・裏取り: emit.sh/safety.sh/evidence.sh/patterns.sh は多数 hook が source）④settings*.json を LOCK へ（writable だと moat 除去可）⑤mv rename gap→root 非再帰 a-w ⑥default-LOCK＋lifecycle re-lock。SemVer MINOR(1.13.0)候補。STATUS rollover: iteration 35・gates reset（plan/review を update-gate.sh reset で正規 pending 化／直接編集が gate-tamper 監査でブロックされ authorized script 経由に是正）・spec ref 設定・brainstorm=approved(PoC スパイク由来)。次: writing-plans→grill-plan→plan ゲート→TDD→grill-code→フルゲート。"
+    phase: "review"
+    note: "iteration 35（案A immutable moat・layer-2 OS lock）review まで完了: 設計を user review→初版『静的 moat 全退役・置換』を撤回し layer-2 追加（rev.2）。**設計レビュー時の暫定案は後段の grill で 3 点 reversed（最終はこちらが正典）**: (a) settings*.json を当初 LOCK 予定→**grill-plan で両方 除外**（Claude Code ハーネスが settings へ permission grant を書く・本リポは hook 登録が settings.local.json で settings.json 不在を実測）、(b) chmod-unlock guard 新規追加予定→**既存 layer-1 が既に deny 済と実測→回帰テストで固定のみ**、(c) mv gap で root 非再帰 a-w 予定→**root は lock しない**（downstream のユーザー root を縛る・mv は layer-1 deny で足る）、(d) SF を『実務クローズ』予定→**敵対 os.chmod 解錠で閉じない＝CLOSED にしない・disposition 追記のみ**、(e) chflags uchg→不採用、(f) lifecycle re-lock→繰延。実装: subagent-dev で Task0-4 per-task TDD（cp-lock.sh 単一所有/session-start fail-warn/layer-1 回帰固定/SF カタログ lock 実証/contract+版1.13.0+docs）→grill-code（🔴0🟡0・🟢 空root ガード/scripts assertion を fix-forward）→Review Army 3（testing rc=1 gap・maintainability drift・performance NFS を fix-forward／NFS は非ブロッカー follow-up）→review ゲート approve（judge 🟢・manual record で test green）。検証: full suite 1025 passed/1 skip・contract PASS・版 1.13.0 同期。コミット 1e46e4d〜244c32e（クリーンツリー）。STATUS rollover は gate-tamper 監査に阻まれ update-gate.sh reset 経由に是正。残ゲート: qa/security/deploy。push は yuuya-miyagaki アカウント。"
   - date: "2026-06-21"
     mode: Dev
     phase: "review"
