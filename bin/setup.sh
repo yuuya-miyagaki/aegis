@@ -147,6 +147,7 @@ copy_file() {
   fi
   mkdir -p "$(dirname "$dst")"
   cp "$src" "$dst"
+  INSTALLED_PATHS+=("$dst")
   echo "  COPY: $dst"
 }
 
@@ -163,6 +164,7 @@ copy_file_force() {
   fi
   mkdir -p "$(dirname "$dst")"
   cp -f "$src" "$dst"
+  INSTALLED_PATHS+=("$dst")
   echo "  COPY (force): $dst"
 }
 
@@ -290,6 +292,7 @@ with open(target, 'w') as f:
     json.dump(out, f, indent=2)
     f.write('\n')
 "
+  INSTALLED_PATHS+=("$target_settings")
   echo "  GENERATE: .claude/settings.local.json"
 }
 
@@ -342,6 +345,7 @@ ensure_target_gitignore() {
   done <<EOF_GI
 $entries
 EOF_GI
+  [ -f "$target/.gitignore" ] && INSTALLED_PATHS+=("$target/.gitignore")
 }
 
 # --- Create a one-time framework baseline commit (OBS-017) ---
@@ -374,14 +378,28 @@ create_framework_baseline() {
     return 0
   fi
 
-  # Stage ONLY the framework artifacts that were actually installed. `git add`
-  # (without -f) honours the .gitignore written above, so runtime artifacts
-  # (.gate-snapshot, evidence-log) are excluded automatically.
-  local candidate
+  # Stage ONLY the paths setup.sh actually wrote (recorded in INSTALLED_PATHS),
+  # never whole directories — so a pre-existing user file inside a framework dir
+  # (e.g. docs/user-note.md) is NOT swept into the baseline (C1 / E1). `git add`
+  # (without -f) still honours the .gitignore written above, so runtime
+  # artifacts (.gate-snapshot, evidence-log) are excluded automatically.
+  local p rel
   local present=()
-  for candidate in hooks scripts templates .claude CLAUDE.md docs; do
-    [ -e "$target/$candidate" ] && present+=("$candidate")
-  done
+  if [ "${#INSTALLED_PATHS[@]}" -gt 0 ]; then
+    for p in "${INSTALLED_PATHS[@]}"; do
+      rel="${p#"$target/"}"
+      [ "$rel" = "$p" ] && continue          # not under target (defensive)
+      [ -e "$target/$rel" ] || continue
+      # Skip paths git would ignore (e.g. a globally-ignored
+      # .claude/settings.local.json). The old `git add <dir>` silently skipped
+      # ignored files; an explicit add of an ignored path errors (rc 1) and would
+      # lose the whole baseline, so replicate the silent-skip here.
+      if git -C "$target" check-ignore -q -- "$rel" 2>/dev/null; then
+        continue
+      fi
+      present+=("$rel")
+    done
+  fi
   if [ ${#present[@]} -eq 0 ]; then
     echo "  (skipped: no framework files to commit)"
     return 0
@@ -406,6 +424,11 @@ create_framework_baseline() {
     echo "  (skipped: git commit failed)"
   fi
 }
+
+# Paths setup.sh actually wrote (copied or generated). The baseline commit
+# stages exactly these — never whole directories — so pre-existing user files
+# inside a framework dir (e.g. docs/user-note.md) are not swept in (C1 / E1).
+INSTALLED_PATHS=()
 
 # --- Main ---
 echo "Aegis Setup"
@@ -452,6 +475,7 @@ generate_settings "$PROFILE_JSON" "$TARGET"
 # user may downgrade by re-running with an older setup.sh).
 mkdir -p "$TARGET/.claude"
 printf '%s\n' "$FRAMEWORK_VERSION" > "$TARGET/.claude/.aegis-install-version"
+INSTALLED_PATHS+=("$TARGET/.claude/.aegis-install-version")
 
 # 5. Create a one-time framework baseline commit (OBS-017)
 echo ""

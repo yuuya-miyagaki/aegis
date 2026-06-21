@@ -108,6 +108,29 @@ class TestSetupBaseline(unittest.TestCase):
                 tracked, "",
                 "baseline must not stage unrelated files (no git add -A)")
 
+    def test_baseline_does_not_stage_preexisting_file_in_framework_dir(self):
+        """C1 (E1): docs/ 等の framework ディレクトリに既存ユーザーファイルが
+        あっても baseline に巻き込まない。setup.sh はディレクトリ単位ではなく
+        実際にコピー/生成した path だけを stage すべき。"""
+        with tempfile.TemporaryDirectory() as tmp:
+            proj = pathlib.Path(tmp) / "proj"
+            (proj / "docs").mkdir(parents=True)
+            user_note = proj / "docs" / "user-note.md"
+            user_note.write_text("my pre-existing note — keep out of baseline\n")
+            r = _run_setup(proj, profile="minimal")
+            self.assertEqual(
+                r.returncode, 0,
+                f"setup failed: {r.stdout[-400:]} {r.stderr[-400:]}")
+            # framework files ARE committed (sanity: the baseline is real)
+            self.assertEqual(
+                _git(proj, "ls-files", "CLAUDE.md").stdout.strip(), "CLAUDE.md",
+                "framework files should be in the baseline commit")
+            # the pre-existing user file is NOT swept in
+            self.assertEqual(
+                _git(proj, "ls-files", "docs/user-note.md").stdout.strip(), "",
+                "pre-existing docs/user-note.md must NOT be staged into baseline "
+                "(dir-granular `git add docs` swept it in)")
+
 
 if __name__ == "__main__":
     unittest.main()
