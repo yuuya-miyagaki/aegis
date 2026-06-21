@@ -40,7 +40,11 @@ class TestSessionStartInjection(unittest.TestCase):
         (d / ".claude").mkdir()
         shutil.copytree(ROOT / "hooks", d / "hooks")
         (d / "scripts").mkdir()
-        (d / "scripts" / "check_status.py").symlink_to(ROOT / "scripts" / "check_status.py")
+        # COPY (not symlink): session-start locks the scratch (chmod a-w via
+        # cp_lock), and TemporaryDirectory cleanup's resetperms does os.chmod which
+        # FOLLOWS symlinks — a symlink would mutate the REAL scripts/check_status.py.
+        shutil.copy2(ROOT / "scripts" / "check_status.py",
+                     d / "scripts" / "check_status.py")
         return d
 
     def _run(self, root: Path) -> dict:

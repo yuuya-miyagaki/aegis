@@ -91,7 +91,11 @@ class TestSessionStartInjection(unittest.TestCase):
         import shutil
         shutil.copytree(ROOT / "hooks", d / "hooks")
         (d / "scripts").mkdir()
-        (d / "scripts" / "check_status.py").symlink_to(ROOT / "scripts" / "check_status.py")
+        # COPY (not symlink): session-start locks the scratch (chmod a-w via
+        # cp_lock), and TemporaryDirectory cleanup's resetperms does os.chmod which
+        # FOLLOWS symlinks — a symlink would mutate the REAL scripts/check_status.py.
+        shutil.copy2(ROOT / "scripts" / "check_status.py",
+                     d / "scripts" / "check_status.py")
         return d
 
     def _run(self, root: Path, extra_env: dict | None = None) -> str:
@@ -103,6 +107,20 @@ class TestSessionStartInjection(unittest.TestCase):
             capture_output=True, text=True, timeout=60,
             env=env)
         return r.stdout
+
+    def test_scaffold_check_status_is_regular_file_not_symlink(self):
+        # Regression (iter36 test-isolation bug): _scaffold must COPY (not symlink)
+        # the real check_status.py. session-start locks the scratch (chmod a-w via
+        # cp_lock), and TemporaryDirectory cleanup's resetperms onerror does
+        # os.chmod — which FOLLOWS symlinks — so a symlink here mutated the REAL
+        # scripts/check_status.py (mode → 0o700), drifting the test fingerprint.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._scaffold(Path(tmp), "implement", ["tdd"])
+            cs = root / "scripts" / "check_status.py"
+            self.assertTrue(cs.is_file(), "scaffold must provide check_status.py")
+            self.assertFalse(
+                cs.is_symlink(),
+                "must copy, not symlink, the real check_status.py")
 
     def test_review_phase_injects_read_instruction(self):
         with tempfile.TemporaryDirectory() as tmp:

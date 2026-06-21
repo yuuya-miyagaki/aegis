@@ -3,31 +3,31 @@ framework: aegis
 framework_version: "1.13.0"
 project_name: "Aegis"
 mode: Dev
-phase: deploy
+phase: implement
 task_type: framework
-task_size: L
-task_size_rationale: "iteration 35 = 案A immutable moat（layer-2 OS lock 追加・L）: control-plane 誤書込み防御を多層化。新規 cp-lock.sh（chmod -R a-w / task_type 連動 lock-unlock）＋ session-start 連動を layer-2 として追加。check-control-plane.sh（layer-1・889行）は退役せず存置し chmod-unlock guard を追加。settings*.json を LOCK 側へ移動。安定 CP セットの単一所有 manifest。Windows は layer-1 のみ（chmod no-op）。SF-001〜005 は POSIX/macOS で実務クローズ・Windows 残余。設計レビューで初版『全退役・置換』を撤回し layer-2 追加に修正済（Windows ゼロ保護 / EACCES が chmod+w 自己修復誘発 / hooks-lib は共有インフラ の3点）。SemVer MINOR 候補（1.13.0）。設計 docs/specs/2026-06-21-immutable-moat-design.md（rev.2）。"
-iteration: 35
+task_size: S
+task_size_rationale: "iteration 36 = bugfix（テスト分離）: iteration 35 発見の follow-up。**当初『cp-lock の chmod -R が symlink を辿る』と推測したが直接プローブで反証（chmod -R は非追従＝cp-lock 無罪）**。実機序: test_phase_skills_lib の _scaffold が実 scripts/check_status.py を scratch に symlink → session-start が task_type=feature で aegis_cp_lock を起動し scratch を chmod -R a-w（正しい lock）→ TemporaryDirectory cleanup の rmtree が locked dir で PermissionError → Python の resetperms ハンドラが os.chmod(path,0o700) を実行（os.chmod は symlink を辿る）→ symlink 経由で実 check_status.py を 0o700 化し fingerprint を揺らしていた。修正＝_scaffold の symlink を copy に変更（cleanup の chmod がコピーに当たり実ファイル不変）。cp-lock は変更しない。回帰ガード追加（scaffold の check_status.py が非 symlink）。framework 型（bugfix 型は moat が framework 編集をブロックするため不可＝知見）・S・review のみ必須。"
+iteration: 36
 ui_surface: false
 last_updated: "2026-06-21T18:00:00Z"
 gate_approvals:
   client_ready_for_dev: n/a
   brainstorm: approved
   plan: approved
-  review: approved
-  qa: approved
-  security: approved
-  deploy: approved
+  review: pending
+  qa: pending
+  security: pending
+  deploy: pending
   dev_ready_for_client: pending
 current_refs:
   requirements:
     - docs/full-review-2026-06-13-context-futureproof.md
-  plan: docs/plans/2026-06-21-aegis-iteration35-immutable-moat.md
-  spec: docs/specs/2026-06-21-immutable-moat-design.md
-  review: docs/qa-reports/iter35-review.md
-  qa: docs/qa-reports/test-strength.md
-  security: docs/qa-reports/iter35-security.md
-  deploy: docs/qa-reports/iter35-deploy.md
+  plan: docs/plans/2026-06-22-iter36-cp-lock-symlink-fix.md
+  spec: null
+  review: null
+  qa: null
+  security: null
+  deploy: null
   translation: null
 external_evidence:
   - type: "second-opinion-v1-foundation-r1-r2"
@@ -42,7 +42,7 @@ external_evidence:
     scope: "v0.12.2 実装後 4 ラウンドレビュー"
     findings: "Round 6 (P1×2, P2×1: pre-compact exit 2 / minimal-project / test rc), Round 7 (P1×1, P3×1: git add 漏れ / テスト件数表記), Round 8 (P2×1, P3×1: stale last_updated / grep 自己マッチ), Round 9 (P3×2: コメント不整合)"
     resolution: "9件全反映。tier 1/2 PASS、134 tests PASS、本体と minimal-project 完全同期確認済み。"
-next_action: "**【iteration 35 = 案A immutable moat（layer-2 OS lock）/ 全6ゲート approved・push 直前・2026-06-22】** brainstorm✓ plan✓ review✓ qa✓ security✓ deploy✓ 全承認。実装7 commit 1e46e4d〜244c32e＋ゲート証拠。full suite 1025 passed/1 skip・contract PASS・版 1.13.0。**実装の確定形（正典）**: layer-2 は『脆い layer-1（889行・5バイパス実績）に対する**事故ケース限定の独立 syscall 保険**』＝**敵対 SF-004 は閉じない**（owner os.chmod 解錠）・SF は CLOSED にせず disposition 追記のみ。`cp-lock.sh`（aegis_cp_paths 単一所有・空 root ガード・CP_DIRS↔cp-lock 相互リンク）＋session-start fail-warn（`if [ -f ]` で set -e 対応）。lock 対象: hooks/scripts/templates/CLAUDE.md/.claude/{rules,skills,commands,agents}（settings 両方除外・root も lock しない）。証拠: iter35-review.md / iter35-security.md（adversarial 9 ベクタ遮断・hardlink 含む）/ test-strength.md / iter35-deploy.md。**security は盲検 adversarial を正規に実施（短絡せず）。** **push 済（585573a..f2d2d1b・10 commit・origin/main）＝iteration 35 完了。** 次タスクは brainstorm から（rollover）。**要対応 follow-up（別 iteration・非ブロッカー）**: (1) **テスト分離バグ**＝full suite 内のどれかが実リポ scripts/check_status.py をモード700 に変更し fingerprint を揺らす（テストは実リポを mutate すべきでない・原因テスト特定要）、(2) NFS/SMB/FUSE で chmod -R 高レイテンシ→FS 検出 skip、(3) lifecycle re-lock 繰延。**残: Batch E は別 iteration。** Bash gotcha: パスはクォート・commit は -F・特殊文字は python FILE。push は yuuya-miyagaki アカウント。"
+next_action: "**【iteration 36 = テスト分離バグ・WIP・/clear 用 再開アンカー・2026-06-22】** **task_type=framework**（bugfix 型は moat が framework コード編集を阻むため不可＝それ自体が知見・LEARNINGS 記録済）・size=S・gates: brainstorm✓ plan✓（ref docs/plans/2026-06-22-iter36-cp-lock-symlink-fix.md）／review/qa/security/deploy=pending（bugfix は review のみ必須・qa/security/deploy 短絡可）。**systematic-debugging で root cause 確定（当初の cp-lock 仮説は直接プローブで反証＝chmod -R は symlink 非追従・cp-lock 無罪）。** ◆**バグA（mode-flip）**: session-start テストが実 scripts/check_status.py を scratch に symlink → session-start が task_type=feature で aegis_cp_lock 起動し scratch を chmod -R a-w → テストの TemporaryDirectory cleanup の rmtree が locked dir で PermissionError → **Python resetperms が os.chmod(path,0o700) 実行・os.chmod は symlink を辿る** → 実 check_status.py が 0o700 化し fingerprint 揺れ。**修正＝該当 _scaffold の symlink→shutil.copy2**。**修正済（commit 済・WIP）: tests/test_phase_skills_lib.py（＋回帰テスト test_scaffold_..._not_symlink）・tests/test_session_start_injection.py**。**要確認: 全 mode-flip 修正後、conftest instrument（pytest_runtest_logfinish で scripts/check_status.py mode 監視）を再実行し残 0 件を確認**（instrument は1回1件検出。既に2件直したので3件目以降がないか要再走）。◆**バグB（deploy-gate・別の分離バグ・未着手）**: tests/test_hook_output_schema.py::test_check_deploy_gate_deny_when_gate_pending が scratch STATUS を書くが、run_hook が CLAUDE_PROJECT_DIR を継承するため hook が**実リポ STATUS を読む**＝判定が実 task_size 依存。実 size=S だと check-deploy-gate が ask（L なら deny）→test fail。iter35 は実 size=L で運頼みに pass していた。**修正案＝run_hook かテストで CLAUDE_PROJECT_DIR を scratch に固定し、scratch STATUS に deny 条件（task_size 等）を明示**。◆**スコープ決定済（ユーザー承認）＝A＋B 両方を iteration 36 で修正**（同根の test-isolation クラス・Bは full suite 緑化の必須条件）。◆**残手順**: (1) 3件目以降の mode-flip 有無を再 instrument 確認＆あれば copy 修正、(2) バグB 修正、(3) full suite 緑＋実 check_status.py mode 644 維持を確認、(4) review ゲート（judge・record-test-result で test green）、(5) qa/security/deploy 短絡、(6) commit＋push（yuuya-miyagaki）。**注意: ゲート ref は承認直前に設定（pending+ref で STATUS 検証テスト赤化）。check_status.py mode は手で触らず suite が残す状態に green を bind。** 設計/正典は plan doc。iter35 follow-up（NFS skip・lifecycle re-lock）も別途残。Bash gotcha: パスはクォート・commit は -F・特殊文字は python FILE。"
 blockers: []
 failure_tracking: null
 session_history:
