@@ -32,6 +32,11 @@
 - **なぜ安易に直せないか**: 「クォート除去＋連結」を素朴に適用すると、`git commit -m "update STATUS.md handling"` のような**クォート内メッセージ救済（OBS-006）を再び壊す**（語の値に `STATUS.md` 部分文字列が現れる）。正しくは「シェル忠実なトークン化 → 各語をクォート除去して**語の値**を得る → その語が**書込み先**の control-plane パスか判定」。重い新プリミティブで、セキュリティ境界ゆえ独立した設計＋TDD＋盲検レビューが必要。
 - **修正方針（暫定・非確定）**: コマンドを語単位にトークン化（python の `shlex` 等＝抽出と同様に python 優先＋bash fail-closed フォールバック）し、各語の literal value を再構成してから control-plane 判定。リダイレクト先・write コマンドの宛先語に限定して deny。`git commit -m`/`echo`/`printf` のメッセージ語は「語全体がパスでない」ため救済を維持。
 - **状態**: **FIX IMPLEMENTED（review/qa/security ゲート＋push は未／ユーザー判断待ち）**。iteration 32 で path-resolution augment（shlex トークン化→各語を解決→control-plane write-target 判定）を実装し、盲検 break-attempt と pre-QA review を反復して**静的難読化クラスを網羅的に閉鎖**。修正計画＝`docs/plans/2026-06-18-sf-001-cp-token-bypass-implementation-plan.md`、設計＝`docs/specs/2026-06-18-sf-001-cp-token-bypass-design.md`。
+- **状態（2026-06-21 更新）**: iteration 35 で layer-2 OS lock を defense-in-depth として
+  追加。lock がアクティブな間（POSIX/macOS の project モード）は本形の**事故**書込みが
+  syscall で EACCES（test_cp_lock_sf_catalog.py で実証）＝多層保険で軽減。ただし**敵対者は
+  `os.chmod` で解錠してから書けるため本項目は CLOSED にしない**（特に SF-004 は静的・OS
+  どちらでも敵対閉鎖は原理的に不可）。Windows ネイティブは layer-2 no-op＝layer-1 のみ。
 - **iteration 32 の閉鎖ラウンド（2026-06-20・各 TDD RED→GREEN・未 push）**:
   - F-1〜F-6: 絶対パス／ANSI-C／cmdsub・$VAR write-target／param-default／brace（commits 〜`1644cd3`）
   - round5（`3c98666`）: tilde-plus `~+`＝PWD・`~-`＝OLDPWD→ask・入れ子 `${X:-${Y:-hooks}}` の fixpoint 解決
@@ -60,6 +65,11 @@
 - **根本原因**: control-plane 判定（SF-001 の token-aware augment 後も）は語の literal value で CP を判定する。glob メタ文字（`* ? [`）を含む語はシェルが実行時にファイル名展開して CP パスに解決するが、判定時点の語は `hooks*` 等で、`CONTROL_PLANE` 正規表現にも bare-name 厳密一致にも当たらない。shlex も glob を展開しない。
 - **修正方針（暫定・非確定）**: bare-name 検出の右境界に glob メタ文字（`*?[`）を許容するか、glob を含む CP 接頭辞語を fail-closed 扱いにする。SF-001 と同じくセキュリティ境界ゆえ独立 TDD＋盲検が要る。
 - **状態**: **FIX IMPLEMENTED（round8 `29caac6`・gate/push 未）**。GATE に `?`/`*`/`[` を追加し resolver で各 path component を CP 絶対パス集合へ component-wise prefix-fnmatch 照合（位置を尊重: `build/*` は非CP、bare `*`/`*/lib` は hooks 配下）→ write=deny / read=carve-out で allow。brace-sequence 形（`hook{s..s}`）は round11 で別途閉鎖。
+- **状態（2026-06-21 更新）**: iteration 35 で layer-2 OS lock を defense-in-depth として
+  追加。lock がアクティブな間（POSIX/macOS の project モード）は本形の**事故**書込みが
+  syscall で EACCES（test_cp_lock_sf_catalog.py で実証）＝多層保険で軽減。ただし**敵対者は
+  `os.chmod` で解錠してから書けるため本項目は CLOSED にしない**（特に SF-004 は静的・OS
+  どちらでも敵対閉鎖は原理的に不可）。Windows ネイティブは layer-2 no-op＝layer-1 のみ。
 - **重要な是正**: 本件を当初「glob＝runtime 値依存の原理的限界」と記録しかけたが**誤り**。glob は cmdsub/$VAR と違い実行時状態に依存せず、既知 CP 名に `fnmatch` で**静的に**照合でき閉じられる。「原理的限界は実証してから言う」の原則どおり、glob は実証の結果 closable と判明した（真の原理的限界は SF-004）。
 
 ### SF-003: CP ディレクトリ名が不透明な cmdsub の中に消える残余（Low・accepted residual）
@@ -76,6 +86,11 @@
 - **根本原因**: SF-001 の F-4 修正は cmdsub/$VAR を sentinel 化して「未知前置＋残る CP 名」を ask で捕捉するが、CP **名自体が cmdsub の内部に入る**形は sentinel が名前ごと飲み込むため検出できない。cmdsub を実行しない限り出力（=CP 名）を静的に復元できない。
 - **なぜ accept するか**: (1) accidental/casual な書込み（moat の主目的）では発生しない＝`$(echo hooks)` を書く者は `hooks` を直接書ける（それは捕捉される）。(2) 任意の静的 moat が同じ限界を持つ。(3) 敵対エージェントは base64/eval 等で無限に回避でき、静的 moat はサンドボックスではない。完全動的解決を求めるのは YAGNI。
 - **状態**: **OPEN（accepted residual・記録のみ）**。現実的 cmdsub ベクタ（`$(pwd)/hooks` 等）は SF-001 F-4 で閉鎖済み。
+- **状態（2026-06-21 更新）**: iteration 35 で layer-2 OS lock を defense-in-depth として
+  追加。lock がアクティブな間（POSIX/macOS の project モード）は本形の**事故**書込みが
+  syscall で EACCES（test_cp_lock_sf_catalog.py で実証）＝多層保険で軽減。ただし**敵対者は
+  `os.chmod` で解錠してから書けるため本項目は CLOSED にしない**（特に SF-004 は静的・OS
+  どちらでも敵対閉鎖は原理的に不可）。Windows ネイティブは layer-2 no-op＝layer-1 のみ。
 
 ### SF-004: interpreter `-c`/`-e` の runtime 構築パス（**原理的限界・実証済み**・accepted residual）
 
@@ -93,6 +108,11 @@
 - **根本原因**: `python3 -c`/`perl -e`/`bash -c`/`node -e` は任意言語のコードを実行し、CP パスを**実行時に**文字列構築する。これを静的に検出するには当該 interpreter 言語をパースまたは実行するしかなく、不可能。全ての `python3 -c`/`bash -c` を ASK にすれば通常の開発が破綻するため、bare interpreter 呼び出しは意図的に flag しない設計。
 - **なぜ accept するか**: (1) 静的コマンド解析の**原理的限界**（任意コード実行は静的に不透明）。(2) 敵対エージェントは base64/eval/外部スクリプト等でも無限に回避でき、moat は sandbox ではない。(3) これを閉じるには moat の外＝OS/FS レベルの防御が必要。
 - **状態**: **OPEN（accepted residual／原理的限界）**。→ 下記「防御の多層化」提言を参照。
+- **状態（2026-06-21 更新）**: iteration 35 で layer-2 OS lock を defense-in-depth として
+  追加。lock がアクティブな間（POSIX/macOS の project モード）は本形の**事故**書込みが
+  syscall で EACCES（test_cp_lock_sf_catalog.py で実証）＝多層保険で軽減。ただし**敵対者は
+  `os.chmod` で解錠してから書けるため本項目は CLOSED にしない**（特に SF-004 は静的・OS
+  どちらでも敵対閉鎖は原理的に不可）。Windows ネイティブは layer-2 no-op＝layer-1 のみ。
 
 ### SF-005: extglob `@()`/`!()`/`+()` の名前分割形（条件付き・Low・記録のみ）
 
@@ -109,6 +129,11 @@
 - **根本原因**: shlex が `()` を句読点として分割するため extglob 内の語が CP 名に再結合されない。`!()` は「マッチしない」意味論で静的解析が困難。
 - **修正方針（非確定）**: extglob 構文 `[?*+@!](` を検出して書込み文脈なら保守的 ASK。ただし条件付き＋稀＋ブラントなので、SF-004 と併せて OS/FS 防御で一括カバーする方が筋が良い。
 - **状態**: **OPEN（条件付き residual・記録のみ）**。
+- **状態（2026-06-21 更新）**: iteration 35 で layer-2 OS lock を defense-in-depth として
+  追加。lock がアクティブな間（POSIX/macOS の project モード）は本形の**事故**書込みが
+  syscall で EACCES（test_cp_lock_sf_catalog.py で実証）＝多層保険で軽減。ただし**敵対者は
+  `os.chmod` で解錠してから書けるため本項目は CLOSED にしない**（特に SF-004 は静的・OS
+  どちらでも敵対閉鎖は原理的に不可）。Windows ネイティブは layer-2 no-op＝layer-1 のみ。
 
 ---
 
@@ -138,6 +163,7 @@ SF-001 系の網羅的閉鎖（rounds 5-11）で**実用的なシェル難読化
 - **非 sandbox（許容）**: エージェントが `chmod +w` を前置すれば書ける＝事故防止スコープでは許容（事故は chmod を前置しない）。
 - **実装時の必須設計（no-go 回避）**: lock 対象は**安定 CP（hooks/*.sh・scripts/*.py・CLAUDE.md・.claude/rules・.claude/skills・templates）に限定**し、framework が実行時に書く runtime-state（`docs/STATUS.md`・`.claude/.gate-snapshot`・`evidence-log`・settings）は**除外**（さもないと framework 自身が壊れる）。re-lock は default-lock＋積極再施錠で crash 窓を縮小。
 - **結論: GO**。iteration 35 で 案A を実装し、成立すれば `check-control-plane.sh`〜1000行＋SF-001〜005 を層1 ごと退役。設計: `docs/specs/2026-06-21-immutable-moat-design.md`。
+- 案A は iteration 35 で layer-2（事故ケース多層保険）として実装。敵対 sandbox ではない旨を明記。
 
 ## CLOSED
 

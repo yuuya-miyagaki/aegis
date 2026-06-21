@@ -95,6 +95,23 @@ How Aegis maps to Claude Code's built-in capabilities.
 | Auto Mode | — | **Keep PaC hooks.** Gate blocks and control-plane *path* protection (Edit/Write) are deterministic hard rules a probabilistic classifier cannot match. The Bash *command* moat is a threshold-raising layer with a known static-analysis limit (SF-004 — not a sandbox; see `docs/security-followups.md`), so "guarantee" applies to the path/gate surface, not arbitrary shell. |
 | Routines / scheduling | — | **N/A** — aegis ships no scheduling/cron surface, so there is nothing to delegate or retire here. |
 
+**Upgrade note (1.13.0):** A second, defense-in-depth layer
+(`hooks/lib/cp-lock.sh`) OS-locks the framework control-plane (`chmod -R a-w`)
+during non-framework work, keyed on `task_type` at session start. It is additive
+and backward-compatible, and is insurance against an undiscovered bypass in the
+static hook layer for the *accidental* case — it is not a sandbox (an agent that
+runs `chmod +w` / `os.chmod` first can still write).
+- The lock **persists on disk** between Claude sessions: while `task_type` is a
+  project type, `hooks/`, `scripts/`, `CLAUDE.md`, `.claude/{rules,skills,commands,agents}`
+  are read-only in your editor too. They unlock automatically in a `task_type:
+  framework` session, or manually via `chmod -R u+w <path>`.
+- **Updating the framework** (e.g. `git pull` that rewrites vendored hooks) must
+  be done in a `task_type: framework` session, otherwise the write hits EACCES.
+- On native Windows `chmod` is a no-op, so layer-1 (the static hooks) remains the
+  protection there. Both `.claude/settings.json` and `.claude/settings.local.json`
+  are **excluded** from the lock (Claude Code writes permission grants there);
+  they stay protected by layer-1.
+
 ## Quick Start
 
 > 🚀 はじめての方は **[オンボーディング教材](docs/onboarding/README.md)**（説明・ハンズオン・早見表）から。

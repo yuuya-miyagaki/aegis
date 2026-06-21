@@ -21,7 +21,7 @@ from platform_manifest import (
 
 ROOT = Path(__file__).resolve().parents[1]
 
-FRAMEWORK_VERSION = "1.12.1"
+FRAMEWORK_VERSION = "1.13.0"
 
 PROFILES_DIR = ROOT / "templates" / "profiles"
 VALID_PROFILES = ["minimal", "standard", "full"]
@@ -174,6 +174,11 @@ REQUIRED_HOOK_FILES = [
     # exit 1 (Claude Code fail-open). Loss of this lib alone collapses the
     # entire moat — must be REQUIRED in framework_contract.
     ROOT / "hooks/lib/safety.sh",
+    # iteration 35 (v1.13.0): layer-2 defense-in-depth. cp-lock.sh applies a
+    # task_type-keyed OS write-lock (chmod -R a-w) to the control-plane at
+    # session start, sourced by session-start.sh. Same F6 lesson — a missing
+    # lib silently fail-opens the layer-2 lock path.
+    ROOT / "hooks/lib/cp-lock.sh",
 ]
 
 # Legacy skill files that should NOT exist (migrated to .claude/skills/ in v0.6.0).

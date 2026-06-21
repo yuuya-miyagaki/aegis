@@ -309,7 +309,7 @@ v1.0.0 で公式同名スキルとの衝突回避のため一部を `aegis-*` �
 
 17 のランタイムフックが Claude Code のツール呼び出しを制御する。
 フック設定は `templates/hooks.template.json` に定義され、`bin/setup.sh` が `settings.local.json` として生成する。
-共有ライブラリは `hooks/lib/`（出力スキーマ＝`emit.sh`、破壊パターン＝`patterns.sh`、入力抽出＝`extract-input.sh`、frontmatter ＝`frontmatter.sh`、観測ログ＝`evidence.sh`/`fingerprint.sh`、phase→skill マップ＝`phase-skills.sh`、credential パターン＝`secrets-patterns.sh`、fail-closed integrity ＝`safety.sh`、untrusted 文中和＝`sanitize.sh` の計 10 本）。
+共有ライブラリは `hooks/lib/`（出力スキーマ＝`emit.sh`、破壊パターン＝`patterns.sh`、入力抽出＝`extract-input.sh`、frontmatter ＝`frontmatter.sh`、観測ログ＝`evidence.sh`/`fingerprint.sh`、phase→skill マップ＝`phase-skills.sh`、credential パターン＝`secrets-patterns.sh`、fail-closed integrity ＝`safety.sh`、untrusted 文中和＝`sanitize.sh`、layer-2 OS lock ＝`cp-lock.sh` の計 11 本）。
 `emit.sh` は pure-bash で外部依存ゼロ＝deny/block が fail-open しない。
 
 ### 7.1 フック一覧
@@ -332,6 +332,8 @@ v1.0.0 で公式同名スキルとの衝突回避のため一部を `aegis-*` �
 | **pre-compact.sh** | PreCompact | — | STATUS.md が 5 分以上未更新かつアクティブフェーズ中はコンテキスト圧縮をブロック |
 | **check-task-created.sh** | TaskCreated | — | phase=implement で plan ゲート未承認なら新タスク作成を hard stop（`continue:false`） |
 | **check-task-completed.sh** | TaskCompleted | — | 完了時に next_action 未更新／evidence 不整合を `exit 2` で差し戻し |
+
+- layer-2: cp-lock.sh が session-start で task_type 連動の OS write-lock を適用（POSIX/macOS）。
 
 ### 7.2 フック連携図
 
@@ -518,7 +520,7 @@ python3 scripts/check_framework_contract.py --profile=standard --root <your-proj
 | エージェント（.claude/agents/） | 12 |
 | スキル（.claude/skills/） | 19（SKILL.md x18 + platforms.md x1） |
 | コマンド（.claude/commands/） | 8 |
-| フック（hooks/） | 27（メイン 17 + lib/ 10: emit / patterns / extract-input / frontmatter / evidence / fingerprint / phase-skills / secrets-patterns / safety / sanitize） |
+| フック（hooks/） | 28（メイン 17 + lib/ 11: emit / patterns / extract-input / frontmatter / evidence / fingerprint / phase-skills / secrets-patterns / safety / sanitize / cp-lock） |
 | スクリプト（scripts/） | 13 |
 | テンプレート（templates/） | 30（.template.md x26 + hooks.template.json + profiles x3） |
 | 拡張（extensions/） | 11 |

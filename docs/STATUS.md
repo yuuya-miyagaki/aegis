@@ -1,20 +1,20 @@
 ---
 framework: aegis
-framework_version: "1.12.1"
+framework_version: "1.13.0"
 project_name: "Aegis"
 mode: Dev
-phase: review
+phase: implement
 task_type: framework
 task_size: L
-task_size_rationale: "iteration 34 = レビュー集中修正（L・完了）: 内製5レンズ＋外部レビューで確定した P1/P2 を修正。A1 emit.sh 利用 6 hook の fail-closed 統一（外部 3→検証で check-deploy-gate 取りこぼし捕捉し 6 hook・byte-identity 12 hook 固定）/ A2 standard で moat4 hook を required-registration / C1 setup baseline を実コピー path 限定 / B1 vacuous safety test 実効化 / B3 missing-ref rc 検証 / D1 README 数字+guarantee 限定 / D2 check-secrets scope / 版 1.12.1。ゲート: review 承認（judge 緑）・qa/security/deploy はユーザー判断で短絡し push で締め。計画 docs/plans/2026-06-21-aegis-iteration34-review-fixes.md。"
-iteration: 34
+task_size_rationale: "iteration 35 = 案A immutable moat（layer-2 OS lock 追加・L）: control-plane 誤書込み防御を多層化。新規 cp-lock.sh（chmod -R a-w / task_type 連動 lock-unlock）＋ session-start 連動を layer-2 として追加。check-control-plane.sh（layer-1・889行）は退役せず存置し chmod-unlock guard を追加。settings*.json を LOCK 側へ移動。安定 CP セットの単一所有 manifest。Windows は layer-1 のみ（chmod no-op）。SF-001〜005 は POSIX/macOS で実務クローズ・Windows 残余。設計レビューで初版『全退役・置換』を撤回し layer-2 追加に修正済（Windows ゼロ保護 / EACCES が chmod+w 自己修復誘発 / hooks-lib は共有インフラ の3点）。SemVer MINOR 候補（1.13.0）。設計 docs/specs/2026-06-21-immutable-moat-design.md（rev.2）。"
+iteration: 35
 ui_surface: false
-last_updated: "2026-06-21T16:30:00Z"
+last_updated: "2026-06-21T18:00:00Z"
 gate_approvals:
   client_ready_for_dev: n/a
   brainstorm: approved
   plan: approved
-  review: approved
+  review: pending
   qa: pending
   security: pending
   deploy: pending
@@ -22,9 +22,9 @@ gate_approvals:
 current_refs:
   requirements:
     - docs/full-review-2026-06-13-context-futureproof.md
-  plan: docs/plans/2026-06-21-aegis-iteration34-review-fixes.md
-  spec: null
-  review: docs/qa-reports/iter34-review.md
+  plan: docs/plans/2026-06-21-aegis-iteration35-immutable-moat.md
+  spec: docs/specs/2026-06-21-immutable-moat-design.md
+  review: null
   qa: null
   security: null
   deploy: null
@@ -42,10 +42,14 @@ external_evidence:
     scope: "v0.12.2 実装後 4 ラウンドレビュー"
     findings: "Round 6 (P1×2, P2×1: pre-compact exit 2 / minimal-project / test rc), Round 7 (P1×1, P3×1: git add 漏れ / テスト件数表記), Round 8 (P2×1, P3×1: stale last_updated / grep 自己マッチ), Round 9 (P3×2: コメント不整合)"
     resolution: "9件全反映。tier 1/2 PASS、134 tests PASS、本体と minimal-project 完全同期確認済み。"
-next_action: "**【iteration 34 = レビュー集中修正・完了・push 済み 2026-06-21】** 全力レビュー（内製5レンズ）＋外部レビュー(E1-E5)で確定した P1/P2 を修正: A1 emit.sh 利用 6 hook の fail-closed 統一（emit.sh/safety.sh 欠損時の fail-open を解消・外部は 3 hook 指摘だが検証で CLI 版 check-deploy-gate 取りこぼしを捕捉し 6 hook・byte-identity 12 hook 固定）/ A2 standard で moat4 hook を required-registration（登録ドリフト無検出を解消）/ C1 setup baseline を実コピー path 限定（既存ユーザーファイル巻き込み解消）/ B1 vacuous safety test 実効化 / B3 missing-ref rc 検証 / D1 README 数字(minimal8/standard18+8)+guarantee 限定 / D2 check-secrets scope / 版 1.12.1。検証: full suite 1006 passed/1 skip・contract(full)・run_eval Tier1・各タスク TDD RED→GREEN・盲検3エージェント収束（security: emit.sh/safety.sh 欠損で 6 hook fail-closed 実走確認 / reviewer: normal-path / reviewer-maintainability: approve_with_notes・Critical0・scope creep0）。フロー: brainstorm→plan→grill-plan（致命2: Task0 gate経路/B4繰延）→per-task TDD→grill-code（Critical0・🟡1 C1完全性テスト修正 dd4c593）→盲検3レビュー→review gate approve（judge 緑・証拠 docs/qa-reports/iter34-review.md）。**qa/security/deploy の formal ゲート儀式はユーザー判断で短絡し push で締め（iteration 32 と同パターン・security WORK は盲検 fail-closed 検証済）。** コミット 2071cac〜dd4c593。**残: Batch E（M3/M4 集約・version-sync 集約・P3 群: M7 STATUS tool 非対称/M8 .git/M10 array ガード/M11 ALL_CHECKS/M12 test env 依存）も別 iteration。**【次＝iteration 35: 案A immutable moat 実装（MAJOR・moat 置換）】** 案A PoC(2026-06-21)=GO: chmod -R a-w が python3 -c(SF-004)/quote-split(SF-001) 含む全誤書込み形を syscall で遮断・CP INTACT＝静的 moat 置換可能。設計 commit 済 docs/specs/2026-06-21-immutable-moat-design.md（lock 状態=task_type 連動・安定CP限定・runtime-state(STATUS/snapshot/evidence-log)除外・chmod 主/chflags macOS 硬化/chattr 不採用・check-control-plane 段階退役）。findings は security-followups.md。**再開フロー: 設計を user review→writing-plans→TDD→フルゲート。STATUS は iteration 34 ledger 据置（iteration 35 は writing-plans 着手時に gate reset＋rollover）。** ターゲットユーザー検証も別途。** Bash gotcha: パスはクォート・commit は -F・特殊文字は python FILE。push は yuuya-miyagaki アカウント。"
+next_action: "**【iteration 35 = 案A immutable moat（layer-2 OS lock）/ plan ゲート承認済・implement 着手・2026-06-21】** 設計 rev.2＋writing-plans＋grill-plan 完了。plan ゲート approved（計画 docs/plans/2026-06-21-aegis-iteration35-immutable-moat.md）。**grill-plan で致命3点を修正済（重要・実装はこの修正版に従う）**: 【致命1】SF-004 closure は敵対に偽——`chmod`/`chflags` は所有権判定なので owner は a-w 下でも `os.chmod` 解錠でき敵対者は同じ interpreter で回避可→justification を『SF-004 閉鎖』ではなく**『889行・5バイパス実績の脆い layer-1 に対する事故ケース限定の独立 syscall 保険（defense-in-depth）』**へ。`chflags uchg` は不採用（敵対に無力）。SF 項目は CLOSED にしない。【致命2】settings を lock すると Claude Code 本体の permission 永続化を破損（本リポは hook 登録が settings.local.json・settings.json 不在を実測）→`settings.json`/`settings.local.json` を**両方 layer-2 除外**し layer-1 に委ねる。【致命3】root は a-w を無視→全 lock テストに `NO_FS_LOCK`(WINDOWS or geteuid==0) skip。要検討: lock は on-disk 永続（エディタでも read-only）・`git pull` 等 framework 更新は framework mode で→README 注記。**lock 対象**: hooks/scripts/templates/CLAUDE.md/.claude/{rules,skills,commands,agents}（settings は除外・root も lock しない）。SemVer MINOR 1.13.0。**実装（subagent-dev・per-task TDD→2段レビュー）**: Task0 cp-lock.sh（aegis_cp_paths 単一所有/lock/unlock）→Task1 session-start 連動(fail-warn)→Task2 layer-1 chmod-unlock/rename deny 回帰固定（production 無改修）→Task3 lock 下の形非依存阻止実証→Task4 contract 登録+版bump+README+SF disposition。**その後 grill-code→フルゲート（review+qa+security+deploy）。** 設計 rev.2 / findings docs/security-followups.md。**残: Batch E は別 iteration。** Bash gotcha: パスはクォート・commit は -F・特殊文字は python FILE。push は yuuya-miyagaki アカウント。"
 blockers: []
 failure_tracking: null
 session_history:
+  - date: "2026-06-21"
+    mode: Dev
+    phase: "plan"
+    note: "iteration 35（案A immutable moat・layer-2 OS lock）着手: 設計ドキュメント docs/specs/2026-06-21-immutable-moat-design.md を user review → 初版『静的 moat 全退役・OS lock 置換』を撤回し layer-2 追加方針へ rev.2 改訂。確定 P1/P2: ①Windows で chmod/chflags=no-op→check-control-plane(layer-1) 存置で cross-platform 維持 ②EACCES が chmod+w 自己修復を誘発→layer-1 ポリシー停止＋chmod-unlock guard 追加 ③hooks/lib は全 hook 共有インフラ＝退役対象外（曖昧是正・裏取り: emit.sh/safety.sh/evidence.sh/patterns.sh は多数 hook が source）④settings*.json を LOCK へ（writable だと moat 除去可）⑤mv rename gap→root 非再帰 a-w ⑥default-LOCK＋lifecycle re-lock。SemVer MINOR(1.13.0)候補。STATUS rollover: iteration 35・gates reset（plan/review を update-gate.sh reset で正規 pending 化／直接編集が gate-tamper 監査でブロックされ authorized script 経由に是正）・spec ref 設定・brainstorm=approved(PoC スパイク由来)。次: writing-plans→grill-plan→plan ゲート→TDD→grill-code→フルゲート。"
   - date: "2026-06-21"
     mode: Dev
     phase: "review"
@@ -54,10 +58,6 @@ session_history:
     mode: Dev
     phase: "security"
     note: "iteration 33（M4 rebuild・簡素化 WS4 最終）完了: 観測 hook（E1）の fingerprint/marker 計算を全 Bash hot-path からテストランナー検出時のみへ寄せた。共有 is_test_runner_cmd（evidence.sh・消費側 read_test_result と同一正規化＋AEGIS_TEST_RUNNER_REGEX・単一 sed -e -e/単一 grep -e -e・bash3.2 安全）を新設し append_evidence を条件分岐＝非ランナーは fp 番兵 'skipped'＋marker false の安価記録。post-bash.sh の検出も同関数へ統合（単一ソース化＝recorder/ヒント/reader がドリフト不能）。ゲート時の緑認証ロジック（fail-closed・silent-green 禁止・fp binding）は byte 不変＝『いつ呼ぶか』だけ変更。フロー: brainstorm（設計#4 既承認）→plan→grill-plan（致命2: 検出 grep 畳み込み/契約ベースライン、YAGNI: 版バンプ撤去 を反映）→per-task TDD（各タスク RED 実証）→grill-code（🔴0・🟡1=canonical FIXTURES 40+形を実関数に通すパリティ実証で closed・🟢2 受容）→REDTEAM PoC 18/18（marker forge fail-closed 不変）→盲検2次 security 独立=approve（silent-green 不可能を 64-hex 番兵壁で実証・4方向 fail-close 実走確認）。検証多層: pytest 998 passed/1 skip・contract・Tier1・scaffold smoke・パリティ 9。ゲート: review🟢／qa🟢（B1 は committed-code で working-tree diff 空＝skip 宣言＋手動 mutation 同等実証）／security🟡ack（外部依存 manifest 無し＝deps N/A）。版 1.12.0 据置（iteration counter と framework_version は直交・他簡素化 WS と同様バンプなし）。コミット f02680d/878af23/fb5c5d1/ffd5050/a710328＋ゲート証拠。本 session は observe hook が tool_response.output を hook に渡さない（全 1160 エントリ marker_verified:false）ため tests 緑化は record-test-result.py（trusted manual runner・実行記録・src=manual は marker 不要）で確立。deploy/ship/docs は solo の push で締め。残: 簡素化 WS2=M2 据置（1行明文化）。push は yuuya-miyagaki アカウント。"
-  - date: "2026-06-18"
-    mode: Dev
-    phase: "docs"
-    note: "iteration 31（ドッグフード由来 改善・Batch1 / v1.11.0）完了: スタジオ・ナギ予約LP で v1.10.0 を Client→Dev 一周ドッグフードして見つかったハーネス自身の摩擦（OBS-001〜022）のうち配布ブロッカー 6 タスクを修正。1.1 setup.sh が新規 install に baseline commit（fresh のみ・既存リポ no-op・scoped add・identity fallback／OBS-017）、1.2 judge stub 走査のみ control-plane 除外・secret 走査は全走査維持（後退ゼロ）、1.3 証拠スクリプト allowlist、1.4 bare git add staging→ask、1.5 read-only パイプ allow（最終セグメント fail-open を TDD で捕捉）、1.6 書込み先 path のみ deny（pure-bash mask_quoted＋redirect target＋no-write コマンドのアロウリスト・cmdsub/改行 fail-closed）。設計核心: write-target 判定は安全コマンドのアロウリスト（echo/printf/git commit）で行いブロックリストは使わない（列挙漏れ）。全タスク Step0→TDD→commit。ユーザー選択 A（Batch1 先行ゲート）で review→qa→security→deploy 全承認。review=3 ラウンド盲検 break-attempt が Batch1 由来 Critical 2 件（write-util ブロックリスト穴 76112bc・改行バイパス 8f85a5b）を検出→fix-forward。security=1次（security エージェント）＋盲検2次とも approve_with_notes、新規 WRITE バイパス ゼロを orig(8f8eb2d) vs new HEAD 実走で確認。qa=B1 mutation drill は committed-code 構造制約（working-tree diff 空）で skip 宣言＋手動 4-mutant 実証（4/4 CAUGHT）。版 1.10.0→1.11.0（contract/template/example/live STATUS 統一）。full suite 830 passed/1 skip・REDTEAM 18/18＋5/5・contract 全 profile・drift・mirror・scaffold smoke・distribution 全 PASS。コミット 52dff43〜6d1b938＋76112bc/8f85a5b＋evidence/版 367e1f0。**SF-001（control-plane の literal `hooks/` 一致回避＝quote分割/backslash/bare-dir。pre-existing＝orig でも同一 allow を実走確認・Critical・deploy blocker 非該当）を docs/security-followups.md に durable 記録＝最優先 follow-up（繰延合意）。** 残: Batch2（skill/契約/配布整合5）+Batch3（Client書込み2）+X.1/X.2＝iteration 32。**残: dev_ready_for_client 承認 → push（明示承認まで保留・自動 push しない）。**"
 ---
 
 ## Summary
