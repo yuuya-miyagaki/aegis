@@ -131,12 +131,57 @@ class TestCpLock:
             subprocess.run(["chmod", "-R", "u+w", tmp.name])
             tmp.cleanup()
 
+    def test_apply_framework_unlocks(self):
+        tmp = _make_scratch(); p = Path(tmp.name)
+        try:
+            _bash('aegis_cp_lock "$PWD"', tmp.name)  # start locked
+            assert not _can_write(p / "hooks" / "lib" / "util.sh")
+            assert _bash('aegis_cp_apply "$PWD" framework', tmp.name).returncode == 0
+            assert _can_write(p / "hooks" / "lib" / "util.sh"), "framework => unlock"
+        finally:
+            subprocess.run(["chmod", "-R", "u+w", tmp.name]); tmp.cleanup()
+
+    def test_apply_nonframework_locks(self):
+        tmp = _make_scratch(); p = Path(tmp.name)
+        try:
+            assert _can_write(p / "hooks" / "lib" / "util.sh")  # fresh = unlocked
+            assert _bash('aegis_cp_apply "$PWD" feature', tmp.name).returncode == 0
+            assert not _can_write(p / "hooks" / "lib" / "util.sh"), "feature => lock"
+        finally:
+            subprocess.run(["chmod", "-R", "u+w", tmp.name]); tmp.cleanup()
+
+    def test_apply_empty_task_type_locks(self):
+        # default-lock: empty/unknown task_type must lock (safe default)
+        tmp = _make_scratch(); p = Path(tmp.name)
+        try:
+            assert _bash('aegis_cp_apply "$PWD" ""', tmp.name).returncode == 0
+            assert not _can_write(p / "hooks" / "lib" / "util.sh")
+        finally:
+            subprocess.run(["chmod", "-R", "u+w", tmp.name]); tmp.cleanup()
+
+    def test_apply_idempotent_keeps_state(self):
+        tmp = _make_scratch(); p = Path(tmp.name)
+        try:
+            _bash('aegis_cp_lock "$PWD"', tmp.name)  # locked
+            assert _bash('aegis_cp_apply "$PWD" feature', tmp.name).returncode == 0
+            assert not _can_write(p / "hooks" / "lib" / "util.sh"), "already locked stays locked"
+            _bash('aegis_cp_unlock "$PWD"', tmp.name)  # unlocked
+            assert _bash('aegis_cp_apply "$PWD" framework; aegis_cp_apply "$PWD" framework',
+                         tmp.name).returncode == 0
+            assert _can_write(p / "hooks" / "lib" / "util.sh"), "already unlocked stays unlocked"
+        finally:
+            subprocess.run(["chmod", "-R", "u+w", tmp.name]); tmp.cleanup()
+
 
 # Platform-independent (no chmod): runs even on Windows/root CI.
 def test_empty_root_is_rejected():
     # An empty root must fail loud (rc 1), never silently chmod absolute /hooks etc.
     assert _bash('aegis_cp_lock ""', ".").returncode == 1
     assert _bash('aegis_cp_unlock ""', ".").returncode == 1
+
+
+def test_apply_empty_root_is_rejected():
+    assert _bash('aegis_cp_apply "" feature', ".").returncode == 1
 
 
 def test_cp_lock_paths_cover_expected_roots():

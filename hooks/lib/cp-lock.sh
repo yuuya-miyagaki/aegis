@@ -52,3 +52,27 @@ aegis_cp_unlock() {
   done < <(aegis_cp_paths "$root")
   return "$rc"
 }
+
+# aegis_cp_apply <root> <task_type> — re-establish the correct CP lock state for the
+# CURRENT task_type. framework => unlock; anything else (incl. empty/unknown =>
+# default-lock) => lock. Idempotent: a cheap sentinel probe ([ -w <root>/hooks ])
+# decides whether a flip is needed so a no-op call avoids a redundant chmod -R.
+# rc mirrors the underlying lock/unlock (0 ok / 1 chmod failure); a no-op returns 0.
+aegis_cp_apply() {
+  local root="$1" task_type="$2" sentinel
+  [ -n "$root" ] || return 1
+  sentinel="${root}/hooks"
+  if [ "$task_type" = "framework" ]; then
+    # desired = unlock. Already writable (unlocked) => no-op.
+    if [ -e "$sentinel" ] && [ -w "$sentinel" ]; then
+      return 0
+    fi
+    aegis_cp_unlock "$root"
+  else
+    # desired = lock (default-lock). Already non-writable (locked) => no-op.
+    if [ -e "$sentinel" ] && [ ! -w "$sentinel" ]; then
+      return 0
+    fi
+    aegis_cp_lock "$root"
+  fi
+}
