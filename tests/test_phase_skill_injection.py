@@ -58,7 +58,11 @@ class TestPhaseTransitionInjection(unittest.TestCase):
         (sk / "SKILL.md").write_text("---\nname: subagent-dev\n---\n", encoding="utf-8")
         shutil.copytree(ROOT / "hooks", d / "hooks")
         (d / "scripts").mkdir()
-        (d / "scripts" / "check_status.py").symlink_to(ROOT / "scripts" / "check_status.py")
+        # COPY (not symlink): post-status-audit locks the scratch (aegis_cp_apply);
+        # TemporaryDirectory cleanup's resetperms(os.chmod) follows symlinks and would
+        # mutate the REAL scripts/check_status.py. copy => cleanup chmods the copy only.
+        shutil.copy2(ROOT / "scripts" / "check_status.py",
+                     d / "scripts" / "check_status.py")
         return d
 
     def _run(self, root: Path) -> dict:
@@ -77,6 +81,16 @@ class TestPhaseTransitionInjection(unittest.TestCase):
             out = self._run(root)  # brainstorm -> plan（brainstorm approved 済 = 正当）
             ctx = out.get("hookSpecificOutput", {}).get("additionalContext", "")
             self.assertIn(".claude/skills/subagent-dev/SKILL.md", ctx)
+
+    def test_scaffold_check_status_is_regular_file_not_symlink(self):
+        # Regression: post-status-audit becomes a CP lock trigger; a symlinked real
+        # check_status.py would be mutated by TemporaryDirectory cleanup's resetperms
+        # (os.chmod follows symlinks). _scaffold must COPY, not symlink.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._scaffold(Path(tmp))
+            cs = root / "scripts" / "check_status.py"
+            self.assertTrue(cs.is_file(), "scaffold must provide check_status.py")
+            self.assertFalse(cs.is_symlink(), "must copy, not symlink, the real check_status.py")
 
     def test_no_transition_emits_allow(self):
         with tempfile.TemporaryDirectory() as tmp:
