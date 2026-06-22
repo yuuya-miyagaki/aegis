@@ -10,13 +10,19 @@ Run: python3 -m unittest tests.test_session_start_injection -v
 from __future__ import annotations
 
 import json
+import os
 import shutil
 import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+
+NO_FS_LOCK = unittest.skipIf(
+    sys.platform.startswith("win") or (hasattr(os, "geteuid") and os.geteuid() == 0),
+    "chmod write-bit is a no-op on native Windows / bypassed by root")
 
 STATUS = """---
 framework: aegis
@@ -101,6 +107,35 @@ class TestSessionStartInjection(unittest.TestCase):
             ctx = out["hookSpecificOutput"]["additionalContext"]
             self.assertIn("あ", ctx)            # 日本語が壊れず載る
             self.assertLess(len(ctx), 1200)     # 上限が効いている（暴走しない）
+
+
+    @NO_FS_LOCK
+    def test_nonframework_locks_control_plane(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._scaffold(Path(tmp), STATUS)  # STATUS has task_type: feature
+            try:
+                self._run(root)
+                w = subprocess.run(
+                    ["bash", "-c", f'printf x >> "{root}/hooks/session-start.sh"'],
+                    capture_output=True)
+                assert w.returncode != 0, "非 framework は CP を lock するべき"
+            finally:
+                subprocess.run(["chmod", "-R", "u+w", str(root)])
+
+    @NO_FS_LOCK
+    def test_framework_unlocks_control_plane(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            status = STATUS.replace("task_type: feature", "task_type: framework")
+            root = self._scaffold(Path(tmp), status)
+            try:
+                subprocess.run(["chmod", "-R", "a-w", f"{root}/hooks"])  # pre-lock
+                self._run(root)
+                w = subprocess.run(
+                    ["bash", "-c", f'printf x >> "{root}/hooks/session-start.sh"'],
+                    capture_output=True)
+                assert w.returncode == 0, "framework は CP を unlock するべき"
+            finally:
+                subprocess.run(["chmod", "-R", "u+w", str(root)])
 
 
 if __name__ == "__main__":

@@ -269,12 +269,8 @@ fi
 
 # layer-2: OS/FS write-lock of the stable control-plane, keyed on task_type.
 # Lock failure is non-fatal — warn into CONTEXT; layer-1 static moat stays active.
-if command -v aegis_cp_lock >/dev/null 2>&1 && command -v aegis_cp_unlock >/dev/null 2>&1; then
-  if [ "$TASK_TYPE" = "framework" ]; then
-    aegis_cp_unlock "$ROOT" || CONTEXT="${CONTEXT} | [WARNING] control-plane unlock 一部失敗（framework 編集が EACCES になる場合あり・該当ファイルを手動 chmod u+w）"
-  else
-    aegis_cp_lock "$ROOT" || CONTEXT="${CONTEXT} | [WARNING] control-plane lock 一部失敗（layer-2 未適用・layer-1 静的 moat は有効）"
-  fi
+if command -v aegis_cp_apply >/dev/null 2>&1; then
+  aegis_cp_apply "$ROOT" "$TASK_TYPE" || CONTEXT="${CONTEXT} | [WARNING] control-plane lock/unlock 一部失敗（layer-2 未適用・layer-1 静的 moat は有効。framework 編集が EACCES なら該当ファイルを手動 chmod u+w）"
 else
   CONTEXT="${CONTEXT} | [WARNING] cp-lock.sh 利用不可（layer-2 OS lock skip・layer-1 静的 moat は有効）"
 fi
