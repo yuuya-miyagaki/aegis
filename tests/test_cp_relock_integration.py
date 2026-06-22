@@ -63,6 +63,22 @@ def test_status_edit_to_nonframework_relocks():
             subprocess.run(["chmod", "-R", "u+w", str(root)])
 
 
+def test_post_status_audit_without_cp_lock_lib_does_not_crash():
+    # cp-lock.sh absent => `command -v aegis_cp_apply` is false => re-lock is
+    # skipped and post-status-audit still runs to a clean exit (optional-lib load
+    # is non-fatal). No chmod happens, so this is platform-independent (no skip).
+    with tempfile.TemporaryDirectory() as tmp:
+        root = _scaffold(Path(tmp), "feature")
+        (root / "hooks" / "lib" / "cp-lock.sh").unlink()
+        payload = json.dumps({"tool_name": "Edit",
+                              "tool_input": {"file_path": str(root / "docs" / "STATUS.md")}})
+        r = subprocess.run(["bash", str(root / "hooks" / "post-status-audit.sh")],
+                           input=payload, capture_output=True, text=True, timeout=60,
+                           env={"PATH": "/usr/bin:/bin", "CLAUDE_PROJECT_DIR": str(root)})
+        assert r.returncode == 0, \
+            f"absent cp-lock.sh must not crash post-status-audit: {r.stderr}"
+
+
 @NO_FS_LOCK
 def test_status_edit_to_framework_unlocks():
     with tempfile.TemporaryDirectory() as tmp:

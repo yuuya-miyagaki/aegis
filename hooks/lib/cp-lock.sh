@@ -61,6 +61,9 @@ aegis_cp_unlock() {
 aegis_cp_apply() {
   local root="$1" task_type="$2" sentinel
   [ -n "$root" ] || return 1
+  # INVARIANT: the sentinel MUST stay a member of aegis_cp_paths (it represents
+  # whole-CP lock state). If "hooks" is ever removed from aegis_cp_paths, update
+  # this sentinel too — otherwise the probe mis-detects state and skips chmod.
   sentinel="${root}/hooks"
   if [ "$task_type" = "framework" ]; then
     # desired = unlock. Already writable (unlocked) => no-op.
