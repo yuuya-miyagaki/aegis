@@ -3,18 +3,18 @@ framework: aegis
 framework_version: "1.13.0"
 project_name: "Aegis"
 mode: Dev
-phase: ship
+phase: brainstorm
 task_type: framework
-task_size: S
-task_size_rationale: "iteration 36 = bugfix（テスト分離）: iteration 35 発見の follow-up。**当初『cp-lock の chmod -R が symlink を辿る』と推測したが直接プローブで反証（chmod -R は非追従＝cp-lock 無罪）**。実機序: test_phase_skills_lib の _scaffold が実 scripts/check_status.py を scratch に symlink → session-start が task_type=feature で aegis_cp_lock を起動し scratch を chmod -R a-w（正しい lock）→ TemporaryDirectory cleanup の rmtree が locked dir で PermissionError → Python の resetperms ハンドラが os.chmod(path,0o700) を実行（os.chmod は symlink を辿る）→ symlink 経由で実 check_status.py を 0o700 化し fingerprint を揺らしていた。修正＝_scaffold の symlink を copy に変更（cleanup の chmod がコピーに当たり実ファイル不変）。cp-lock は変更しない。回帰ガード追加（scaffold の check_status.py が非 symlink）。framework 型（bugfix 型は moat が framework 編集をブロックするため不可＝知見）・S・review のみ必須。"
-iteration: 36
+task_size: M
+task_size_rationale: "iteration 37 = moat lifecycle re-lock（セッション中 task_type 切替での再施錠）: iteration 35 follow-up（繰延項目）。現状 lock/unlock は session-start の1箇所のみで、framework→非 framework に同一セッションで移ると CP が unlock のまま＝layer-2 が必要時に無効。アプローチ C（ユーザー承認）＝cp-lock.sh に共有 aegis_cp_apply を新設（desired 判定→sentinel 安価プローブ→不一致時のみ chmod -R）、session-start のインライン判定を置換し post-status-audit からも呼ぶ。post-status-audit が新 lock トリガになるため iter36 の Bug A（os.chmod symlink 追従）が再発しうる＝post-status-audit を起動する全テスト scaffold の symlink→copy 化＋回帰ガードを必須に含む。cp-lock.sh／session-start／post-status-audit＋テスト＋分離再監査で M 見込み（L になれば plan で更新）。security 関与（moat）につき review+qa+security 必須。"
+iteration: 37
 ui_surface: false
-last_updated: "2026-06-22T03:30:00Z"
+last_updated: "2026-06-22T04:10:00Z"
 gate_approvals:
   client_ready_for_dev: n/a
   brainstorm: approved
-  plan: approved
-  review: approved
+  plan: pending
+  review: pending
   qa: pending
   security: pending
   deploy: pending
@@ -22,9 +22,9 @@ gate_approvals:
 current_refs:
   requirements:
     - docs/full-review-2026-06-13-context-futureproof.md
-  plan: docs/plans/2026-06-22-iter36-cp-lock-symlink-fix.md
-  spec: null
-  review: docs/qa-reports/iter36-review.md
+  plan: null
+  spec: docs/plans/2026-06-22-iter37-moat-relock-design.md
+  review: null
   qa: null
   security: null
   deploy: null
@@ -42,7 +42,7 @@ external_evidence:
     scope: "v0.12.2 実装後 4 ラウンドレビュー"
     findings: "Round 6 (P1×2, P2×1: pre-compact exit 2 / minimal-project / test rc), Round 7 (P1×1, P3×1: git add 漏れ / テスト件数表記), Round 8 (P2×1, P3×1: stale last_updated / grep 自己マッチ), Round 9 (P3×2: コメント不整合)"
     resolution: "9件全反映。tier 1/2 PASS、134 tests PASS、本体と minimal-project 完全同期確認済み。"
-next_action: "**【iteration 36 = テスト分離バグ修正・実装完了／push 確認待ち・2026-06-22】** task_type=framework・size=S。バグA（mode-flip：session-start scaffold の symlink→`shutil.copy2`）＋バグB（deploy-gate test の実 STATUS 依存→`AEGIS_ROOT_OVERRIDE` で scratch 固定＋vacuous `if out:` 撤去）の両方を修正。回帰ガード `test_scaffold_check_status_is_regular_file_not_symlink` を 2 scaffold 両方に対称配置。**検証**: full suite 1027 passed/1 skip・実 scripts/check_status.py mode 644 維持（pre/post 計測）・contract PASS・record-test-result green・Bug B は RED(ask!=deny)→GREEN 実証。**ゲート**: review🟢 approved（ref docs/qa-reports/iter36-review.md・judge 🟢・盲検 reviewer-testing 第2意見 approve_with_notes 一致）／qa/security/deploy=pending（S は size-skip で exempt＝短絡）。grill-code 実施（🔴0🟡0／🟡#1 回帰ガード非対称→対称化で解消）。**残**: コミット（review 証拠＋Bug B test＋STATUS/LEARNINGS）＋push（yuuya-miyagaki）。**follow-up（別 iteration・本 diff 外で現状無害）**: 同クラス latent symlink＝test_hook_output_schema.py:1429/1508（scripts/ 丸ごと symlink・cp_lock 不発火で安全・LEARNINGS 記録済）。iter35 follow-up（NFS skip・lifecycle re-lock）も別途残。Bash gotcha: パスはクォート・commit は -F・特殊文字は python FILE。"
+next_action: "**【iteration 37 = moat lifecycle re-lock・brainstorm 完了／plan 着手・2026-06-22】** task_type=framework・size=M（plan で確定）。**スコープ（ユーザー承認）＝(a) セッション中 task_type 切替での再施錠のみ**（(b) クラッシュ窓 default-lock 硬化はスコープ外＝既存 session-start でほぼ自己修復）。**アプローチ C 承認済み**: cp-lock.sh に `aegis_cp_apply <root> <task_type>` を新設（desired= framework?unlock:lock → sentinel `[ -w hooks/session-start.sh ]` で現状を安価プローブ → 不一致時のみ chmod -R）。session-start:272-280 のインライン判定を同関数呼び出しに置換（挙動保存）。post-status-audit.sh から同関数を呼ぶ＝**セッション中再施錠の発火点**。**重大エッジ（必須）**: post-status-audit が新 lock トリガになるため iter36 Bug A（os.chmod が symlink 追従→実ファイル mode 化）が再発しうる＝**post-status-audit を起動する全テスト scaffold の symlink→copy 化＋回帰ガード**を含む（特に test_phase_skill_injection.py:61 が check_status.py を symlink）。default-lock: task_type 空/不読は非 framework 扱い=lock。**テスト(TDD)**: test_cp_lock_lib.py に aegis_cp_apply（framework→unlock/非→lock/既状態→no-op 冪等/空→lock）、mid-session task_type 切替で post-status-audit が再 lock する統合、full suite 後 実 check_status.py mode 644 維持の不変ガード、session-start 挙動保存。**YAGNI 除外**: PreToolUse 毎ツール再 lock／SessionEnd default-lock／settings.json lock。**ゲート**: brainstorm✓（design: docs/plans/2026-06-22-iter37-moat-relock-design.md）→plan 次。review+qa+security 必須（M は deploy skip）。設計/正典は design doc。Bash gotcha: パスはクォート・commit は -F・特殊文字は python FILE。push は yuuya-miyagaki。"
 blockers: []
 failure_tracking: null
 session_history:
