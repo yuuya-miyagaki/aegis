@@ -99,7 +99,10 @@ def test_lock_failure_warns_not_crashes():
         (p / "hooks" / "lib" / "cp-lock.sh").write_text(
             "aegis_cp_paths() { :; }\n"
             "aegis_cp_lock() { return 1; }\n"
-            "aegis_cp_unlock() { return 1; }\n")
+            "aegis_cp_unlock() { return 1; }\n"
+            # session-start calls aegis_cp_apply (v1.14.0): it must exist and
+            # return non-zero to exercise the rc=1 fail-soft warn branch.
+            "aegis_cp_apply() { return 1; }\n")
         r = _run_session_start(tmp.name)
         assert r.returncode == 0, "lock rc=1 must not abort session-start"
         assert "一部失敗" in r.stdout, "should warn on partial lock failure"
