@@ -138,6 +138,11 @@ qa ゲート承認の前に実施する。承認時にハーネス（`pre_approv
 {"skip": true, "reason": "ドキュメントのみの変更でテスト対象コードなし"}
 ```
 
+> **skip スペックは手順4のプレビューを実行しない**: standalone runner は
+> `test_command` 必須で skip を解釈できず `verdict: FAIL` になる。skip 解釈は
+> 承認時の `check_status.py::run_qa_drill` のみ（`verdict: SKIP`）。`.drill` を置いたら
+> プレビューせず `update-gate.sh qa approve` に委ねる。
+
 理由はユーザーが見る証拠に残る。安易なスキップは避け、コードがあるなら必ずドリルする。
 ただし **framework 自体の改修などコードを per-task でコミット済みのタスク**は、qa 承認時の
 working-tree diff（`git diff HEAD`）が空＝mutant を置く追加行が無く skip になるのは
