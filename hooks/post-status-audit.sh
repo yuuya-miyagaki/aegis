@@ -27,6 +27,8 @@ source "${SCRIPT_DIR}/lib/extract-input.sh"
 source "${SCRIPT_DIR}/lib/emit.sh"
 source "${SCRIPT_DIR}/lib/frontmatter.sh"
 source "${SCRIPT_DIR}/lib/phase-skills.sh"
+# layer-2 cp-lock lib (optional — absent in minimal scaffolds).
+[ -r "${SCRIPT_DIR}/lib/cp-lock.sh" ] && source "${SCRIPT_DIR}/lib/cp-lock.sh" 2>/dev/null || true
 
 # Read stdin (JSON with tool_input/tool_result).
 INPUT=$(cat)
@@ -52,6 +54,13 @@ esac
 if [ ! -f "$STATUS_FILE" ]; then
   emit_allow
   exit 0
+fi
+# layer-2 lifecycle re-lock: a mid-session task_type change (framework <-> other)
+# must re-establish the correct CP lock state. chmod side-effect only — never emits
+# and never alters the audit decision below; || true keeps it non-fatal under set -e.
+if command -v aegis_cp_apply >/dev/null 2>&1; then
+  _AEGIS_TT=$(frontmatter_value "$STATUS_FILE" "task_type" || true)
+  aegis_cp_apply "$ROOT" "$_AEGIS_TT" || true
 fi
 if [ ! -f "$SNAPSHOT_FILE" ]; then
   mkdir -p "$(dirname "$AUDIT_SKIP_LOG")" 2>/dev/null || true
