@@ -3,20 +3,20 @@ framework: aegis
 framework_version: "1.14.0"
 project_name: "Aegis"
 mode: Dev
-phase: review
+phase: ship
 task_type: framework
 task_size: M
 task_size_rationale: "iteration 37 = moat lifecycle re-lock（セッション中 task_type 切替での再施錠）: iteration 35 follow-up（繰延項目）。現状 lock/unlock は session-start の1箇所のみで、framework→非 framework に同一セッションで移ると CP が unlock のまま＝layer-2 が必要時に無効。アプローチ C（ユーザー承認）＝cp-lock.sh に共有 aegis_cp_apply を新設（desired 判定→sentinel 安価プローブ→不一致時のみ chmod -R）、session-start のインライン判定を置換し post-status-audit からも呼ぶ。post-status-audit が新 lock トリガになるため iter36 の Bug A（os.chmod symlink 追従）が再発しうる＝post-status-audit を起動する全テスト scaffold の symlink→copy 化＋回帰ガードを必須に含む。cp-lock.sh／session-start／post-status-audit＋テスト＋分離再監査で M 見込み（L になれば plan で更新）。security 関与（moat）につき review+qa+security 必須。"
 iteration: 37
 ui_surface: false
-last_updated: "2026-06-22T04:10:00Z"
+last_updated: "2026-06-22T13:10:00Z"
 gate_approvals:
   client_ready_for_dev: n/a
   brainstorm: approved
   plan: approved
   review: approved
-  qa: pending
-  security: pending
+  qa: approved
+  security: approved
   deploy: pending
   dev_ready_for_client: pending
 current_refs:
@@ -25,8 +25,8 @@ current_refs:
   plan: docs/plans/2026-06-22-iter37-moat-relock-plan.md
   spec: docs/plans/2026-06-22-iter37-moat-relock-design.md
   review: docs/qa-reports/iter37-review.md
-  qa: null
-  security: null
+  qa: docs/qa-reports/test-strength.md
+  security: docs/qa-reports/iter37-security.md
   deploy: null
   translation: null
 external_evidence:
@@ -42,10 +42,14 @@ external_evidence:
     scope: "v0.12.2 実装後 4 ラウンドレビュー"
     findings: "Round 6 (P1×2, P2×1: pre-compact exit 2 / minimal-project / test rc), Round 7 (P1×1, P3×1: git add 漏れ / テスト件数表記), Round 8 (P2×1, P3×1: stale last_updated / grep 自己マッチ), Round 9 (P3×2: コメント不整合)"
     resolution: "9件全反映。tier 1/2 PASS、134 tests PASS、本体と minimal-project 完全同期確認済み。"
-next_action: "**【iteration 37 = moat lifecycle re-lock・brainstorm 完了／plan 着手・2026-06-22】** task_type=framework・size=M（plan で確定）。**スコープ（ユーザー承認）＝(a) セッション中 task_type 切替での再施錠のみ**（(b) クラッシュ窓 default-lock 硬化はスコープ外＝既存 session-start でほぼ自己修復）。**アプローチ C 承認済み**: cp-lock.sh に `aegis_cp_apply <root> <task_type>` を新設（desired= framework?unlock:lock → sentinel `[ -w hooks/session-start.sh ]` で現状を安価プローブ → 不一致時のみ chmod -R）。session-start:272-280 のインライン判定を同関数呼び出しに置換（挙動保存）。post-status-audit.sh から同関数を呼ぶ＝**セッション中再施錠の発火点**。**重大エッジ（必須）**: post-status-audit が新 lock トリガになるため iter36 Bug A（os.chmod が symlink 追従→実ファイル mode 化）が再発しうる＝**post-status-audit を起動する全テスト scaffold の symlink→copy 化＋回帰ガード**を含む（特に test_phase_skill_injection.py:61 が check_status.py を symlink）。default-lock: task_type 空/不読は非 framework 扱い=lock。**テスト(TDD)**: test_cp_lock_lib.py に aegis_cp_apply（framework→unlock/非→lock/既状態→no-op 冪等/空→lock）、mid-session task_type 切替で post-status-audit が再 lock する統合、full suite 後 実 check_status.py mode 644 維持の不変ガード、session-start 挙動保存。**YAGNI 除外**: PreToolUse 毎ツール再 lock／SessionEnd default-lock／settings.json lock。**ゲート**: brainstorm✓（design: docs/plans/2026-06-22-iter37-moat-relock-design.md）→plan 次。review+qa+security 必須（M は deploy skip）。設計/正典は design doc。Bash gotcha: パスはクォート・commit は -F・特殊文字は python FILE。push は yuuya-miyagaki。"
+next_action: "**【iteration 37 = moat lifecycle re-lock・全必須ゲート完了／push 確認待ち・2026-06-22】** task_type=framework・M・v1.14.0。セッション中 task_type 切替の再施錠を `aegis_cp_apply`（cp-lock.sh 単一判定）に集約し session-start＋post-status-audit から発火。ゲート: review🟢／qa🟡ack（skip-drill＋手動変異実証）／security🟢（盲検 adversarial・injection 無害・fail-open なし・deploy-blocker0）。deploy=pending（M は size-skip exempt）。検証: full suite 1038 passed/1 skip・mode644・git backstop クリーン・contract PASS。**残**: commit（security/qa 証拠＋STATUS/LEARNINGS＋evidence-archive）＋push（yuuya-miyagaki）。**follow-up（別 iteration）**: (1) qa-verification SKILL の skip-drill preview 手順が standalone runner で動かない doc drift（LEARNINGS 記録済）、(2) iter35 由来 (b) クラッシュ窓 default-lock 硬化・SF-001/004/005 静的 moat 限界。設計/正典: docs/plans/2026-06-22-iter37-moat-relock-design.md。Bash gotcha: パスはクォート・commit は -F・特殊文字は python FILE。"
 blockers: []
 failure_tracking: null
 session_history:
+  - date: "2026-06-22"
+    mode: Dev
+    phase: "ship"
+    note: "iteration 37（moat lifecycle re-lock・M・framework・v1.14.0）全必須ゲート完了。iter35 follow-up（繰延）に着手。**スコープ（ユーザー承認）＝(a) セッション中 task_type 切替の再施錠のみ**（(b) クラッシュ窓 default-lock 硬化は YAGNI でスコープ外）。**設計（アプローチ C）**: lock 判定を共有 `aegis_cp_apply <root> <task_type>`（cp-lock.sh）に一本化（framework→unlock/他→lock・空=default-lock・sentinel `[ -w <root>/hooks ]` で現状プローブ・不一致時のみ chmod -R）、session-start のインライン判定を置換（挙動保存）、**post-status-audit から呼んでセッション中の再施錠を発火**。brainstorm→grill なし(設計)→plan→**grill-plan**（致命2: TempProjectWithHooks を当初危険視→検証で cp-lock.sh 不在=安全と縮小修正・git-status バックストップ追加／反映済）→subagent-dev T1-T5 per-task TDD→**grill-code🔴0🟡0🟢3(accept)**→**Review Army3**（performance approve／testing・maintainability approve_with_notes=note2件 fix-forward: sentinel 不変条件コメント・absent-lib テスト）→盲検 holistic reviewer approve(conf9)。**重大エッジ（必須・回収）**: post-status-audit を lock トリガ化で iter36 Bug A 再発しうる→full `hooks/` copytree＋実ファイル symlink＋TemporaryDirectory の3条件テスト＝test_phase_skill_injection.py のみと特定し symlink→copy2＋回帰ガード。**検証**: full suite 1038 passed/1 skip・実 check_status.py mode 644・**git status --porcelain クリーン（mode-flip ゼロ＝repo 破壊なし実証）**・contract PASS（版 1.14.0 同期）。**ゲート（review+qa+security 必須・M は deploy skip）**: review🟢（judge🟢・盲検第2意見一致）／qa🟡ack（skip-drill＝per-task commit 済の B1 構造制約・iter30/31/33/35 同型＋手動変異実走で aegis_cp_apply の framework 分岐破壊→RED→復元 GREEN を実証）／**security🟢（短絡せず正規実施）**＝盲検 adversarial で injection 実走無害（task_type はクォート文字列等価のみ・eval なし）・default-lock fail-open なし・gate-tamper deny 不変・deploy-blocker0・secrets0・deps N/A ack。**LEARNINGS 2件追記**（lock ライフサイクル単一関数＋複数発火点と再監査3条件／qa skip-drill は standalone runner で preview 不可＝check_status.run_qa_drill のみ解釈の skill drift）。コミット 3857460〜（実装）。残=commit＋push（yuuya-miyagaki）。"
   - date: "2026-06-22"
     mode: Dev
     phase: "ship"
@@ -54,10 +58,6 @@ session_history:
     mode: Dev
     phase: "deploy"
     note: "iteration 35（案A immutable moat・layer-2 OS lock）全6ゲート完了: 設計を user review→初版『静的 moat 全退役・置換』を撤回し layer-2 追加（rev.2）。**設計レビュー時の暫定案は後段の grill で 3 点 reversed（最終はこちらが正典）**: (a) settings*.json を当初 LOCK 予定→**grill-plan で両方 除外**（Claude Code ハーネスが settings へ permission grant を書く・本リポは hook 登録が settings.local.json で settings.json 不在を実測）、(b) chmod-unlock guard 新規追加予定→**既存 layer-1 が既に deny 済と実測→回帰テストで固定のみ**、(c) mv gap で root 非再帰 a-w 予定→**root は lock しない**（downstream のユーザー root を縛る・mv は layer-1 deny で足る）、(d) SF を『実務クローズ』予定→**敵対 os.chmod 解錠で閉じない＝CLOSED にしない・disposition 追記のみ**、(e) chflags uchg→不採用、(f) lifecycle re-lock→繰延。実装: subagent-dev で Task0-4 per-task TDD（cp-lock.sh 単一所有/session-start fail-warn/layer-1 回帰固定/SF カタログ lock 実証/contract+版1.13.0+docs）→grill-code（🔴0🟡0・🟢 空root ガード/scripts assertion を fix-forward）→Review Army 3（testing rc=1 gap・maintainability drift・performance NFS を fix-forward／NFS は非ブロッカー follow-up）→review ゲート approve（judge 🟢・manual record で test green）。検証: full suite 1025 passed/1 skip・contract PASS・版 1.13.0 同期。コミット 1e46e4d〜244c32e（実装）。**ゲート（全6 approved）**: review🟢／qa🟡ack（skip-drill＝per-task commit 済の想定縁ケース・手動 mutation 同等で lock 破壊を実証＝chmod no-op 化で lock/SF テスト FAIL→復元で PASS）／**security🟢（短絡せず正規実施）**＝盲検 adversarial で lock 中の CP へ 9 ベクタ実走→全遮断（truncate/O_TRUNC/dd/tee/open(w)/rm/mv/install/**hardlink**＝inode 共有で mode 効く）・唯一の残余 pre-open-FD は os.chmod 解錠と同じ accepted クラス（事故ベクタでない）・secrets0・deps N/A ack・deploy-blocker なし／deploy🟢（framework＝push 締め）。grill-code🔴0🟡0・Review Army3（testing rc=1 gap/maintainability drift/performance NFS）全 fix-forward。証拠: iter35-review/security/deploy.md・test-strength.md。**発見した follow-up（別 iteration）**: テスト分離バグ＝full suite が実リポ scripts/check_status.py をモード700 化し fingerprint を揺らす（要原因特定）。STATUS rollover は gate-tamper 監査に阻まれ update-gate.sh reset 経由に是正。push は yuuya-miyagaki アカウント。"
-  - date: "2026-06-21"
-    mode: Dev
-    phase: "review"
-    note: "iteration 34（レビュー集中修正）完了・push: 全力レビュー（内製5レンズ）＋外部レビュー(E1-E5)の確定 P1/P2 を TDD で修正。A1 emit.sh 利用 6 hook の fail-closed 統一（byte-identity 12 hook・新規 test_hook_emit_failclosed が emit.sh を使う check-*.sh の fallback 必須を動的検査）/ A2 standard で moat4 hook required-registration / C1 setup baseline を実コピー path 限定（INSTALLED_PATHS funnel＋git-ignore skip）/ B1 vacuous safety test 実効化 / B3 missing-ref rc 検証 / D1 README 数字+guarantee 限定 / D2 check-secrets scope / 版 1.12.1。検証: full suite 1006 passed/1 skip・contract(full)・Tier1・各タスク RED→GREEN・盲検3エージェント（2件 infra stall だが核心の fail-closed/normal-path を実走確認・1件 complete=approve_with_notes・Critical0・scope creep0）。grill-plan 致命2（Task0 を update-gate.sh 経路へ・B4 phase↔gate 自動検査は YAGNI＋ロジック不全で Batch E 繰延）と grill-code 🟡1（C1 baseline 完全性テスト）を反映。review gate approve（judge 緑・record-test-result で緑確立）。qa/security/deploy の formal ゲートはユーザー判断で短絡し push で締め（iteration 32 同パターン）。コミット f8aff7a〜dd4c593。push は yuuya-miyagaki アカウント。残=Batch E＋戦略 PoC は別 iteration。"
 ---
 
 ## Summary
