@@ -1,9 +1,9 @@
 ---
 framework: aegis
-framework_version: "1.13.0"
+framework_version: "1.14.0"
 project_name: "Aegis"
 mode: Dev
-phase: plan
+phase: implement
 task_type: framework
 task_size: M
 task_size_rationale: "iteration 37 = moat lifecycle re-lock（セッション中 task_type 切替での再施錠）: iteration 35 follow-up（繰延項目）。現状 lock/unlock は session-start の1箇所のみで、framework→非 framework に同一セッションで移ると CP が unlock のまま＝layer-2 が必要時に無効。アプローチ C（ユーザー承認）＝cp-lock.sh に共有 aegis_cp_apply を新設（desired 判定→sentinel 安価プローブ→不一致時のみ chmod -R）、session-start のインライン判定を置換し post-status-audit からも呼ぶ。post-status-audit が新 lock トリガになるため iter36 の Bug A（os.chmod symlink 追従）が再発しうる＝post-status-audit を起動する全テスト scaffold の symlink→copy 化＋回帰ガードを必須に含む。cp-lock.sh／session-start／post-status-audit＋テスト＋分離再監査で M 見込み（L になれば plan で更新）。security 関与（moat）につき review+qa+security 必須。"
