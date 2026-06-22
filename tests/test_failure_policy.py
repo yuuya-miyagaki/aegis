@@ -128,9 +128,12 @@ class TestPython3AbsentBehavior(unittest.TestCase):
         """hook → (payload, cwd, env_extra, expected_decision, declared_substr)."""
         t = self.tmp
         return [
-            ("check-gate.sh",
-             make_pretool_payload("Edit", {"file_path": f"{t}/src/main.py"}),
-             t, {}, "allow", "通常判定"),
+            # check-gate.sh is verified by a dedicated method, not this loop: it
+            # resolves ROOT as SCRIPT_DIR/.. (ignoring cwd/AEGIS_ROOT_OVERRIDE), so
+            # firing the real hook here reads the LIVE repo STATUS and would pass
+            # only by luck of the repo's plan-gate state (iter36 Bug-B class; this
+            # surfaced in iter38 rollover when plan=pending made it deny→fail).
+            # See test_python3_absent_check_gate_reads_scratch_status.
             ("check-tdd.sh",
              make_pretool_payload("Edit", {"file_path": f"{t}/src/main.py"}),
              t, {"AEGIS_TDD_MODE": "off"}, "allow", "通常判定"),
@@ -222,6 +225,50 @@ class TestPython3AbsentBehavior(unittest.TestCase):
             decision_of(r.returncode, out), "deny",
             f"raw fallback must fail closed, got rc={r.returncode} "
             f"out={r.stdout[:160]} stderr={r.stderr[:160]}")
+
+    def test_python3_absent_check_gate_reads_scratch_status(self):
+        """check-gate.sh resolves ROOT as SCRIPT_DIR/.. (it honors neither cwd nor
+        AEGIS_ROOT_OVERRIDE), so firing the real hook with cwd=scratch still reads
+        the LIVE repo STATUS — the _scenarios() loop only passed by luck of the
+        repo's plan-gate state (iter36 Bug-B class; iter38 rollover's plan=pending
+        exposed it as a deny→fail). Fire a temp-root COPY (libs copied, not
+        symlinked — os.chmod follows symlinks, iter36 Bug A) so ROOT=scratch, and
+        assert the py-absent fallback tracks the SCRATCH plan gate at BOTH poles
+        (approved→allow '通常判定' / pending→deny) — proving live-STATUS independence."""
+        import shutil
+        row = self.table["check-gate.sh"]
+        self.assertIn("通常判定", row["py_absent"])
+        hooks_dir = self.tmp / "hooks"
+        (hooks_dir / "lib").mkdir(parents=True)
+        shutil.copy2(HOOKS / "check-gate.sh", hooks_dir)
+        for lib in ("safety.sh", "extract-input.sh", "emit.sh", "frontmatter.sh"):
+            shutil.copy2(HOOKS / "lib" / lib, hooks_dir / "lib")
+        env = os.environ.copy()
+        env.update(_python3_broken_env(self))
+        payload = make_pretool_payload("Edit", {"file_path": f"{self.tmp}/src/main.py"})
+
+        def _decide():
+            r = subprocess.run(
+                ["bash", str(hooks_dir / "check-gate.sh")],
+                input=json.dumps(payload), capture_output=True, text=True,
+                check=False, cwd=str(self.tmp), env=env)
+            out = json.loads(r.stdout) if r.stdout.strip() else {}
+            return decision_of(r.returncode, out), r
+
+        # scratch plan=approved -> allow (faithful to the table's '通常判定').
+        _write_status(self.tmp, FEATURE_STATUS)
+        decision, r = _decide()
+        self.assertEqual(decision, "allow",
+                         f"plan=approved scratch must allow, got rc={r.returncode} "
+                         f"out={r.stdout[:160]} stderr={r.stderr[:160]}")
+        # scratch plan=pending -> deny: the verdict tracks the SCRATCH STATUS, which
+        # only holds if the hook reads scratch and not the live repo STATUS.
+        _write_status(self.tmp, IMPLEMENT_PLAN_PENDING_STATUS)
+        decision, r = _decide()
+        self.assertEqual(decision, "deny",
+                         f"plan=pending scratch must deny (proves scratch is read), "
+                         f"got rc={r.returncode} out={r.stdout[:160]} "
+                         f"stderr={r.stderr[:160]}")
 
     def test_python3_absent_advisory_hooks_do_not_crash(self):
         """advisory hooks: python3 遮断でも RC0（セッションを止めない）。"""

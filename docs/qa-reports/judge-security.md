@@ -19,4 +19,4 @@
 （LLM が平易日本語で記述）
 
 ## ACK
-- deps=manifest 不在の N/A（unverified=advisory・脆弱性検出ではない）。test=実体は GREEN（full suite 1038 passed/1 skip を本日 4 回・コードは記録後 byte 不変・git backstop クリーン・contract PASS）。カードの test unverified は本 session の observe hook が tool_response.output を渡さず marker_verified=false になる既知の infra 限界（iter33/35 同型）＝trusted manual runner record-test-result(src=manual) で green 確立済。盲検 security エージェント adversarial（injection 実走で無害・default-lock fail-open なし・gate-tamper deny 不変・F1-F6 approve）＋holistic reviewer 第2意見 approve 一致。deploy-blocker 0・secrets 0・新規 residual 0。証拠: docs/qa-reports/iter37-security.md。 （2026-06-22 14:10）
+- tests unverified は gate 処理中の docs/STATUS 編集による fingerprint drift（suite は本 iteration で record-test-result green・review ゲートでも tests=green 確認済＝実体は green）。deps unverified は Python・lockfile 無しで N/A。security は test-only でサーフェスなし・盲検 security 2次 approve 一致・secrets0・coverage はむしろ強化。詳細 docs/qa-reports/iter39-security.md。 （2026-06-22 22:42）

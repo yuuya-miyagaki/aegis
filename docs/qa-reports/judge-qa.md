@@ -14,4 +14,4 @@
 （LLM が平易日本語で記述）
 
 ## ACK
-- skip-drill＝framework を per-task commit 済で working-tree diff 空（B1 構造制約・iter30/31/33/35 同型）。代替実証: 各タスク RED-first TDD＋手動変異実走（aegis_cp_apply の framework 分岐破壊で test_apply_framework_unlocks/idempotent が RED→復元で 5/5 GREEN）。test=GREEN 再記録済（full suite 1038 passed/1 skip・mode644・git backstop クリーン）。claims 未提出はハーネス生成 SKIP レポート（test-strength.md）の構造上 inherent。証拠: docs/qa-reports/test-strength.drill / iter37-review.md。 （2026-06-22 12:47）
+- test-only 変更につき skip 宣言（対象プロダクトコードなし）。強度は専用メソッドの両極アサート（plan:pending→deny は live-STATUS を読めば allow になり FAIL する load-bearing 回帰ガード）＝手動 mutation 同等。claims はハーネス生成の test-strength.md に無いため ack。full suite green・review 🟢・詳細 docs/qa-reports/iter39-review.md。 （2026-06-22 22:37）
