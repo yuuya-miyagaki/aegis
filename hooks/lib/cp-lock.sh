@@ -1,8 +1,16 @@
 #!/usr/bin/env bash
 # hooks/lib/cp-lock.sh — layer-2 OS/FS write-lock for the stable control-plane.
 # Sourced by session-start.sh. pure-bash, bash 3.2 safe, idempotent.
-#   lock   = chmod -R a-w  (removes write for all; read+exec preserved)
-#   unlock = chmod -R u+w  (restores owner write)
+#   lock   = find <p> -exec chmod a-w  (removes write for all; read+exec preserved)
+#   unlock = find <p> -exec chmod u+w  (restores owner write)
+# Recursion uses `find -exec chmod {} +`, NOT `chmod -R`: this lib is also sourced
+# by post-status-audit on a mid-session task_type change, which runs under the
+# Claude Code hook sandbox where `chmod -R <dir>` affects ONLY the top-level CP
+# directory and does NOT descend to nested files (e.g. hooks/lib/emit.sh) —
+# leaving a desynced state the dir sentinel ([ -w <root>/hooks ]) then misreads as
+# fully-applied, so the moat sticks half-locked. `find -exec chmod` walks every
+# path explicitly and recurses correctly in that environment (iteration 40,
+# reproduced + verified). Do NOT revert to `chmod -R`.
 # Failure is NON-fatal: the caller warns and continues (OS lock is a defense
 # layer, not a fail-closed gate — layer-1 static moat is always present).
 # Owner of the stable CP path set (single source of truth for the chmod target).
@@ -37,7 +45,8 @@ aegis_cp_lock() {
   [ -n "$root" ] || return 1
   while IFS= read -r p; do
     [ -n "$p" ] || continue
-    chmod -R a-w "$p" 2>/dev/null || rc=1
+    # find -exec, not chmod -R (recurses under the hook sandbox; see header).
+    find "$p" -exec chmod a-w {} + 2>/dev/null || rc=1
   done < <(aegis_cp_paths "$root")
   return "$rc"
 }
@@ -48,7 +57,8 @@ aegis_cp_unlock() {
   [ -n "$root" ] || return 1
   while IFS= read -r p; do
     [ -n "$p" ] || continue
-    chmod -R u+w "$p" 2>/dev/null || rc=1
+    # find -exec, not chmod -R (recurses under the hook sandbox; see header).
+    find "$p" -exec chmod u+w {} + 2>/dev/null || rc=1
   done < <(aegis_cp_paths "$root")
   return "$rc"
 }
@@ -56,7 +66,7 @@ aegis_cp_unlock() {
 # aegis_cp_apply <root> <task_type> — re-establish the correct CP lock state for the
 # CURRENT task_type. framework => unlock; anything else (incl. empty/unknown =>
 # default-lock) => lock. Idempotent: a cheap sentinel probe ([ -w <root>/hooks ])
-# decides whether a flip is needed so a no-op call avoids a redundant chmod -R.
+# decides whether a flip is needed so a no-op call avoids a redundant recursive chmod.
 # rc mirrors the underlying lock/unlock (0 ok / 1 chmod failure); a no-op returns 0.
 aegis_cp_apply() {
   local root="$1" task_type="$2" sentinel
