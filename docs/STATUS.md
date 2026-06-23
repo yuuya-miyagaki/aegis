@@ -5,29 +5,29 @@ project_name: "Aegis"
 mode: Dev
 phase: ship
 task_type: framework
-task_size: S
-task_size_rationale: "iteration 40 = moat 自動解錠バグ修正（framework・S・hooks/lib/cp-lock.sh の 2 行＋コメント）。iter39 で発見＝session hook 環境では `chmod -R` がトップ階層 CP ディレクトリしか再帰せずネストファイルを解錠/施錠しない（Claude Code hook サンドボックス）。経験的に `find \"$p\" -exec chmod {} +` は hook 環境で完全再帰すると実証（lock/unlock 両方向に適用）。dir-only sentinel は完全再帰なら正確なので変更不要。対象は hooks/lib/cp-lock.sh（control file＝framework で編集可・plan 不要）＋LEARNINGS のみ＝1 ファイル＝S。既存 test_cp_lock_lib.py が lock/unlock の挙動を被覆。review ゲートのみ必須（qa/security/deploy は size-skip exempt・セキュリティ含意は review で網羅）。"
-iteration: 40
+task_size: L
+task_size_rationale: "iteration 41 = 2026-06-24 全力レビュー Batch 1（配布正常化＋整合性 fail-closed 化・framework・L・6 finding）。要件＝docs/full-review-2026-06-24-hooks-gates-distribution.md（D1-D4 配布／I1-I2 整合性）＋SF-006。対象＝templates/profiles/standard.json（D1 build-judge-card.py 追加・D2 Task hooks 追加）／bin/setup.sh（D3 framework 資産 upgrade 上書き・D4 壊れ設定の無警告全消し是正）／hooks/post-status-audit.sh（I1 fail-closed 化）／scripts/check_status.py（I2 完了evidence fail-closed）／.claude/settings.local.json＋scripts/check_framework_contract.py（D2 active settings の Task hook 配線＋契約検査）＋tests。6+ ファイル＝L＝全ゲート（review+qa+security+deploy）必須。RC-1（STATUS 兼務）は I1+I2 で部分対処・I3 は Batch 2 繰延。check-control-plane 本体は触らない。"
+iteration: 41
 ui_surface: false
-last_updated: "2026-06-23T00:40:00Z"
+last_updated: "2026-06-24T00:00:00Z"
 gate_approvals:
   client_ready_for_dev: n/a
   brainstorm: approved
-  plan: pending
+  plan: approved
   review: approved
-  qa: pending
-  security: pending
-  deploy: pending
+  qa: approved
+  security: approved
+  deploy: approved
   dev_ready_for_client: pending
 current_refs:
   requirements:
-    - docs/full-review-2026-06-13-context-futureproof.md
-  plan: null
-  spec: null
-  review: docs/qa-reports/iter40-review.md
-  qa: null
-  security: null
-  deploy: null
+    - docs/full-review-2026-06-24-hooks-gates-distribution.md
+  plan: docs/plans/2026-06-24-iter41-batch1-implementation-plan.md
+  spec: docs/specs/2026-06-24-iter41-batch1-distribution-integrity-design.md
+  review: docs/qa-reports/iter41-review.md
+  qa: docs/qa-reports/test-strength.md
+  security: docs/qa-reports/iter41-security.md
+  deploy: docs/qa-reports/iter41-deploy.md
   translation: null
 external_evidence:
   - type: "second-opinion-v1-foundation-r1-r2"
@@ -42,10 +42,14 @@ external_evidence:
     scope: "v0.12.2 実装後 4 ラウンドレビュー"
     findings: "Round 6 (P1×2, P2×1: pre-compact exit 2 / minimal-project / test rc), Round 7 (P1×1, P3×1: git add 漏れ / テスト件数表記), Round 8 (P2×1, P3×1: stale last_updated / grep 自己マッチ), Round 9 (P3×2: コメント不整合)"
     resolution: "9件全反映。tier 1/2 PASS、134 tests PASS、本体と minimal-project 完全同期確認済み。"
-next_action: "**【iteration 40 完了（framework・S・moat 解錠バグ修正／review 🟢 approved／commit+push 済）／次は iteration 41・/clear 後 /recover 用アンカー・2026-06-23】** ◆**まず iteration rollover を実施**（state-machine 準拠）: `update-gate.sh <gate> reset` で dev ゲートを pending に戻し（gate 変更は **update-gate.sh のみ**・非 framework 下では **bare 単独呼び出し**＝chain/redirect/pipe は check-control-plane が弾く）、STATUS を Edit で iteration=41・phase=brainstorm・task_type/size/rationale 更新・current_refs を null（requirements 保持）。◆**iter41 候補（残 follow-up・優先度順）**: (1) **iter35 由来 (b) クラッシュ窓 default-lock 硬化**（YAGNI 寄り・session-start 前にクラッシュした窓で CP が unlock のままになりうる点。実害低・優先度低）。(2) **SF-001/004/005 静的 moat 限界**（敵対 os.chmod 解錠＝設計上の既知限界・大きめ・CLOSED にはしない方針）。(3) iter36 由来 latent symlink test_hook_output_schema.py:1429/1508（cp_lock 不発火で現状無害）。**いずれも着手前に grill-premise/grill-market で『作る価値があるか』を疑うこと**（moat 系は YAGNI に流れやすい）。**重要な作業則（iter38-40 で確立）**: framework 内部の tests/・非 control コード修正は framework-M（S は plan フェーズ無しで check-gate に阻まれ・bugfix は moat 施錠でスイート破壊）。hooks/scripts/.claude/CLAUDE.md（control file）は framework なら S でも編集可。Bash gotcha: パスはクォート・commit は -F・特殊文字は python FILE・非 framework 下の update-gate.sh は bare 単独。gate 承認順の罠: current_refs.<gate> をセットしたら同 gate を approve するまで suite/contract を走らせない（pending+ref は stale 判定で赤）。"
+next_action: "**【iteration 41 完了（framework・L・配布正常化 D1-D4＋整合性 fail-closed I1-I2／review+qa+security+deploy 全 approved／commit+push 済）／次は iteration 42・/clear 後 /recover 用アンカー・2026-06-24】** ◆**まず iteration rollover**: update-gate.sh で dev ゲートを pending に戻し（**bare 単独**呼び出し・非 framework 下は chain/redirect 不可）、STATUS を iteration=42・phase=brainstorm（ship→brainstorm は backward で audit allow）・task_type/size/rationale 更新・current_refs を null（requirements 保持）。**session_history は contract が max 3 ＝rollover で最古を剪定**（長文 note は Edit の exact-match が脆く、ASCII マーカーで python script 剪定が安全）。◆**iter42 候補（優先度順）**: **(0) Batch 2＝I3 task_type/task_size の tamper-evidence**（post-status-audit に task_type/size 監査を追加＝authorized-path 経由のみ変更可。I1 fail-closed が前提＝達成済）＋**G1-G3 guard 網羅**（破壊コマンド dd of= / chmod -R / mkfs / shred / system-path truncate を `hooks/lib/patterns.sh` に single-source 化し check-destructive/deploy-gate/cron-gate 全 gate で import）。要件＝docs/full-review-2026-06-24-hooks-gates-distribution.md（I3/G1-G3）＋SF-006（I3）。(1) **Backlog**: C1（setup.sh `--profile` 空白形式）・C2-C4（heredoc/gate パーサ統一）・C5（ROOT 外 plan-gate false-positive＝auto-memory 等への摩擦）・G4（exfil リスク再評価）。**やらない**: check-control-plane 再設計。◆**iter41 で確立した罠（重要）**: (a) **gate 承認コマンドを `head` にパイプすると SIGPIPE で set -e 下の STATUS 書込み前に中断**＝`tail` を使う。(b) current_refs.<gate> は承認直前に設定（pending+ref は contract の stale-ref FAIL＝suite の test_framework_contract_passes が赤化し record red になる）。(c) judge は claims/2次意見を current_refs.<gate> の report から読む＝承認前に ref 設定が必要だが (b) と両立（approve 自体は stale 検査を走らせない・間に suite/contract を挟まない）。(d) record-test-result は全コード編集完了後に1回（fingerprint bind）。(e) framework 混在 L diff は B1 drill 構造的不適用＝skip-drill＋RED-first TDD 実証。"
 blockers: []
 failure_tracking: null
 session_history:
+  - date: "2026-06-24"
+    mode: Dev
+    phase: "ship"
+    note: "iteration 41（2026-06-24 全力レビュー Batch 1・framework・L・v1.14.0 据置）完了。/clear→/recover で復帰し rollover（iteration 41・phase=brainstorm・task_size S→L・requirements ref を docs/full-review-2026-06-24-hooks-gates-distribution.md に更新）→ brainstorm→plan(grill-plan)→implement→grill-code→review→qa→security→deploy→ship を完走。**実装した 6 fix**: D1 standard profile に judge ツールチェーン依存閉包を同梱（build-judge-card+run-test-strength-drill=required・record-test-result+fingerprint.sh=recommended・README 件数 20/10 更新）＝standard で gate 承認可能化／D2 Task 完了強制 hook（check-task-created/completed）を standard profile（hooks_include+required_hook_scripts）・active settings・contract self-check（check_active_settings_core_hooks）に配線／D3 setup.sh が再 install で framework 所有（hooks/scripts/templates/.claude/{skills,agents,commands,rules}/bin）を diff-gated .bak つき上書き・user 所有は保全／D4 壊れ settings を無警告全消しせず stderr 警告／I1 post-status-audit を PostToolUse fail-closed 化（safety.sh に block 版 helper・別マーカー POSTTOOL で 12-hook byte-identity 非破壊）／I2 完了evidence を STATUS 不在/None-frontmatter で violation 化。**ゲート（L＝全必須）**: review🟢（盲検2次 security+maintainability とも approve_with_notes・Critical=契約が gitignored settings 依存で非再現→不在 skip 化で修正済）／qa🟡ack（skip-drill＝framework 混在 L diff に B1 構造的不適用・代替 RED-first TDD 実証）／security🟢ack（新規脆弱性なし・Low residual symlink=SF-004 受容）／deploy🟢ack（framework=main commit がデプロイ）。**検証**: full suite 1053 passed/1 skip（record green）・contract full PASS・status_doctor PASS・standard install で --profile=standard PASS 実機確認・git mode-flip なし。**罠を記録（next_action 参照）**: gate コマンドを head にパイプ→SIGPIPE で STATUS 書込み前中断／ref は承認直前設定／record は全コード編集後1回。SF-006 を I1/I2 対処済・I3 は Batch 2 へ。push は yuuya-miyagaki。"
   - date: "2026-06-23"
     mode: Dev
     phase: "ship"
@@ -54,10 +58,6 @@ session_history:
     mode: Dev
     phase: "ship"
     note: "iteration 39（check-gate.sh テスト分離バグ修正・framework・M・test-only・v1.14.0）完了・/recover で復帰し継続。**バグ**: test_failure_policy.py::test_python3_absent_behavior の check-gate.sh シナリオが check-gate.sh:24 の ROOT=SCRIPT_DIR/.. 解決（override/cwd 非対応）で実リポ STATUS を読み、iter38 rollover の plan=pending で deny→fail＝運頼み pass が露出（iter36 Bug-B 同クラス）。**修正（test-only・本番 hook 不変）**: check-gate.sh を _scenarios() ループから外し control-plane 同型の temp-root copy 専用メソッド test_python3_absent_check_gate_reads_scratch_status を追加（lib 4本 copy2・両極 approved→allow／pending→deny で scratch 追従＝live-STATUS 非依存を実証＝旧方式なら pending 極で FAIL する load-bearing 回帰ガード）。**分類の紆余曲折（重要）**: 当初 bugfix（plan=n/a で tests/ 編集可）にしたが**非 framework＝moat が control plane 施錠**し control-plane 書込みテスト（test_setup_distribution force-overwrite 等）を破壊＝full suite red 化を実体験→ユーザー承認(A)で framework-M に再分類（plan フェーズで plan 承認→tests/ 編集可・moat 解錠でスイート green）。check-control-plane は update-gate.sh を allowlist 済だが**非 framework 下は chain/redirect 付きだと弾く＝bare 単独呼び出し必須**も実体験。**発見した moat バグ（follow-up・LEARNINGS conf6）**: task_type を framework に戻しても post-status-audit が自動解錠せず手動 aegis_cp_unlock が必要だった（iter37 の解錠経路が task_type-change edit で不発の疑い）。**ゲート（framework M＝review+qa+security 必須・deploy size-skip）**: review🟢（judge🟢・tests green・盲検 reviewer-testing approve_with_notes 一致＝Minor2件は非アクション）／qa🟡ack（test-only skip-drill・両極アサート＝手動 mutation 同等）／security🟢（盲検 security approve＝subprocess arg-list・copy2・coverage 強化・secrets0・deps N/A ack。判定時 tests は fingerprint drift で unverified だが review ゲートで green 確認済＝実体 green）。**検証**: full suite 1038 passed/1 skip・record green・contract PASS（版 1.14.0）・git mode-flip なし。LEARNINGS 2件追記（framework 内部テスト修正は framework-M／moat 自動解錠 follow-up）。push は yuuya-miyagaki。"
-  - date: "2026-06-22"
-    mode: Dev
-    phase: "ship"
-    note: "iteration 38（qa skip-drill doc 修正・S・framework・v1.14.0）完了・/clear 後 /recover で復帰し rollover→着手。**タスク**: qa-verification SKILL の skip 節に『skip スペックは手順4のプレビューを実行しない＝.drill を置いたら update-gate.sh qa approve に委ねる（解釈は check_status.py::run_qa_drill のみ／standalone runner は test_command 必須で skip 拒否＝fail-closed FAIL）』を追記（iter37 confidence:7 LEARNINGS が一次ソース）。注記の正確性は runner の REQUIRED_SPEC_KEYS と run_qa_drill の skip 分岐を実読して確認。**budget**: 注記で qa-verification SKILL が語数予算超過（443>434）→ context-budgets.json を新カウントちょうど 434→443 に意図的引き上げ（tighten-only ratchet は自動引き上げのみ禁止＝test_tighten_never_raises は tighten() 関数だけ制約）。**ゲート（S＝review のみ必須・qa/security/deploy は size-skip exempt）**: review🟡ack（judge tier-1 tests=unverified の唯一要因は下記の既存潜在分離バグ＝doc 変更と無関係／盲検2次 reviewer-maintainability approve 一致・accuracy conf10）。**検証**: contract PASS（443≦443・版 1.14.0）・full suite 1038 passed/1 skip/**1 failed**。**繰延（iter39・重要発見）**: その 1 failed＝test_failure_policy::test_python3_absent_behavior（check-gate.sh シナリオ）は check-gate.sh:24 が ROOT=SCRIPT_DIR/.. で実リポ STATUS を読む潜在分離バグ（iter36 Bug-B 同クラス）で、rollover の plan=pending（S は plan を size-skip）で deny→fail＝運頼み pass が露出。**修正は check-gate.sh が tests/ 編集を plan 未承認で deny する（tests/ は control-file allowlist 外）ため doc-only S に収まらず iter39（plan 必須・テストのみ temp-root コピー方式）へ繰延＝ユーザー承認(B)**。LEARNINGS 3件更新（skip-drill doc 修正済／framework S は tests/ 編集不可＝plan 必須／budget 超過は識別子を削るより budget を上げる）。push は yuuya-miyagaki。"
 ---
 
 ## Summary

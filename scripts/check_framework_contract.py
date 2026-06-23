@@ -26,6 +26,21 @@ FRAMEWORK_VERSION = "1.14.0"
 PROFILES_DIR = ROOT / "templates" / "profiles"
 VALID_PROFILES = ["minimal", "standard", "full"]
 
+# Hooks that mechanically enforce the operating contract's hard guarantees. The
+# framework's own active settings MUST register all of these. The dogfood
+# settings.local.json once drifted from the template and never registered the
+# Task completion-enforcement hooks (D2), so "completion requires evidence" was
+# unenforced even here. This is deliberately NOT the full hooks_include set: the
+# dogfood omits check-tdd / check-skill-gate / check-cron-gate etc. on purpose,
+# so requiring the whole template would false-positive.
+CORE_ENFORCEMENT_HOOKS = [
+    "check-gate.sh",
+    "post-status-audit.sh",
+    "check-control-plane.sh",
+    "check-task-created.sh",
+    "check-task-completed.sh",
+]
+
 REQUIRED_FILES = [
     ROOT / "README.md",
     ROOT / "CLAUDE.md",
@@ -368,6 +383,45 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
+def check_active_settings_core_hooks(root: Path) -> list:
+    """If an active settings file EXISTS, it must register every
+    CORE_ENFORCEMENT_HOOKS command. Catches dogfood hook-wiring drift (D2):
+    the active config silently lacking the completion-enforcement hooks.
+
+    settings.local.json is conventionally gitignored (local per-machine), so an
+    ABSENT settings file is "not yet configured" (e.g. a fresh clone before
+    setup.sh runs), NOT drift — return no failures so this reproducible
+    self-check never depends on an untracked file. The install-time
+    run_profile_check separately warns when settings are missing."""
+    failures: list[str] = []
+    settings = root / ".claude" / "settings.local.json"
+    if not settings.exists():
+        settings = root / ".claude" / "settings.json"
+    if not settings.exists():
+        return failures
+    try:
+        data = json.loads(read_text(settings))
+    except json.JSONDecodeError as e:
+        failures.append(f"{settings.name} is not valid JSON: {e}")
+        return failures
+    cmds: list[str] = []
+    for entries in (data.get("hooks", {}) or {}).values():
+        if not isinstance(entries, list):
+            continue
+        for entry in entries:
+            if not isinstance(entry, dict):
+                continue
+            for hook in entry.get("hooks", []):
+                if isinstance(hook, dict) and isinstance(hook.get("command"), str):
+                    cmds.append(hook["command"])
+    for script in CORE_ENFORCEMENT_HOOKS:
+        if not any(script in c for c in cmds):
+            failures.append(
+                f".claude/settings.local.json missing CORE enforcement hook: {script}"
+            )
+    return failures
+
+
 def run_profile_check(profile_name: str, project_root: Path) -> int:
     """Run profile-based validation against a project root."""
     profile_path = PROFILES_DIR / f"{profile_name}.json"
@@ -551,6 +605,9 @@ def main() -> int:
     # Context budget: skills/rules word budgets (roadmap P1). Runs only here in
     # the framework-root full self-check (after main()'s profile early-return).
     failures.extend(context_budget.check(ROOT))
+    # D2: the dogfood active settings must register CORE enforcement hooks
+    # (catches the Task-hook wiring drift that left completion unenforced).
+    failures.extend(check_active_settings_core_hooks(ROOT))
 
     # Failure rule sync check: the block starting with "Stop after 3 failures"
     # must be identical across all CLAUDE.md variants.

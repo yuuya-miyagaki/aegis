@@ -1483,15 +1483,22 @@ def main() -> int:
 
     if args.check_completion_evidence:
         status_path = root / "docs" / "STATUS.md"
-        violations: list[str] = []
-        if status_path.exists():
-            frontmatter = extract_frontmatter(read_text(status_path))
-            if frontmatter is not None:
-                refs = extract_current_refs(frontmatter)
-                approvals = extract_approval_map(frontmatter)
-                violations = evidence_integrity_violations(refs, approvals, root)
-                for v in violations:
-                    print(f"EVIDENCE: {v}")
+        # I2: fail-closed (symmetric with validate_status_file). A missing or
+        # frontmatter-less STATUS.md means we cannot verify completion evidence,
+        # so it must be a violation (exit 1) — not a silent PASS that an adversary
+        # could trigger by deleting/corrupting STATUS.md before TaskCompleted.
+        if not status_path.exists():
+            print("EVIDENCE: docs/STATUS.md not found — cannot verify completion evidence")
+            return 1
+        frontmatter = extract_frontmatter(read_text(status_path))
+        if frontmatter is None:
+            print("EVIDENCE: docs/STATUS.md missing YAML frontmatter — cannot verify completion evidence")
+            return 1
+        refs = extract_current_refs(frontmatter)
+        approvals = extract_approval_map(frontmatter)
+        violations = evidence_integrity_violations(refs, approvals, root)
+        for v in violations:
+            print(f"EVIDENCE: {v}")
         # Exit-code coupled (belt-and-suspenders): the TaskCompleted hook keys on
         # stdout, but any other caller can trust the exit code too.
         return 1 if violations else 0

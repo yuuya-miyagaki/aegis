@@ -135,6 +135,31 @@
   `os.chmod` で解錠してから書けるため本項目は CLOSED にしない**（特に SF-004 は静的・OS
   どちらでも敵対閉鎖は原理的に不可）。Windows ネイティブは layer-2 no-op＝layer-1 のみ。
 
+### SF-006: tamper-evidence の非対称（gate改竄検知の fail-open＋task_type/task_size 無監査・Medium）
+
+- **発見**: 2026-06-24 全力レビュー統合（多エージェント敵対レビュー＋ユーザーレビュー P1-A/P2-B）。全件一次資料で裏取り。詳細＝`docs/full-review-2026-06-24-hooks-gates-distribution.md`（I1/I2/I3）。
+- **種別**: 整合性の**非対称/網羅性**の穴。SF-001 系（moat＝事故防止・敵対受容）とは別レイヤ＝**gate の偽造不能性**（人間承認が agent に偽造されない、というより強い性質）の側道。
+- **重大度**: Medium。理由の較正＝下記。Critical 扱いはしない（脅威モデル準拠）。
+- **構成する 3 点**:
+  - **I1（gate改竄検知が fail-open）**: `hooks/post-status-audit.sh:26-29` は他 deny hook と違い `AEGIS_SAFETY_FALLBACK` 無しで lib を直接 source。`docs/hook-failure-policy.md:27` で advisory・python3 不在時 allow と宣言。gate/mode tamper 検知は bash のみ（python3 不要）なのに、lib source 失敗/python3 不在で監査ごとスキップ。
+  - **I2（完了evidence が fail-open）**: `scripts/check_status.py:1484-1497`。STATUS.md 不在/frontmatter 不正で `violations=[]`→exit 0。`validate_status_file` は同条件 fail-closed＝非対称。
+  - **I3（task_type/task_size 無監査）**: `hooks/post-status-audit.sh:89-139` は gate/phase/mode のみ監査。task_type は docs/* 無条件 allow（`check-gate.sh:80-85`）で自由 Edit 可。`:61-64` の `aegis_cp_apply` が task_type 変更で layer-2 を張り替えるため `task_type: feature→framework` の単一 Edit で layer-1+2 が同時解錠。`task_size: L→S` は必須 gate を skip させる。
+- **再現（task_type=feature の install で）**:
+  ```
+  # I3: STATUS.md の task_type を framework へ Edit → post-status-audit は {} (allow・無監査)
+  #     → 直後の hooks/check-gate.sh 編集も {} (allow)。control-plane 編集が成立。
+  # I1: python3 を PATH から外す or lib を壊す → post-status-audit が gate 改竄を検知できない。
+  # I2: docs/STATUS.md を削除/破損 → TaskCompleted の完了evidence 検査が PASS。
+  ```
+- **根本原因（RC-1）**: STATUS.md がセキュリティ制御面（task_type/task_size/mode/gates）と自由編集ドキュメントを兼ねる。間に立つ `post-status-audit` が (i) task_type/task_size を監査せず、(ii) 自身 fail-open。gate-advancement は tamper-evident にしたのに、gate 要件と moat を制御する switch は無監査＝強い性質に側道。
+- **較正（重要・過大評価を避ける）**: I3 は**新規の敵対的 moat 破綻ではない**。事故では task_type を書き換えない（moat の事故防止目的は無傷）。敵対経路としては SF-004 の os.chmod 解錠と同クラスで**受容済み**。正当な残課題は「tamper-evidence の網羅性/非対称」であって「フル moat 崩壊」ではない。
+- **修正方針（暫定・非確定）**: I1＝post-status-audit に safety fallback を足し gate/mode/task_type tamper 検知を fail-closed 化（python3 依存の phase-transition 検査部のみ advisory 維持）。I2＝STATUS 不在/None-frontmatter を violation 化。I3＝task_type/task_size を tamper 検知対象に追加（authorized-path 経由のみ変更可）。I1 が I3 の前提（fail-open のままでは I3 監査もスキップされる）。**check-control-plane の再設計は不要。**
+- **状態**: **PARTIALLY ADDRESSED（iteration 41 Batch 1 で I1/I2 対処済・I3 は OPEN）**。
+  - **I1（fail-open）= 対処済**: `hooks/post-status-audit.sh` に PostToolUse 用 fail-closed fallback（`AEGIS_SAFETY_FALLBACK_POSTTOOL_BEGIN/END`）＋`safety.sh` の `aegis_require_lib_block` を追加。lib source 失敗で `{"decision":"block"}` を emit＝gate/mode tamper 検知（bash のみ）が lib 欠落で skip されない。phase-transition の python3 依存部は現挙動維持（最小変更）。テスト: `tests/test_post_status_audit_fail_closed.py`。
+  - **I2（完了evidence fail-open）= 対処済**: `scripts/check_status.py` の `--check-completion-evidence` で STATUS 不在 / frontmatter None を violation（exit 1）化＝`validate_status_file` と対称。テスト: `tests/test_completion_evidence_fail_closed.py`。
+  - **I3（task_type/task_size 無監査）= OPEN（Batch 2）**: post-status-audit に task_type/task_size の tamper 検知を追加する。I1（fail-closed 化）が前提＝達成済なので Batch 2 で着手可能。
+  - 関連配布修正（同 iteration・SF ではないが文脈）: standard profile が judge builder / Task 完了強制 hook を欠いていた（gate 承認不能・completion 強制不発）＝D1/D2 で是正。再 install で framework 所有ファイルが `.bak` つきで上書きされるよう変更（D3）＝security 修正が既存ユーザーに届く。
+
 ---
 
 ## 防御の多層化（提言・2026-06-20・ユーザー判断待ち）

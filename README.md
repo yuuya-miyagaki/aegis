@@ -181,7 +181,7 @@ Profile-based validation for scaffold projects:
 python3 scripts/check_framework_contract.py --profile=standard --root <your-project-dir>
 ```
 
-Available profiles: `minimal` (8 required), `standard` (18 required + 8 recommended). `full` is framework repo root only (do not use with `--root`).
+Available profiles: `minimal` (8 required), `standard` (20 required + 10 recommended). `full` is framework repo root only (do not use with `--root`).
 Profile definitions: `templates/profiles/*.json`.
 
 Optional strict YAML validation (requires PyYAML):

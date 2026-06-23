@@ -19,7 +19,9 @@
     "hooks/lib/frontmatter.sh",
     "hooks/lib/safety.sh",
     "hooks/lib/secrets-patterns.sh",
-    "hooks/lib/phase-skills.sh"
+    "hooks/lib/phase-skills.sh",
+    "scripts/build-judge-card.py",
+    "scripts/run-test-strength-drill.py"
   ],
   "recommended": [
     "hooks/post-bash.sh",
@@ -29,7 +31,9 @@
     "hooks/check-secrets.sh",
     "hooks/check-deploy-gate.sh",
     ".claude/skills/tdd/SKILL.md",
-    ".claude/skills/subagent-dev/SKILL.md"
+    ".claude/skills/subagent-dev/SKILL.md",
+    "scripts/record-test-result.py",
+    "hooks/lib/fingerprint.sh"
   ],
   "required_hook_scripts": [
     "hooks/session-start.sh",
@@ -38,7 +42,9 @@
     "hooks/check-control-plane.sh",
     "hooks/check-destructive.sh",
     "hooks/check-secrets.sh",
-    "hooks/check-deploy-gate.sh"
+    "hooks/check-deploy-gate.sh",
+    "hooks/check-task-created.sh",
+    "hooks/check-task-completed.sh"
   ],
   "hooks_include": [
     "session-start.sh",
@@ -50,6 +56,8 @@
     "check-secrets.sh",
     "check-deploy-gate.sh",
     "post-bash-observe.sh",
-    "post-bash.sh"
+    "post-bash.sh",
+    "check-task-created.sh",
+    "check-task-completed.sh"
   ]
 }

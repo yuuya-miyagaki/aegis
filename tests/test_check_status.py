@@ -2536,11 +2536,15 @@ class TestCheckCompletionEvidence(unittest.TestCase):
             self.assertIn("EVIDENCE:", out, "missing requirements file must violate")
             self.assertIn("requirements", out)
 
-    def test_missing_status_no_violations(self):
+    def test_missing_status_is_violation(self):
+        # iter41 I2: a missing STATUS.md is now fail-CLOSED (rc=1), symmetric
+        # with validate_status_file. Previously this returned rc=0 (fail-open),
+        # which let an adversary delete STATUS.md to pass the TaskCompleted
+        # evidence check.
         with tempfile.TemporaryDirectory() as empty_root:
             rc, out = run_check(empty_root, "--check-completion-evidence")
-            self.assertEqual(rc, 0)
-            self.assertEqual(out, "", f"missing STATUS must be fail-safe, got: {out}")
+            self.assertEqual(rc, 1)
+            self.assertIn("EVIDENCE:", out, f"missing STATUS must violate, got: {out}")
 
 
 class TestTaskSizeRationaleEnforcement(unittest.TestCase):

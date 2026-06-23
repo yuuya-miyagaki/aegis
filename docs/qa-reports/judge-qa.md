@@ -14,4 +14,4 @@
 （LLM が平易日本語で記述）
 
 ## ACK
-- test-only 変更につき skip 宣言（対象プロダクトコードなし）。強度は専用メソッドの両極アサート（plan:pending→deny は live-STATUS を読めば allow になり FAIL する load-bearing 回帰ガード）＝手動 mutation 同等。claims はハーネス生成の test-strength.md に無いため ack。full suite green・review 🟢・詳細 docs/qa-reports/iter39-review.md。 （2026-06-22 22:37）
+- skip-drill は framework 混在 L diff で B1 構造的不適用（LEARNINGS conf9）。代替＝RED-first TDD（6 fix 全て失敗テスト先行で RED 実測→GREEN）。full suite 1053 passed/1 skip（record green）・contract full PASS・standard install で --profile=standard PASS 実機確認。詳細 docs/qa-reports/iter41-qa.md。current_refs.qa は本承認直後に設定する。 （2026-06-24 02:25）

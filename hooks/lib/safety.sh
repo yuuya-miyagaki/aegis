@@ -50,3 +50,32 @@ aegis_require_lib() {
     _aegis_emit_fail_closed_deny "lib source failed (rc=$_rc): $(basename "$lib")"
   fi
 }
+
+# --- PostToolUse variant (I1, iter41) ---
+# post-status-audit.sh is a PostToolUse blocker; its fail-closed signal is the
+# top-level {"decision":"block"} schema, NOT PreToolUse deny. Same static-reason
+# discipline (no %s / $VAR) for the JSON-injection / drift reasons above. This
+# is why post-status-audit is NOT part of the 12-hook byte-identity set — its
+# fallback emits a different (PostToolUse) schema.
+_aegis_emit_fail_closed_block() {
+  local stderr_hint="${1:-unspecified}"
+  printf '[aegis-safety] fail-closed: %s\n' "$stderr_hint" >&2
+  printf '%s\n' '{"decision":"block","reason":"[integrity] hook safety lib unavailable — check hooks/lib/* integrity"}'
+  exit 0
+}
+
+# Source a lib file; on failure, fail-closed via PostToolUse block above.
+aegis_require_lib_block() {
+  local lib="$1"
+  if [ ! -r "$lib" ]; then
+    _aegis_emit_fail_closed_block "lib not readable: $(basename "$lib")"
+  fi
+  set +e
+  # shellcheck disable=SC1090
+  source "$lib" 2>/dev/null
+  local _rc=$?
+  set -e
+  if [ "$_rc" -ne 0 ]; then
+    _aegis_emit_fail_closed_block "lib source failed (rc=$_rc): $(basename "$lib")"
+  fi
+}

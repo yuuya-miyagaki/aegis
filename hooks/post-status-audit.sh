@@ -15,6 +15,26 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+# AEGIS_SAFETY_FALLBACK_POSTTOOL_BEGIN
+# I1 (iter41): PostToolUse fail-closed. If safety.sh is unreadable / unsourceable
+# the libs below cannot load and the audit (gate/mode tamper detection) would die
+# under set -e with empty stdout = allow = fail-open. Emit a PostToolUse block
+# instead. Distinct from the PreToolUse byte-identity fallback (different schema).
+if [ ! -r "${SCRIPT_DIR}/lib/safety.sh" ]; then
+  printf '[aegis-safety] fail-closed: safety.sh not readable\n' >&2
+  printf '%s\n' '{"decision":"block","reason":"[integrity] hook safety lib unavailable — check hooks/lib/* integrity"}'
+  exit 0
+fi
+set +e
+source "${SCRIPT_DIR}/lib/safety.sh" 2>/dev/null
+_aegis_safety_rc=$?
+set -e
+if [ "$_aegis_safety_rc" -ne 0 ]; then
+  printf '[aegis-safety] fail-closed: safety.sh source failed\n' >&2
+  printf '%s\n' '{"decision":"block","reason":"[integrity] hook safety lib unavailable — check hooks/lib/* integrity"}'
+  exit 0
+fi
+# AEGIS_SAFETY_FALLBACK_POSTTOOL_END
 # Resolve framework root (allow CLAUDE_PROJECT_DIR override for test fixtures
 # that source hooks from a copy laid out outside the framework repo).
 ROOT="${CLAUDE_PROJECT_DIR:-$(cd "${SCRIPT_DIR}/.." && pwd)}"
@@ -22,11 +42,13 @@ STATUS_FILE="${ROOT}/docs/STATUS.md"
 SNAPSHOT_FILE="${ROOT}/.claude/.gate-snapshot"
 AUDIT_SKIP_LOG="${ROOT}/.claude/.audit-skip.log"
 
-# Load shared input extraction.
-source "${SCRIPT_DIR}/lib/extract-input.sh"
-source "${SCRIPT_DIR}/lib/emit.sh"
-source "${SCRIPT_DIR}/lib/frontmatter.sh"
-source "${SCRIPT_DIR}/lib/phase-skills.sh"
+# Load shared libs fail-closed (PostToolUse block on absence/source failure).
+# gate/mode tamper detection is bash-only (frontmatter.sh), so it must not be
+# skipped just because a lib is missing.
+aegis_require_lib_block "${SCRIPT_DIR}/lib/extract-input.sh"
+aegis_require_lib_block "${SCRIPT_DIR}/lib/emit.sh"
+aegis_require_lib_block "${SCRIPT_DIR}/lib/frontmatter.sh"
+aegis_require_lib_block "${SCRIPT_DIR}/lib/phase-skills.sh"
 # layer-2 cp-lock lib (optional — absent in minimal scaffolds).
 [ -r "${SCRIPT_DIR}/lib/cp-lock.sh" ] && source "${SCRIPT_DIR}/lib/cp-lock.sh" 2>/dev/null || true
 

@@ -155,6 +155,11 @@ copy_file() {
 # Loss of an old lib is the F6 / DIST-02 fail-open path — `SKIP (exists)`
 # is wrong for these files because the upgrade target legitimately needs
 # them replaced even when present. Always overwrite, never SKIP.
+# D3 (iter41): diff-gated .bak. A same-version re-install where the file is
+# identical is a no-op (no churn, no spurious .bak); a differing existing copy
+# (stale framework file OR a user customization) is backed up before overwrite
+# so it is recoverable. This is how security fixes in framework-owned assets
+# reach existing installs across an upgrade.
 copy_file_force() {
   local src="$1"
   local dst="$2"
@@ -162,10 +167,44 @@ copy_file_force() {
     echo "  SKIP (source not found): $dst"
     return
   fi
+  if [[ -f "$dst" ]] && cmp -s "$src" "$dst"; then
+    return  # identical — nothing to do
+  fi
+  if [[ -f "$dst" ]]; then
+    cp "$dst" "${dst}.bak.$(date +%s)" 2>/dev/null || true
+  fi
   mkdir -p "$(dirname "$dst")"
   cp -f "$src" "$dst"
   INSTALLED_PATHS+=("$dst")
   echo "  COPY (force): $dst"
+}
+
+# D3 (iter41): framework-owned paths are overwritten on upgrade (security fixes
+# must reach existing installs); user-owned paths keep skip-if-exists so a
+# user's STATUS / LEARNINGS / CLAUDE.md / settings / client docs are never
+# clobbered. Classification is by TARGET rel-path (independent of template
+# substitution in resolve_source).
+is_framework_owned() {
+  case "$1" in
+    # bin/ is the installer itself; no profile ships it today, but it is
+    # unambiguously framework-owned (listed so the classifier stays complete if
+    # a future profile adds a bin/ entry).
+    hooks/*|scripts/*|templates/*|bin/*) return 0 ;;
+    .claude/skills/*|.claude/agents/*|.claude/commands/*|.claude/rules/*) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+# Route a file to force-overwrite (framework-owned) or skip-if-exists (user).
+copy_file_routed() {
+  local rel="$1"
+  local src="$2"
+  local dst="$3"
+  if is_framework_owned "$rel"; then
+    copy_file_force "$src" "$dst"
+  else
+    copy_file "$src" "$dst"
+  fi
 }
 
 # --- Parse JSON arrays (lightweight, no jq dependency) ---
@@ -273,7 +312,16 @@ if os.path.exists(target):
     try:
         with open(target) as f:
             existing = json.load(f)
-    except Exception:
+    except Exception as e:
+        # D4: do NOT silently drop the user's permissions/env when their
+        # existing settings cannot be parsed (a // comment etc.). Warn loudly
+        # and point at the .bak created above so they can recover.
+        sys.stderr.write(
+            'WARNING: existing %s could not be parsed as JSON (%s).\n'
+            '         Its permissions/env were NOT carried over. A backup was '
+            'saved alongside it (.bak.*); restore values manually if needed.\n'
+            % (target, e)
+        )
         existing = {}
     for k, v in existing.items():
         if k == 'hooks':
@@ -317,14 +365,17 @@ copy_hooks() {
   # `source lib/emit.sh` and the moat fails open (audit F6, 2026-06-07).
   # K-9 (v1.6.2): hooks/lib/*.sh are framework-owned. Always force-overwrite,
   # never SKIP, to prevent old libs from lingering across upgrades and
-  # silently breaking new hooks (DIST-02 / F6 同型).
+  # silently breaking new hooks (DIST-02 / F6 同型). This calls copy_file_force
+  # directly (rather than copy_file_routed) because the whole lib/ glob is
+  # unconditionally framework-owned — is_framework_owned("hooks/lib/...") would
+  # return the same routing anyway.
   for lib in "$FRAMEWORK_ROOT"/hooks/lib/*.sh; do
     [[ -e "$lib" ]] || continue
     copy_file_force "$lib" "$target_dir/hooks/lib/$(basename "$lib")"
   done
 
   while IFS= read -r script; do
-    copy_file "$FRAMEWORK_ROOT/hooks/$script" "$target_dir/hooks/$script"
+    copy_file_routed "hooks/$script" "$FRAMEWORK_ROOT/hooks/$script" "$target_dir/hooks/$script"
   done <<< "$hooks_include"
 }
 
@@ -440,7 +491,7 @@ echo ""
 echo "--- Required files ---"
 while IFS= read -r rel_path; do
   src=$(resolve_source "$rel_path")
-  copy_file "$src" "$TARGET/$rel_path"
+  copy_file_routed "$rel_path" "$src" "$TARGET/$rel_path"
 done < <(parse_json_array "$PROFILE_JSON" "required")
 
 # 2. Copy recommended files
@@ -450,7 +501,7 @@ recommended=$(parse_json_array "$PROFILE_JSON" "recommended" 2>/dev/null) || tru
 if [[ -n "$recommended" ]]; then
   while IFS= read -r rel_path; do
     src=$(resolve_source "$rel_path")
-    copy_file "$src" "$TARGET/$rel_path"
+    copy_file_routed "$rel_path" "$src" "$TARGET/$rel_path"
   done <<< "$recommended"
 else
   echo "  (none)"
