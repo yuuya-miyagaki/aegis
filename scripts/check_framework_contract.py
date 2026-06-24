@@ -194,6 +194,12 @@ REQUIRED_HOOK_FILES = [
     # session start, sourced by session-start.sh. Same F6 lesson — a missing
     # lib silently fail-opens the layer-2 lock path.
     ROOT / "hooks/lib/cp-lock.sh",
+    # iter43 (I3): snapshot single-source. session-start/update-gate/update-task
+    # write it and post-status-audit.sh REQUIRES it (fail-closed) — the snapshot
+    # is the tamper-evidence baseline (gate/phase/mode + task_type/task_size).
+    # Same F6 life-support lesson: a missing lib would fail-close every STATUS
+    # edit (post-status-audit) or silently stop snapshot regen elsewhere.
+    ROOT / "hooks/lib/snapshot.sh",
 ]
 
 # Legacy skill files that should NOT exist (migrated to .claude/skills/ in v0.6.0).

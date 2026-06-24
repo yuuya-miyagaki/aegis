@@ -10,6 +10,11 @@ source "${SCRIPT_DIR}/lib/emit.sh"
 source "${SCRIPT_DIR}/lib/frontmatter.sh"
 source "${SCRIPT_DIR}/lib/phase-skills.sh"
 source "${SCRIPT_DIR}/lib/sanitize.sh"
+# iter43: snapshot writer single-source. Best-effort here (session-start is
+# advisory); a missing lib must not fail-close the session.
+if [ -f "${SCRIPT_DIR}/lib/snapshot.sh" ]; then
+  source "${SCRIPT_DIR}/lib/snapshot.sh" 2>/dev/null || true
+fi
 # layer-2 CP OS-lock lib. Sourced safely: a missing/broken lib must NOT
 # fail-close the session (the static moat / layer-1 is always present).
 # NOTE: a bare `source missing.sh || true` does NOT survive `set -e` — sourcing
@@ -26,18 +31,12 @@ if [ ! -f "$STATUS_FILE" ]; then
 fi
 
 # Initialize gate snapshot for tamper detection (used by post-status-audit.sh).
-SNAPSHOT_DIR="${ROOT}/.claude"
-SNAPSHOT_FILE="${SNAPSHOT_DIR}/.gate-snapshot"
-mkdir -p "$SNAPSHOT_DIR"
-# K-7 (v1.6.2): atomic write — see post-status-audit.sh for rationale.
-_AEGIS_SNAP_TMP="${SNAPSHOT_FILE}.tmp.$$"
-{
-  sed -n '/^gate_approvals:/,/^[a-z]/{ /^gate_approvals:/p; /^  /p; }' "$STATUS_FILE" 2>/dev/null
-  grep -m1 "^phase:" "$STATUS_FILE" 2>/dev/null
-  grep -m1 "^mode:" "$STATUS_FILE" 2>/dev/null
-} > "$_AEGIS_SNAP_TMP" 2>/dev/null && \
-  mv "$_AEGIS_SNAP_TMP" "$SNAPSHOT_FILE" 2>/dev/null || \
-  rm -f "$_AEGIS_SNAP_TMP" 2>/dev/null || true
+# iter43: single-source via aegis_write_snapshot (captures gate/phase/mode +
+# task_type/task_size). Best-effort: if the helper is unavailable the session
+# still proceeds (advisory layer).
+if command -v aegis_write_snapshot >/dev/null 2>&1; then
+  aegis_write_snapshot "$ROOT" || true
+fi
 
 # E1: rotate + touch the evidence log. The (possibly empty) file is the
 # "observer layer alive" liveness signal consumed by check-task-completed.sh.

@@ -49,8 +49,23 @@ aegis_require_lib_block "${SCRIPT_DIR}/lib/extract-input.sh"
 aegis_require_lib_block "${SCRIPT_DIR}/lib/emit.sh"
 aegis_require_lib_block "${SCRIPT_DIR}/lib/frontmatter.sh"
 aegis_require_lib_block "${SCRIPT_DIR}/lib/phase-skills.sh"
+# iter43 (I3): snapshot single-source. Required (fail-closed): the snapshot is
+# the tamper-evidence baseline; a broken install missing it must fail loud like
+# every other core lib (F6 life-support doctrine), not silently stop regen.
+aegis_require_lib_block "${SCRIPT_DIR}/lib/snapshot.sh"
 # layer-2 cp-lock lib (optional — absent in minimal scaffolds).
 [ -r "${SCRIPT_DIR}/lib/cp-lock.sh" ] && source "${SCRIPT_DIR}/lib/cp-lock.sh" 2>/dev/null || true
+
+# iter43 (I3): layer-2 re-lock from the CURRENT STATUS task_type. Called only on
+# paths that are NOT a tamper block — see the two call sites. chmod side-effect
+# only; never emits and never alters the audit decision.
+_aegis_relock_from_status() {
+  if command -v aegis_cp_apply >/dev/null 2>&1; then
+    local _tt
+    _tt=$(frontmatter_value "$STATUS_FILE" "task_type" || true)
+    aegis_cp_apply "$ROOT" "$_tt" || true
+  fi
+}
 
 # Read stdin (JSON with tool_input/tool_result).
 INPUT=$(cat)
@@ -77,18 +92,20 @@ if [ ! -f "$STATUS_FILE" ]; then
   emit_allow
   exit 0
 fi
-# layer-2 lifecycle re-lock: a mid-session task_type change (framework <-> other)
-# must re-establish the correct CP lock state. chmod side-effect only — never emits
-# and never alters the audit decision below; || true keeps it non-fatal under set -e.
-if command -v aegis_cp_apply >/dev/null 2>&1; then
-  _AEGIS_TT=$(frontmatter_value "$STATUS_FILE" "task_type" || true)
-  aegis_cp_apply "$ROOT" "$_AEGIS_TT" || true
-fi
+# iter43 (I3): the layer-2 re-lock (aegis_cp_apply) MOVED from the top of this
+# hook to (a) this first-edit branch and (b) the clean path after the tamper
+# checks. It must NOT run on a tamper BLOCK: a raw Edit of
+# task_type:<locked>→framework would, if cp_apply ran first, UNLOCK the moat
+# before the task-tamper check could block — handing the edit the very write
+# access the block denies. The first-edit branch has no snapshot baseline (so no
+# tamper is even possible), so re-locking from STATUS there is safe and preserves
+# the iter37 backstop (a STATUS edit re-asserts the correct moat state).
 if [ ! -f "$SNAPSHOT_FILE" ]; then
   mkdir -p "$(dirname "$AUDIT_SKIP_LOG")" 2>/dev/null || true
   printf '%s first-edit allowance (snapshot missing)\n' \
     "$(date -u +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || echo unknown)" \
     >> "$AUDIT_SKIP_LOG" 2>/dev/null || true
+  _aegis_relock_from_status
   emit_allow
   exit 0
 fi
@@ -160,19 +177,36 @@ if [ -n "$OLD_MODE" ] && [ -n "$NEW_MODE" ] && [ "$OLD_MODE" != "$NEW_MODE" ]; t
   fi
 fi
 
-# K-7 (v1.6.2): atomic snapshot write. Stage the file in a per-PID tmp,
-# then rename. If we crash before the mv (SIGKILL / OOM / power loss),
-# the previous snapshot stays intact — never a partially-written file
-# with phase: / mode: missing (which the v1.6.1 detector bypassed via
-# `[ -n "$OLD_PHASE" ]` guard).
-_AEGIS_SNAP_TMP="${SNAPSHOT_FILE}.tmp.$$"
-{
-  sed -n '/^gate_approvals:/,/^[a-z]/{ /^gate_approvals:/p; /^  /p; }' "$STATUS_FILE" 2>/dev/null
-  grep -m1 "^phase:" "$STATUS_FILE" 2>/dev/null
-  grep -m1 "^mode:" "$STATUS_FILE" 2>/dev/null
-} > "$_AEGIS_SNAP_TMP" 2>/dev/null && \
-  mv "$_AEGIS_SNAP_TMP" "$SNAPSHOT_FILE" 2>/dev/null || \
-  rm -f "$_AEGIS_SNAP_TMP" 2>/dev/null || true
+# --- Task field tamper validation (iter43 / I3) ---
+# task_type controls gate requirements (STRICT_GATE_TASK_TYPES) AND the layer-2
+# moat lock; task_size controls which gates apply. Authorized changes go through
+# scripts/update-task.sh (which updates the snapshot atomically). A raw Edit that
+# changes either field is tamper — block (mirrors the gate loop). The `[ -n "$OLD" ]`
+# guard is a migration grace: an older snapshot without task fields is upgraded by
+# the regen below rather than blocking a legitimate edit.
+# NOTE: this MUST run before aegis_cp_apply below — see the moved-cp_apply note above.
+for tf in task_type task_size; do
+  OLD_TF=$(frontmatter_value "$SNAPSHOT_FILE" "$tf")
+  NEW_TF=$(frontmatter_value "$STATUS_FILE" "$tf")
+  if [ "$OLD_TF" != "$NEW_TF" ] && [ -n "$OLD_TF" ]; then
+    REASON=$(printf '[task-tamper] %s changed %s→%s without authorization. Use scripts/update-task.sh to change task_type/task_size.' "$tf" "$OLD_TF" "$NEW_TF")
+    emit_block "$REASON"
+    exit 0
+  fi
+done
+
+# iter43 (I3): layer-2 re-lock, MOVED here from the top. Only the clean path
+# (all tamper checks passed) reaches this, so a blocked tamper edit can never
+# unlock the moat. On a clean edit task_type == snapshot (untampered), so this is
+# an idempotent re-assert of the correct lock state (backstop; the primary
+# re-lock on a legitimate task_type change happens in update-task.sh).
+_aegis_relock_from_status
+
+# iter43: snapshot regen via single-source aegis_write_snapshot (atomic tmp→mv;
+# K-7 rationale preserved in hooks/lib/snapshot.sh). Captures gate/phase/mode +
+# task_type/task_size so the next edit's tamper check has a baseline for the
+# task fields too.
+aegis_write_snapshot "$ROOT" || true
 
 # Phase-skill injection (P1-A): a legitimate phase transition is the moment the
 # next phase's skills must be loaded — SessionStart injection cannot reach a

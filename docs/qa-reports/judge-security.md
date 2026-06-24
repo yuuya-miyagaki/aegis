@@ -13,10 +13,9 @@
 
 ## 🟡 要確認
 - 依存監査が未検証
-- 1次/2次レビューの相違（self-attested）: 1次=None / 2次=approve_with_notes
 
 ## あなたが取るアクション
 （LLM が平易日本語で記述）
 
 ## ACK
-- 依存変更なし（bash+grep のみ・manifest 不変）＝依存監査 N/A。1次=PASS（iter42-security.md）。盲検 security 2次＝approve_with_notes。G2 は secret-staging deny の fail-open（git -C で CWD scan 空振り）を塞ぐ純増。G1/G3 は既存 deny を弱めず（AEGIS_DEPLOY_REGEX 逐語移設・cron は旧 DANGER_RE の superset）。F1（quoted-path-with-space miss）は Low＝pre-G2 baseline 同等の非 fresh hole・quote strip で realistic ケース回復済。injection なし（git 引数は配列・eval なし）。1次=None は claims スキーマ差。 （2026-06-24 17:53）
+- 新規依存ゼロ（pure bash + python stdlib）＝依存監査 unverified は環境非依存の advisory。net security 改善（raw task_type→framework の即時 moat 解錠経路を cp_apply 移動で封鎖）・新規脆弱性なし。盲検2次 security agent approve_with_notes。残留 S2-S4 は全て Low（SF-004 class／gate と同 grace／可用性）＝受容。詳細 docs/qa-reports/iter43-security.md。 （2026-06-24 23:08）

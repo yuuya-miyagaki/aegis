@@ -69,7 +69,8 @@ skip する場合は `gate_approvals.brainstorm` を `n/a` に設定する（`ba
 ## Step D: plan フェーズへ移行
 
 1. `docs/STATUS.md` の `phase` を `plan` に更新
-2. `task_size` を設定し `task_size_rationale` を記録
+2. `task_size` を `bash scripts/update-task.sh --size <S|M|L>` で設定（raw Edit は
+   post-status-audit が tamper として block する）し、`task_size_rationale` を記録
 3. brainstorm gate 承認：`bash scripts/update-gate.sh brainstorm approve`
 
 ## コンテキスト予算

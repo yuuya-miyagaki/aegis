@@ -10,6 +10,9 @@
 - [confidence:8] `CLAUDE.md` は薄く保ち、詳細ルールは pull-based にした方が Claude Code では安定しやすい。
 - [confidence:9] シェルコマンドの control-plane 判定を「正規表現＋クォート span マスク」でやると、シェルの**クォート除去＋隣接トークン連結**（`hooks""/lib`→語 `hooks/lib`）を再現できず分割トークン書込みを取りこぼす。正しくは**語単位にトークン化→各語の literal value を再構成→書込み先語のみ判定**。詳細・OPEN 課題は `docs/security-followups.md` SF-001。
 - [confidence:9] 書込み先が安全かの判定は「**安全コマンドのアロウリスト**（echo/printf/git commit 等）」で行う。「write ユーティリティのブロックリスト」は列挙漏れ（perl -i/patch/awk/sponge…）で必ず漏れる。改行は区切りとして扱う（`\n`→`;` 正規化）＝line-oriented grep の取りこぼし防止。
+- [confidence:8] STATUS の制御フィールド（gate に続き iter43 で task_type/task_size）を tamper-evidence 化する型は固定: (1) `.gate-snapshot` に取り込む (2) Bash 経由の authorized writer（update-gate.sh / update-task.sh＝PostToolUse を自然バイパス）を用意 (3) post-status-audit に「snapshot≠STATUS かつ snapshot 非空で block」ループを gate と**完全同型**で足す（`[ -n "$OLD" ]` は移行猶予）。同型にすると読み手の心智モデルが1つで済む。tamper-evidence であって proof ではない（block はディスク編集を巻き戻さない・cross-session re-bless は受容）。
+- [confidence:8] 副作用を伴う再適用（`aegis_cp_apply` の moat 施錠）は tamper チェックの**後**に置く。冒頭に置くと改竄編集（`task_type:locked→framework`）が検知前に解錠を発火させ、block が無意味になる。ただし no-baseline 経路（snapshot 不在の first-edit）は tamper 不能なので副作用も安全＝「clean 経路＋first-edit でのみ発火する helper」に切り出すと両立する（iter43 で `_aegis_relock_from_status` に抽出）。
+- [confidence:7] authorized writer（update-task.sh）は frontmatter 行の **replace だけでなく insert（行欠落時）** も実装する。STATUS テンプレは task_size 行を持たない（任意フィールド）ため、replace-only だと新規プロジェクト初回の size 設定が silent no-op になる（grill-code Critical で発見）。schema 必須フィールド（task_type）欠落時は黙らず明示エラー。
 
 ## プロセス
 
@@ -17,6 +20,8 @@
 
 - [confidence:9] `docs/STATUS.md` を短い状態ファイルとして維持すると、再開時の迷いが減る。
 - [confidence:8] `docs/plans/` の設計書（design）は決定の正典として durable に保ち、必要なら更新する。実装計画（implementation）は実行時点のスナップショットとして commit するが、マージ後は更新しない（行番号・厳密文字列が陳腐化し将来の読者を誤誘導するため）。design＋implementation＋git 差分＋親設計の §チェックリスト反映で「決定・手順・差分・追従」が揃う。
+- [confidence:9] gate ref の罠（精密化）: `current_refs.<gate>` を set してから approve するまでの間に **contract を走らせる処理（record-test-result が full suite→test_cp_lock_contract を含む）を挟むと stale-ref FAIL→record red**（pending+ref は契約違反）。set→approve を中断なく連続させ、record-test-result は「全コード編集後・全 ref 確定前」または「各 gate approve 後」に置く。iter43 で qa ref set 後に record して赤化→qa approve で解消を実体験。
+- [confidence:8] framework 混在 diff では B1 mutation drill の coverage floor（全変更ハンクに mutant）が構造的に不成立（docs プロセ・コメント・inline→helper リファクタ・REQUIRED リスト追加には behavior-catching mutant を置けない）。sanctioned path は **skip + 代替実証**: 全挙動変更で RED-first TDD ＋ core ロジックへ手動 mutant 適用→テスト RED 実測→revert。iter42 は「committed＝working-tree diff 空」で skip、iter43 は「uncommitted 混在＝coverage-floor block」で skip＝skip 理由が2系統ある。
 
 ## コミュニケーション
 
@@ -36,6 +41,7 @@
 - [confidence:7] extensions/ に配置する設定テンプレートは、実サーバー接続検証まではスコープに含めにくい。構造検証と実接続検証を明示的に分けて記録すべき。
 - [confidence:9] `update-gate.sh` は `current_refs.<gate>` を "approved" 文字列で上書きする。ゲート承認後に手動で正しいファイルパスを復元する必要がある。将来のバージョンで修正すべきバグ。**→ v1.4.0 で解消**: 単一パス書込（P3-3）により approve は current_refs に触れなくなった（reset の null 化は仕様）。v1.4.0 の 4 ゲート承認で refs 無傷を実証。
 - [confidence:8] contract validator のエージェント構造チェック（hallucination guard, turn limit）は大文字小文字を区別する。"Do not" ではなく "do not"、"Complete" ではなく "complete" で書く必要がある。
+- [confidence:7] bash スクリプトが Python 正本（check_status.py の ALLOWED_TASK_*）の enum をハードコードで mirror する場合、**両者の一致を照合する test を1本足す**と drift を恒久防止できる（片方追加で他方が黙って正当値を拒否する事故を防ぐ）。grill-code では YAGNI と判断したが、盲検2レビュー（maintainability＋testing 由来）が独立指摘＝「2つ以上の独立シグナル」を閾値に YAGNI を覆すと良い。
 - [confidence:8] standard profile は Dev-lean に保つべき。Client 専用 artifact（docs/client/, docs/translation/）を standard に含めると、対応する skill/agent なしでは不整合になる。Client 機能は full profile に集約する。
 - [confidence:7] 大規模変更（L サイズ）の実装は Phase 分割+並列サブエージェントが効果的。v0.8.0 では 18 タスクを 6 フェーズに分割し、各フェーズ内で最大 5 並列実行した。
 - [confidence:9] B1 テスト強度ドリルは framework タスクの混在 diff に構造的に適用不能（v1.3.3 で実証）: (1) L サイズの未コミット diff はハンク数が MAX_MUTANTS=25 を超えやすい（38 ハンク）、(2) coverage floor が docs/STATUS.md 等の簿記ハンクにも mutant を強制するが、テストは fixture ベースのため捕獲不能＝必ず FAIL。設計 §11 のスキップ宣言で回避したが、恒久対応の候補は「coverage floor から docs/** を除外（DRILL_ARTIFACT_PREFIX と同型）」「対象ファイルの opt-in スコープ指定」。次バッチ（P2/P3 群）で改善を検討。**→ v1.4.0 で恒久対応済み**: run-test-strength-drill.py が docs/** を mutant 生成と coverage floor の両方から除外（DRILL_EXCLUDED_PREFIXES）。

@@ -6,10 +6,10 @@ mode: Dev
 phase: ship
 task_type: framework
 task_size: L
-task_size_rationale: "iteration 42 = 2026-06-24 全力レビュー Batch 2 のうち G1-G3 guard 網羅（確定・ユーザー承認『推奨で進めて』）。**I3 は iter43 へ繰延**（authorized-path 機構＝rollover の正当な task_type/size 編集と両立させる設計フォークが要・別イテレーションで方式合意）。スコープ: **G1** hooks/lib/patterns.sh に破壊コマンド dd of=/chmod -R/mkfs/shred/system-path truncate-redirect を AEGIS_DESTRUCTIVE_CMD_REGEX へ追加（check-destructive 自動適用）。**G3** patterns.sh に AEGIS_DEPLOY_REGEX を single-source 化し check-deploy-gate（挙動保存リファクタ）＋check-cron-gate（inline DANGER_RE を AEGIS_DESTRUCTIVE_*＋AEGIS_DEPLOY_REGEX に置換＝G1 の新破壊パターンも自動波及）で import。**G2** check-secrets.sh の staged-diff scan が `git -C <repo> commit` で CWD 不一致＝-C/--git-dir を抽出。対象＝patterns.sh・check-deploy-gate.sh・check-cron-gate.sh・check-secrets.sh＋tests＝L＝全ゲート必須。**out-of-scope（文書化）**: git push をデプロイ判定（通常 push と区別不能＝MCP push 除外と整合）／`$V deploy` 変数間接（SF-004 クラス＝受容）。check-control-plane 本体は触らない。"
-iteration: 42
+task_size_rationale: "iteration 43 = 2026-06-24 full-review I3: task_type/task_size の tamper-evidence（SF-006）。現状 post-status-audit は snapshot と gate/phase/mode のみ比較し、task_type/task_size は Edit で改竄しても無検知（例: framework→other で CP lock 回避、L→S で gate skip）。本 iteration で task_type/task_size を snapshot に取り込み、authorized write-path 経由のみ変更可能にする。**着手前に設計フォークを brainstorm/grill-premise で決定**（(a) update-task.sh 新設／(b) update-gate.sh 拡張／(c) iteration インクリメント時のみ task_type/size 変更許可）。**chicken-and-egg**: I3 実装後は rollover/brainstorm の Edit による task_type/size 変更が自分でブロックされるため、authorized-path が前提。task_size は plan で確定（暫定 L）。out-of-scope はブレインストームで確定。"
+iteration: 43
 ui_surface: false
-last_updated: "2026-06-24T00:00:00Z"
+last_updated: "2026-06-24T23:30:00Z"
 gate_approvals:
   client_ready_for_dev: n/a
   brainstorm: approved
@@ -22,12 +22,12 @@ gate_approvals:
 current_refs:
   requirements:
     - docs/full-review-2026-06-24-hooks-gates-distribution.md
-  plan: docs/plans/2026-06-24-iter42-guard-coverage-plan.md
-  spec: docs/specs/2026-06-24-iter42-guard-coverage-design.md
-  review: docs/qa-reports/iter42-review.md
+  plan: docs/plans/2026-06-24-iter43-task-tamper-evidence-implementation-plan.md
+  spec: docs/specs/2026-06-24-iter43-task-tamper-evidence-design.md
+  review: docs/qa-reports/iter43-review.md
   qa: docs/qa-reports/test-strength.md
-  security: docs/qa-reports/iter42-security.md
-  deploy: docs/qa-reports/iter42-deploy.md
+  security: docs/qa-reports/iter43-security.md
+  deploy: docs/qa-reports/iter43-deploy.md
   translation: null
 external_evidence:
   - type: "second-opinion-v1-foundation-r1-r2"
@@ -42,10 +42,14 @@ external_evidence:
     scope: "v0.12.2 実装後 4 ラウンドレビュー"
     findings: "Round 6 (P1×2, P2×1: pre-compact exit 2 / minimal-project / test rc), Round 7 (P1×1, P3×1: git add 漏れ / テスト件数表記), Round 8 (P2×1, P3×1: stale last_updated / grep 自己マッチ), Round 9 (P3×2: コメント不整合)"
     resolution: "9件全反映。tier 1/2 PASS、134 tests PASS、本体と minimal-project 完全同期確認済み。"
-next_action: "**【iteration 42 完了（framework・L・guard 網羅 G1-G3／review+qa+security+deploy 全 approved／commit 済・push 未＝yuuya-miyagaki で `git push`）／次は iteration 43・/clear 後 /recover 用アンカー・2026-06-24】** ◆**push 未了**: iter41（721388a・a0e403f）＋iter42 の commit がローカル ahead。tigereye credential は 403＝**yuuya-miyagaki アカウントで `git push`**。◆**まず rollover**: update-gate.sh で dev ゲートを pending（**bare 単独**）、STATUS を iteration=43・phase=brainstorm（ship→brainstorm backward で allow）・task_type/size/rationale 更新・current_refs null（requirements 保持）・**session_history 最古剪定（contract max 3）**。◆**iter43 本命＝I3 task_type/task_size の tamper-evidence**（SF-006・full-review I3）: post-status-audit に task_type/task_size 改竄検知を追加。**設計フォーク（着手前に方式決定）**: snapshot は現状 gate/phase/mode のみ＝task_type/size を snapshot に追加し authorized write path を用意（案: (a) update-task.sh 新設／(b) update-gate.sh 拡張／(c) iteration インクリメント時のみ task_type/size 変更許可）。**制約**: rollover/brainstorm が現状 Edit で task_type/size を変更＝authorized-path へ移行しないと rollover が自分でブロックされる。brainstorm で grill-premise（事故では task_type 書換えない＝価値は『非対称性解消』であって新規 moat でない・YAGNI 注意）。◆**Backlog**: C1（setup.sh `--profile` 空白）・C2-C4（heredoc/gate パーサ統一）・C5（ROOT 外 plan-gate false-positive）・G4（exfil 再評価）・iter42 既知限界（chmod の operand 後フラグ・quoted -C path-with-space）。**やらない**: check-control-plane 再設計。◆**罠（iter41-42 で確立）**: (a) gate 承認は **tail**（head は SIGPIPE で STATUS 書込み前中断）。(b) current_refs.<gate> は承認直前設定（pending+ref は contract stale-ref FAIL→record red）。(c) judge は claims/2次意見を current_refs.<gate> report から読む＝承認前 ref 設定が必要（b と両立）。(d) record-test-result は全コード編集後1回（fp bind）。(e) framework 混在 diff は skip-drill＋RED-first TDD。(f) **hook が新 lib を source したら test scratch（TempProjectWithHooks 等）にも同 lib を追加**しないと scratch 経路で fail-closed 赤化（full suite でのみ出る）。(g) `${cmd%%word*}` は ` word`（前置スペース）で境界を取る（path に word 部分文字列が混ざる）。"
+next_action: "**【iteration 43 完了（framework・L・I3 task_type/task_size tamper-evidence／review🟢+qa🟡ack+security🟢ack+deploy🟢 全 approved／commit 済・push 未＝yuuya-miyagaki で `git push`）／次は iteration 44・/clear 後 /recover 用アンカー・2026-06-24】** ◆**push**: iter43 の commit がローカル ahead。`gh auth switch --user yuuya-miyagaki && git push`（tigereye は 403）。◆**まず rollover**: dev ゲートを pending（update-gate.sh bare 単独）、STATUS を iteration=44・phase=brainstorm・**task_type/task_size は update-task.sh 経由で変更**（I3 実装後は raw Edit が tamper block される！rollover は update-task.sh --type/--size を使う）・current_refs null（requirements 保持）・session_history 最古剪定（contract max 3）。◆**iter44 候補（full-review 残）**: C1（setup.sh `--profile` 空白）・C2-C4（heredoc/gate パーサ統一）・C5（ROOT 外 plan-gate false-positive）・G4（exfil 再評価）。iter42 既知限界（chmod operand 後フラグ・quoted -C path-with-space）。**やらない**: check-control-plane 再設計。◆**I3 残留（受容・security report）**: cross-session re-bless（SF-004 class）／migration grace 窓／update-task lock orphan-reclaim なし（可用性）。◆**罠（iter41-43 で確立）**: (a) gate 承認出力は **tail**（head は SIGPIPE）。(b) current_refs.<gate> は承認直前設定（pending+ref は contract stale-ref FAIL→record red）。(c) **ref set→approve の間に record-test-result（=full suite→contract）を挟むと stale-ref で赤**（iter43 qa で実体験）＝set→approve を連続、record は approve 後。(d) record-test-result は全コード編集後1回（fp bind・手動 mutant の revert 後も再 record 要）。(e) framework 混在 diff は B1 coverage-floor 不成立→skip＋RED-first TDD＋手動 mutant 実測。(f) hook が新 lib を source したら test scratch（TempProjectWithHooks 等）にも同 lib を追加。(g) **task_type/task_size は update-task.sh 経由のみ（raw Edit は tamper block）**。(h) push は `gh auth switch --user yuuya-miyagaki` で session から可能。"
 blockers: []
 failure_tracking: null
 session_history:
+  - date: "2026-06-24"
+    mode: Dev
+    phase: "ship"
+    note: "iteration 43（full-review I3＝task_type/task_size の tamper-evidence・framework・L・v1.14.0 据置）完了。/clear→/recover→rollover（iter43・dev ゲート全 pending・push 済 origin/main=e87174e）→ brainstorm(grill-premise)→plan(grill-plan)→implement(TDD)→grill-code→review→qa→security→deploy→ship を完走。**実装（6 task）**: T1 新規 hooks/lib/snapshot.sh＝`aegis_write_snapshot` 単一関数（gate/phase/mode＋**task_type/task_size**をアトミック書込み）。T2 3 writer（session-start/update-gate/post-status-audit）の inline snapshot 書込みを helper へ集約（iter37 単一関数＋複数発火点）。T3 新規 scripts/update-task.sh＝task_type/task_size の authorized writer（enum 検証・replace-or-insert・update-gate と同一ロック共有・task_type 変更時 aegis_cp_apply）。T4 post-status-audit に task tamper 検知ループ（gate と同型・`[ -n $OLD ]` 移行猶予）＋**aegis_cp_apply を tamper チェック後へ移動**（`_aegis_relock_from_status` helper＝改竄編集が moat 解錠する前に block／no-baseline first-edit と clean 経路でのみ発火）。T5 docs（CLAUDE.md/state-machine/aegis-brainstorm/bug-diagnosis）を update-task.sh 経由に。T6 snapshot.sh を contract REQUIRED_HOOK_FILES に登録（setup.sh は全 lib 無条件 copy＝配布自動）。**脅威モデル**: LLM self-bypass（外部 adversary 非対象）・tamper-evidence であって proof でない（cross-session re-bless 受容）。**grill-code Critical**: update-task.sh の task_size 行欠落時 silent no-op→replace-or-insert 化＋task_type 欠落は明示エラー。**盲検2次（review gate）**: maintainability＋testing とも approve_with_notes→全 notes 反映（authorized-path 非block の e2e test 追加・enum-parity test 追加・STATUS_FILE_CUR 撤去）。**ゲート（L＝全必須）**: review🟢／qa🟡ack（framework 混在 diff で coverage floor 不成立＝skip＋代替実証: RED-first TDD＋手動 mutant2件 tamper比較/cp_apply トリガを != →= で RED 実測・revert）／security🟢ack（盲検 security agent＝net 改善・raw task_type→framework 即時解錠経路を封鎖・依存監査 unverified は新規依存ゼロで advisory）／deploy🟢。**検証**: full suite 1097 passed/1 skip（record green）・contract full PASS・status_doctor PASS・context budget PASS・bash -n 全 hook/script・git mode-flip なし。**罠（追記）**: ref set→approve 間に record(=contract) を挟むと stale-ref FAIL→赤（qa で実体験）。LEARNINGS 7件追記。push は yuuya-miyagaki（gh auth switch で session から可）。"
   - date: "2026-06-24"
     mode: Dev
     phase: "ship"
@@ -54,10 +58,6 @@ session_history:
     mode: Dev
     phase: "ship"
     note: "iteration 41（2026-06-24 全力レビュー Batch 1・framework・L・v1.14.0 据置）完了。/clear→/recover で復帰し rollover（iteration 41・phase=brainstorm・task_size S→L・requirements ref を docs/full-review-2026-06-24-hooks-gates-distribution.md に更新）→ brainstorm→plan(grill-plan)→implement→grill-code→review→qa→security→deploy→ship を完走。**実装した 6 fix**: D1 standard profile に judge ツールチェーン依存閉包を同梱（build-judge-card+run-test-strength-drill=required・record-test-result+fingerprint.sh=recommended・README 件数 20/10 更新）＝standard で gate 承認可能化／D2 Task 完了強制 hook（check-task-created/completed）を standard profile（hooks_include+required_hook_scripts）・active settings・contract self-check（check_active_settings_core_hooks）に配線／D3 setup.sh が再 install で framework 所有（hooks/scripts/templates/.claude/{skills,agents,commands,rules}/bin）を diff-gated .bak つき上書き・user 所有は保全／D4 壊れ settings を無警告全消しせず stderr 警告／I1 post-status-audit を PostToolUse fail-closed 化（safety.sh に block 版 helper・別マーカー POSTTOOL で 12-hook byte-identity 非破壊）／I2 完了evidence を STATUS 不在/None-frontmatter で violation 化。**ゲート（L＝全必須）**: review🟢（盲検2次 security+maintainability とも approve_with_notes・Critical=契約が gitignored settings 依存で非再現→不在 skip 化で修正済）／qa🟡ack（skip-drill＝framework 混在 L diff に B1 構造的不適用・代替 RED-first TDD 実証）／security🟢ack（新規脆弱性なし・Low residual symlink=SF-004 受容）／deploy🟢ack（framework=main commit がデプロイ）。**検証**: full suite 1053 passed/1 skip（record green）・contract full PASS・status_doctor PASS・standard install で --profile=standard PASS 実機確認・git mode-flip なし。**罠を記録（next_action 参照）**: gate コマンドを head にパイプ→SIGPIPE で STATUS 書込み前中断／ref は承認直前設定／record は全コード編集後1回。SF-006 を I1/I2 対処済・I3 は Batch 2 へ。push は yuuya-miyagaki。"
-  - date: "2026-06-23"
-    mode: Dev
-    phase: "ship"
-    note: "iteration 40（moat 自動解錠バグ修正・framework・S・hooks/lib/cp-lock.sh・v1.14.0）完了・/recover で継続。**根本原因（iter39 発見→iter40 で bash -x 確証）**: post-status-audit は STATUS 編集で発火し aegis_cp_apply framework→aegis_cp_unlock→chmod -R u+w まで実行していた（＝hook 不発火説は反証）。真因は **Claude Code hook サンドボックスで `chmod -R <dir>` がトップ階層 CP ディレクトリのみ変更しネストファイルに再帰しない**（同 chmod -R を Bash ツールで呼ぶと完全再帰＝環境差）→ dir 解錠/nested 施錠の desync を dir-only sentinel `[ -w hooks ]` が解錠済と誤認し no-op 固定。**修正**: aegis_cp_lock/unlock の `chmod -R` を `find \"$p\" -exec chmod {} +` に変更（lock/unlock 両方向・hook 環境で完全再帰を lock→STATUS編集 trigger→full-unlock 再現で実証）。sentinel は完全再帰なら正確で据置（YAGNI）。ヘッダに『chmod -R 差し戻し禁止』明記。**ゲート（framework S＝review のみ必須・qa/security/deploy size-skip）**: review🟢（judge🟢 tests green・盲検 security 2次 approve＝挙動等価を nested/単一ファイル/空/space/symlink で実測一致・lock=a-w/unlock=u+w でセキュリティ無退行・既存 test_lock_blocks_all_write_forms/test_unlock_restores_writability が nested flip を被覆）。Minor 2件（stale 'chmod -R' 文言＝是正済／find nonexistent rc は [ -e ] ゲートで不発）。**検証**: bash -n PASS・cp-lock 15 tests・full suite 1038 passed/1 skip・record green・contract PASS（版 1.14.0）・git mode-flip なし。**罠を記録**: current_refs.<gate> をセットしたら approve まで suite/contract を走らせない（pending+ref は stale 判定で赤）。LEARNINGS 更新（conf6→conf9＝chmod -R は hook サンドボックスで再帰せず＝find -exec を使う）。push は yuuya-miyagaki。"
 ---
 
 ## Summary

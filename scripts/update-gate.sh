@@ -323,17 +323,15 @@ if [ "$ACTION" = "reset" ] && [ -n "${REF_KEY:-}" ]; then
 fi
 
 # --- Update snapshot atomically ---
-
-mkdir -p "$SNAPSHOT_DIR"
-# K-7 (v1.6.2): atomic write — see post-status-audit.sh for rationale.
-_AEGIS_SNAP_TMP="${SNAPSHOT_FILE}.tmp.$$"
-{
-  sed -n '/^gate_approvals:/,/^[a-z]/{ /^gate_approvals:/p; /^  /p; }' "$STATUS_FILE" 2>/dev/null
-  grep -m1 "^phase:" "$STATUS_FILE" 2>/dev/null
-  grep -m1 "^mode:" "$STATUS_FILE" 2>/dev/null
-} > "$_AEGIS_SNAP_TMP" 2>/dev/null && \
-  mv "$_AEGIS_SNAP_TMP" "$SNAPSHOT_FILE" 2>/dev/null || \
-  rm -f "$_AEGIS_SNAP_TMP" 2>/dev/null || true
+# iter43: single-source via aegis_write_snapshot (captures gate/phase/mode +
+# task_type/task_size). The lib lives under hooks/lib (already sourced:
+# frontmatter.sh). Fall back to a no-op if unavailable — the gate value is
+# already persisted to STATUS.md above; a stale snapshot self-heals at the next
+# session-start / status edit.
+source "${ROOT}/hooks/lib/snapshot.sh" 2>/dev/null || true
+if command -v aegis_write_snapshot >/dev/null 2>&1; then
+  aegis_write_snapshot "$ROOT" || true
+fi
 
 echo "[${ACTION_TAG}] STATUS.md and .gate-snapshot updated."
 

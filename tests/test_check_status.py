@@ -384,6 +384,11 @@ class TempProjectWithHooks(TempProject):
         (lib_dir / "patterns.sh").symlink_to(
             ROOT / "hooks" / "lib" / "patterns.sh"
         )
+        # iter43 (I3): post-status-audit.sh now requires snapshot.sh
+        # (fail-closed) for the single-source snapshot write.
+        (lib_dir / "snapshot.sh").symlink_to(
+            ROOT / "hooks" / "lib" / "snapshot.sh"
+        )
         # Copy each hook script (not symlink — so dirname resolves to temp).
         import shutil
         for hook_name in [

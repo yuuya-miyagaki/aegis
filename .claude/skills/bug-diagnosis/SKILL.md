@@ -22,7 +22,7 @@ user-invocable: false
 1. `gate_approvals.brainstorm` → `n/a`（理由: bug-diagnosis で代替）
 2. `gate_approvals.plan` → `n/a`（理由: 修正方針を Step 4 で決定済み）
 3. STATUS.md の `next_action` に修正方針の要約を記録する
-4. `task_size` を設定した場合、`task_size_rationale` にサイズ判定の根拠を記録する
+4. `task_size`/`task_type` の変更は `bash scripts/update-task.sh`（例: `--type bugfix --size S`）経由で行う（raw Edit は post-status-audit が tamper として block）。`task_size` を設定した場合は `task_size_rationale` に根拠を記録する
 
 ## プロセス
 

@@ -520,7 +520,7 @@ python3 scripts/check_framework_contract.py --profile=standard --root <your-proj
 | エージェント（.claude/agents/） | 12 |
 | スキル（.claude/skills/） | 19（SKILL.md x18 + platforms.md x1） |
 | コマンド（.claude/commands/） | 8 |
-| フック（hooks/） | 28（メイン 17 + lib/ 11: emit / patterns / extract-input / frontmatter / evidence / fingerprint / phase-skills / secrets-patterns / safety / sanitize / cp-lock） |
+| フック（hooks/） | 29（メイン 17 + lib/ 12: emit / patterns / extract-input / frontmatter / evidence / fingerprint / phase-skills / secrets-patterns / safety / sanitize / cp-lock / snapshot） |
 | スクリプト（scripts/） | 13 |
 | テンプレート（templates/） | 30（.template.md x26 + hooks.template.json + profiles x3） |
 | 拡張（extensions/） | 11 |
