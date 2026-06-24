@@ -14,4 +14,4 @@
 （LLM が平易日本語で記述）
 
 ## ACK
-- skip-drill は framework 混在 L diff で B1 構造的不適用（LEARNINGS conf9）。代替＝RED-first TDD（6 fix 全て失敗テスト先行で RED 実測→GREEN）。full suite 1053 passed/1 skip（record green）・contract full PASS・standard install で --profile=standard PASS 実機確認。詳細 docs/qa-reports/iter41-qa.md。current_refs.qa は本承認直後に設定する。 （2026-06-24 02:25）
+- skip-drill＝framework 混在 diff（patterns.sh+3 hooks+tests）で B1 構造的不適用（LEARNINGS conf9）。代替＝RED-first TDD（G1/G2/G3 各テストを fix 無しで赤化実測→緑・grill-code 修正も赤→緑確認）。full suite 1067 passed/1 skip（record green）・contract full PASS・bash -n 全 hook。詳細 docs/qa-reports/iter42-qa.md。current_refs.qa は本承認直後に設定。 （2026-06-24 17:52）

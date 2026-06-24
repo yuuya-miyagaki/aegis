@@ -379,6 +379,11 @@ class TempProjectWithHooks(TempProject):
         (lib_dir / "safety.sh").symlink_to(
             ROOT / "hooks" / "lib" / "safety.sh"
         )
+        # G3 (iter42): check-deploy-gate.sh now sources patterns.sh
+        # (AEGIS_DEPLOY_REGEX, single-sourced with check-cron-gate.sh).
+        (lib_dir / "patterns.sh").symlink_to(
+            ROOT / "hooks" / "lib" / "patterns.sh"
+        )
         # Copy each hook script (not symlink — so dirname resolves to temp).
         import shutil
         for hook_name in [

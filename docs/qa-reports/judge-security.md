@@ -19,4 +19,4 @@
 （LLM が平易日本語で記述）
 
 ## ACK
-- 依存監査: 依存変更なし（bash + python stdlib のみ・package manifest 不変）＝N/A。1次=None は claims スキーマ差で、1次判定は report prose に PASS と明記。盲検 security 2次（diff＋脅威モデルのみ・1次非共有）＝approve_with_notes、新規脆弱性なし、I1/I2 で fail-open 非対称を解消、gate 偽造不能性・moat 事故防止目的に退行なし。Low residual＝.bak/上書きの symlink follow は事前 CP 書込み済（既に game-over）でのみ＝SF-004 受容クラス（security-followups 記録）。詳細 docs/qa-reports/iter41-security.md。 （2026-06-24 02:27）
+- 依存変更なし（bash+grep のみ・manifest 不変）＝依存監査 N/A。1次=PASS（iter42-security.md）。盲検 security 2次＝approve_with_notes。G2 は secret-staging deny の fail-open（git -C で CWD scan 空振り）を塞ぐ純増。G1/G3 は既存 deny を弱めず（AEGIS_DEPLOY_REGEX 逐語移設・cron は旧 DANGER_RE の superset）。F1（quoted-path-with-space miss）は Low＝pre-G2 baseline 同等の非 fresh hole・quote strip で realistic ケース回復済。injection なし（git 引数は配列・eval なし）。1次=None は claims スキーマ差。 （2026-06-24 17:53）

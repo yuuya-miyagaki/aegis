@@ -31,6 +31,7 @@ STATUS_FILE="${ROOT}/docs/STATUS.md"
 # Load shared input extraction.
 aegis_require_lib "${SCRIPT_DIR}/lib/extract-input.sh"
 aegis_require_lib "${SCRIPT_DIR}/lib/emit.sh"
+aegis_require_lib "${SCRIPT_DIR}/lib/patterns.sh"
 
 # Read stdin (JSON with tool_input).
 INPUT=$(cat)
@@ -59,8 +60,9 @@ fi
 #           --prod; subcommands like `vercel env` do NOT match), firebase/netlify
 #           deploy, npm/pnpm/yarn/bun [run] deploy, flyctl/railway/gcloud deploy,
 #           wrangler deploy|publish.
-DEPLOY_RE='(^|[[:space:];&|])(vercel +deploy|vercel( +--[A-Za-z][A-Za-z0-9-]*(=[^[:space:];&|]*)?)*[[:space:]]*($|[;&|>])|firebase +deploy|netlify +deploy|(npm|pnpm|yarn|bun) +(run +)?deploy|flyctl +deploy|railway +deploy|gcloud +app +deploy|wrangler +(deploy|publish))'
-if ! printf '%s' "$CMD" | grep -qEi "$DEPLOY_RE"; then
+# G3 (iter42): pattern moved to hooks/lib/patterns.sh (AEGIS_DEPLOY_REGEX) so
+# check-cron-gate.sh shares the exact same deploy detection (no drift).
+if ! printf '%s' "$CMD" | grep -qEi "$AEGIS_DEPLOY_REGEX"; then
   emit_allow
   exit 0
 fi

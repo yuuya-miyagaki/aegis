@@ -29,6 +29,7 @@ if [ "$_aegis_safety_rc" -ne 0 ]; then
 fi
 # AEGIS_SAFETY_FALLBACK_END
 aegis_require_lib "${SCRIPT_DIR}/lib/emit.sh"
+aegis_require_lib "${SCRIPT_DIR}/lib/patterns.sh"
 
 # Read stdin (JSON with tool_input containing the cron prompt).
 INPUT=$(cat)
@@ -68,11 +69,32 @@ if [ -z "$PROMPT" ]; then
   exit 0
 fi
 
-# Deploy + destructive patterns. Aligned with check-deploy-gate.sh and
-# check-destructive.sh, but evaluated against the scheduled prompt text.
-DANGER_RE='vercel +deploy|vercel *$|firebase +deploy|netlify +deploy|gcloud +app +deploy|(npm|pnpm|yarn|bun) +(run +)?deploy|flyctl +deploy|railway +deploy|rm\s+-[a-zA-Z]*r|drop\s+(table|database)|git\s+push\s+.*(-f\b|--force)|git\s+reset\s+--hard|git\s+filter-branch|git\s+update-ref\s+-d|git\s+reflog\s+expire.*--expire=now|npx\s+rimraf|find\s+.*-delete'
+# Deploy + destructive detection against the scheduled prompt text.
+# G3 (iter42): single-sourced from hooks/lib/patterns.sh instead of an inline
+# DANGER_RE, so new destructive patterns (e.g. dd/chmod -R from G1) and the full
+# deploy regex propagate here automatically — no drift between the gates.
+PROMPT_LOWER=$(printf '%s' "$PROMPT" | tr '[:upper:]' '[:lower:]')
+_danger=""
+# Deploy commands (shared regex).
+printf '%s' "$PROMPT" | grep -qEi "$AEGIS_DEPLOY_REGEX" 2>/dev/null && _danger=1
+# Destructive: SQL (matched against lower-cased prompt).
+if [ -z "$_danger" ]; then
+  for i in "${!AEGIS_DESTRUCTIVE_LOWER_REGEX[@]}"; do
+    if printf '%s' "$PROMPT_LOWER" | grep -qE "${AEGIS_DESTRUCTIVE_LOWER_REGEX[$i]}" 2>/dev/null; then _danger=1; break; fi
+  done
+fi
+# Destructive: raw command patterns (git / dd / chmod -R / mkfs / shred / ...).
+if [ -z "$_danger" ]; then
+  for i in "${!AEGIS_DESTRUCTIVE_CMD_REGEX[@]}"; do
+    if printf '%s' "$PROMPT" | grep -qE "${AEGIS_DESTRUCTIVE_CMD_REGEX[$i]}" 2>/dev/null; then _danger=1; break; fi
+  done
+fi
+# Recursive delete (rm -r/-R), special-cased like check-destructive.sh.
+if [ -z "$_danger" ]; then
+  printf '%s' "$PROMPT" | grep -qE 'rm\s+(-[a-zA-Z]*[rR]|--recursive)' 2>/dev/null && _danger=1
+fi
 
-if printf '%s' "$PROMPT" | grep -qEi "$DANGER_RE"; then
+if [ -n "$_danger" ]; then
   # Truncate the prompt preview to 200 chars and sanitize to a single printable
   # line: collapse ALL control chars (0x00-0x1F + DEL) to space so emit.sh never
   # receives a raw control byte that would make the ask JSON malformed (Round 3 P1).

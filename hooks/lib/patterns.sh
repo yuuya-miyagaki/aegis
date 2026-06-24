@@ -31,6 +31,11 @@ AEGIS_DESTRUCTIVE_CMD_REGEX=(
   'git\s+reflog\s+expire.*--expire=now'
   'npx\s+rimraf'
   'find\s+.+\s+-delete'
+  '(^|[^[:alnum:]_])dd\s+.*\bof='
+  '(^|[^[:alnum:]_])chmod\s+(-[a-zA-Z]*R[a-zA-Z]*\b|--recursive\b)'
+  '(^|[^[:alnum:]_])mkfs(\.|[[:space:]]|$)'
+  '(^|[^[:alnum:]_])shred([[:space:]]|$)'
+  '(^|[^0-9>])>\s*/(etc|usr|bin|sbin|boot|sys|lib)(/|[[:space:]]|$)'
 )
 AEGIS_DESTRUCTIVE_CMD_WARN=(
   "Destructive: git force-push rewrites remote history."
@@ -44,7 +49,21 @@ AEGIS_DESTRUCTIVE_CMD_WARN=(
   "Destructive: git reflog expire --expire=now wipes reflog (no recovery)."
   "Destructive: npx rimraf bulk-deletes files recursively."
   "Destructive: find -delete bulk-deletes matching files."
+  "Destructive: dd writes directly to a device/file (overwrites raw blocks)."
+  "Destructive: recursive chmod (-R) changes permissions across a whole tree."
+  "Destructive: mkfs formats a filesystem (destroys all data on it)."
+  "Destructive: shred securely wipes files (unrecoverable)."
+  "Destructive: redirect truncates a system path."
 )
+
+# Deploy-command detection. Single source of truth (G3, iter42): consumed by
+# check-deploy-gate.sh (gates actual deploy execution) AND check-cron-gate.sh
+# (asks when a scheduled prompt contains a deploy command). Keeping it here
+# stops the two hooks from drifting. NOTE: git-push-as-deploy (heroku/dokku) and
+# variable-indirected deploys ($V deploy) are intentionally NOT matched — a git
+# push is indistinguishable from a normal remote update (same rationale as the
+# MCP push exclusion), and var-indirection is the accepted SF-004 class.
+AEGIS_DEPLOY_REGEX='(^|[[:space:];&|])(vercel +deploy|vercel( +--[A-Za-z][A-Za-z0-9-]*(=[^[:space:];&|]*)?)*[[:space:]]*($|[;&|>])|firebase +deploy|netlify +deploy|(npm|pnpm|yarn|bun) +(run +)?deploy|flyctl +deploy|railway +deploy|gcloud +app +deploy|wrangler +(deploy|publish))'
 
 # Test-runner classification patterns (E1 activity verification).
 # Consumed by post-bash.sh (grep -E) and build-judge-card.py (python re).

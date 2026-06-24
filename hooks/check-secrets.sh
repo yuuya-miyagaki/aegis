@@ -71,6 +71,40 @@ SAFE_ENV_SUFFIXES='\.env\.(example|template|sample)'
 GIT_PRE_OPTS='(-{1,2}[A-Za-z][-A-Za-z0-9]*(=[^[:space:]]+|[[:space:]]+[^[:space:]-][^[:space:]]*)?[[:space:]]+)*'
 GIT_STAGE_VERB='(add|stage|update-index)'
 
+# G2 (iter42): honor `-C <path>` / `--git-dir=<path>` so `git -C repo commit`
+# scans the TARGET repo's staged diff, not the hook CWD (which scanned nothing
+# and let a staged .env through). git options precede the subcommand, so scope
+# extraction to the pre-`commit` prefix — otherwise a `-C` inside the commit
+# message (git -C r commit -m "fix -C") is grabbed by the greedy match.
+_aegis_git_dir_args() {
+  # Strip from the ` commit` SUBCOMMAND (space-delimited) onward — NOT a bare
+  # "commit" substring, which could appear inside the -C path (e.g. a repo at
+  # /home/u/my-commit-tool) and truncate the path mid-way.
+  local cmd="${1%% commit*}"
+  local flag="" path=""
+  # --git-dir=PATH  and  --git-dir PATH  (GIT_PRE_OPTS already admits both forms).
+  path=$(printf '%s' "$cmd" | sed -nE 's/.*--git-dir=([^[:space:]]+).*/\1/p' | head -1)
+  [ -n "$path" ] && flag="--git-dir"
+  if [ -z "$path" ]; then
+    path=$(printf '%s' "$cmd" | sed -nE 's/.*--git-dir[[:space:]]+([^[:space:]]+).*/\1/p' | head -1)
+    [ -n "$path" ] && flag="--git-dir"
+  fi
+  if [ -z "$path" ]; then
+    path=$(printf '%s' "$cmd" | sed -nE 's/.*[[:space:]]-C[[:space:]]+([^[:space:]]+).*/\1/p' | head -1)
+    [ -n "$path" ] && flag="-C"
+  fi
+  [ -z "$path" ] && return
+  # Strip one layer of surrounding matched quotes: git -C "/repo" → /repo. A
+  # quoted path CONTAINING spaces is not fully recovered (the unquoted capture
+  # stops at the space) — accepted known limitation, identical to the pre-G2
+  # CWD-scan baseline; rare and out of the accident-prevention sweet spot.
+  case "$path" in
+    \"*\") path="${path#\"}"; path="${path%\"}" ;;
+    \'*\') path="${path#\'}"; path="${path%\'}" ;;
+  esac
+  printf -- '%s\n%s\n' "$flag" "$path"
+}
+
 # --- Check 0: Deny staging high-risk credential files (Form 1: command-text regex) ---
 if printf '%s' "$CMD" | grep -qE "git[[:space:]]+${GIT_PRE_OPTS}${GIT_STAGE_VERB}([[:space:]]+(--[A-Za-z][-A-Za-z0-9]*[[:space:]]+)*)?.*(${AEGIS_HIGH_RISK_RE})" 2>/dev/null; then
   emit_deny "[secrets] 高リスク認証ファイル (PEM鍵/SSH鍵/credentials.json/service-account.json 等) を git に追加しないでください。鍵が漏洩します。"
@@ -158,13 +192,17 @@ fi
 # prefix as the staging verbs above. Without this, `git --git-dir=.git
 # --work-tree=. commit` and `git -C dir commit` skipped the staged-diff check.
 if printf '%s' "$CMD" | grep -qE "git[[:space:]]+${GIT_PRE_OPTS}commit" 2>/dev/null; then
+  # G2: resolve -C/--git-dir so the staged-diff scan targets the right repo.
+  # Empty when absent → git runs in the hook CWD (current behavior, no regression).
+  GIT_DIR_ARGS=()
+  while IFS= read -r _a; do [ -n "$_a" ] && GIT_DIR_ARGS+=("$_a"); done < <(_aegis_git_dir_args "$CMD")
   # v0.13.0 Phase 0b NO-GO fix: high-risk credential files in staged diff (Form 4).
-  if git diff --cached --name-only 2>/dev/null | grep -E "${AEGIS_HIGH_RISK_STAGED_RE}" | grep -q . 2>/dev/null; then
+  if git ${GIT_DIR_ARGS[@]+"${GIT_DIR_ARGS[@]}"} diff --cached --name-only 2>/dev/null | grep -E "${AEGIS_HIGH_RISK_STAGED_RE}" | grep -q . 2>/dev/null; then
     emit_deny "[secrets] 高リスク認証ファイル (PEM鍵/SSH鍵/credentials.json/service-account.json) がステージングされています。git reset HEAD でファイル名を指定して除外してからコミットしてください。"
     exit 0
   fi
   # Check if any secret .env file is in the staging area (exclude safe variants)
-  if git diff --cached --name-only 2>/dev/null | grep -E '\.env' | grep -vE "${SAFE_ENV_SUFFIXES}$" | grep -q . 2>/dev/null; then
+  if git ${GIT_DIR_ARGS[@]+"${GIT_DIR_ARGS[@]}"} diff --cached --name-only 2>/dev/null | grep -E '\.env' | grep -vE "${SAFE_ENV_SUFFIXES}$" | grep -q . 2>/dev/null; then
     emit_deny "[secrets] .env ファイルがステージングされています。git reset HEAD .env で除外してからコミットしてください。"
     exit 0
   fi

@@ -2,5 +2,5 @@
 
 ```
 verdict: SKIP
-reason: iter41 Batch 1 は framework の混在 L diff（hooks/scripts/bin/templates/profiles/tests・未コミット）で B1 mutation drill が構造的に適用不能（LEARNINGS conf9・confidence9: 変更ハンク数が MAX_MUTANTS=25 を超え、config/JSON/コメントハンクは fixture ベーステストでは捕獲不能＝必ず FAIL）。代替実証＝RED-first TDD: 6 fix すべてで失敗テストを先に書き RED を実測してから実装（D1 profile judge toolchain・D2 task hook wiring/contract・D3 upgrade overwrite・D4 broken-settings warning・I1 post-status-audit fail-closed・I2 completion-evidence fail-closed）。各テストは fix が無い状態（=mutant 相当）で確かに赤化することを確認済み。full suite 1053 passed/1 skip・contract full PASS・standard install で --profile=standard PASS を実機確認。詳細: docs/qa-reports/iter41-qa.md。
+reason: iter42 G1-G3 は framework の混在 diff（hooks/lib/patterns.sh＋3 guard hooks＋tests）で B1 mutation drill が構造的に適用不能（LEARNINGS conf9: 変更ハンクに config/regex/コメント/リファクタ塊が混在しハンク数も多い＝coverage floor を fixture テストで満たせず必ず FAIL）。代替実証＝RED-first TDD: G1（破壊パターン不在で test_check_destructive_coverage が赤→追加で緑）・G3（AEGIS_DEPLOY_REGEX 不在＋cron が chmod -R 取りこぼしで test_gate_pattern_single_source が赤→single-source で緑）・G2（git -C で staged .env 取りこぼしで test_check_secrets_git_dir が赤→抽出で緑）すべて fix 無し状態（=mutant 相当）の赤化を実測。grill-code 由来の Major（2>/etc 誤検知）/Low（quoted -C）も test 追加で赤→修正で緑を確認。full suite 1067 passed/1 skip・contract full PASS・bash -n 全 hook。詳細: docs/qa-reports/iter42-qa.md。
 ```
