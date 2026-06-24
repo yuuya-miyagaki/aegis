@@ -139,6 +139,27 @@ if is_control_file "$TARGET_FILE"; then
   exit 0
 fi
 
+# --- ROOT-external absolute targets: not this project's code (C5, iter44) ---
+# Control files / templates / docs are handled above. The Client-mode lock and
+# the plan gate below both exist to stop edits to THIS project's code; a clearly
+# ROOT-external absolute path (e.g. global auto-memory at ~/.claude/.../memory/)
+# is not project code, so neither applies — short-circuit to allow. This is
+# intentional for both gates: auto-memory is mode-independent. Relative targets
+# stay gated (cwd unknown; Edit/Write always supply absolute paths anyway).
+# Fail-safe: if $ROOT_REAL were ever empty its pattern collapses to /*, which
+# matches every absolute path into the first (keep-gating) arm — i.e. it errs
+# toward gating, never toward allowing.
+case "$TARGET_FILE" in
+  # The literal '/' after $ROOT is load-bearing: it anchors the boundary so a
+  # sibling like /path/aegis-backup does NOT match ROOT /path/aegis (no false
+  # "internal"); only true children /path/aegis/... do.
+  "$ROOT"/*|"$ROOT_REAL"/*) ;;   # inside the project root → keep gating
+  /*)
+    emit_allow
+    exit 0
+    ;;
+esac
+
 # Extract mode and plan gate from STATUS.md frontmatter.
 MODE=$(frontmatter_value "$STATUS_FILE" "mode")
 PLAN_GATE=$(gate_value "$STATUS_FILE" "plan")

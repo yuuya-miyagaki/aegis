@@ -1,6 +1,9 @@
 # テスト強度ドリル結果（機械ブロック・ハーネス生成）
 
 ```
-verdict: SKIP
-reason: iter43 I3 は framework の混在 diff（新規 snapshot.sh/update-task.sh＋post-status-audit/session-start/update-gate のリファクタ＋contract REQUIRED リスト＋CLAUDE.md/state-machine/skills のドキュメント＋test 群）で、B1 自動ドリルの coverage floor（全変更ハンクに mutant 必須）が構造的に満たせない（プレビューで 14 ハンクが no-mutant ブロック＝docs プロセ・コメント・inline→helper リファクタ・REQUIRED リスト追加には behavior-catching mutant が置けない＝LEARNINGS conf9 と同 class）。代替実証は2層: (1) RED-first TDD を全挙動変更で実施（snapshot helper・update-task.sh・task tamper 検知・cp_apply 移動の各テストを fix 前 RED→fix 後 GREEN で確認）。(2) 手動 mutation を core ロジックに適用し検知を実測: ①post-status-audit.sh:191 の tamper 比較 != →= で test_post_status_audit_task_tamper が2件 RED（解錠検知の反転をテストが捕捉）。②update-task.sh:156 の cp_apply トリガ != →= で test_type_change_to_nonframework_locks_moat が RED（task_type 変更時の moat 再施錠脱落をテストが捕捉）。両 mutant とも revert 済・suite 緑復帰を確認。full suite 1097 passed/1 skip（record green）・contract full PASS・status_doctor PASS・context budget PASS・bash -n 全 hook/script・git mode-flip なし。詳細: docs/qa-reports/iter43-qa.md。
+verdict: PASS
+mutants_total: 2
+mutants_caught: 2
+baseline: green
+survived: []
 ```
