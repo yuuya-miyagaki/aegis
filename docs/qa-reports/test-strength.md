@@ -1,9 +1,6 @@
 # テスト強度ドリル結果（機械ブロック・ハーネス生成）
 
 ```
-verdict: PASS
-mutants_total: 4
-mutants_caught: 4
-baseline: green
-survived: []
+verdict: SKIP
+reason: docs-only iteration: 変更は docs/security-followups.md（canonical 脅威モデル節＋SF-007/008）・full-review backlog 行・docs/LEARNINGS.md のみで、テスト対象 production code・mutant を置く追加実行行が無い。回帰は full pytest suite（1120 passed / 1 skipped）で確認し record-test-result.py で記録済（tests=green）。
 ```

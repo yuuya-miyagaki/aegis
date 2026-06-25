@@ -58,7 +58,7 @@ interpreter コードで無限に回避でき、これは受容済み」）に�
   Fix: `patterns.sh` を single source 化して全 gate で import。
 
 - **G4 / M5：秘密スキャンが Bash の git commit のみ** — Write/Edit の `.env` 直接生成、`curl -d @.env` 外部送信が無防備。一部 by-design（`check-secrets.sh:9-13`）。
-  Fix: 漏洩主経路（exfil）のリスク受容を再評価。Edit/Write matcher にファイル名ベース ask を検討。
+  Fix: 漏洩主経路（exfil）のリスク受容を再評価。Edit/Write matcher にファイル名ベース ask を検討。→ **iteration 46 で再評価: by-design（accepted）。secret ゲートはファイル名・commit-stage 限定が意図（D2）。Write/Edit .env はローカル生成が正常で commit が既存 chokepoint。exfil は経路無限で regex 防御不能＝モデル外（false-assurance 回避）。`.gitignore nudge` は ROI 低で YAGNI。`docs/security-followups.md` SF-008 へクローズ。**
 
 ### 🟢 訂正・構造的留意・小
 
@@ -66,7 +66,7 @@ interpreter コードで無限に回避でき、これは受容済み」）に�
   Fix: `PLATFORM_VERIFIED` 再検証時に「write 可能な全 tool を列挙 → matcher と突合」を必須項目化。
 - **C2**: `bin/setup.sh:46` は `--profile=*` のみ受理。`CLAUDE.md:17` は散文で `--profile`。空白形式が「Unknown argument」で即死。
 - **C3**: `bin/setup.sh:100-111` の FRAMEWORK_VERSION heredoc は `<<'PY'` 内で `$FRAMEWORK_ROOT` 非展開→必ず FileNotFoundError→"unknown"。grep フォールバック頼みの dead 第一経路。
-- **C4**: gate 値パーサの bash/python 分岐（`hooks/lib/frontmatter.sh:69-73` vs `scripts/check_status.py:283`）。行コメント付き値で別結果。strict allowlist（`pending|approved|blocked|n/a`）へ統一。
+- **C4**: gate 値パーサの bash/python 分岐（`hooks/lib/frontmatter.sh:69-73` vs `scripts/check_status.py:283`）。行コメント付き値で別結果。strict allowlist（`pending|approved|blocked|n/a`）へ統一。→ **iteration 46 で再評価: NOT-A-VULN と実証（両消費側は clean トークンでのみ allow・bypass-direction 0 行）。strict 化は tamper backstop を弱める逆効果のため不採用＝据え置き。`docs/security-followups.md` SF-007 へクローズ。**
 - **C5（本レビュー中に実証）**: `hooks/check-gate.sh:153` がプロジェクト root の外の Edit/Write 対象にも plan-gate を適用する。2026-06-24 本レビュー中、グローバル auto-memory ファイル（`~/.claude/projects/.../memory/*.md`＝ROOT 外）への Edit が `[gate] Plan gate is pending` で deny された。`:80-140` の docs/ allowlist と control-file 判定はいずれも ROOT 基準なので、ROOT 外の任意パスは素通りして plan-gate 判定に落ち、Dev×plan=pending で false-positive deny になる（プロジェクトの plan gate は外部ファイルと無関係）。Fix: ROOT 外（および明確に project 外）の対象は plan-gate 前に allow へ short-circuit するか、plan-gate 判定を ROOT 内対象に限定する。クロスカッティングなツール（auto-memory 等）との摩擦点。
 
 ## root cause（2 本）
@@ -78,7 +78,7 @@ interpreter コードで無限に回避でき、これは受容済み」）に�
 
 - **Batch 1（全部小さく低リスク・高確度）**: D1, D2, D3, D4, I1, I2。→ 推奨 profile が動く＋upgrade がコードを更新する＋整合性 hook が fail-closed。
 - **Batch 2**: I3（task_type/size の tamper-evidence・I1 が前提）, G1（破壊ガード網羅）, G2, G3。
-- **Backlog**: C1〜C4, G4（リスク再評価）。
+- **Backlog**: ~~C1〜C4, G4~~ → 整理済み（2026-06-25）。**C2/C3** = iteration 45 実装（`bin/setup.sh`）。**C4** = iteration 46 で再評価し **NOT-A-VULN（実証・bypass-direction 0 行・strict 化は tamper backstop 弱体化で逆効果）**＝`docs/security-followups.md` SF-007 へクローズ。**G4** = iteration 46 で **by-design（accepted・exfil はモデル外/futile・commit が既存 chokepoint）**＝同 SF-008 へクローズ。**C1** は MultiEdit 不成立の訂正で platform 解決済み＝残る構造的留意点（`extract-input.sh:20` first-path-only／matcher whitelist）のみ別系統の robustness backlog として残置（本 iteration 対象外）。
 - **やらないこと**: `check-control-plane.sh`（moat 1000 行）の再設計。今回の指摘はどれもそこを触らず閉じられる。
 
 ## 検証メモ

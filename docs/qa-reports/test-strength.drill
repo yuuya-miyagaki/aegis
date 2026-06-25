@@ -1,18 +1,1 @@
-{
-  "test_command": "python3 -m pytest tests/test_setup_arg_version.py -q",
-  "timeout_seconds": 120,
-  "mutants": [
-    {"file": "bin/setup.sh", "line": 54,
-     "original": "      [ $# -ge 2 ] || { echo \"ERROR: --profile requires a value\" >&2; exit 1; }",
-     "mutated": "      [ $# -ge 1 ] || { echo \"ERROR: --profile requires a value\" >&2; exit 1; }"},
-    {"file": "bin/setup.sh", "line": 63,
-     "original": "      echo \"       (--profile/--target also accept the space form: --profile full)\"",
-     "mutated": "      echo \"       MUTANT\""},
-    {"file": "bin/setup.sh", "line": 67,
-     "original": "      echo \"ERROR: Unknown argument: $1\" >&2",
-     "mutated": "      echo \"ERROR: MUTANT: $1\" >&2"},
-    {"file": "bin/setup.sh", "line": 118,
-     "original": "src = pathlib.Path(sys.argv[1]).read_text()",
-     "mutated": "src = pathlib.Path(\"/dev/null\").read_text()"}
-  ]
-}
+{"skip": true, "reason": "docs-only iteration: 変更は docs/security-followups.md（canonical 脅威モデル節＋SF-007/008）・full-review backlog 行・docs/LEARNINGS.md のみで、テスト対象 production code・mutant を置く追加実行行が無い。回帰は full pytest suite（1120 passed / 1 skipped）で確認し record-test-result.py で記録済（tests=green）。"}

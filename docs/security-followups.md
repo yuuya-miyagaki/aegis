@@ -4,6 +4,46 @@
 > per-iteration の qa-reports と違い、解決まで root に残す。解決したら「状態」を
 > CLOSED にし、対応コミット/ゲートを記す。
 
+## 脅威モデル（canonical）
+
+> Aegis のセキュリティ層が**何を守り／何を守らないか**の単一正典。各 SF エントリ・
+> README §95・`docs/architecture-overview.md` はこの節を参照する（重複記述は本節に集約）。
+
+**対象とする脅威 = LLM の自己バイパス（self-bypass）**。善意だが過誤を犯しうる/
+ミスリードされうるコーディングエージェントが、**自身に課されたフレームワーク規律を
+事故的に（または手近な手段で）回り込む**こと。**決定論的に守る**のは path/gate サーフェス
+（下記の Edit/Write・gate・commit-stage）で、**Bash の任意コマンド経路は「敷居を上げる層」**
+（静的解析の原理的限界＝SF-004／決定論ではない）と切り分ける（README §95 と同じ区別）:
+
+- **gate の改竄検知（tamper-evident）**: 人間承認ゲート（review/qa/security/deploy 等）の値は
+  authorized writer（`scripts/update-gate.sh`）以外が書き換えると `.gate-snapshot` 比較で検知・
+  block する。`task_type`/`task_size` も同様（iter43・`update-task.sh`）。**tamper-evidence で
+  あって偽造不能の証明ではない**（chmod 権を持つ敵対者・cross-session re-bless は下記「守らない」／SF-006 較正）。
+- **control-plane path の保護（Edit/Write は決定論的・Bash command は閾値）**: フック・スクリプト・
+  `CLAUDE.md`・`.claude/rules`・skills・templates への **Edit/Write は path 一致で決定論的に deny**
+  （非 framework タスク中）。同パスへの **Bash 経由の書込みは layer-1 静的解析（敷居上げ・SF-004
+  原理的限界）＋layer-2 OS lock（事故軽減・敵対者は `os.chmod` で解錠可）**の多層で、決定論ではない。
+- **事故的な secret commit の阻止**: 認証**ファイル名**（`.env`/PEM/SSH 鍵/
+  credentials*.json 等）の git ステージ/コミットを block（最も高頻度な AI 事故）。
+- **完了 evidence の強制**: ゲート承認・完了主張に artifact/evidence を要求（fail-closed）。
+
+**対象としない（境界・意図的）**:
+
+- **sandbox ではない**: 任意シェルの静的コマンド解析には原理的限界がある（SF-004 実証済）。
+  Bash moat は「**敷居を上げる層（threshold-raising layer）**」であって sandbox ではない。
+- **exfil 耐性ではない**: 秘密の**外部送信**（`curl -d @.env`・base64-in-commit-msg・DNS・
+  PR 本文 等）は経路が無限でコマンド regex では原理的に塞げない。これを防ぐとは主張しない
+  （false-assurance 回避）。秘密保護の chokepoint は「**commit/stage の阻止**」であって
+  「送信の阻止」ではない。
+- **content スキャナではない**: 秘密**値**が任意名ファイルに書かれる形（D2・SF-008）は
+  ファイル名ゲートの対象外。
+- **filesystem/chmod 権を持つ敵対者を守らない**: ディスクに直接書ける相手はフック自体を
+  無効化でき（`os.chmod` で OS lock 解錠 等、SF-001/004）、静的 moat の範囲外。
+
+要するに **Aegis は「規律の事故的回避」を決定論的に防ぐ guardrail であって、敵対的
+エージェント/侵入者に対する sandbox や DLP ではない**。「限界は実証してから主張する」
+方針を貫く（SF-002 の glob 再分類・SF-004 の原理的限界実証・SF-007 の bypass 不能実証が先例）。
+
 ## OPEN
 
 ### SF-001: control-plane フックのクォート/エスケープ トークン分割バイパス（Critical・pre-existing）
@@ -189,6 +229,40 @@ SF-001 系の網羅的閉鎖（rounds 5-11）で**実用的なシェル難読化
 - **実装時の必須設計（no-go 回避）**: lock 対象は**安定 CP（hooks/*.sh・scripts/*.py・CLAUDE.md・.claude/rules・.claude/skills・templates）に限定**し、framework が実行時に書く runtime-state（`docs/STATUS.md`・`.claude/.gate-snapshot`・`evidence-log`・settings）は**除外**（さもないと framework 自身が壊れる）。re-lock は default-lock＋積極再施錠で crash 窓を縮小。
 - **結論: GO**。iteration 35 で 案A を実装し、成立すれば `check-control-plane.sh`〜1000行＋SF-001〜005 を層1 ごと退役。設計: `docs/specs/2026-06-21-immutable-moat-design.md`。
 - 案A は iteration 35 で layer-2（事故ケース多層保険）として実装。敵対 sandbox ではない旨を明記。
+
+## 調査済み・非該当（NOT-A-VULN / by-design）
+
+> 「セキュリティ課題か？」と提起され調査した結果、**脅威モデル内では脆弱性ではない**
+> （NOT-A-VULN）か、**意図的な境界**（by-design）と判明した項目。CLOSED（実在した課題を
+> 修正したもの）とは区別する。再調査の重複を防ぐため verdict と根拠を durable に残す。
+
+### SF-007: gate 値パーサの bash/python 乖離（**NOT-A-VULN・実証済み**）
+
+- **発見**: full-review 2026-06-24 の C4（`docs/full-review-2026-06-24-hooks-gates-distribution.md:69`）。gate 値を bash（`hooks/lib/frontmatter.sh` の `gate_value`＝permissive）と python（`scripts/check_status.py` の `extract_approval_map`＝strict allowlist）が別ロジックで parse し、行コメント付き値等で結果が割れる、という指摘。iteration 46 で再評価。
+- **種別**: **not-a-vulnerability（実証）**。脅威モデル（self-bypass）内で gate bypass に到達する乖離が存在しないことを実測で確認。
+- **重大度**: なし（脆弱性ではない）。
+- **verdict（実証）**: bypass には「bash=approved/n-a ∧ python≠approved」な**到達可能**な STATUS 行が要る。だが —
+  - **消費側はどちらも fail-safe**: `hooks/check-gate.sh` の plan-gate は `[ "$PLAN_GATE" = "approved" ]`/`"n/a"` の **exact-match** でしか allow せず、python は `approvals.get(key, "pending")`＝strict 正規表現に外れた値は不在→`"pending"`（not approved）。**両者が clean トークンで一致しない限り allow にならない**。
+  - **混入経路が無い**: in-session の gate 値変更は `update-gate.sh`（clean enum のみ）か raw Edit（`post-status-audit.sh` が**任意**の値変化を tamper block）に限られ、divergent な値を STATUS＋snapshot 両方へ入れる clean 経路が存在しない。ディスク直編集は filesystem 権を持つ敵対者＝**脅威モデル外**（canonical 節）。
+- **最小再構築キット**（第三者が 5 分で検証可能）:
+  - 両パーサ: `gate_value`（`frontmatter.sh`）と `extract_approval_map`（`check_status.py:267-`）。
+  - bypass 定義: bash の `gate_value` は値を**そのまま返す**（末尾空白等も保持・surrounding double-quote のみ除去）。clean トークン以外を拒否するのは**消費側**＝`check-gate.sh:174` の exact-match `[ "$PLAN_GATE" != "approved" ]` と python の `approvals.get(key, "pending")`。bypass には「**両者が同一の clean トークンで一致**」が必要で、weird 値はどちらかが必ず not-approved 方向に倒れる。
+  - 検証手順: 各形を `  plan: <値>` の gate_approvals 行にした STATUS fixture を作り、`gate_value`（bash）と `extract_approval_map`（python）＋PyYAML に通して値を突き合わせる。
+  - 試した 12 形の代表: `approved` / ` approved` / `approved `(末尾空白) / `approved x` / `approvedx` / `"approved"` / `'approved'` / `""approved""` / `approved#c` / `n/a` / `approved\t` / `  approved`。**bash が `approved` を返しつつ python が `approved` を返さない行は 0**。残る乖離は全て「片方が stricter＝fail-safe」方向。`""approved""`/`approved\t` は `check_status.py:865` の PyYAML cross-check でも別途検出される。一方 `"approved"`/`'approved'`（quoted）は cross-check では**検出されない**（PyYAML と strict 正規表現が一致するため）が、bash 消費側の exact-match で fail-safe（`'approved'` ≠ `approved` → not approved）かつ authorized writer は clean enum しか書かず raw Edit は tamper block＝**in-session 到達不能**。よって cross-check の死角は穴ではない（safety net は cross-check ではなく consumer の exact-match と writer/tamper 不到達）。
+  - **strict 化は逆効果（C4 提案＝python の正規化に倣う場合）**: `gate_value` を「trim 後 allowlist で正規化」する python ミラー実装にすると、`post-status-audit.sh:129-130` が同関数で OLD/NEW を比較するため `approved`↔`approved `(末尾空白) を同一視し tamper を**取りこぼす**＝backstop 弱体化の net-negative。permissive のまま据え置くのが正しい（仮に「exact-match 以外は空文字」で strict 化すれば検知は維持されるが、整合の利得が無いまま分岐が増えるだけ＝やはり不要）。
+- **状態**: **調査クローズ（NOT-A-VULN・コード変更なし）**。`docs/LEARNINGS.md`[tech] に二重記録。乖離を見たら「security」ではなく「同一概念の二言語実装＝maintainability」と切り分ける。
+
+### SF-008: secret ゲートの scope（ファイル名・commit-stage 限定／**by-design**・accepted）
+
+- **発見**: full-review 2026-06-24 の G4/M5（`docs/full-review-2026-06-24-hooks-gates-distribution.md:60`）。秘密スキャンが Bash の git add/commit のみで、Write/Edit の `.env` 直接生成・`curl -d @.env` 外部送信が無防備、という指摘。iteration 46 で再評価。
+- **種別**: **by-design boundary（accepted）**。脅威モデル（canonical 節）に照らし、追加防御は不要かつ一部は原理的に不可能（exfil）と判断。
+- **重大度**: Low（脅威モデル内の実害到達は限定的）。
+- **判断**:
+  - **`check-secrets.sh` は意図的に「認証ファイル名」ゲート**（D2 scope・`hooks/check-secrets.sh:9-13`）。content スキャナではない（秘密**値**が任意名ファイルに入る形は対象外＝canonical の「非 content スキャナ」）。
+  - **Write/Edit の .env 直接生成は by-design で許容**: ローカルに `.env` を作ること自体は正常・必要（アプリ開発）。漏洩の chokepoint は **commit/stage** で、そこは既に `git add .env`/`git add .`/`git add -A` で block 済み（`check-secrets.sh:122-181`）。Write/Edit に block を足しても commit gate の重複で、正常操作に摩擦を増やすだけ。
+  - **`curl -d @.env` 外部送信は防御対象としない**: exfil は経路が無限（commit メッセージへ base64・DNS・PR 本文・別名ファイル経由…）でコマンド regex では原理的に塞げず、block しても false-assurance になる。canonical 節の「非 exfil 耐性」境界そのもの。SF-004（interpreter コード）と同クラスの原理的限界。
+- **早期警告の現状（誤解防止）**: **Bash 経由の `.env` 生成**（`> .env`・`cp … .env`）には `.gitignore` 保護が無ければ advisory ask する nudge が**既にある**（`check-secrets.sh:241-258`・Check 3）。未カバーは **Write/Edit ツール経由の `.env` 生成のみ**（check-secrets は Bash の PreToolUse hook なので Write/Edit には発火しない）。だがそれも commit gate（Check 2・`:189-208`／broad-stage `:127-186`）が漏洩を塞ぐため、Write/Edit 用の新 nudge は ROI 低＝今回は実装しない（YAGNI）。将来 UX 改善として検討可。なお **Check 3 は `emit_ask` の advisory であって block ではなく**、コマンドテキスト照合ゆえ難読化リダイレクト（`> "$(echo .env)"` 等）には SF-001/004 と同じ静的限界がある。**拘束力ある保証は commit/stage の block**（Check 0-2・broad-stage）＝事故的 .env commit はそこで確実に止まる。
+- **状態**: **調査クローズ（by-design・accepted residual・コード変更なし）**。
 
 ## CLOSED
 
