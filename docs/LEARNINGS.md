@@ -14,6 +14,8 @@
 - [confidence:8] 副作用を伴う再適用（`aegis_cp_apply` の moat 施錠）は tamper チェックの**後**に置く。冒頭に置くと改竄編集（`task_type:locked→framework`）が検知前に解錠を発火させ、block が無意味になる。ただし no-baseline 経路（snapshot 不在の first-edit）は tamper 不能なので副作用も安全＝「clean 経路＋first-edit でのみ発火する helper」に切り出すと両立する（iter43 で `_aegis_relock_from_status` に抽出）。
 - [confidence:7] authorized writer（update-task.sh）は frontmatter 行の **replace だけでなく insert（行欠落時）** も実装する。STATUS テンプレは task_size 行を持たない（任意フィールド）ため、replace-only だと新規プロジェクト初回の size 設定が silent no-op になる（grill-code Critical で発見）。schema 必須フィールド（task_type）欠落時は黙らず明示エラー。
 - [confidence:8] check-gate の plan-gate / Client-mode deny は「project の code を編集させない」ゲート。ROOT 外の絶対パス（global auto-memory `~/.claude/.../memory/`）は project code でないので両ゲットの対象外にする＝control-file/templates/docs 判定の**後**・mode/plan 判定の**前**に「`$ROOT/*`・`$ROOT_REAL/*` 以外の絶対パス→emit_allow」short-circuit を置く。`/` anchor が sibling（`/p/aegis-backup` vs ROOT `/p/aegis`）誤判定を防ぐ。相対は防御的に gate 維持（Edit/Write は常に絶対）。empty-`$ROOT_REAL` は `/*` に縮退し keep-gating 側＝fail-safe。`is_control_file` は短絡より前に走り、外部絶対は control パターンに構造的に非マッチなので穴は開かない（iter44 C5）。
+- [confidence:7] クォート heredoc（`<<'PY'`）の body 内で `$VAR` を参照すると非展開で dead first path になる（python が常に FileNotFoundError→フォールバック頼み）。値は **argv 経由**で渡す（`python3 - "$VAR" <<'PY'` → `sys.argv[1]`）と、body 非展開のまま（injection 安全＝値は data として渡りコードとして評価されない）実値が届く。grep フォールバックは defense-in-depth として残すが、主経路が実際に機能することを実証するテストを別途置く（iter45 C3）。
+- [confidence:7] 2 経路の分岐で「正しい方が勝つ」ことを示す positive-control は、green 状態では負け経路が実行されないため fixture がドリフトすると静かに牙を失う（false-green）。RED-first だけでなく**負け経路を単独実行して誤値を返すことを直接 assert** すると、discriminator が live であることを steady-state CI でも証明できる（盲検 reviewer-testing F1 指摘で追加）。さらに RED の理由を「値の相違」に固定するため、両経路とも rc 0 を保つ仕掛け（grep を空振り=rc1 でなく greedy で誤値に倒す）にして abort と value-miss を分離する（iter45 C3）。
 
 ## プロセス
 
@@ -28,6 +30,9 @@
 - [confidence:7] qa は `SECOND_OPINION_GATES`（review/security のみ）に**含まれない**。`current_refs.qa` を **claims ブロック付き QA レポート**（iter44-qa.md 等）に向ければ「claims 未提出🟡」を避け 🟢 にできる。test-strength.md は drill が再生成するため claims を置けない＝別ファイルにする。b1 verdict は collect_facts が test-strength.md から読むので drill は別途実走で問題ない。
 - [confidence:7] `task_size=M` は `SIZE_ALLOWED_PHASES["M"]` に deploy phase を含まない＝deploy ゲートは pending のまま size routing で要件から**自動除外**（n/a 化は不要・そもそも deploy は na 不可）。security→ship が M の隣接遷移で、必須は review+qa+security のみ。緩和系の小変更は「前回 L だから L」ではなく M に右サイジングしてよい（security ゲートは外さない）。
 - [confidence:7] 「限界主張は実証せよ」の運用例: 盲検 security が pre/post 実行トレースで設計の「no new exposure」を反証（case-variant control-file への絶対パスは PRE=plan-gate の偶発 backstop で deny→POST=short-circuit で allow＝incidental backstop の喪失）。安全主張は「新規穴ではない」と書く前にトレースで確認し、外れたら「incidental backstop を除去・Low・自己誘発のみ受容」へ正直に訂正する（iter44）。
+- [confidence:7] line 26 の精密化: 焦点変更でも「純コメントのみのハンク」は behavior-catching mutant を置けず coverage floor を不成立にする唯一の要因になりがち。**冗長なコメントハンクを除去**（隣接コード直近の説明に集約）すれば全ハンクが behavioral/text-coverable になり本物の drill PASS に倒せる。echo メッセージ等の text 変更は「メッセージ文字列を assert するテスト」で捕捉可＝mutant 可能（純コメントのみが不可）。skip に逃げる前に diff を coverable な形へ整形する手がある（iter45 は 4 mutant＝guard 反転/argv 潰し/2 echo text で DRILL PASS）。
+- [confidence:7] レビュー指摘が「検証不能/版依存」（例: 盲検 maintainability の『bash 4+ では `shift N>$#` が 0 を返す』＝手元 bash 3.2 では非0・man は版横断で非0 と記載で真偽未確定）なときは、主張の真偽を論争せず **依存自体を外す修正**を採る。`shift 2 || {…}` の終了コード依存を `[ $# -ge 2 ]` の明示 arg-count guard に置換＝どの bash 版でもメッセージ決定的。receiving-code-review の「盲従でも却下でもなく技術判断」の具体例（iter45 C2）。
+- [confidence:6] full suite 実走中に suite 内テストが観測 hook を叩いて real evidence-log へ spurious な observed test-runner エントリ（`vitest run` status:fail・marker_verified:false）を書きうる。read_test_result は **newest matching** で判定するため、`record-test-result.py`（suite 完走の**後**に manual エントリを append）が時刻的に最後＝勝つ。authoritative な記録は必ず suite 実走の後に置く（iter45 で実観測）。
 
 ## コミュニケーション
 

@@ -1,12 +1,18 @@
 {
-  "test_command": "python3 -m pytest tests/test_check_gate_root_external.py -q",
+  "test_command": "python3 -m pytest tests/test_setup_arg_version.py -q",
   "timeout_seconds": 120,
   "mutants": [
-    {"file": "hooks/check-gate.sh", "line": 156,
-     "original": "  \"$ROOT\"/*|\"$ROOT_REAL\"/*) ;;   # inside the project root → keep gating",
-     "mutated": "  \"$ROOT\"/nomatch/*|\"$ROOT_REAL\"/nomatch/*) ;;   # inside the project root → keep gating"},
-    {"file": "hooks/check-gate.sh", "line": 158,
-     "original": "    emit_allow",
-     "mutated": "    emit_deny mutant"}
+    {"file": "bin/setup.sh", "line": 54,
+     "original": "      [ $# -ge 2 ] || { echo \"ERROR: --profile requires a value\" >&2; exit 1; }",
+     "mutated": "      [ $# -ge 1 ] || { echo \"ERROR: --profile requires a value\" >&2; exit 1; }"},
+    {"file": "bin/setup.sh", "line": 63,
+     "original": "      echo \"       (--profile/--target also accept the space form: --profile full)\"",
+     "mutated": "      echo \"       MUTANT\""},
+    {"file": "bin/setup.sh", "line": 67,
+     "original": "      echo \"ERROR: Unknown argument: $1\" >&2",
+     "mutated": "      echo \"ERROR: MUTANT: $1\" >&2"},
+    {"file": "bin/setup.sh", "line": 118,
+     "original": "src = pathlib.Path(sys.argv[1]).read_text()",
+     "mutated": "src = pathlib.Path(\"/dev/null\").read_text()"}
   ]
 }

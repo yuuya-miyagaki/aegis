@@ -41,17 +41,30 @@ PROFILE=""
 TARGET="."
 FORCE=false
 
-for arg in "$@"; do
-  case "$arg" in
-    --profile=*) PROFILE="${arg#*=}" ;;
-    --target=*)  TARGET="${arg#*=}" ;;
-    --force)     FORCE=true ;;
+# C2: accept both --flag=val and --flag val forms (CLAUDE.md prose uses the
+# space form). The bare --flag arms consume the next token via an explicit
+# `[ $# -ge 2 ]` guard — NOT shift's exit code, which is not a portable
+# value-presence signal — so the "requires a value" error is deterministic
+# across bash 3.2/4/5. Do not collapse back to =-only — the space arms are
+# intentional, not dead code.
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --profile=*) PROFILE="${1#*=}"; shift ;;
+    --profile)
+      [ $# -ge 2 ] || { echo "ERROR: --profile requires a value" >&2; exit 1; }
+      PROFILE="$2"; shift 2 ;;
+    --target=*)  TARGET="${1#*=}"; shift ;;
+    --target)
+      [ $# -ge 2 ] || { echo "ERROR: --target requires a value" >&2; exit 1; }
+      TARGET="$2"; shift 2 ;;
+    --force)     FORCE=true; shift ;;
     -h|--help)
       echo "Usage: bin/setup.sh --profile=minimal|standard|full --target=<dir> [--force]"
+      echo "       (--profile/--target also accept the space form: --profile full)"
       exit 0
       ;;
     *)
-      echo "ERROR: Unknown argument: $arg" >&2
+      echo "ERROR: Unknown argument: $1" >&2
       exit 1
       ;;
   esac
@@ -97,15 +110,16 @@ fi
 # K-11 (v1.6.2): framework_version stamp source.
 # Read FRAMEWORK_VERSION from scripts/check_framework_contract.py (single
 # source of truth — also referenced by status_doctor.py / drift checker).
-FRAMEWORK_VERSION="$(python3 - <<'PY' 2>/dev/null || echo unknown
-import re, pathlib
-src = pathlib.Path("$FRAMEWORK_ROOT/scripts/check_framework_contract.py").read_text()
+# C3: pass the path via argv so the quoted heredoc (injection-safe — body is not
+# shell-expanded) still receives the real $FRAMEWORK_ROOT. This is the primary
+# resolver; the grep below is a fallback, not the only working path.
+FRAMEWORK_VERSION="$(python3 - "$FRAMEWORK_ROOT/scripts/check_framework_contract.py" <<'PY' 2>/dev/null || echo unknown
+import re, pathlib, sys
+src = pathlib.Path(sys.argv[1]).read_text()
 m = re.search(r'FRAMEWORK_VERSION\s*=\s*"([^"]+)"', src)
 print(m.group(1) if m else "unknown")
 PY
 )"
-# Python heredoc cannot interpolate the $FRAMEWORK_ROOT — fall back to a
-# bash-level grep when the heredoc returns "unknown".
 if [[ "$FRAMEWORK_VERSION" == "unknown" ]] || [[ -z "$FRAMEWORK_VERSION" ]]; then
   FRAMEWORK_VERSION="$(grep -E '^FRAMEWORK_VERSION\s*=' "$FRAMEWORK_ROOT/scripts/check_framework_contract.py" | sed -E 's/.*"([^"]+)".*/\1/' | head -1)"
 fi
