@@ -194,10 +194,10 @@
 - **根本原因（RC-1）**: STATUS.md がセキュリティ制御面（task_type/task_size/mode/gates）と自由編集ドキュメントを兼ねる。間に立つ `post-status-audit` が (i) task_type/task_size を監査せず、(ii) 自身 fail-open。gate-advancement は tamper-evident にしたのに、gate 要件と moat を制御する switch は無監査＝強い性質に側道。
 - **較正（重要・過大評価を避ける）**: I3 は**新規の敵対的 moat 破綻ではない**。事故では task_type を書き換えない（moat の事故防止目的は無傷）。敵対経路としては SF-004 の os.chmod 解錠と同クラスで**受容済み**。正当な残課題は「tamper-evidence の網羅性/非対称」であって「フル moat 崩壊」ではない。
 - **修正方針（暫定・非確定）**: I1＝post-status-audit に safety fallback を足し gate/mode/task_type tamper 検知を fail-closed 化（python3 依存の phase-transition 検査部のみ advisory 維持）。I2＝STATUS 不在/None-frontmatter を violation 化。I3＝task_type/task_size を tamper 検知対象に追加（authorized-path 経由のみ変更可）。I1 が I3 の前提（fail-open のままでは I3 監査もスキップされる）。**check-control-plane の再設計は不要。**
-- **状態**: **PARTIALLY ADDRESSED（iteration 41 Batch 1 で I1/I2 対処済・I3 は OPEN）**。
+- **状態**: **ADDRESSED（I1/I2=iteration 41 Batch 1・I3=iteration 43）**。
   - **I1（fail-open）= 対処済**: `hooks/post-status-audit.sh` に PostToolUse 用 fail-closed fallback（`AEGIS_SAFETY_FALLBACK_POSTTOOL_BEGIN/END`）＋`safety.sh` の `aegis_require_lib_block` を追加。lib source 失敗で `{"decision":"block"}` を emit＝gate/mode tamper 検知（bash のみ）が lib 欠落で skip されない。phase-transition の python3 依存部は現挙動維持（最小変更）。テスト: `tests/test_post_status_audit_fail_closed.py`。
   - **I2（完了evidence fail-open）= 対処済**: `scripts/check_status.py` の `--check-completion-evidence` で STATUS 不在 / frontmatter None を violation（exit 1）化＝`validate_status_file` と対称。テスト: `tests/test_completion_evidence_fail_closed.py`。
-  - **I3（task_type/task_size 無監査）= OPEN（Batch 2）**: post-status-audit に task_type/task_size の tamper 検知を追加する。I1（fail-closed 化）が前提＝達成済なので Batch 2 で着手可能。
+  - **I3（task_type/task_size 無監査）= 対処済（iteration 43・commit `93fc166`）**: `scripts/update-task.sh`（task_type/task_size の authorized writer）＋`hooks/post-status-audit.sh` の task tamper 検知ループ（gate と同型・snapshot 取り込み）で tamper-evidence 化。`aegis_cp_apply` の moat 再施錠を tamper チェック後へ移動し、改竄編集が moat を解錠する前に block。テスト: `tests/test_update_task.py` ほか。
   - 関連配布修正（同 iteration・SF ではないが文脈）: standard profile が judge builder / Task 完了強制 hook を欠いていた（gate 承認不能・completion 強制不発）＝D1/D2 で是正。再 install で framework 所有ファイルが `.bak` つきで上書きされるよう変更（D3）＝security 修正が既存ユーザーに届く。
 
 ---
@@ -230,10 +230,11 @@ SF-001 系の網羅的閉鎖（rounds 5-11）で**実用的なシェル難読化
 - **結論: GO**。iteration 35 で 案A を実装し、成立すれば `check-control-plane.sh`〜1000行＋SF-001〜005 を層1 ごと退役。設計: `docs/specs/2026-06-21-immutable-moat-design.md`。
 - 案A は iteration 35 で layer-2（事故ケース多層保険）として実装。敵対 sandbox ではない旨を明記。
 
-## 調査済み・非該当（NOT-A-VULN / by-design）
+## 調査済み・非該当（NOT-A-VULN / by-design / forward-looking）
 
 > 「セキュリティ課題か？」と提起され調査した結果、**脅威モデル内では脆弱性ではない**
-> （NOT-A-VULN）か、**意図的な境界**（by-design）と判明した項目。CLOSED（実在した課題を
+> （NOT-A-VULN）・**意図的な境界**（by-design）・**現状到達不能で将来トリガ時のみ再評価**
+> （forward-looking / accepted residual）のいずれかと判明した項目。CLOSED（実在した課題を
 > 修正したもの）とは区別する。再調査の重複を防ぐため verdict と根拠を durable に残す。
 
 ### SF-007: gate 値パーサの bash/python 乖離（**NOT-A-VULN・実証済み**）
@@ -263,6 +264,25 @@ SF-001 系の網羅的閉鎖（rounds 5-11）で**実用的なシェル難読化
   - **`curl -d @.env` 外部送信は防御対象としない**: exfil は経路が無限（commit メッセージへ base64・DNS・PR 本文・別名ファイル経由…）でコマンド regex では原理的に塞げず、block しても false-assurance になる。canonical 節の「非 exfil 耐性」境界そのもの。SF-004（interpreter コード）と同クラスの原理的限界。
 - **早期警告の現状（誤解防止）**: **Bash 経由の `.env` 生成**（`> .env`・`cp … .env`）には `.gitignore` 保護が無ければ advisory ask する nudge が**既にある**（`check-secrets.sh:241-258`・Check 3）。未カバーは **Write/Edit ツール経由の `.env` 生成のみ**（check-secrets は Bash の PreToolUse hook なので Write/Edit には発火しない）。だがそれも commit gate（Check 2・`:189-208`／broad-stage `:127-186`）が漏洩を塞ぐため、Write/Edit 用の新 nudge は ROI 低＝今回は実装しない（YAGNI）。将来 UX 改善として検討可。なお **Check 3 は `emit_ask` の advisory であって block ではなく**、コマンドテキスト照合ゆえ難読化リダイレクト（`> "$(echo .env)"` 等）には SF-001/004 と同じ静的限界がある。**拘束力ある保証は commit/stage の block**（Check 0-2・broad-stage）＝事故的 .env commit はそこで確実に止まる。
 - **状態**: **調査クローズ（by-design・accepted residual・コード変更なし）**。
+
+### SF-009: フック入力抽出の first-path-only ＋ matcher ホワイトリスト（**forward-looking / 現状到達不能**・accepted）
+
+- **発見**: full-review 2026-06-24 の C1（`docs/full-review-2026-06-24-hooks-gates-distribution.md:65`）＝「MultiEdit バイパスは現行 platform で不成立」という訂正 finding の**残留構造的留意点**。iteration 47 で再評価。
+- **種別**: **forward-looking robustness（現状到達不能・accepted residual）**。
+- **重大度**: なし（現行 platform では脅威モデル内に実害経路なし）。
+- **判断**:
+  - **(1) `hooks/lib/extract-input.sh:20` first-path-only**: `extract_file_path` は `grep … | head -1` で最初の `file_path`/`notebook_path` のみ抽出する。だが現行の filesystem-write built-in tool は Edit/Write/NotebookEdit で**各 1 パス/呼び出し**、複数パスを渡した旧 MultiEdit は**廃止済**。複数パス入力が生成されないため取りこぼし経路が**現状存在しない**。duplicate-key JSON（`{"file_path":"safe","file_path":"hooks/x"}`）も LLM の単一スキーマ tool 呼び出しでは生成できず脅威モデル（self-bypass）外。
+  - **(2) matcher のツール名ホワイトリスト**（`scripts/platform_manifest.py` の `KNOWN_TOOL_NAMES`）: 現行 write-tool（Edit/Write/NotebookEdit）は matcher で**全カバー**＝漏れなし。新 write-tool 追加時の取りこぼしは、`stale_keys()`（`PLATFORM_VERIFIED["tool_names"]`・180 日）が再検証を催促する**既存機構**で軽減される（ただし `check_reference_drift.py` 経由の**advisory 警告であって blocking ではない**＝再検証の実施と write-tool 列挙は人手に委ねられる）。full-review の Fix 案＝再検証時に write-tool 列挙、は部分的に機械化済み。
+- **やらない（YAGNI）**: 存在しない複数パス入力への防御コード追加（テスト不能・mutant を置く実行経路なし）／matcher の動的列挙（`stale_keys` と重複）。
+- **状態**: **調査クローズ（forward-looking・現状到達不能・コード変更なし）**。将来トリガ＝(a) 複数パスを渡す built-in write-tool の登場（→ `extract_file_path` を全パス検査へ）(b) `stale_keys()` の tool_names 失効（→ write-tool を列挙し matcher と突合）。
+
+### full-review 2026-06-24 backlog: triaged-complete（2026-06-26）
+
+`docs/full-review-2026-06-24-hooks-gates-distribution.md` の全指摘を triage 完了：
+
+- **実コード修正**: D1-D4/I1/I2（iter41）・G1-G3（iter42）・I3（iter43・→SF-006）・C5（iter44）・C2/C3（iter45）。
+- **by-design / not-a-vuln / forward-looking（コード変更なし）**: C4→SF-007（NOT-A-VULN）・G4→SF-008（by-design）・C1→SF-009（forward-looking・現状到達不能）。
+- 残る実コード修正タスクは**ゼロ**。今後 backlog 由来の着手は、上記 SF の「将来トリガ」が発火した時のみ。
 
 ## CLOSED
 

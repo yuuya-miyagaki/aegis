@@ -16,4 +16,4 @@
 （LLM が平易日本語で記述）
 
 ## ACK
-- docs-only iteration につき production code 変更なし＝unit test 非該当。構造健全性は status_doctor PASS と framework contract PASS で確認済。回帰確認のフル pytest は qa フェーズで実走・記録する。レビュー実体（doc 正確性・過大主張・spec 整合・盲検2次 approve_with_notes）は完了。 （2026-06-26 00:03）
+- docs-only・size S（qa/test 実行は S フロー免除）につき tests=unverified は advisory。production code 変更ゼロ・status_doctor PASS・framework contract PASS。盲検2次 reviewer-maintainability=approve_with_notes・3 Minor＋grill-code 1件 全反映済。SF-009 verdict は code/git で確認。 （2026-06-26 01:58）

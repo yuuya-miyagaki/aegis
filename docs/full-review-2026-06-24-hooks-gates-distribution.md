@@ -62,8 +62,8 @@ interpreter コードで無限に回避でき、これは受容済み」）に�
 
 ### 🟢 訂正・構造的留意・小
 
-- **C1 / P2-A の訂正：MultiEdit バイパスは現行 platform で不成立** — 公式 `code.claude.com/docs/en/tools.md` 確認により **MultiEdit は廃止**（Edit に統合）。filesystem 書込み built-in tool は `Edit/Write/NotebookEdit` の 3 つで matcher が全カバー。残る構造的留意点：`hooks/lib/extract-input.sh:20` の first-path-only と、matcher がツール名ホワイトリスト列挙（`platform_manifest.py:44-50` 自認の best-effort registry）である点。
-  Fix: `PLATFORM_VERIFIED` 再検証時に「write 可能な全 tool を列挙 → matcher と突合」を必須項目化。
+- **C1 / P2-A の訂正：MultiEdit バイパスは現行 platform で不成立** — 公式 `code.claude.com/docs/en/tools.md` 確認により **MultiEdit は廃止**（Edit に統合）。filesystem 書込み built-in tool は `Edit/Write/NotebookEdit` の 3 つで matcher が全カバー。残る構造的留意点：`hooks/lib/extract-input.sh:20` の first-path-only と、matcher がツール名ホワイトリスト列挙（`platform_manifest.py:46-50` の `KNOWN_TOOL_NAMES`＝自認の best-effort registry）である点。
+  Fix: `PLATFORM_VERIFIED` 再検証時に「write 可能な全 tool を列挙 → matcher と突合」を必須項目化。→ **iteration 47 で再評価: forward-looking / 現状到達不能（複数パス built-in tool が無い・matcher 全カバー＋`stale_keys()` 再検証機構あり）。`docs/security-followups.md` SF-009 へクローズ。**
 - **C2**: `bin/setup.sh:46` は `--profile=*` のみ受理。`CLAUDE.md:17` は散文で `--profile`。空白形式が「Unknown argument」で即死。
 - **C3**: `bin/setup.sh:100-111` の FRAMEWORK_VERSION heredoc は `<<'PY'` 内で `$FRAMEWORK_ROOT` 非展開→必ず FileNotFoundError→"unknown"。grep フォールバック頼みの dead 第一経路。
 - **C4**: gate 値パーサの bash/python 分岐（`hooks/lib/frontmatter.sh:69-73` vs `scripts/check_status.py:283`）。行コメント付き値で別結果。strict allowlist（`pending|approved|blocked|n/a`）へ統一。→ **iteration 46 で再評価: NOT-A-VULN と実証（両消費側は clean トークンでのみ allow・bypass-direction 0 行）。strict 化は tamper backstop を弱める逆効果のため不採用＝据え置き。`docs/security-followups.md` SF-007 へクローズ。**
@@ -78,7 +78,7 @@ interpreter コードで無限に回避でき、これは受容済み」）に�
 
 - **Batch 1（全部小さく低リスク・高確度）**: D1, D2, D3, D4, I1, I2。→ 推奨 profile が動く＋upgrade がコードを更新する＋整合性 hook が fail-closed。
 - **Batch 2**: I3（task_type/size の tamper-evidence・I1 が前提）, G1（破壊ガード網羅）, G2, G3。
-- **Backlog**: ~~C1〜C4, G4~~ → 整理済み（2026-06-25）。**C2/C3** = iteration 45 実装（`bin/setup.sh`）。**C4** = iteration 46 で再評価し **NOT-A-VULN（実証・bypass-direction 0 行・strict 化は tamper backstop 弱体化で逆効果）**＝`docs/security-followups.md` SF-007 へクローズ。**G4** = iteration 46 で **by-design（accepted・exfil はモデル外/futile・commit が既存 chokepoint）**＝同 SF-008 へクローズ。**C1** は MultiEdit 不成立の訂正で platform 解決済み＝残る構造的留意点（`extract-input.sh:20` first-path-only／matcher whitelist）のみ別系統の robustness backlog として残置（本 iteration 対象外）。
+- **Backlog**: ~~C1〜C4, G4~~ → 整理済み（2026-06-25）。**C2/C3** = iteration 45 実装（`bin/setup.sh`）。**C4** = iteration 46 で再評価し **NOT-A-VULN（実証・bypass-direction 0 行・strict 化は tamper backstop 弱体化で逆効果）**＝`docs/security-followups.md` SF-007 へクローズ。**G4** = iteration 46 で **by-design（accepted・exfil はモデル外/futile・commit が既存 chokepoint）**＝同 SF-008 へクローズ。**C1** = iteration 47 で再評価し **forward-looking / 現状到達不能**（複数パス built-in tool が無く first-path-only は到達不能・matcher は現行 write-tool 全カバー＋`stale_keys()` 再検証機構あり）＝`docs/security-followups.md` SF-009 へクローズ。→ **backlog triaged-complete（2026-06-26）: 残る実コード修正タスクはゼロ**（実装=C2/C3/C5/G1-3/I1-3/D1-4・by-design/not-a-vuln/forward-looking=C4/G4/C1）。
 - **やらないこと**: `check-control-plane.sh`（moat 1000 行）の再設計。今回の指摘はどれもそこを触らず閉じられる。
 
 ## 検証メモ
