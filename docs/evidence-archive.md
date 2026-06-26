@@ -40,3 +40,9 @@ v151-security.md 記録の残余 5 系統を Task 1〜9 TDD で完走（461→47
 ### session-history: iteration 33 (M4 rebuild・簡素化 WS4 最終, 2026-06-21)
 
 観測 hook（E1）の fingerprint/marker 計算を全 Bash hot-path からテストランナー検出時のみへ寄せた。共有 is_test_runner_cmd（evidence.sh・消費側 read_test_result と同一正規化＋AEGIS_TEST_RUNNER_REGEX・単一 sed -e -e/単一 grep -e -e・bash3.2 安全）を新設し append_evidence を条件分岐＝非ランナーは fp 番兵 'skipped'＋marker false の安価記録。post-bash.sh の検出も同関数へ統合（単一ソース化＝recorder/ヒント/reader がドリフト不能）。ゲート時の緑認証ロジック（fail-closed・silent-green 禁止・fp binding）は byte 不変＝『いつ呼ぶか』だけ変更。grill-code（🔴0・🟡1 closed・🟢2 受容）→REDTEAM PoC 18/18→盲検2次 security 独立 approve。pytest 998 passed/1 skip・contract・Tier1・scaffold smoke・パリティ 9。ゲート review🟢／qa🟢／security🟡ack（deps N/A）。版 1.12.0 据置。コミット f02680d/878af23/fb5c5d1/ffd5050/a710328。tests 緑化は record-test-result.py（trusted manual runner）。
+
+### external_evidence: second-opinion-v0122-r6-r9 (v0.12.2 実装後 4 ラウンドレビュー, archived iter48 2026-06-26)
+
+- **scope:** v0.12.2 実装後 4 ラウンドレビュー
+- **findings:** Round 6 (P1×2, P2×1: pre-compact exit 2 / minimal-project / test rc), Round 7 (P1×1, P3×1: git add 漏れ / テスト件数表記), Round 8 (P2×1, P3×1: stale last_updated / grep 自己マッチ), Round 9 (P3×2: コメント不整合)
+- **resolution:** 9件全反映。tier 1/2 PASS、134 tests PASS、本体と minimal-project 完全同期確認済み。STATUS external_evidence が 3 件上限のため iter48 rollover でアーカイブ（最古エントリ）。

@@ -9,7 +9,7 @@
 - 依存監査: unverified
 
 ## ティア2: 🔍 第2意見（self-attested・自己申告・低信頼）
-- あり: approve_with_notes
+- あり: approve
 
 ## 🟡 要確認
 - 依存監査が未検証
@@ -18,4 +18,4 @@
 （LLM が平易日本語で記述）
 
 ## ACK
-- docs-only iteration＝依存パッケージ変更ゼロのため依存監査 unverified は advisory（新規 deps なし）。verdict（SF-007=NOT-A-VULN・SF-008=by-design）は盲検2次 security agent が一次資料で独立確認し AGREE・1次/2次とも approve_with_notes。secrets 検出なし・tests green。 （2026-06-26 00:31）
+- 新規依存ゼロ（標準ライブラリ ast/json のみ・package 追加なし）。盲検2次 security agent=approve・injection/secret/supply-chain の新規リスクなしを独立確認。deps_clean=true は新規依存ゼロの advisory。 （2026-06-26 22:43）

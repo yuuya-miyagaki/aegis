@@ -128,5 +128,52 @@ class TestDenyMessageIncludesTemplatePath(unittest.TestCase):
             )
 
 
+class TestFullInstallSurfacesTemplateHints(unittest.TestCase):
+    """iter48 (JNY-07 e2e): full install が _artifact_template_map.py を同梱し、
+    client-gate deny に実際にテンプレ位置ヒントが出る（install で空 degrade しない）
+    ことを固定する。回帰: map を full.json から外すと deny ヒントが消えて本テストが RED。"""
+
+    _STATUS = (
+        "---\nframework: aegis\nmode: Client\nphase: handover\n"
+        "task_type: feature\niteration: 1\n"
+        "gate_approvals:\n"
+        "  client_ready_for_dev: pending\n"
+        "  brainstorm: pending\n  plan: pending\n  review: pending\n"
+        "  qa: pending\n  security: pending\n  deploy: pending\n"
+        "  dev_ready_for_client: pending\n"
+        "current_refs:\n  requirements: null\n"
+        "blockers: []\nfailure_tracking: null\n"
+        'last_updated: "2026-06-26T00:00:00Z"\n---\n'
+    )
+
+    def test_full_install_deny_includes_template_hint(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            target = pathlib.Path(tmp) / "proj"
+            subprocess.run(
+                ["bash", str(ROOT / "bin" / "setup.sh"),
+                 "--profile=full", f"--target={target}"],
+                check=True, capture_output=True, text=True,
+            )
+            # the JNY-07 data dependency must be shipped by the full profile
+            self.assertTrue(
+                (target / "scripts" / "_artifact_template_map.py").exists(),
+                "full install must ship scripts/_artifact_template_map.py (JNY-07 data dep)")
+            (target / "docs").mkdir(parents=True, exist_ok=True)
+            (target / "docs" / "STATUS.md").write_text(self._STATUS, encoding="utf-8")
+            # run the INSTALL's own check_status so import resolution proves
+            # self-containment (sys.path[0] = the install's scripts/ dir).
+            r = subprocess.run(
+                ["python3", str(target / "scripts" / "check_status.py"),
+                 "--root", str(target),
+                 "--pre-approve-gate", "client_ready_for_dev"],
+                capture_output=True, text=True,
+            )
+            combined = r.stdout + r.stderr
+            self.assertIn(
+                "templates/PRD.template.md", combined,
+                f"full install client-gate deny must surface the PRD template hint "
+                f"(JNY-07 must not degrade to empty in the field): {combined[:400]}")
+
+
 if __name__ == "__main__":
     unittest.main()
