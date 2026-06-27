@@ -18,4 +18,4 @@
 （LLM が平易日本語で記述）
 
 ## ACK
-- 新規依存ゼロ（標準ライブラリ ast/json のみ・package 追加なし）。盲検2次 security agent=approve・injection/secret/supply-chain の新規リスクなしを独立確認。deps_clean=true は新規依存ゼロの advisory。 （2026-06-26 22:43）
+- 依存監査 advisory: iter49 は新規依存ゼロ（標準ライブラリ re のみ・update-task.sh は既存 pure-bash）。盲検2次 security agent も approve・material finding ゼロ・1次/2次 verdict 一致（claims に両明記）。 （2026-06-27 18:54）

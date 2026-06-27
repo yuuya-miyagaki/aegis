@@ -7,6 +7,7 @@
     "docs/LEARNINGS.md",
     "scripts/check_status.py",
     "scripts/update-gate.sh",
+    "scripts/update-task.sh",
     ".claude/rules/state-machine.md",
     ".claude/rules/routing.md",
     ".claude/commands/status.md",

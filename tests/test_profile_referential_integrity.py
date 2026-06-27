@@ -21,13 +21,24 @@
 過検出（docstring 中の .py 等）は fail-closed＝allow-list で明示解消する。
 
 対象外（本スライスの bound）: required-vs-recommended の severity（現状 gate-blocking 依存は
-既に required）／command(.md)→script・skill 散文参照の網羅。
+既に required）／command(.md)→script の網羅（commands は setup.sh:resolve_source で
+templates/commands/ の scaffold-safe 版に差し替わり graceful degrade するため別問題）。
+
+iter49 追補: skill(.md)→script を本ファイル後段（_skill_script_edges 以降）で検査する。
+skills は templates 変種を持たず **verbatim install** される次元で、shipped skill が
+未同梱 script を参照すると install 後にサイレントに inert 化する（実穴: full の
+aegis-brainstorm/bug-diagnosis → scripts/update-task.sh）。.py 限定の前段検査とは検査対象
+artifact（skill .md vs script .py）が異なるため分離して実装する。SKILL.md だけでなく
+skill ディレクトリ内の全 .md asset（例 deploy/platforms.md）が verbatim install されるため
+検査対象に含める。同じ verbatim-install サーフェスの .claude/agents/*.md も同型だが、現状
+shipped agent の script 参照はゼロ（実証済）のため本スライスでは射程外（穴が出たら同機構で別スライス）。
 """
 from __future__ import annotations
 
 import ast
 import json
 import pathlib
+import re
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 SCRIPTS_DIR = ROOT / "scripts"
@@ -250,3 +261,157 @@ def test_every_profile_is_referentially_self_contained():
                     f"にも未登録。対処: {dep} を profile に同梱する OR 理由付きで allow-list する。"
                 )
     assert not failures, "参照整合性違反:\n" + "\n".join(failures)
+
+
+# ===========================================================================
+# iter49: skill(.md) → script 参照整合性
+# ---------------------------------------------------------------------------
+# skills は templates 変種を持たず verbatim install される（commands は
+# setup.sh:resolve_source で templates/commands/ の scaffold-safe 版に差し替わるが
+# skills にその仕組みは無い）。よって shipped skill が未同梱 script を参照すると
+# install 後にサイレントに inert 化する。実穴: full の aegis-brainstorm/bug-diagnosis が
+# scripts/update-task.sh を無条件参照（task_size 設定＝gate routing の中核）。
+# 検査範囲は skill→scripts/*.(py|sh)。guard heuristic は持たず、guarded-optional な
+# 参照は理由付き allow-list で明示する（前段 .py 検査と同じ哲学）。
+# ===========================================================================
+
+# scripts/<name>.(py|sh) トークン。hooks/lib/*.sh は別 prefix で自然に対象外
+# （setup.sh:copy_hooks が wholesale install するため常在＝検査不要）。
+# 検出境界（既知）: コメント/URL/散文中の `scripts/x.py` も拾う（過検出側＝fail-closed。
+# 意図的に optional な参照は INTENTIONAL_UNSHIPPED_SKILL で理由付き解消する）。`scripts/` 直下の
+# flat 名のみ対象で `scripts/sub/x.py` のネストは非マッチ（現状 scripts は flat）。
+_SKILL_SCRIPT_RE = re.compile(r"scripts/[A-Za-z0-9_.-]+\.(?:py|sh)")
+
+# 意図的非同梱の skill→script allow-list（理由非空必須・rot 検知あり）。
+# update-task.sh 同梱で実穴は解消＝現状エントリ無し（将来の guarded-optional ref 用受け皿）。
+INTENTIONAL_UNSHIPPED_SKILL: dict[str, dict[str, str]] = {}
+
+
+def _skill_script_edges(md_text: str) -> set[str]:
+    """skill の .md 本文が参照する scripts/<name>.(py|sh) の集合。"""
+    return set(_SKILL_SCRIPT_RE.findall(md_text))
+
+
+def _shipped_scripts_any(profile: dict) -> set[str]:
+    """profile が install で配る scripts/*.(py|sh)（required ∪ recommended）。
+    前段 _shipped_scripts は .py 限定だが、skill は update-task.sh のような .sh も
+    参照するため両拡張子を対象にする。"""
+    entries = list(profile.get("required", [])) + list(profile.get("recommended", []))
+    return {
+        e
+        for e in entries
+        if e.startswith("scripts/") and (e.endswith(".py") or e.endswith(".sh"))
+    }
+
+
+def _shipped_skill_docs(profile: dict) -> list[str]:
+    """profile が install で配る skill 配下の .md 全て（SKILL.md ＋ platforms.md 等の asset）。
+    skills は templates 変種を持たず verbatim install されるため、SKILL.md に限らず
+    ディレクトリ内の全 .md が install 実体＝検査対象。"""
+    entries = list(profile.get("required", [])) + list(profile.get("recommended", []))
+    return [
+        e
+        for e in entries
+        if e.startswith(".claude/skills/") and e.endswith(".md")
+    ]
+
+
+# ---- 単体テスト（skill 抽出ヘルパに歯があること） ----
+
+def test_skill_edges_picks_code_fence_sh():
+    md = "Set size:\n```bash\nbash scripts/update-task.sh --size M\n```\n"
+    assert _skill_script_edges(md) == {"scripts/update-task.sh"}
+
+
+def test_skill_edges_picks_inline_py():
+    md = "Run `scripts/run-test-strength-drill.py` then report.\n"
+    assert "scripts/run-test-strength-drill.py" in _skill_script_edges(md)
+
+
+def test_skill_edges_ignores_non_scripts_prose():
+    # 'scripts/' 接頭辞の無い裸のファイル名言及は拾わない（誤検出抑止）。
+    md = "update-task.sh で size を設定する。\n"
+    assert _skill_script_edges(md) == set()
+
+
+def test_skill_edges_ignores_hooks_lib():
+    # hooks/lib は別 prefix（wholesale install で常在）＝検査対象外。
+    md = "The hook sources hooks/lib/emit.sh at startup.\n"
+    assert _skill_script_edges(md) == set()
+
+
+def test_skill_edges_empty_when_no_ref():
+    assert _skill_script_edges("no script references here.\n") == set()
+
+
+def test_shipped_scripts_helpers_consistent():
+    # drift 防止: _shipped_scripts(.py 限定) は _shipped_scripts_any(.py+.sh) の .py 部分集合。
+    # 2 ヘルパの「shipped」定義が将来ズレたら検知する。
+    for profile_path in sorted(PROFILES_DIR.glob("*.json")):
+        profile = json.loads(profile_path.read_text(encoding="utf-8"))
+        any_py = {e for e in _shipped_scripts_any(profile) if e.endswith(".py")}
+        assert _shipped_scripts(profile) == any_py, (
+            f"{profile['name']}: _shipped_scripts と _shipped_scripts_any(.py) が不一致"
+        )
+
+
+def test_skill_allowlist_reasons_nonempty():
+    for profile_name, deps in INTENTIONAL_UNSHIPPED_SKILL.items():
+        for dep, reason in deps.items():
+            assert reason and reason.strip(), (
+                f"INTENTIONAL_UNSHIPPED_SKILL['{profile_name}']['{dep}'] には非空 reason が必要"
+            )
+
+
+def test_skill_allowlist_no_stale_entries():
+    """skill allow-list の rot 検知（参照されない/同梱済みエントリを禁止）。"""
+    for profile_path in sorted(PROFILES_DIR.glob("*.json")):
+        profile = json.loads(profile_path.read_text(encoding="utf-8"))
+        name = profile["name"]
+        shipped = _shipped_scripts_any(profile)
+        live_edges: set[str] = set()
+        for skill_rel in _shipped_skill_docs(profile):
+            md = (ROOT / skill_rel).read_text(encoding="utf-8")
+            live_edges |= _skill_script_edges(md)
+        for dep in INTENTIONAL_UNSHIPPED_SKILL.get(name, {}):
+            assert dep in live_edges, (
+                f"stale skill allow-list: [{name}] {dep} はどの shipped skill からも"
+                f"参照されない。削除せよ。"
+            )
+            assert dep not in shipped, (
+                f"redundant skill allow-list: [{name}] {dep} は同梱済み。削除せよ。"
+            )
+
+
+# ---- 横断検査本体（skill→script 穴を恒久封鎖） ----
+
+def test_every_profile_skill_script_ref_is_self_contained():
+    failures: list[str] = []
+    for profile_path in sorted(PROFILES_DIR.glob("*.json")):
+        profile = json.loads(profile_path.read_text(encoding="utf-8"))
+        name = profile["name"]
+        shipped = _shipped_scripts_any(profile)
+        allow = INTENTIONAL_UNSHIPPED_SKILL.get(name, {})
+        for skill_rel in sorted(_shipped_skill_docs(profile)):
+            md = (ROOT / skill_rel).read_text(encoding="utf-8")
+            edges = _skill_script_edges(md)
+            for dep in _violations(shipped, edges, allow):
+                failures.append(
+                    f"[{name}] {skill_rel} は {dep} を参照するが {name}.json の "
+                    f"required/recommended に未同梱・INTENTIONAL_UNSHIPPED_SKILL['{name}'] "
+                    f"未登録。対処: {dep} を profile 同梱 OR 理由付き allow-list。"
+                )
+    assert not failures, "skill→script 参照整合性違反:\n" + "\n".join(failures)
+
+
+def test_update_task_shipped_in_dev_profiles():
+    # update-task.sh は required な update-gate.sh の sibling（gate/task の tamper 保護 STATUS 変更対）。
+    # full は skill(aegis-brainstorm/bug-diagnosis) が、standard は state-machine.md が update-task.sh を
+    # 参照するため両 profile の required に同梱必須。standard 側は skill→script 検査で非強制ゆえ、
+    # この明示ガードが rename/削除を捕捉する（盲検2次 F3・grill #3 で指摘された未保護点を封鎖）。
+    for name in ("standard", "full"):
+        profile = json.loads((PROFILES_DIR / f"{name}.json").read_text(encoding="utf-8"))
+        assert "scripts/update-task.sh" in profile.get("required", []), (
+            f"{name}.json の required に scripts/update-task.sh が無い（update-gate.sh の sibling・"
+            "state-machine.md/skill が参照）"
+        )
