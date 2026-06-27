@@ -415,3 +415,301 @@ def test_update_task_shipped_in_dev_profiles():
             f"{name}.json の required に scripts/update-task.sh が無い（update-gate.sh の sibling・"
             "state-machine.md/skill が参照）"
         )
+
+
+# ===========================================================================
+# iter50: doc(.md) → script 参照整合性（残る install surface）
+# ---------------------------------------------------------------------------
+# install surface の doc のうち未検査の2種を検査する:
+#   - CLAUDE.md      : install 実体は setup.sh:resolve_source で templates/CLAUDE.template.md
+#                      へ remap される（dogfood の repo-root CLAUDE.md ではない）。
+#   - .claude/rules/*.md : remap なし＝verbatim install。
+# guard-only（grill-premise で実穴ゼロを実証）。install 実体では壊れた参照なし＝
+#   CLAUDE.md(template) は check_framework_contract.py のみ参照（maintainer 専用の意図的
+#   非同梱）／rules/state-machine.md→update-task.sh は full+standard で充足済。本セクションは
+#   「全 install surface を1原理で覆う regression guard ＋ maintainer 参照の allow-list 明示化」。
+# 対象外: .claude/commands/*.md（resolve_source で scaffold-safe 版へ remap・iter49 で別問題と確定）／
+#   .claude/agents/*.md（script 参照ゼロ実証済）。
+#
+# 重要（iter49 conf8 の教訓）: doc の参照穴判定は **install 実体（resolve_source の source）**を
+# 読む。dogfood の repo-root CLAUDE.md を読むと install されない参照を誤検出する。
+# ===========================================================================
+
+# doc rel-path → install 実体の template rel-path（明示 map で fail-closed）。
+# setup.sh:resolve_source の remap を mirror。setup.sh との同期はアンカーテスト
+# test_doc_resolver_matches_setup_sh が強制する（drift は明示 fail）。
+_DOC_TEMPLATE_REMAP: dict[str, str] = {
+    "CLAUDE.md": "templates/CLAUDE.template.md",
+}
+
+
+def _doc_install_source(rel: str) -> pathlib.Path:
+    """doc の profile entry rel-path → install 実体の絶対 Path。
+
+    _DOC_TEMPLATE_REMAP にあれば template 実体、無ければ verbatim（ROOT/rel）。
+    明示 map にする理由＝setup.sh パース失敗時に空 map へ degrade して false-clean に
+    なる fail-open（D5 型）を避ける。検査本体は本 map を使い parse に依存しない。
+    """
+    return ROOT / _DOC_TEMPLATE_REMAP.get(rel, rel)
+
+
+def _shipped_doc_surfaces(profile: dict) -> list[str]:
+    """profile が install で配る install-surface doc（required ∪ recommended・順序保持）。
+
+    対象は CLAUDE.md と .claude/rules/*.md のみ。.claude/commands/*.md（scaffold-safe
+    remap・別問題）・.claude/agents/*.md（script 参照ゼロ）・.claude/skills/*.md
+    （iter49 が別途検査）は除外。
+    """
+    entries = list(profile.get("required", [])) + list(profile.get("recommended", []))
+    return [
+        e
+        for e in entries
+        if e == "CLAUDE.md" or (e.startswith(".claude/rules/") and e.endswith(".md"))
+    ]
+
+
+# 意図的非同梱の doc→script allow-list（理由非空必須・rot 検知あり）。
+# 注意（cross-ref）: 同名 scripts/check_framework_contract.py は前段 .py 層の
+# INTENTIONAL_UNSHIPPED['full'] にも登場するが、そちらの referrer は status_doctor.py
+# （full のみ・実行依存）。本 doc 層の referrer は CLAUDE.md(template) の**記述的 prose**
+# （実行指示ではない）で、CLAUDE.md は全 profile 同梱のため3 profile 全てに必要。
+# referrer/scope が異なる同一 script の別宣言＝重複ではない。
+_INTENTIONAL_DOC_REASON = (
+    "install 実体 CLAUDE.md（templates/CLAUDE.template.md L41「Agent model/effort is "
+    "pinned ... (enforced by scripts/check_framework_contract.py); applies once agents "
+    "are installed (the full profile)」）の**記述的 provenance**＝どこで pin が enforce "
+    "されるかの出所情報で、実行指示ではない。check_framework_contract は maintainer 専用で "
+    "依存閉包 platform_manifest+context_budget を install に引き込まないため意図的非同梱"
+    "（iter48 で確定）。.py 層 allow-list とは referrer（status_doctor.py vs CLAUDE.md prose）"
+    "が異なる別宣言。案Y（template から参照除去）は有用な出所情報を削るため不採用。"
+)
+INTENTIONAL_UNSHIPPED_DOC: dict[str, dict[str, str]] = {
+    "minimal": {"scripts/check_framework_contract.py": _INTENTIONAL_DOC_REASON},
+    "standard": {"scripts/check_framework_contract.py": _INTENTIONAL_DOC_REASON},
+    "full": {"scripts/check_framework_contract.py": _INTENTIONAL_DOC_REASON},
+}
+
+
+# doc 本文の script 参照抽出は skill 面と同一原理（共有 _SKILL_SCRIPT_RE）。新ロジックを
+# 増やさず別名で呼び出し側を自己説明化する（grill-code 🟡: doc に skill 名の関数を当てると
+# 読み手が二度見する）。
+_doc_script_edges = _skill_script_edges
+
+
+# setup.sh:resolve_source の case を抽出する正規表現。`)` と `echo` の間は `[^"]*?`
+# （引用符を含まない非貪欲）＝コメント行を飲み込みつつ次 case の "label" を越えない。
+# grill-plan ①: 素朴な `\s+` だとコメント挟みの case を取りこぼし、将来の rules remap が
+# parse から漏れてアンカーが fail-open する。コメント耐性で fail-closed を保つ。
+_SETUP_CASE_RE = re.compile(r'"([^"]+)"\)[^"]*?echo\s+"\$FRAMEWORK_ROOT/([^"]+)"')
+
+
+def _setup_resolve_remap(setup_src: str) -> dict[str, str]:
+    """setup.sh:resolve_source の case ブロックから rel→template-rel の remap を抽出。
+
+    `case "$rel_path" in` 〜 `esac` に限定（ブロック外の echo を誤抽出しない）。
+    parse 失敗（構文変更）なら空 dict を返し、呼び出し側アンカーの `assert "CLAUDE.md"
+    in remap` が明示 fail する（fail-closed）。
+    """
+    m = re.search(r'case\s+"\$rel_path"\s+in(.*?)\besac\b', setup_src, re.DOTALL)
+    body = m.group(1) if m else ""
+    # bash の行コメント（`# ...`）を除去してから抽出する。コメント中に `"` があると
+    # `[^"]*?` がそこで止まり case を取りこぼす（reviewer-testing F1）。case label と echo は
+    # 別行なのでコメント行除去後も隣接は崩れない（残る空行/空白は [^"]*? が飲む）。
+    body = re.sub(r'(?m)^[ \t]*#.*$', '', body)
+    return {rel: tpl for rel, tpl in _SETUP_CASE_RE.findall(body)}
+
+
+# ---- 単体テスト（resolver） ----
+
+def test_doc_source_claude_is_template():
+    # CLAUDE.md の install 実体は templates/CLAUDE.template.md（remap）。
+    assert _doc_install_source("CLAUDE.md") == ROOT / "templates" / "CLAUDE.template.md"
+
+
+def test_doc_source_rules_is_verbatim():
+    # rules は remap なし＝verbatim install。
+    assert (
+        _doc_install_source(".claude/rules/state-machine.md")
+        == ROOT / ".claude" / "rules" / "state-machine.md"
+    )
+
+
+def _all_doc_surfaces() -> set[str]:
+    """全 profile が install する doc surface の和集合。"""
+    surfaces: set[str] = set()
+    for profile_path in sorted(PROFILES_DIR.glob("*.json")):
+        profile = json.loads(profile_path.read_text(encoding="utf-8"))
+        surfaces |= set(_shipped_doc_surfaces(profile))
+    return surfaces
+
+
+def test_doc_resolver_matches_setup_sh():
+    """アンカー: resolver（_DOC_TEMPLATE_REMAP）が setup.sh:resolve_source と同期している
+    ことを強制する。setup.sh に rules remap を足す/CLAUDE.md の template パスを変える/
+    コメント付き remap を追加する、のいずれでも本テストが**明示 fail** し、resolver の
+    更新を強制する（install 実体とのズレ＝fail-open を封鎖）。"""
+    setup_src = (ROOT / "bin" / "setup.sh").read_text(encoding="utf-8")
+    remap = _setup_resolve_remap(setup_src)
+    # parse 健全性（構文変更で空 dict に degrade したら明示 fail）。
+    assert "CLAUDE.md" in remap, (
+        "setup.sh:resolve_source の parse が CLAUDE.md remap を見つけられない"
+        "（case 構文変更の可能性＝_setup_resolve_remap を更新せよ）"
+    )
+    surfaces = _all_doc_surfaces()
+    for rel in sorted(surfaces):
+        expected = ROOT / remap.get(rel, rel)
+        assert _doc_install_source(rel) == expected, (
+            f"resolver と setup.sh が doc '{rel}' で不一致: "
+            f"resolver={_doc_install_source(rel)} vs setup.sh={expected}。"
+            "_DOC_TEMPLATE_REMAP を setup.sh:resolve_source に合わせよ。"
+        )
+    # dead-key 禁止: _DOC_TEMPLATE_REMAP の各 key は実 doc surface であること。
+    for key in _DOC_TEMPLATE_REMAP:
+        assert key in surfaces, (
+            f"dead _DOC_TEMPLATE_REMAP key: '{key}' はどの profile の doc surface でもない。削除せよ。"
+        )
+
+
+# ---- 単体テスト（_shipped_doc_surfaces） ----
+
+def test_shipped_doc_surfaces_selects_claude_and_rules():
+    profile = {
+        "required": ["CLAUDE.md", ".claude/rules/state-machine.md", "scripts/check_status.py"],
+        "recommended": [
+            ".claude/rules/routing.md",
+            ".claude/commands/status.md",
+            ".claude/agents/planner.md",
+            ".claude/skills/tdd/SKILL.md",
+        ],
+    }
+    assert _shipped_doc_surfaces(profile) == [
+        "CLAUDE.md",
+        ".claude/rules/state-machine.md",
+        ".claude/rules/routing.md",
+    ]
+
+
+def test_shipped_doc_surfaces_excludes_commands_agents_skills():
+    profile = {
+        "required": [".claude/commands/gate.md"],
+        "recommended": [".claude/agents/qa.md", ".claude/skills/deploy/platforms.md"],
+    }
+    assert _shipped_doc_surfaces(profile) == []
+
+
+# ---- 単体テスト（doc edge 抽出＝既存 _skill_script_edges の doc 適用を固定） ----
+# 新規関数は起こさない（YAGNI）。共有 _SKILL_SCRIPT_RE が doc 面も指すことを固定し、
+# 将来 regex 変更で doc 抽出が壊れたら検知する。
+
+def test_doc_edge_picks_check_contract_from_prose():
+    # CLAUDE.template.md L41 想定の散文 provenance から script を拾う。
+    md = "Agent model/effort is pinned (enforced by `scripts/check_framework_contract.py`).\n"
+    assert "scripts/check_framework_contract.py" in _doc_script_edges(md)
+
+
+# ---- 単体テスト（setup.sh remap parse の歯＝コメント耐性） ----
+
+def test_setup_parse_extracts_single_line_case():
+    src = (
+        'resolve_source() {\n'
+        '  case "$rel_path" in\n'
+        '    "CLAUDE.md")  echo "$FRAMEWORK_ROOT/templates/CLAUDE.template.md"; return ;;\n'
+        '  esac\n'
+        '}\n'
+    )
+    assert _setup_resolve_remap(src) == {"CLAUDE.md": "templates/CLAUDE.template.md"}
+
+
+def test_setup_parse_tolerates_comment_between_case_and_echo():
+    # grill-plan ①: `)` と `echo` の間にコメント行がある case を取りこぼすと、将来の
+    # rules remap が parse から漏れてアンカーが fail-open する。コメント耐性を固定する。
+    src = (
+        'case "$rel_path" in\n'
+        '    ".claude/rules/state-machine.md")\n'
+        '      # Scaffold-safe variant: degrades gracefully.\n'
+        '      echo "$FRAMEWORK_ROOT/templates/rules/state-machine.md"; return ;;\n'
+        'esac\n'
+    )
+    assert _setup_resolve_remap(src) == {
+        ".claude/rules/state-machine.md": "templates/rules/state-machine.md"
+    }
+
+
+def test_setup_parse_tolerates_quoted_comment_in_case():
+    # reviewer-testing F1: コメント中に `"` が含まれても case を取りこぼさない。
+    # 素の `[^"]*?` はコメント内の `"` で止まり取りこぼす（fail-closed だが分かりにくい）。
+    # 行コメントを事前除去して robustness を上げる。
+    src = (
+        'case "$rel_path" in\n'
+        '    "CLAUDE.md")\n'
+        '      # see "templates/CLAUDE.template.md" for context\n'
+        '      echo "$FRAMEWORK_ROOT/templates/CLAUDE.template.md"; return ;;\n'
+        'esac\n'
+    )
+    assert _setup_resolve_remap(src) == {"CLAUDE.md": "templates/CLAUDE.template.md"}
+
+
+def test_setup_parse_ignores_outside_case_block():
+    # case ブロック外の echo "$FRAMEWORK_ROOT/..." は拾わない（誤抽出抑止）。
+    src = (
+        'copy_file "$x" "$FRAMEWORK_ROOT/scripts/foo.py"\n'
+        'case "$rel_path" in\n'
+        '    "CLAUDE.md") echo "$FRAMEWORK_ROOT/templates/CLAUDE.template.md"; return ;;\n'
+        'esac\n'
+    )
+    assert _setup_resolve_remap(src) == {"CLAUDE.md": "templates/CLAUDE.template.md"}
+
+
+# ---- allow-list governance（reason 非空＋rot 検知） ----
+
+def test_doc_allowlist_reasons_nonempty():
+    for profile_name, deps in INTENTIONAL_UNSHIPPED_DOC.items():
+        for dep, reason in deps.items():
+            assert reason and reason.strip(), (
+                f"INTENTIONAL_UNSHIPPED_DOC['{profile_name}']['{dep}'] には非空 reason が必要"
+            )
+
+
+def test_doc_allowlist_no_stale_or_redundant():
+    """doc allow-list の rot 検知。各エントリは (a) その profile の shipped doc surface が
+    実際に参照する辺であり、(b) その profile に未同梱（同梱なら allow-list 不要）であること。"""
+    for profile_path in sorted(PROFILES_DIR.glob("*.json")):
+        profile = json.loads(profile_path.read_text(encoding="utf-8"))
+        name = profile["name"]
+        shipped = _shipped_scripts_any(profile)
+        live_edges: set[str] = set()
+        for rel in _shipped_doc_surfaces(profile):
+            text = _doc_install_source(rel).read_text(encoding="utf-8")
+            live_edges |= _doc_script_edges(text)
+        for dep in INTENTIONAL_UNSHIPPED_DOC.get(name, {}):
+            assert dep in live_edges, (
+                f"stale doc allow-list: [{name}] {dep} はどの shipped doc surface からも"
+                f"参照されない。削除せよ。"
+            )
+            assert dep not in shipped, (
+                f"redundant doc allow-list: [{name}] {dep} は同梱済み。削除せよ。"
+            )
+
+
+# ---- 横断検査本体（doc→script 穴を恒久封鎖） ----
+
+def test_every_profile_doc_script_ref_is_self_contained():
+    """各 profile × shipped doc surface を **install 実体**で読み、参照 script が
+    「同梱 ∨ 理由付き INTENTIONAL_UNSHIPPED_DOC」であることを検査する。"""
+    failures: list[str] = []
+    for profile_path in sorted(PROFILES_DIR.glob("*.json")):
+        profile = json.loads(profile_path.read_text(encoding="utf-8"))
+        name = profile["name"]
+        shipped = _shipped_scripts_any(profile)
+        allow = INTENTIONAL_UNSHIPPED_DOC.get(name, {})
+        for rel in sorted(_shipped_doc_surfaces(profile)):
+            source = _doc_install_source(rel)
+            edges = _doc_script_edges(source.read_text(encoding="utf-8"))
+            for dep in _violations(shipped, edges, allow):
+                failures.append(
+                    f"[{name}] {rel}（install 実体 {source.relative_to(ROOT)}）は {dep} を "
+                    f"参照するが {name}.json の required/recommended に未同梱・"
+                    f"INTENTIONAL_UNSHIPPED_DOC['{name}'] 未登録。対処: {dep} を profile 同梱 "
+                    "OR 理由付き allow-list。"
+                )
+    assert not failures, "doc→script 参照整合性違反:\n" + "\n".join(failures)
