@@ -1,15 +1,24 @@
 {
-  "test_command": "python3 -m pytest tests/test_profile_referential_integrity.py -q",
+  "test_command": "python3 -m pytest tests/test_permission_allowlist_install.py -q",
   "timeout_seconds": 120,
   "mutants": [
-    {"file": "tests/test_profile_referential_integrity.py", "line": 453,
-     "original": "    return ROOT / _DOC_TEMPLATE_REMAP.get(rel, rel)",
-     "mutated": "    return ROOT / rel"},
-    {"file": "tests/test_profile_referential_integrity.py", "line": 467,
-     "original": "        if e == \"CLAUDE.md\" or (e.startswith(\".claude/rules/\") and e.endswith(\".md\"))",
-     "mutated": "        if e == \"CLAUDE.mdX\" or (e.startswith(\".claude/rules/\") and e.endswith(\".md\"))"},
-    {"file": "tests/test_profile_referential_integrity.py", "line": 518,
-     "original": "    body = re.sub(r'(?m)^[ \\t]*#.*$', '', body)",
-     "mutated": "    body = body"}
+    {
+      "file": "bin/setup.sh",
+      "line": 334,
+      "original": "    perms['allow'] = list(template['permissions'].get('allow', []))",
+      "mutated": "    perms['allow'] = []"
+    },
+    {
+      "file": "bin/setup.sh",
+      "line": 367,
+      "original": "            for a in list(fw_allow) + list(v.get('allow', [])):",
+      "mutated": "            for a in list(v.get('allow', [])):"
+    },
+    {
+      "file": "templates/hooks.template.json",
+      "line": 11,
+      "original": "      \"Bash(git status:*)\",",
+      "mutated": "      \"Bash(git xxx:*)\","
+    }
   ]
 }

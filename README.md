@@ -128,6 +128,8 @@ TDD backstop strictness follows the profile: `full` installs `check-tdd.sh` (str
 
 Phase HINT nudges (the per-phase reminder sermon injected at session start) also follow the profile: `full` shows them; `minimal`/`standard` write `AEGIS_NUDGE=off` into the generated settings `env`, so the sermon is suppressed by default. Set `AEGIS_NUDGE=off` to silence it for a session in any profile (lowercase `off` only). Only the phase HINT is removed — gates, skill boot-paths, blockers, failure-tracking, the unknown-phase diagnostic, and safety warnings always remain. To re-enable nudges on a `minimal`/`standard` install, remove the `env.AEGIS_NUDGE` key from `.claude/settings.local.json` (the unambiguous method; shell-vs-settings env precedence is platform-dependent). Unlike `AEGIS_TDD_MODE`, session-start does not warn when nudges are off (it is benign).
 
+Every profile also ships a curated `permissions.allow` list (in the generated `.claude/settings.local.json`) so the framework's own safe, read-only/diagnostic commands — status/contract/judge readers, `pytest`, and `git status`/`log`/`diff` — run **without a permission prompt**. State-changing scripts (`update-gate.sh`/`update-task.sh`) and dangerous commands deliberately keep prompting, and the deterministic deny-hooks still inspect every command regardless of the allow-list (the allow-list suppresses the prompt, not the safety check). Your own `allow` entries are preserved across re-installs (union, never overwritten); to make an allow-listed command prompt again, add it to `permissions.ask`/`deny` (a settings rule overrides `allow`).
+
 ### Manual setup
 
 1. Read [CLAUDE.md](CLAUDE.md)

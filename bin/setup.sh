@@ -320,6 +320,20 @@ else:
             filtered['hooks'][event_name] = filtered_entries
     out = filtered
 
+# iter51: ship framework permissions.allow (the curated safe-command allow set)
+# for ALL profiles. full uses out=dict(template) so it already carries it, but
+# the filtered (minimal/standard) branch above keeps only 'hooks' and would drop
+# permissions. Re-assert the template's allow here so every profile ships it.
+if 'permissions' in template:
+    # Carry the framework allow set into out for ALL profiles. Build a fresh dict
+    # so we (1) never mutate the loaded template (full profile's out=dict(template)
+    # is a shallow copy that shares template['permissions']), and (2) preserve any
+    # other template-level permission keys (e.g. a future deny/ask) instead of
+    # silently dropping them.
+    perms = dict(out.get('permissions', {}))
+    perms['allow'] = list(template['permissions'].get('allow', []))
+    out['permissions'] = perms
+
 # K-8: merge in user keys (everything except 'hooks') from any existing file
 target = '$target_settings'
 if os.path.exists(target):
@@ -340,7 +354,25 @@ if os.path.exists(target):
     for k, v in existing.items():
         if k == 'hooks':
             continue  # framework-owned, never preserve user mutations
-        out[k] = v   # preserve permissions / env / future keys
+        if k == 'permissions' and isinstance(v, dict):
+            # iter51: framework allow entries are authoritative (always present);
+            # union them with the user's own allow additions (dedup, framework
+            # first = stable & idempotent across re-installs). The user's deny /
+            # ask / any other permission keys are preserved. To opt OUT of an
+            # allowed command, the user adds it to ask/deny (a settings rule
+            # overrides allow), rather than deleting the framework entry.
+            merged = dict(v)  # keep user's deny / ask / other permission keys
+            fw_allow = out.get('permissions', {}).get('allow', [])
+            seen, union = set(), []
+            for a in list(fw_allow) + list(v.get('allow', [])):
+                if a not in seen:
+                    seen.add(a)
+                    union.append(a)
+            if union:
+                merged['allow'] = union
+            out['permissions'] = merged
+        else:
+            out[k] = v   # preserve env / future keys
 
 # P2-a (v1.7.0): minimal/standard default the phase-HINT nudge OFF via settings
 # env (settings env propagates to hook process env). full leaves it unset = on.

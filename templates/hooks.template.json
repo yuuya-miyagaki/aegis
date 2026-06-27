@@ -1,4 +1,18 @@
 {
+  "permissions": {
+    "allow": [
+      "Bash(python3 scripts/status_doctor.py:*)",
+      "Bash(python3 scripts/check_framework_contract.py:*)",
+      "Bash(python3 scripts/check_status.py:*)",
+      "Bash(python3 scripts/retro_report.py:*)",
+      "Bash(python3 scripts/build-judge-card.py:*)",
+      "Bash(python3 -m pytest:*)",
+      "Bash(pytest:*)",
+      "Bash(git status:*)",
+      "Bash(git log:*)",
+      "Bash(git diff:*)"
+    ]
+  },
   "hooks": {
     "SessionStart": [
       {
