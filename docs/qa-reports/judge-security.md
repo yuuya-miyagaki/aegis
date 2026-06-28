@@ -18,4 +18,4 @@
 （LLM が平易日本語で記述）
 
 ## ACK
-- 新規依存ゼロ（stdlib json/subprocess のみ・allow-list は config）＝dependency audit 非該当。tests=verified（full suite 1166 passed/1 skip・record green newest）。盲検2次 security エージェント=approve（全 allow-listed script の exec sink を独立監査・gadget 不在・moat intact・secrets/deps clean）。material finding ゼロ。 （2026-06-28 02:08）
+- 依存監査: 依存マニフェスト（requirements/pyproject/package.json 等）無改変・新規サードパーティ依存ゼロ（唯一の新 import は標準ライブラリ re）。よって脆弱性監査の対象増分なし。盲検2次 security agent も deps_clean: true で一致。 （2026-06-28 12:53）

@@ -9,6 +9,7 @@ update-task.sh) and dangerous commands keep prompting. Verifies:
 """
 import json
 import pathlib
+import re
 import subprocess
 
 import pytest
@@ -27,6 +28,10 @@ SHOULD_MATCH = [
     "git status",
     "git diff HEAD",
     "git log --oneline -5",
+    "git show HEAD",
+    "python3 scripts/check_reference_drift.py --root .",
+    "python3 scripts/learnings_search.py --query mutation",
+    "python3 scripts/lint_names.py --root .",
 ]
 # Commands that MUST keep prompting — no allow entry may match these.
 # record-test-result.py / run-test-strength-drill.py are command-EXEC gadgets
@@ -171,3 +176,128 @@ def test_install_preserves_deny_hooks(tmp_path):
     pre = json.dumps(_installed(target).get("hooks", {}).get("PreToolUse", []))
     assert "check-destructive.sh" in pre, "destructive deny-hook missing"
     assert "check-control-plane.sh" in pre, "control-plane deny-hook missing"
+
+
+# --- iter52: allow-list completeness guard (classification-map driven) ---
+# Every scripts/ CLI entrypoint is classified by INTENT, not mechanism: several
+# safe readers (check_status.py etc.) call subprocess.run on FIXED internal
+# commands, so "uses subprocess" is NOT the criterion.
+#   safe_auto_allow = pure reader / benign idempotent generator that never
+#       executes an arg/stdin-controlled command and mutates no risky repo state
+#       -> MUST be in permissions.allow.
+#   must_prompt = mutates persistent state (STATUS/snapshot, evidence log) OR
+#       executes an arg-controlled command (exec gadget) OR scaffolds/installs/
+#       evals -> MUST NOT be auto-allowed.
+#   not_cli = import-only module, never invoked as a Bash command.
+# A new scripts/ entrypoint absent here trips test_every_script_is_classified,
+# forcing an explicit allow/prompt decision (anti-drift; iter49/50 family).
+SCRIPTS_DIR = ROOT / "scripts"
+
+SCRIPT_CLASS = {
+    "check_status.py": "safe_auto_allow",
+    "check_framework_contract.py": "safe_auto_allow",
+    "status_doctor.py": "safe_auto_allow",
+    "retro_report.py": "safe_auto_allow",
+    "build-judge-card.py": "safe_auto_allow",
+    "check_reference_drift.py": "safe_auto_allow",
+    "learnings_search.py": "safe_auto_allow",
+    "lint_names.py": "safe_auto_allow",
+    # context_budget.py is read-only in its default `check` mode but
+    # --tighten/--seed WRITE the tracked scripts/context-budgets.json (a
+    # contract-gating config). A blanket Bash(...:*) rule can't exclude those
+    # write modes, so it must keep prompting (grill-code 🔴).
+    "context_budget.py": "must_prompt",
+    "record-test-result.py": "must_prompt",
+    "run-test-strength-drill.py": "must_prompt",
+    "run_eval.py": "must_prompt",
+    "eval_scaffold_smoke.py": "must_prompt",
+    "eval_scenario.py": "must_prompt",
+    "update-gate.sh": "must_prompt",
+    "update-task.sh": "must_prompt",
+    "_artifact_template_map.py": "not_cli",
+    "platform_manifest.py": "not_cli",
+}
+
+SAFE_GIT_READS = ["git status", "git log", "git diff", "git show"]
+DESTRUCTIVE_GIT = ["git branch -D x", "git remote remove origin", "git checkout ."]
+
+
+def _enumerated_scripts():
+    return {p.name for p in SCRIPTS_DIR.glob("*.py")} | \
+           {p.name for p in SCRIPTS_DIR.glob("*.sh")}
+
+
+def _allow_targets_script(entry, name):
+    # name-mention check — used by the NEGATIVE/orphan tests where we want to
+    # catch ANY allow entry that references a must_prompt / not_cli script.
+    return f"scripts/{name}" in entry
+
+
+def _rep_invocation(name):
+    # representative real invocation, so the POSITIVE membership test proves the
+    # script is actually auto-allowed (a malformed entry lacking ':*' would
+    # name-mention but NOT auto-allow '... <args>'). Runner follows the
+    # extension convention (.sh via bash) so a future safe_auto_allow shell
+    # script doesn't yield a false RED.
+    runner = "bash" if name.endswith(".sh") else "python3"
+    return f"{runner} scripts/{name} x"
+
+
+def test_every_script_is_classified():
+    enum = _enumerated_scripts()
+    missing = enum - set(SCRIPT_CLASS)
+    assert not missing, f"unclassified scripts/ entrypoints: {sorted(missing)}"
+    stale = set(SCRIPT_CLASS) - enum
+    assert not stale, f"SCRIPT_CLASS lists non-existent scripts: {sorted(stale)}"
+
+
+def test_safe_auto_allow_scripts_are_allowed():
+    allow = _template_allow()
+    for name, cls in SCRIPT_CLASS.items():
+        if cls == "safe_auto_allow":
+            assert any(_matches(e, _rep_invocation(name)) for e in allow), \
+                f"safe_auto_allow script not actually auto-allowed: {name}"
+
+
+def test_non_safe_scripts_are_not_allowed():
+    allow = _template_allow()
+    for name, cls in SCRIPT_CLASS.items():
+        if cls != "safe_auto_allow":
+            assert not any(_allow_targets_script(e, name) for e in allow), \
+                f"{cls} script must NOT be auto-allowed: {name}"
+
+
+def test_safe_git_reads_allowed_destructive_excluded():
+    allow = _template_allow()
+    for cmd in SAFE_GIT_READS:
+        assert any(_matches(e, cmd) for e in allow), f"safe git read not allowed: {cmd}"
+    for cmd in DESTRUCTIVE_GIT:
+        assert not any(_matches(e, cmd) for e in allow), f"destructive git auto-allowed: {cmd}"
+
+
+def test_no_orphan_script_allow_entry():
+    safe = {n for n, c in SCRIPT_CLASS.items() if c == "safe_auto_allow"}
+    for entry in _template_allow():
+        m = re.search(r"scripts/([\w.-]+)", entry)
+        if m:
+            assert m.group(1) in safe, \
+                f"allow entry targets non-safe_auto_allow script: {entry}"
+
+
+def test_script_class_consistent_with_should_lists():
+    # single-source guard: the matcher-form lists SHOULD_MATCH / SHOULD_NOT_MATCH
+    # and SCRIPT_CLASS must never disagree, so a future editor updating one
+    # cannot silently diverge from the other.
+    def _script(cmd):
+        m = re.search(r"scripts/([\w.-]+)", cmd)
+        return m.group(1) if m else None
+    for cmd in SHOULD_MATCH:
+        n = _script(cmd)
+        if n:
+            assert SCRIPT_CLASS.get(n) == "safe_auto_allow", \
+                f"SHOULD_MATCH {cmd!r} but SCRIPT_CLASS[{n}]={SCRIPT_CLASS.get(n)}"
+    for cmd in SHOULD_NOT_MATCH:
+        n = _script(cmd)
+        if n:
+            assert SCRIPT_CLASS.get(n) == "must_prompt", \
+                f"SHOULD_NOT_MATCH {cmd!r} but SCRIPT_CLASS[{n}]={SCRIPT_CLASS.get(n)}"

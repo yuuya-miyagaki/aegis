@@ -2,8 +2,8 @@
 
 ```
 verdict: PASS
-mutants_total: 3
-mutants_caught: 3
+mutants_total: 5
+mutants_caught: 5
 baseline: green
 survived: []
 ```

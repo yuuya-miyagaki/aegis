@@ -2,23 +2,20 @@
   "test_command": "python3 -m pytest tests/test_permission_allowlist_install.py -q",
   "timeout_seconds": 120,
   "mutants": [
-    {
-      "file": "bin/setup.sh",
-      "line": 334,
-      "original": "    perms['allow'] = list(template['permissions'].get('allow', []))",
-      "mutated": "    perms['allow'] = []"
-    },
-    {
-      "file": "bin/setup.sh",
-      "line": 367,
-      "original": "            for a in list(fw_allow) + list(v.get('allow', [])):",
-      "mutated": "            for a in list(v.get('allow', [])):"
-    },
-    {
-      "file": "templates/hooks.template.json",
-      "line": 11,
-      "original": "      \"Bash(git status:*)\",",
-      "mutated": "      \"Bash(git xxx:*)\","
-    }
+    {"file": "tests/test_permission_allowlist_install.py", "line": 12,
+     "original": "import re",
+     "mutated": "import re_BROKEN_MUTANT"},
+    {"file": "tests/test_permission_allowlist_install.py", "line": 31,
+     "original": "    \"git show HEAD\",",
+     "mutated": "    \"git showZ HEAD\","},
+    {"file": "tests/test_permission_allowlist_install.py", "line": 210,
+     "original": "    \"record-test-result.py\": \"must_prompt\",",
+     "mutated": "    \"record-test-result.py\": \"safe_auto_allow\","},
+    {"file": "templates/hooks.template.json", "line": 9,
+     "original": "      \"Bash(python3 scripts/check_reference_drift.py:*)\",",
+     "mutated": "      \"Bash(python3 scripts/check_reference_driftX.py:*)\","},
+    {"file": "templates/hooks.template.json", "line": 17,
+     "original": "      \"Bash(git show:*)\"",
+     "mutated": "      \"Bash(git showX:*)\""}
   ]
 }

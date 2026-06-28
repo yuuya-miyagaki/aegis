@@ -16,4 +16,4 @@
 （LLM が平易日本語で記述）
 
 ## ACK
-- full suite 1166 passed/1 skip を手動実行・新規9テスト green。形式 test evidence は qa ゲートで記録（review は test 実行の領分外=trap o）。盲検2次=approve_with_notes・全 Critical/Major を実装内で解消済。 （2026-06-28 01:49）
+- tests 実行は qa ゲートの領分（trap o）。allowlist テストファイルは grill-code＋Minor1 修正後に手動で 15 passed 確認済。権威ある full suite は qa で record-test-result により検証する。コードレビュー観点（分類正当性・mutation 耐性・moat 維持）は 1次＋盲検2次(reviewer-testing) で approve_with_notes 一致。 （2026-06-28 12:22）
