@@ -47,7 +47,7 @@ if [ -z "$CMD" ]; then
     done
   fi
   if [ -n "$_raw_hit" ] || printf '%s' "$INPUT" | grep -qE 'rm[[:space:]]+(-[a-zA-Z]*[rR]|--recursive)' 2>/dev/null; then
-    emit_ask "[careful] command extraction failed but the raw payload matches a destructive pattern — confirm intent"
+    emit_ask "[careful] コマンドの解析に失敗しましたが、入力が破壊的コマンドのパターンに一致します。意図を確認してください。"
   else
     emit_allow
   fi
@@ -86,7 +86,7 @@ WARN=""
 # returned for build-artifact-only deletes, so this is a real recursive delete).
 # [rR] covers both -r (GNU) and -R (BSD/macOS) recursive flags (R4).
 if printf '%s' "$CMD" | grep -qE 'rm\s+(-[a-zA-Z]*[rR]|--recursive)' 2>/dev/null; then
-  WARN="Destructive: recursive delete (rm -r/-R). Permanently removes files."
+  WARN="破壊的: 再帰削除 (rm -r/-R)。ファイルを完全に削除します（復元できません）。"
 fi
 
 # LOWER-cased command patterns (SQL) from patterns.sh.

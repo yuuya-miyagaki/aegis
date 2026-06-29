@@ -3,7 +3,7 @@
 ## 総合: 🟡 要確認
 
 ## ティア1: 機械事実（✅検証済・高信頼）
-- テスト: green
+- テスト: unverified
 - 未完成マーカー(変更行): なし
 - シークレット: なし
 - 依存監査: unverified
@@ -12,10 +12,11 @@
 - あり: approve
 
 ## 🟡 要確認
+- テスト結果が未検証（記録なし/コード変更後）
 - 依存監査が未検証
 
 ## あなたが取るアクション
 （LLM が平易日本語で記述）
 
 ## ACK
-- 依存監査: 依存マニフェスト（requirements/pyproject/package.json 等）無改変・新規サードパーティ依存ゼロ（唯一の新 import は標準ライブラリ re）。よって脆弱性監査の対象増分なし。盲検2次 security agent も deps_clean: true で一致。 （2026-06-28 12:53）
+- tests=unverified は qa ドリル後の newest エントリ stale 由来＝直前 qa で full suite green（record-test-result manual）＋B1 drill 5/5 PASS を権威検証済・以降プロダクションコード変更なし（docs/STATUS のみ）。deps=新規依存ゼロ（テストは stdlib json/subprocess/unittest/pathlib のみ・ドリフトガードは bash source の read-only・2次 security agent が独立確認）。moat 不変は regex byte-diff＋behavioral spot-check で実証。 （2026-06-29 02:07）

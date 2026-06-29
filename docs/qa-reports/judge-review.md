@@ -7,7 +7,7 @@
 - 未完成マーカー(変更行): なし
 
 ## ティア2: 🔍 第2意見（self-attested・自己申告・低信頼）
-- あり: approve_with_notes
+- あり: approve
 
 ## 🟡 要確認
 - テスト結果が未検証（記録なし/コード変更後）
@@ -16,4 +16,4 @@
 （LLM が平易日本語で記述）
 
 ## ACK
-- tests 実行は qa ゲートの領分（trap o）。allowlist テストファイルは grill-code＋Minor1 修正後に手動で 15 passed 確認済。権威ある full suite は qa で record-test-result により検証する。コードレビュー観点（分類正当性・mutation 耐性・moat 維持）は 1次＋盲検2次(reviewer-testing) で approve_with_notes 一致。 （2026-06-28 12:22）
+- tests=unverified は意図通り＝full suite 再走/B1 drill/record-test-result は qa ゲートの領分。review はコード/設計レビュー（盲検2次 reviewer-testing=approve・moat 不変3層実証）。新規6テスト＋既存88 は手動 green・implement 時点 full suite 1177 passed/1 skip を確認済。 （2026-06-29 01:47）

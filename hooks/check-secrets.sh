@@ -48,7 +48,7 @@ if [ -z "$CMD" ]; then
   # Credential file patterns come from the lib (C-9 single owner); .env is local.
   if printf '%s' "$INPUT" | grep -qE "\.env([^.a-z]|\$)|${AEGIS_HIGH_RISK_RE}" 2>/dev/null \
      && ! printf '%s' "$INPUT" | grep -qE '\.env\.(example|template|sample)' 2>/dev/null; then
-    emit_ask "[careful] command extraction failed but the raw payload references a secret/credential file — confirm intent"
+    emit_ask "[careful] コマンドの解析に失敗しましたが、入力が秘密情報/認証ファイルを参照しています。意図を確認してください。"
   else
     emit_allow
   fi

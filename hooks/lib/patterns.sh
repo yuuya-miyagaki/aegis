@@ -13,8 +13,8 @@
 # Destructive patterns matched against the LOWER-cased command ($CMD_LOWER).
 AEGIS_DESTRUCTIVE_LOWER_REGEX=('drop\s+(table|database)' '\btruncate\b')
 AEGIS_DESTRUCTIVE_LOWER_WARN=(
-  "Destructive: SQL DROP detected."
-  "Destructive: SQL TRUNCATE detected."
+  "破壊的: SQL DROP を検出（テーブル/データベースを削除します・復元不可）。"
+  "破壊的: SQL TRUNCATE を検出（テーブルの全行を削除します・復元不可）。"
 )
 
 # Destructive patterns matched against the RAW command ($CMD).
@@ -38,22 +38,22 @@ AEGIS_DESTRUCTIVE_CMD_REGEX=(
   '(^|[^0-9>])>\s*/(etc|usr|bin|sbin|boot|sys|lib)(/|[[:space:]]|$)'
 )
 AEGIS_DESTRUCTIVE_CMD_WARN=(
-  "Destructive: git force-push rewrites remote history."
-  "Destructive: git reset --hard discards uncommitted changes."
-  "Destructive: discards all uncommitted working tree changes."
-  "Destructive: branch deletion."
-  "Destructive: discards changes to specific files."
-  "Destructive: git clean removes untracked files."
-  "Destructive: git filter-branch rewrites repository history (irreversible)."
-  "Destructive: git update-ref -d deletes a ref permanently."
-  "Destructive: git reflog expire --expire=now wipes reflog (no recovery)."
-  "Destructive: npx rimraf bulk-deletes files recursively."
-  "Destructive: find -delete bulk-deletes matching files."
-  "Destructive: dd writes directly to a device/file (overwrites raw blocks)."
-  "Destructive: recursive chmod (-R) changes permissions across a whole tree."
-  "Destructive: mkfs formats a filesystem (destroys all data on it)."
-  "Destructive: shred securely wipes files (unrecoverable)."
-  "Destructive: redirect truncates a system path."
+  "破壊的: git force-push はリモートの履歴を書き換えます（元に戻せません）。"
+  "破壊的: git reset --hard は未コミットの変更を破棄します（復元できません）。"
+  "破壊的: 作業ツリーの未コミット変更をすべて破棄します（復元できません）。"
+  "破壊的: ブランチを削除します（未マージのコミットが失われる可能性があります）。"
+  "破壊的: 指定ファイルの変更を破棄します（復元できません）。"
+  "破壊的: git clean は未追跡ファイルを削除します（復元できません）。"
+  "破壊的: git filter-branch はリポジトリ履歴を書き換えます（元に戻せません）。"
+  "破壊的: git update-ref -d は参照(ref)を完全に削除します（復元不可）。"
+  "破壊的: git reflog expire --expire=now は reflog を消去します（復旧手段が失われます）。"
+  "破壊的: npx rimraf はファイルを再帰的に一括削除します（復元できません）。"
+  "破壊的: find -delete は該当ファイルを一括削除します（復元できません）。"
+  "破壊的: dd はデバイス/ファイルに直接書き込みます（生ブロックを上書き・復元不可）。"
+  "破壊的: 再帰的な chmod (-R) はツリー全体の権限を変更します（元の権限を控えていないと戻せません）。"
+  "破壊的: mkfs はファイルシステムを初期化します（その上の全データを破壊・復元不可）。"
+  "破壊的: shred はファイルを完全消去します（復元不可）。"
+  "破壊的: リダイレクトがシステムパスを上書き(truncate)します（元の内容は失われます）。"
 )
 
 # Deploy-command detection. Single source of truth (G3, iter42): consumed by
