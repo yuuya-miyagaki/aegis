@@ -51,6 +51,31 @@ aegis_require_lib() {
   fi
 }
 
+# --- FS case-sensitivity probe (C-1, iter54) ---
+# aegis_fs_case_insensitive <root> — returns 0 when <root> sits on a
+# case-insensitive filesystem (macOS/Windows defaults), 1 otherwise.
+#
+# Probe: the framework root always carries a lowercase `hooks/` dir (the deny
+# hooks themselves live there); if the UPPERCASE spelling resolves AND is the
+# SAME directory entry (device+inode via `-ef`), the FS folds case. The `-ef`
+# check is load-bearing: a case-SENSITIVE FS can host a genuinely separate
+# user-owned `HOOKS/` dir — `-d` alone would misdetect that as case-insensitive
+# and drag the user's dir into the moat (false deny).
+#
+# AEGIS_CASE_FOLD_FORCE=1 forces case-folding ON regardless of the probe. The
+# override is STRENGTHEN-ONLY (it can only widen deny coverage); there is
+# deliberately NO off-switch env var, so session-env pollution cannot weaken
+# the moat. Consumers must pass their own probe result to child processes
+# explicitly (e.g. AEGIS_CASE_INSENSITIVE=<result> python3 ...), never inherit
+# it from the session environment.
+aegis_fs_case_insensitive() {
+  local root="$1"
+  if [ "${AEGIS_CASE_FOLD_FORCE:-}" = "1" ]; then
+    return 0
+  fi
+  [ -d "${root}/HOOKS" ] && [ "${root}/HOOKS" -ef "${root}/hooks" ]
+}
+
 # --- PostToolUse variant (I1, iter41) ---
 # post-status-audit.sh is a PostToolUse blocker; its fail-closed signal is the
 # top-level {"decision":"block"} schema, NOT PreToolUse deny. Same static-reason

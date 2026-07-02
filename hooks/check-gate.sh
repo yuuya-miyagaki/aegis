@@ -51,12 +51,32 @@ fi
 # workdirs). Absolute targets may arrive in either form.
 ROOT_REAL="$(cd "$ROOT" && pwd -P)"
 
+# C-1 (iter54): conditional case-fold. On a case-insensitive FS an Edit to
+# HOOKS/lib/emit.sh or CLAUDE.MD lands on the real control file, so the
+# protection `case` matches below run under nocasematch — but only when the
+# probe (hooks/lib/safety.sh) says the FS folds case; on a case-sensitive FS
+# an uppercase HOOKS/ is a legitimately distinct user dir. The docs/* allowlist
+# above stays case-sensitive: not folding it only OVER-gates (a DOCS/ edit
+# falls through to the plan gate), never weakens protection.
+CASE_FOLD=0
+if aegis_fs_case_insensitive "$ROOT"; then
+  CASE_FOLD=1
+fi
+
 # Lexically resolve ./ and ../ segments so non-canonical forms (././hooks/,
 # foo/../hooks/, $ROOT/./hooks/) cannot dodge the root-anchored patterns.
 # No filesystem access; unresolvable leading ..s are preserved.
 normalize_target() {
-  local p="$1" out="" seg abs=""
+  local p="$1" out="" seg abs="" had_noglob=0
   case "$p" in /*) abs="/" ;; esac
+  # S-glob-2 (iter54): the unquoted $p word-split below must NOT
+  # pathname-expand. A literal segment like [id] (Next.js route) or [h]ooks
+  # otherwise matches real files in the hook CWD and rewrites the target —
+  # e.g. Edit("[h]ooks/lib/emit.sh") glob-expanded to hooks/lib/emit.sh and
+  # produced a spurious control-plane deny. noglob is save/restored (the
+  # function runs in a $() subshell today, but do not rely on that).
+  case $- in *f*) had_noglob=1 ;; esac
+  set -f
   local IFS='/'
   for seg in $p; do
     case "$seg" in
@@ -71,6 +91,7 @@ normalize_target() {
       *) out="${out:+$out/}$seg" ;;
     esac
   done
+  [ "$had_noglob" = "1" ] || set +f
   printf '%s%s' "$abs" "$out"
 }
 
@@ -93,12 +114,17 @@ esac
 # subdirectory — classification is unknowable here, so they stay protected
 # (conservative deny).
 is_protected_dir() {
-  local path="$1" name="$2"
+  local path="$1" name="$2" rc=1
+  # C-1: nocasematch is scoped to this case and restored immediately (bash
+  # `case` honors the shopt). Guarded by if (not `&&`) so set -e survives
+  # the CASE_FOLD=0 branch.
+  if [ "$CASE_FOLD" = "1" ]; then shopt -s nocasematch; fi
   case "$path" in
     "$ROOT"/$name/*|"$ROOT_REAL"/$name/*|$name/*|../$name/*|../*/$name/*)
-      return 0 ;;
+      rc=0 ;;
   esac
-  return 1
+  if [ "$CASE_FOLD" = "1" ]; then shopt -u nocasematch; fi
+  return $rc
 }
 
 # --- Templates: framework-controlled files ---
@@ -115,16 +141,20 @@ fi
 
 # --- Framework control files: protected during project work ---
 is_control_file() {
-  local path="$1"
+  local path="$1" rc=1
   if is_protected_dir "$path" hooks || is_protected_dir "$path" scripts || \
      is_protected_dir "$path" .claude; then
     return 0
   fi
+  # C-1: fold the CLAUDE.md name match too (CLAUDE.MD is the same file on a
+  # case-insensitive FS).
+  if [ "$CASE_FOLD" = "1" ]; then shopt -s nocasematch; fi
   case "$path" in
     "$ROOT"/CLAUDE.md|"$ROOT_REAL"/CLAUDE.md|CLAUDE.md|../CLAUDE.md|../*/CLAUDE.md)
-      return 0 ;;
+      rc=0 ;;
   esac
-  return 1
+  if [ "$CASE_FOLD" = "1" ]; then shopt -u nocasematch; fi
+  return $rc
 }
 
 if is_control_file "$TARGET_FILE"; then
@@ -149,16 +179,27 @@ fi
 # Fail-safe: if $ROOT_REAL were ever empty its pattern collapses to /*, which
 # matches every absolute path into the first (keep-gating) arm — i.e. it errs
 # toward gating, never toward allowing.
-case "$TARGET_FILE" in
-  # The literal '/' after $ROOT is load-bearing: it anchors the boundary so a
-  # sibling like /path/aegis-backup does NOT match ROOT /path/aegis (no false
-  # "internal"); only true children /path/aegis/... do.
-  "$ROOT"/*|"$ROOT_REAL"/*) ;;   # inside the project root → keep gating
-  /*)
-    emit_allow
-    exit 0
-    ;;
-esac
+# C-1 (iter54): the boundary test folds case with the FS — an uppercase
+# spelling of a ROOT-internal path is the SAME project code on a
+# case-insensitive FS and must NOT escape through the external-allow arm.
+is_root_external_absolute() {
+  local t="$1" rc=1
+  if [ "$CASE_FOLD" = "1" ]; then shopt -s nocasematch; fi
+  case "$t" in
+    # The literal '/' after $ROOT is load-bearing: it anchors the boundary so a
+    # sibling like /path/aegis-backup does NOT match ROOT /path/aegis (no false
+    # "internal"); only true children /path/aegis/... do.
+    "$ROOT"/*|"$ROOT_REAL"/*) ;;   # inside the project root → keep gating
+    /*) rc=0 ;;                    # ROOT-external absolute → not project code
+  esac
+  if [ "$CASE_FOLD" = "1" ]; then shopt -u nocasematch; fi
+  return $rc
+}
+
+if is_root_external_absolute "$TARGET_FILE"; then
+  emit_allow
+  exit 0
+fi
 
 # Extract mode and plan gate from STATUS.md frontmatter.
 MODE=$(frontmatter_value "$STATUS_FILE" "mode")

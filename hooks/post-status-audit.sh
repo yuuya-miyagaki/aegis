@@ -38,6 +38,13 @@ fi
 # Resolve framework root (allow CLAUDE_PROJECT_DIR override for test fixtures
 # that source hooks from a copy laid out outside the framework repo).
 ROOT="${CLAUDE_PROJECT_DIR:-$(cd "${SCRIPT_DIR}/.." && pwd)}"
+# C-1 (iter54, security 2次 N-1): the case-fold probe uses a root derived
+# STRICTLY from SCRIPT_DIR — NOT the CLAUDE_PROJECT_DIR-overridable ROOT — so
+# it matches the sibling deny hooks' env-independent basis. Otherwise pointing
+# CLAUDE_PROJECT_DIR at a dir without hooks/ would flip the probe to fold-off
+# and let a docs/STATUS.MD tamper skip the audit. (The hook is always installed
+# at <root>/hooks/, so SCRIPT_DIR/.. is the true framework root.)
+PROBE_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 STATUS_FILE="${ROOT}/docs/STATUS.md"
 SNAPSHOT_FILE="${ROOT}/.claude/.gate-snapshot"
 AUDIT_SKIP_LOG="${ROOT}/.claude/.audit-skip.log"
@@ -76,13 +83,25 @@ INPUT=$(cat)
 # The matcher is `Edit|Write|NotebookEdit`, and this `case "$TARGET_FILE" in
 # *STATUS.md` is the authoritative filter covering all three tool variants.
 TARGET_FILE=$(extract_file_path "$INPUT")
-case "$TARGET_FILE" in
-  *STATUS.md) ;; # proceed with audit
-  *)
-    emit_allow
-    exit 0
-    ;;
-esac
+# C-1 (iter54, grill-code Critical): on a case-insensitive FS an
+# Edit(docs/STATUS.MD) rewrites the REAL docs/STATUS.md, but a case-sensitive
+# `*STATUS.md` filter skipped the ENTIRE audit — gate/task/phase/mode tamper
+# went undetected (and check-gate's docs/* allowlist waves the Edit through).
+# Fold ONLY on a case-insensitive FS (same probe the deny hooks use); on a
+# case-sensitive FS a literal STATUS.MD is a genuinely different file and the
+# filter stays byte-exact `*STATUS.md` (no over-audit of a lowercase
+# build-status.md — 2次レビュー Minor-2).
+if aegis_fs_case_insensitive "$PROBE_ROOT"; then
+  case "$(printf '%s' "$TARGET_FILE" | tr '[:upper:]' '[:lower:]')" in
+    *status.md) ;; # proceed with audit (folded)
+    *) emit_allow; exit 0 ;;
+  esac
+else
+  case "$TARGET_FILE" in
+    *STATUS.md) ;; # proceed with audit
+    *) emit_allow; exit 0 ;;
+  esac
+fi
 
 # K-7 (v1.6.2) consumer policy: snapshot lifecycle.
 #   - STATUS.md missing → can't compare, skip audit (no allowance log).

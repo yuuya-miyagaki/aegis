@@ -84,17 +84,37 @@ CONTROL_PLANE="${CONTROL_PLANE}|\\\$[A-Za-z_{][A-Za-z0-9_}]*/(${CP_DIRS})/"
 # well as `${VAR:-hooks/lib/...}` (path inside the braces).
 CONTROL_PLANE="${CONTROL_PLANE}|:[-=+](${CP_DIRS})}?/"
 
+# C-1 (iter54): conditional case-fold. On a case-insensitive FS (macOS/Windows
+# defaults) `cp evil HOOKS/lib/emit.sh` writes to the REAL hooks/lib/emit.sh,
+# so every control-plane DENY comparison below must fold case — but only
+# there: on a case-sensitive FS an uppercase HOOKS/ is a legitimately distinct
+# user dir (probe + strengthen-only AEGIS_CASE_FOLD_FORCE live in
+# hooks/lib/safety.sh). Allow-side carve-outs (allowlist scripts, read-only
+# starts, bare git stage) intentionally stay case-sensitive: folding them
+# would WIDEN allow, the wrong direction. CASE_I is spliced into greps via the
+# bash-3.2-safe ${arr[@]+...} idiom; the python resolver receives
+# AEGIS_CASE_INSENSITIVE explicitly per-invocation (never inherited from the
+# session env — see safety.sh).
+CASE_FOLD=0
+if aegis_fs_case_insensitive "$ROOT"; then
+  CASE_FOLD=1
+fi
+CASE_I=()
+if [ "$CASE_FOLD" = "1" ]; then
+  CASE_I=(-i)
+fi
+
 # True when TEXT references this project's control plane (regex form + literal
 # absolute paths under the project root — the boundary regex intentionally skips
 # /-preceded names, so absolute paths need the fixed-string pass). Shared by the
 # raw (fail-closed) and the masked (precise) passes of the mention check.
 _text_mentions_cp() {
   local text="$1" base
-  if printf '%s' "$text" | grep -qE "$CONTROL_PLANE"; then
+  if printf '%s' "$text" | grep ${CASE_I[@]+"${CASE_I[@]}"} -qE "$CONTROL_PLANE"; then
     return 0
   fi
   for base in "$ROOT" "$ROOT_REAL"; do
-    if printf '%s' "$text" | grep -qF \
+    if printf '%s' "$text" | grep ${CASE_I[@]+"${CASE_I[@]}"} -qF \
         -e "${base}/hooks/" -e "${base}/scripts/" -e "${base}/templates/"; then
       return 0
     fi
@@ -228,7 +248,7 @@ cmd_token_verdict() {
   # the raw branch of cmd_mentions_control_plane, so a command reaching here has
   # no CP literal; we may safely replace each remaining cmdsub / $VAR with an
   # opaque sentinel and tokenize/resolve. pwd / $PWD are the agent's cwd = ROOT.
-  local cmd="$1" verdict rc
+  local cmd="$1" verdict rc gate_probe
   # Gate: a CP-dir reconstruction names the dir (hooks/scripts/templates), hides
   # it behind a quote / backslash, SPLITS it across an expansion — brace
   # `${VAR:-..}` / `{a,b}` (both contain `{`), cmdsub `$(..)`, or backtick (round6
@@ -240,7 +260,14 @@ cmd_token_verdict() {
   # widens the spawn set but the resolver still costs only one short python run).
   # Patterns with shell-special chars are single-quoted so the case does not
   # parameter-expand or glob them.
-  case "$cmd" in
+  # C-1 (iter54): the gate itself must fold — bare `rm -rf HOOKS` carries no
+  # quote/glob and no lowercase CP substring, so without folding the resolver
+  # (the only layer that catches bare/absolute forms) never even spawns.
+  gate_probe="$cmd"
+  if [ "$CASE_FOLD" = "1" ]; then
+    gate_probe=$(printf '%s' "$cmd" | tr '[:upper:]' '[:lower:]')
+  fi
+  case "$gate_probe" in
     *hooks*|*scripts*|*templates*|*\'*|*\"*|*\\*|*'{'*|*'$('*|*'`'*|*'?'*|*'*'*|*'['*) : ;;
     *) echo none; return ;;
   esac
@@ -250,6 +277,7 @@ cmd_token_verdict() {
   command -v python3 >/dev/null 2>&1 || { echo none; return; }
   verdict=$(AEGIS_CMD="$cmd" AEGIS_CP_RE="$CONTROL_PLANE" AEGIS_CP_DIRS="$CP_DIRS" \
             AEGIS_ROOT="$ROOT" AEGIS_ROOT_REAL="$ROOT_REAL" \
+            AEGIS_CASE_INSENSITIVE="$CASE_FOLD" \
             python3 - <<'PY' 2>/dev/null
 import fnmatch, os, re, shlex, sys
 
@@ -289,7 +317,20 @@ def decode_ansic(s):
 
 SENT = "\x01"  # opaque placeholder for an unresolved cmdsub / $VAR (no slash)
 cmd = decode_ansic(os.environ.get("AEGIS_CMD", ""))
-cp_re = re.compile(os.environ.get("AEGIS_CP_RE", ""))
+# C-1 (iter54): AEGIS_CASE_INSENSITIVE is set EXPLICITLY by the hook from its
+# own FS probe (never inherited from the session env — a session-set value is
+# overwritten at invocation, so it cannot weaken the moat). When on, every
+# comparison folds: cp_re gets IGNORECASE, and cp_targets / cp_glob / cp_dirs
+# membership goes through _fold (casefold both sides).
+CASEFOLD = os.environ.get("AEGIS_CASE_INSENSITIVE", "") == "1"
+
+
+def _fold(s):
+    return s.casefold() if CASEFOLD else s
+
+
+cp_re = re.compile(os.environ.get("AEGIS_CP_RE", ""),
+                   re.IGNORECASE if CASEFOLD else 0)
 cp_dirs = [d for d in os.environ.get("AEGIS_CP_DIRS", "").split("|") if d]
 root = os.environ.get("AEGIS_ROOT", "")
 root_real = os.environ.get("AEGIS_ROOT_REAL", "")
@@ -297,18 +338,20 @@ cp_targets = set()
 for base in (root, root_real):
     if base:
         for d in cp_dirs:
-            cp_targets.add(os.path.normpath(os.path.join(base, d)))
+            cp_targets.add(_fold(os.path.normpath(os.path.join(base, d))))
 # round8: absolute CP paths for GLOB matching — the dirs PLUS the named files and
 # the .claude dir at their real locations. A glob token is compared component-wise
 # (fnmatch) against these as a PATH PREFIX so position is respected: `build/*` is
 # under none of them, but bare `*` and `*/lib` are under hooks. cp_re still covers
 # the LITERAL forms; this set only adds the glob-resolved deny.
+# NB: cp_targets / cp_glob entries are stored FOLDED; every membership probe
+# below must fold its own side before comparing.
 cp_glob = set(cp_targets)
 for base in (root, root_real):
     if base:
-        cp_glob.add(os.path.normpath(os.path.join(base, ".claude")))
-        cp_glob.add(os.path.normpath(os.path.join(base, "CLAUDE.md")))
-        cp_glob.add(os.path.normpath(os.path.join(base, "docs", "STATUS.md")))
+        cp_glob.add(_fold(os.path.normpath(os.path.join(base, ".claude"))))
+        cp_glob.add(_fold(os.path.normpath(os.path.join(base, "CLAUDE.md"))))
+        cp_glob.add(_fold(os.path.normpath(os.path.join(base, "docs", "STATUS.md"))))
 
 # NB: backticks are written \x60 (hex) — a LITERAL ` inside this $(... <<'PY')
 # heredoc breaks the bash parser (it scans for a matching ` even in the quoted
@@ -367,16 +410,16 @@ def _glob_hits_cp(ap):
     # ap is a normalized absolute path that still contains glob metachars. It is a
     # control-plane target when some cp_glob path is a PREFIX of it under
     # component-wise fnmatch: each CP component must be matched by the aligned ap
-    # component (the glob pattern). fnmatch(name, pattern) -> name = literal CP
-    # component, pattern = ap component. Case sensitivity follows the platform FS
-    # via fnmatch (conservative on a case-insensitive FS: HOOK? -> hooks). The
-    # prefix/position rule keeps build/* out (its first component is the literal
-    # build, matching no CP component) while catching bare * and */lib.
-    ap_parts = ap.split(os.sep)
-    for t in cp_glob:
+    # component (the glob pattern). fnmatchcase(name, pattern) -> name = literal
+    # CP component, pattern = ap component. C-1 (iter54): case sensitivity is
+    # decided by OUR probe (both sides folded when CASEFOLD), not by python's
+    # platform normcase — posix python treats macOS as case-sensitive, which is
+    # exactly the mismatch that let HOOK?/HOOKS glob forms through.
+    ap_parts = _fold(ap).split(os.sep)
+    for t in cp_glob:  # entries already folded
         t_parts = t.split(os.sep)
         if len(ap_parts) >= len(t_parts) and all(
-                fnmatch.fnmatch(t_parts[i], ap_parts[i]) for i in range(len(t_parts))):
+                fnmatch.fnmatchcase(t_parts[i], ap_parts[i]) for i in range(len(t_parts))):
             return True
     return False
 
@@ -391,10 +434,11 @@ def classify_one(w):
     unknown = SENT in w
     base = w if os.path.isabs(w) else os.path.join(root, w)
     ap = os.path.normpath(base)
+    apf = _fold(ap)  # cp_targets entries are stored folded (C-1)
     if not unknown:
         if cp_re.search(w):
             return "deny"
-        if ap in cp_targets or any(ap.startswith(t + os.sep) for t in cp_targets):
+        if apf in cp_targets or any(apf.startswith(t + os.sep) for t in cp_targets):
             return "deny"
         # round8: a glob/wildcard/char-class token whose runtime expansion (cwd=
         # ROOT) lands on a CP path. Resolved statically via fnmatch against the
@@ -402,7 +446,7 @@ def classify_one(w):
         if _has_glob(w) and _glob_hits_cp(ap):
             return "deny"
         return "no"
-    if any(c in cp_dirs for c in ap.split(os.sep)):
+    if any(c in cp_dirs for c in apf.split(os.sep)):
         return "ask"
     if cp_re.search(w):
         return "ask"
@@ -414,8 +458,9 @@ def classify_one(w):
     we = w.replace(SENT, "")
     if we and we != w:
         ae = os.path.normpath(we if os.path.isabs(we) else os.path.join(root, we))
-        if cp_re.search(we) or ae in cp_targets \
-                or any(ae.startswith(t + os.sep) for t in cp_targets):
+        aef = _fold(ae)
+        if cp_re.search(we) or aef in cp_targets \
+                or any(aef.startswith(t + os.sep) for t in cp_targets):
             return "ask"
         # round8b: the empty-glued form may itself be a CP-resolving GLOB
         # (ho${E}ok? -> hook? -> hooks). The literal re-test above misses it, so
@@ -534,7 +579,7 @@ def classify(w, extract_eq=False):
         if "{" in t or "}" in t:
             arms = _brace_expand(t)
             if arms is None:
-                if any(re.search(r"(^|[{,/])" + re.escape(d) + r"([},/]|$)", t)
+                if any(re.search(r"(^|[{,/])" + re.escape(d) + r"([},/]|$)", _fold(t))
                        for d in cp_dirs) and _ORDER["ask"] > _ORDER[best]:
                     best = "ask"
                 arms = [t]
@@ -750,7 +795,7 @@ if [ -n "$CMD" ]; then
 else
   # Extraction failed — fall back to the raw input. A control plane mention
   # anywhere then keeps the deny path active (fail-closed).
-  if ! printf '%s' "$INPUT" | grep -qE "$CONTROL_PLANE"; then
+  if ! printf '%s' "$INPUT" | grep ${CASE_I[@]+"${CASE_I[@]}"} -qE "$CONTROL_PLANE"; then
     emit_allow
     exit 0
   fi

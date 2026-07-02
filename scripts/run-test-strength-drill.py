@@ -93,10 +93,25 @@ def parse_spec(path: Path) -> dict:
     return data
 
 
+def _quoted_residual(path: str) -> bool:
+    """True when a git-emitted path is still quoted/garbled after
+    core.quotepath=off — i.e. it contains control characters (git quotes those
+    unconditionally) or failed to decode (errors="replace" marker). Such a path
+    does not exist on disk under that spelling, so downstream reads would
+    silently skip it — the exact silent-green C-4 closed."""
+    return path.startswith('"') or "�" in path
+
+
 def _tracked_added_lines(root: Path, ref: str) -> dict[str, set[int]]:
     try:
         out = subprocess.run(
-            ["git", "-C", str(root), "diff", "--unified=0", ref],
+            # C-4 (iter54): core.quotepath defaults to ON, mangling non-ASCII
+            # paths (テスト.py) into quoted octal escapes; the garbled name then
+            # missed every disk read and the file silently vanished from the
+            # drill scope AND the judge's secret/stub scans (false-green).
+            # Same hardening as hooks/lib/fingerprint.sh:54.
+            ["git", "-C", str(root), "-c", "core.quotepath=off",
+             "diff", "--unified=0", ref],
             capture_output=True, text=True, check=True,
             errors="replace",  # binary-ish diffs must not crash scope discovery
         ).stdout
@@ -108,6 +123,21 @@ def _tracked_added_lines(root: Path, ref: str) -> dict[str, set[int]]:
     for line in out.splitlines():
         if line.startswith("+++ "):
             path = line[4:].strip()
+            # C-4: a path that is STILL quoted (control chars) cannot be read
+            # back under this spelling. Excluded prefixes (docs/, vendor) are
+            # out of drill scope anyway; anything else fails CLOSED — a silent
+            # `continue` here would recreate the same false-green class.
+            if _quoted_residual(path):
+                probe = path.strip('"')
+                probe = probe[2:] if probe.startswith("b/") else probe
+                if _drill_excluded(probe):
+                    cur_file = None
+                    new_lineno = None
+                    continue
+                raise DrillError(
+                    f"git emitted a quoted path even with core.quotepath=off "
+                    f"(control characters in the name?): {path!r} — "
+                    f"fail-closed; rename the file to a scannable name")
             cur_file = path[2:] if path.startswith("b/") else (
                 None if path == "/dev/null" else path)
             new_lineno = None
@@ -126,12 +156,30 @@ def _tracked_added_lines(root: Path, ref: str) -> dict[str, set[int]]:
 def _untracked_files(root: Path) -> list[str]:
     try:
         out = subprocess.run(
-            ["git", "-C", str(root), "ls-files", "--others", "--exclude-standard"],
-            capture_output=True, text=True, check=True,
+            # C-4 (iter54): quotepath=off + errors="replace" — see
+            # _tracked_added_lines for the rationale.
+            ["git", "-C", str(root), "-c", "core.quotepath=off",
+             "ls-files", "--others", "--exclude-standard"],
+            capture_output=True, text=True, check=True, errors="replace",
         ).stdout
     except (subprocess.CalledProcessError, OSError) as exc:
         raise DrillError(f"git ls-files failed: {exc}")
-    return [p for p in out.splitlines() if p]
+    files: list[str] = []
+    for p in out.splitlines():
+        if not p:
+            continue
+        # C-4: still-quoted names fail closed unless the path is outside drill
+        # scope anyway (docs/, vendor) — mirrors _tracked_added_lines.
+        if _quoted_residual(p):
+            probe = p.strip('"')
+            if _drill_excluded(probe):
+                continue
+            raise DrillError(
+                f"git emitted a quoted path even with core.quotepath=off "
+                f"(control characters in the name?): {p!r} — "
+                f"fail-closed; rename the file to a scannable name")
+        files.append(p)
+    return files
 
 
 def resolve_diff_ref(root: Path) -> str:

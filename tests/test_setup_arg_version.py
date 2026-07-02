@@ -157,28 +157,40 @@ class TestC2ArgParserBothForms(unittest.TestCase):
 class TestC3VersionHeredoc(unittest.TestCase):
     """C3: version heredoc の dead first path を解消し python 主経路を機能させる。"""
 
-    def _heredoc_body(self) -> str:
-        """bin/setup.sh の唯一の <<'PY' ... PY ブロックの body（呼出行と終端 PY を除く）。"""
+    def _heredoc_bodies(self) -> list:
+        """bin/setup.sh の全 <<'PY' ... PY ブロックの body（呼出行と終端 PY を除く）。
+
+        iter54 C-2 で heredoc は 1→複数（profile 検証・parse_json_array・
+        generate_settings も argv 経由の quoted heredoc に統一）。契約は
+        「全 heredoc が argv でパスを受け、$VAR 展開に依存しない」に拡張。
+        """
         lines = SETUP_SH.read_text().splitlines()
         starts = [i for i, l in enumerate(lines) if "<<'PY'" in l]
-        self.assertEqual(len(starts), 1,
-                         f"expected exactly one <<'PY' heredoc, found {len(starts)}")
-        s = starts[0]
-        ends = [i for i in range(s + 1, len(lines)) if lines[i].strip() == "PY"]
-        self.assertTrue(ends, "heredoc terminator 'PY' not found")
-        return "\n".join(lines[s + 1:ends[0]])
+        self.assertGreaterEqual(len(starts), 1, "expected at least one <<'PY' heredoc")
+        bodies = []
+        for s in starts:
+            ends = [i for i in range(s + 1, len(lines)) if lines[i].strip() == "PY"]
+            self.assertTrue(ends, f"heredoc terminator 'PY' not found after line {s}")
+            bodies.append("\n".join(lines[s + 1:ends[0]]))
+        return bodies
 
     def test_heredoc_uses_argv_not_framework_root_var(self):
-        """静的: heredoc body は sys.argv を読み、$FRAMEWORK_ROOT を含まない。
+        """静的: 全 heredoc body は sys.argv を読み、$FRAMEWORK_ROOT 等の
+        シェル変数参照を含まない。
 
         修正前は body に pathlib.Path("$FRAMEWORK_ROOT/...") があり（クォート
-        heredoc 内で非展開＝dead path）、sys.argv は無い。
+        heredoc 内で非展開＝dead path）、sys.argv は無い。iter54 C-2 で同じ
+        不変条件を全 heredoc（profile 検証／parse_json_array／generate_settings）
+        に適用（inline `python3 -c "...'$var'..."` は `'` 入りパスで壊れる）。
         """
-        body = self._heredoc_body()
-        self.assertIn("sys.argv", body,
-                      "heredoc body must read the path from sys.argv")
-        self.assertNotIn("$FRAMEWORK_ROOT", body,
-                         "quoted heredoc body must not rely on $FRAMEWORK_ROOT (non-expanded = dead path)")
+        for i, body in enumerate(self._heredoc_bodies()):
+            self.assertIn("sys.argv", body,
+                          f"heredoc #{i} body must read paths from sys.argv")
+            self.assertNotIn("$FRAMEWORK_ROOT", body,
+                             f"heredoc #{i}: quoted body must not rely on "
+                             f"$FRAMEWORK_ROOT (non-expanded = dead path)")
+            self.assertNotIn("$TARGET", body,
+                             f"heredoc #{i}: quoted body must not rely on $TARGET")
 
     def test_python_primary_path_resolves_version(self):
         """positive-control: python 主経路が実際に version を返すことの実証。

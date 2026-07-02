@@ -44,10 +44,20 @@ CMD=$(extract_command "$INPUT")
 
 # If no command extracted, allow — UNLESS the raw payload still references a
 # secret/credential file (defense-in-depth fail-closed fallback for truncated JSON).
+# C-1 (iter54): credential-name matching is case-folded UNCONDITIONALLY (no FS
+# probe): on a case-insensitive FS `key.PEM` IS the real key file, and on a
+# case-sensitive FS an uppercase-named key is still a real key file — folding
+# is a pure widening of the deny (never a correctness risk). Mechanism: the
+# TEXT is lowercased (tr) and matched against the existing lowercase patterns,
+# NOT `grep -i` — bracket expressions like [^.a-z] interact ambiguously with -i
+# across grep implementations. The fold is applied SYMMETRICALLY: every folded
+# positive pattern has its safe-variant exclusion / strip folded too, so
+# `.ENV.EXAMPLE` does not become a false deny.
 if [ -z "$CMD" ]; then
+  RAW_LC=$(printf '%s' "$INPUT" | tr '[:upper:]' '[:lower:]')
   # Credential file patterns come from the lib (C-9 single owner); .env is local.
-  if printf '%s' "$INPUT" | grep -qE "\.env([^.a-z]|\$)|${AEGIS_HIGH_RISK_RE}" 2>/dev/null \
-     && ! printf '%s' "$INPUT" | grep -qE '\.env\.(example|template|sample)' 2>/dev/null; then
+  if printf '%s' "$RAW_LC" | grep -qE "\.env([^.a-z]|\$)|${AEGIS_HIGH_RISK_RE}" 2>/dev/null \
+     && ! printf '%s' "$RAW_LC" | grep -qE '\.env\.(example|template|sample)' 2>/dev/null; then
     emit_ask "[careful] コマンドの解析に失敗しましたが、入力が秘密情報/認証ファイルを参照しています。意図を確認してください。"
   else
     emit_allow
@@ -105,8 +115,13 @@ _aegis_git_dir_args() {
   printf -- '%s\n%s\n' "$flag" "$path"
 }
 
+# C-1 (iter54): lowercased command text for credential-NAME matching (see the
+# fold rationale at the fallback above). The git verb/option regexes use
+# [A-Za-z] classes, so they match unchanged on lowercased text.
+CMD_LC=$(printf '%s' "$CMD" | tr '[:upper:]' '[:lower:]')
+
 # --- Check 0: Deny staging high-risk credential files (Form 1: command-text regex) ---
-if printf '%s' "$CMD" | grep -qE "git[[:space:]]+${GIT_PRE_OPTS}${GIT_STAGE_VERB}([[:space:]]+(--[A-Za-z][-A-Za-z0-9]*[[:space:]]+)*)?.*(${AEGIS_HIGH_RISK_RE})" 2>/dev/null; then
+if printf '%s' "$CMD_LC" | grep -qE "git[[:space:]]+${GIT_PRE_OPTS}${GIT_STAGE_VERB}([[:space:]]+(--[A-Za-z][-A-Za-z0-9]*[[:space:]]+)*)?.*(${AEGIS_HIGH_RISK_RE})" 2>/dev/null; then
   emit_deny "[secrets] 高リスク認証ファイル (PEM鍵/SSH鍵/credentials.json/service-account.json 等) を git に追加しないでください。鍵が漏洩します。"
   exit 0
 fi
@@ -115,34 +130,42 @@ fi
 # Exclude safe variants: .env.example, .env.template, .env.sample
 
 # Strip safe variants from command text, then check for remaining .env refs.
-STRIPPED=$(printf '%s' "$CMD" | sed -E "s/${SAFE_ENV_SUFFIXES}//g")
+# C-1: strip runs on the LOWERCASED text so `.ENV.EXAMPLE` is stripped exactly
+# like `.env.example` (symmetric fold — a case-variant safe file must not
+# become a false deny).
+STRIPPED=$(printf '%s' "$CMD_LC" | sed -E "s/${SAFE_ENV_SUFFIXES}//g")
 
 # Direct .env staging across all variants. Case-insensitive: on case-insensitive
 # FS (macOS/Windows default) `git add .ENV` stages the real `.env` secret.
-if printf '%s' "$STRIPPED" | grep -qiE "git[[:space:]]+${GIT_PRE_OPTS}${GIT_STAGE_VERB}([[:space:]]+(--[A-Za-z][-A-Za-z0-9]*[[:space:]]+)*)?.*\.env" 2>/dev/null; then
+if printf '%s' "$STRIPPED" | grep -qE "git[[:space:]]+${GIT_PRE_OPTS}${GIT_STAGE_VERB}([[:space:]]+(--[A-Za-z][-A-Za-z0-9]*[[:space:]]+)*)?.*\.env" 2>/dev/null; then
   emit_deny "[secrets] .env ファイルを git に追加しないでください。認証情報がリポジトリに漏洩します。"
   exit 0
 fi
 
 # Broad staging that would include .env or high-risk credentials: git add -A, git add .
 # Only `add` (not stage / update-index) has the -A/--all/. broad-stage spellings.
-if printf '%s' "$CMD" | grep -qE "git[[:space:]]+${GIT_PRE_OPTS}add[[:space:]]+(-A|--all|\.)" 2>/dev/null; then
+# C-1: matched on CMD_LC so `GIT ADD -a` folds too; `-A` is spelled `-a` here.
+if printf '%s' "$CMD_LC" | grep -qE "git[[:space:]]+${GIT_PRE_OPTS}add[[:space:]]+(-a|--all|\.)" 2>/dev/null; then
   ROOT=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
 
   # v0.13.0 Phase 0b NO-GO fix: broad staging must also catch high-risk credentials
   # (these have no "safe variant", so any presence in the repo is risky).
   # Form 3 (find -name globs) + Form 2 (basename case glob): broad capture by
   # find, then tight match by case.
+  # C-1 (iter54): -iname (was -name) — a KEY.PEM / ID_RSA in the repo is a real
+  # credential file on ANY filesystem; the over-fetch step folds case.
   FIND_ARGS=()
   for _name in "${AEGIS_HIGH_RISK_FIND_NAMES[@]}"; do
-    FIND_ARGS+=( -name "$_name" -o )
+    FIND_ARGS+=( -iname "$_name" -o )
   done
   # Trim the trailing -o.
   unset 'FIND_ARGS[${#FIND_ARGS[@]}-1]'
 
   HAS_HIGH_RISK=false
   while IFS= read -r f; do
-    BN=$(basename "$f")
+    # C-1: fold the basename before the tight gate — the form-2 globs are
+    # lowercase and [[ == ]] is case-sensitive.
+    BN=$(basename "$f" | tr '[:upper:]' '[:lower:]')
     # Iterate AEGIS_HIGH_RISK_CASE_GLOB_ARR — `case "$x" in $JOINED)` does NOT
     # honor `|` as alternation after variable expansion (the whole expanded
     # string becomes ONE pattern). Per-entry [[ == glob ]] preserves the
@@ -170,11 +193,13 @@ if printf '%s' "$CMD" | grep -qE "git[[:space:]]+${GIT_PRE_OPTS}add[[:space:]]+(
   # Recursive search handles monorepo layouts (e.g., services/api/.env).
   HAS_SECRET_ENV=false
   while IFS= read -r f; do
-    case "$(basename "$f")" in
+    # C-1: -iname over-fetches case variants; the folded basename keeps the
+    # safe-variant exemption symmetric (.ENV.EXAMPLE is exempt like .env.example).
+    case "$(basename "$f" | tr '[:upper:]' '[:lower:]')" in
       .env.example|.env.template|.env.sample) ;;
       *) HAS_SECRET_ENV=true; break ;;
     esac
-  done < <(find "$ROOT" -name '.env*' \
+  done < <(find "$ROOT" -iname '.env*' \
     -not -path '*/node_modules/*' \
     -not -path '*/.git/*' \
     -not -path '*/vendor/*' \
@@ -191,18 +216,24 @@ fi
 # grill-code A-S4 (v1.6.1): commit verb also accepts the same GIT_PRE_OPTS
 # prefix as the staging verbs above. Without this, `git --git-dir=.git
 # --work-tree=. commit` and `git -C dir commit` skipped the staged-diff check.
-if printf '%s' "$CMD" | grep -qE "git[[:space:]]+${GIT_PRE_OPTS}commit" 2>/dev/null; then
+# C-1 (iter54): the TRIGGER matches on CMD_LC (a `GIT COMMIT` resolves to
+# /bin/git via the FS on a case-insensitive system); the -C/--git-dir path
+# EXTRACTION below stays on the raw $CMD — folding it would corrupt the path.
+if printf '%s' "$CMD_LC" | grep -qE "git[[:space:]]+${GIT_PRE_OPTS}commit" 2>/dev/null; then
   # G2: resolve -C/--git-dir so the staged-diff scan targets the right repo.
   # Empty when absent → git runs in the hook CWD (current behavior, no regression).
   GIT_DIR_ARGS=()
   while IFS= read -r _a; do [ -n "$_a" ] && GIT_DIR_ARGS+=("$_a"); done < <(_aegis_git_dir_args "$CMD")
   # v0.13.0 Phase 0b NO-GO fix: high-risk credential files in staged diff (Form 4).
-  if git ${GIT_DIR_ARGS[@]+"${GIT_DIR_ARGS[@]}"} diff --cached --name-only 2>/dev/null | grep -E "${AEGIS_HIGH_RISK_STAGED_RE}" | grep -q . 2>/dev/null; then
+  # C-1 (iter54): staged names are folded (tr) before matching, so KEY.PEM is
+  # caught; the .env safe-variant -v exclusion runs on the SAME folded stream
+  # (symmetric — a staged .ENV.EXAMPLE stays allowed).
+  if git ${GIT_DIR_ARGS[@]+"${GIT_DIR_ARGS[@]}"} diff --cached --name-only 2>/dev/null | tr '[:upper:]' '[:lower:]' | grep -E "${AEGIS_HIGH_RISK_STAGED_RE}" | grep -q . 2>/dev/null; then
     emit_deny "[secrets] 高リスク認証ファイル (PEM鍵/SSH鍵/credentials.json/service-account.json) がステージングされています。git reset HEAD でファイル名を指定して除外してからコミットしてください。"
     exit 0
   fi
   # Check if any secret .env file is in the staging area (exclude safe variants)
-  if git ${GIT_DIR_ARGS[@]+"${GIT_DIR_ARGS[@]}"} diff --cached --name-only 2>/dev/null | grep -E '\.env' | grep -vE "${SAFE_ENV_SUFFIXES}$" | grep -q . 2>/dev/null; then
+  if git ${GIT_DIR_ARGS[@]+"${GIT_DIR_ARGS[@]}"} diff --cached --name-only 2>/dev/null | tr '[:upper:]' '[:lower:]' | grep -E '\.env' | grep -vE "${SAFE_ENV_SUFFIXES}$" | grep -q . 2>/dev/null; then
     emit_deny "[secrets] .env ファイルがステージングされています。git reset HEAD .env で除外してからコミットしてください。"
     exit 0
   fi
@@ -230,7 +261,8 @@ fi
 # かつ word-boundary 付きの `.env` か高リスク認証ファイル参照があれば ASK。
 # safe variants (.env.example/.template/.sample) は事前 strip して
 # false-positive を抑止（grill 要検討 2）。
-K4_STRIPPED=$(printf '%s' "$CMD" | sed -E "s/${SAFE_ENV_SUFFIXES}//g")
+# C-1 (iter54): lowercase-then-strip keeps the fold symmetric here too.
+K4_STRIPPED=$(printf '%s' "$CMD_LC" | sed -E "s/${SAFE_ENV_SUFFIXES}//g")
 if printf '%s' "$CMD" | grep -qE '\$\(|`' 2>/dev/null && \
    { printf '%s' "$K4_STRIPPED" | grep -qE "(^|[^A-Za-z0-9_])\\.env([^A-Za-z0-9_]|$)" 2>/dev/null || \
      printf '%s' "$K4_STRIPPED" | grep -qE "${AEGIS_HIGH_RISK_RE}" 2>/dev/null; }; then
@@ -243,7 +275,9 @@ fi
 # (e.g., echo "KEY=val" > .env, cp template .env)
 # Safe variants (.env.example, .env.template, .env.sample) are excluded.
 
-STRIPPED_WRITE=$(printf '%s' "$CMD" | sed -E "s/${SAFE_ENV_SUFFIXES}//g")
+# C-1 (iter54): lowercase-then-strip (symmetric fold; `cp x .ENV` is a real
+# secret .env on a case-insensitive FS).
+STRIPPED_WRITE=$(printf '%s' "$CMD_LC" | sed -E "s/${SAFE_ENV_SUFFIXES}//g")
 if printf '%s' "$STRIPPED_WRITE" | grep -qE '>\s*\.env|>\s*\S+/\.env|cp\s+.*\.env' 2>/dev/null; then
   ROOT=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
   if [ -f "${ROOT}/.gitignore" ]; then

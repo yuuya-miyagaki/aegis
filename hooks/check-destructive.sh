@@ -61,6 +61,13 @@ CMD_LOWER=$(printf '%s' "$CMD" | tr '[:upper:]' '[:lower:]')
 SAFE_TARGETS=$(printf '%s' "$CMD" | sed -E 's/^[[:space:]]*rm[[:space:]]+(-[a-zA-Z]+[[:space:]]+)*//;s/--recursive[[:space:]]*//;s/--force[[:space:]]*//')
 if [ -n "$SAFE_TARGETS" ]; then
   SAFE_ONLY=true
+  # S-glob-1 (iter54): word-split WITHOUT pathname expansion. The unquoted
+  # $SAFE_TARGETS previously glob-expanded against the hook CWD, so in a
+  # build/dist-only directory `rm -rf *` turned `*` into "build dist" and the
+  # safe-artifact exception swallowed the warning (fail-open). noglob is
+  # save/restored so later patterns are untouched.
+  case $- in *f*) _had_noglob=1 ;; *) _had_noglob=0 ;; esac
+  set -f
   for target in $SAFE_TARGETS; do
     case "$target" in
       */node_modules|node_modules|*/dist|dist|*/__pycache__|__pycache__|*/build|build|*/coverage|coverage|*/.next|.next|*/.turbo|.turbo|*/.cache|.cache)
@@ -73,6 +80,7 @@ if [ -n "$SAFE_TARGETS" ]; then
         ;;
     esac
   done
+  [ "$_had_noglob" = "1" ] || set +f
   if [ "$SAFE_ONLY" = true ]; then
     emit_allow
     exit 0

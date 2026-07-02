@@ -91,6 +91,26 @@ if [[ ! -f "$PROFILE_JSON" ]]; then
   exit 1
 fi
 
+# C-2 (iter54): validate the profile JSON up front, fail-closed. A broken
+# profile previously made every parse_json_array call fail inside process
+# substitutions / `|| return 0` guards, all of which swallow the error —
+# ending with "Setup complete." rc 0 and ZERO files installed (a fail-open
+# install = no moat at all). The path goes via argv (quoted heredoc body is
+# not shell-expanded), so a framework path containing `'` cannot break it.
+if ! python3 - "$PROFILE_JSON" <<'PY'
+import json, sys
+try:
+    with open(sys.argv[1]) as f:
+        json.load(f)
+except Exception as exc:
+    sys.stderr.write("ERROR: profile JSON is not valid: %s\n       parse error: %s\n"
+                     % (sys.argv[1], exc))
+    sys.exit(1)
+PY
+then
+  exit 1
+fi
+
 if [[ ! -d "$TARGET" ]]; then
   mkdir -p "$TARGET"
 fi
@@ -159,6 +179,20 @@ copy_file() {
     echo "  SKIP (exists): $dst"
     return
   fi
+  # C-3 (iter54): this branch is reachable with an existing $dst only under
+  # --force, and copy_file handles USER-OWNED files (docs/STATUS.md, CLAUDE.md
+  # — live operational state). Overwriting them with no recovery copy is data
+  # loss, so apply the D3 diff-gated .bak here too: back up only when content
+  # differs (identical re-install stays churn-free). Unlike copy_file_force's
+  # best-effort `|| true`, a failed backup ABORTS — for user files the backup
+  # is the whole point of the operation.
+  if [[ -f "$dst" ]] && ! cmp -s "$src" "$dst"; then
+    if ! cp "$dst" "${dst}.bak.$(date +%s)"; then
+      echo "ERROR: could not back up existing $dst — aborting to avoid data loss" >&2
+      exit 1
+    fi
+    echo "  OVERWRITE (user file, backed up): $dst"
+  fi
   mkdir -p "$(dirname "$dst")"
   cp "$src" "$dst"
   INSTALLED_PATHS+=("$dst")
@@ -222,17 +256,22 @@ copy_file_routed() {
 }
 
 # --- Parse JSON arrays (lightweight, no jq dependency) ---
+# C-2 (iter54): file/key travel via argv into a quoted heredoc (the body is
+# never shell-expanded), mirroring the FRAMEWORK_VERSION resolver above. The
+# previous inline-interpolation form (`open('$json_file')`) broke into a
+# python SyntaxError whenever the framework path contained a single quote —
+# and every caller swallowed that failure (fail-open install).
 parse_json_array() {
   local json_file="$1"
   local key="$2"
   # Extract array content for key, one entry per line
-  python3 -c "
+  python3 - "$json_file" "$key" <<'PY'
 import json, sys
-with open('$json_file') as f:
+with open(sys.argv[1]) as f:
     data = json.load(f)
-for item in data.get('$key', []):
+for item in data.get(sys.argv[2], []):
     print(item)
-"
+PY
 }
 
 # --- Generate settings.local.json from hooks_include ---
@@ -247,18 +286,15 @@ generate_settings() {
     return
   fi
 
-  # Get hooks_include list
+  # Get hooks_include list. C-2 (iter54): argv-based parse + explicit rc split —
+  # an EMPTY list (key absent) is the normal "profile ships no hooks" skip,
+  # while a python FAILURE is a broken install step and must abort (the old
+  # `2>/dev/null || return 0` folded both into a silent success).
   local hooks_include
-  hooks_include=$(python3 -c "
-import json, sys
-with open('$profile_json') as f:
-    data = json.load(f)
-include = data.get('hooks_include', [])
-if not include:
-    sys.exit(1)
-for h in include:
-    print(h)
-" 2>/dev/null) || return 0
+  hooks_include=$(parse_json_array "$profile_json" "hooks_include") || {
+    echo "ERROR: failed to read 'hooks_include' from profile: $profile_json" >&2
+    exit 1
+  }
 
   if [[ -z "$hooks_include" ]]; then
     return 0
@@ -275,14 +311,17 @@ for h in include:
   # all top-level keys from the existing file EXCEPT `hooks` (which is
   # framework-owned and always overwritten). permissions / env / future
   # Claude Code keys are preserved.
-  python3 -c "
+  # C-2 (iter54): all three paths travel via argv into a quoted heredoc — the
+  # old inline interpolation broke on a `'` in the TARGET path (python
+  # SyntaxError) and aborted the install midway.
+  python3 - "$hooks_template" "$profile_json" "$target_settings" <<'PY'
 import json, sys, os
 
-with open('$hooks_template') as f:
+with open(sys.argv[1]) as f:
     template = json.load(f)
 
 include = set()
-with open('$profile_json') as f:
+with open(sys.argv[2]) as f:
     profile = json.load(f)
 include = set(profile.get('hooks_include', []))
 
@@ -335,7 +374,7 @@ if 'permissions' in template:
     out['permissions'] = perms
 
 # K-8: merge in user keys (everything except 'hooks') from any existing file
-target = '$target_settings'
+target = sys.argv[3]
 if os.path.exists(target):
     try:
         with open(target) as f:
@@ -385,7 +424,7 @@ if profile_name in ('minimal', 'standard'):
 with open(target, 'w') as f:
     json.dump(out, f, indent=2)
     f.write('\n')
-"
+PY
   INSTALLED_PATHS+=("$target_settings")
   echo "  GENERATE: .claude/settings.local.json"
 }
@@ -395,8 +434,14 @@ copy_hooks() {
   local profile_json="$1"
   local target_dir="$2"
 
+  # C-2 (iter54): rc split — empty (key absent) = normal skip; python failure
+  # = abort (was `2>/dev/null || return 0`, which silently skipped ALL hooks
+  # on any parse failure → installed target had no moat).
   local hooks_include
-  hooks_include=$(parse_json_array "$profile_json" "hooks_include" 2>/dev/null) || return 0
+  hooks_include=$(parse_json_array "$profile_json" "hooks_include") || {
+    echo "ERROR: failed to read 'hooks_include' from profile: $profile_json" >&2
+    exit 1
+  }
 
   if [[ -z "$hooks_include" ]]; then
     return 0
@@ -534,16 +579,31 @@ echo "  Target:  $TARGET"
 echo ""
 
 # 1. Copy required files
+# C-2 (iter54): capture-with-rc-check, not `< <(parse_json_array ...)` — a
+# process substitution swallows the parser's exit code (K-10 already noted
+# this), so a failing parse used to yield ZERO required files and still print
+# "Setup complete." with rc 0. Now any parse failure aborts, fail-closed.
 echo "--- Required files ---"
-while IFS= read -r rel_path; do
-  src=$(resolve_source "$rel_path")
-  copy_file_routed "$rel_path" "$src" "$TARGET/$rel_path"
-done < <(parse_json_array "$PROFILE_JSON" "required")
+required=$(parse_json_array "$PROFILE_JSON" "required") || {
+  echo "ERROR: failed to read 'required' from profile: $PROFILE_JSON" >&2
+  exit 1
+}
+if [[ -n "$required" ]]; then
+  while IFS= read -r rel_path; do
+    src=$(resolve_source "$rel_path")
+    copy_file_routed "$rel_path" "$src" "$TARGET/$rel_path"
+  done <<< "$required"
+else
+  echo "  (none)"
+fi
 
 # 2. Copy recommended files
 echo ""
 echo "--- Recommended files ---"
-recommended=$(parse_json_array "$PROFILE_JSON" "recommended" 2>/dev/null) || true
+recommended=$(parse_json_array "$PROFILE_JSON" "recommended") || {
+  echo "ERROR: failed to read 'recommended' from profile: $PROFILE_JSON" >&2
+  exit 1
+}
 if [[ -n "$recommended" ]]; then
   while IFS= read -r rel_path; do
     src=$(resolve_source "$rel_path")
