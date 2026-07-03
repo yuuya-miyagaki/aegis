@@ -96,6 +96,25 @@ class TestGuardsUnchanged(unittest.TestCase):
             out = _hook(root, f"{root}/notes/inner.md")
         self.assertTrue(_denied(out), f"got: {out[:200]!r}")
 
+    def test_symlink_md_to_control_file_not_prose_allowed(self):
+        """盲検2次(security): prose carve-out は symlink を解決しない。repo 直下の
+        `*.md` が制御ファイルへの symlink だと Client/plan 承認前でも allow され、
+        iter55 前（plan-gate で deny）からの防御多層の後退になる。symlink は
+        prose fast-path に載せず gate に落とす（＝Client/plan-pending で deny 復帰）。"""
+        with _scratch_root(mode="Client", phase="discovery") as name:
+            root = Path(name)
+            # 実 repo の lib を破壊しないよう、target は制御プレーンの scripts/ 名を
+            # scratch 内に実ファイルとして作りそこへ張る（symlink 経由の write は
+            # 貫通するため、既存 symlink（emit.sh 等）を target にしてはならない）。
+            (root / "scripts").mkdir(exist_ok=True)
+            control_target = root / "scripts" / "update-gate.sh"
+            control_target.write_text("x", encoding="utf-8")
+            link = root / "notes.md"
+            link.symlink_to(control_target)
+            out = _hook(root, str(link))
+        self.assertTrue(_denied(out),
+                        f"symlink prose must not take the allow fast-path: {out[:200]!r}")
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -209,6 +209,14 @@ fi
 # case-fold（.MD 変種）。サブディレクトリの .md はコード木の可能性があるため対象外。
 is_root_prose_md() {
   local t="$1" d rc=1
+  # 盲検2次(security): symlink は解決しないため、repo 直下の `*.md` が制御ファイルへの
+  # symlink だと prose 判定を通って allow され、iter55 前（plan-gate で deny）からの
+  # 防御多層の後退になる。既存の symlink は fast-path に載せず gate に落とす（deny 復帰）。
+  # 新規 prose ファイル（未作成）は `-L` 偽＝通る。Edit/Write は symlink を作れないため
+  # これで LLM 由来経路は塞がり、事前設置 symlink も carve-out から除外される。
+  if [ -L "$t" ]; then
+    return 1
+  fi
   d=$(dirname "$t")
   if [ "$CASE_FOLD" = "1" ]; then shopt -s nocasematch; fi
   case "$t" in
