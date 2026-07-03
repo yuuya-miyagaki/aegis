@@ -76,6 +76,15 @@ class TestMessages(unittest.TestCase):
         self.assertIn('"ask"', out)
         self.assertIn("git add docs/", _reason(out))
 
+    def test_write_to_script_gets_generic_not_standalone_hint(self):
+        """grill-code 🟡: 書込みコマンド（チェーン演算子なし）に「単体で実行せよ」と
+        誤診しない。実行形プレフィックス不一致＝汎用メッセージに落ちることを pin。"""
+        out = _out(self.root, "cp evil scripts/update-gate.sh")
+        self.assertIn('"deny"', out)
+        self.assertNotIn("単体", _reason(out).split("。")[0],
+                         "書込みコマンドへの誤った単体実行案内")
+        self.assertIn("Edit/Write", _reason(out))
+
 
 if __name__ == "__main__":
     unittest.main()

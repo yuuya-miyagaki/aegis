@@ -829,15 +829,25 @@ CMD_SAFE=$(strip_safe_stderr_redirects "$CMD")
 # `> hooks/...` を deny する前提は不変）。
 SCRIPTS_MANIFEST="${SCRIPT_DIR}/lib/scripts-manifest.tsv"
 
-# rc0 ⟺ $1 (コマンド文字列) が manifest の class allow|ask エントリを substring
-# として含む。manifest が読めなければ常に rc1（fail-closed）。
+# rc0 ⟺ $1 (コマンド文字列) が manifest の class allow|ask スクリプトの**実行形**
+# （interpreter+パス or パス自体で**始まる**）。manifest が読めなければ常に rc1
+# （fail-closed）。grill-code 🔴: 旧実装（と旧ハードコード case）は substring
+# マッチだったため `cp evil scripts/update-gate.sh` のような**スクリプトへの
+# 書込み**まで「実行」と誤認して allow していた — プレフィックス限定で封鎖。
+# env 代入プレフィックス（FOO=x python3 …）や quoted パスは不一致＝deny（安全側。
+# 汎用 deny メッセージが単体実行形を案内する）。
 manifest_script_in() {
   local cmd="$1" entry cls
   [ -r "$SCRIPTS_MANIFEST" ] || return 1
   while IFS=$'\t' read -r entry cls || [ -n "$entry" ]; do
     case "$entry" in ''|\#*) continue ;; esac
     case "$cls" in allow|ask) ;; *) continue ;; esac
-    case "$cmd" in *"$entry"*) return 0 ;; esac
+    case "$cmd" in
+      "$entry"|"$entry "*|"./$entry"|"./$entry "*|\
+      "python3 $entry"|"python3 $entry "*|"python $entry"|"python $entry "*|\
+      "bash $entry"|"bash $entry "*|"sh $entry"|"sh $entry "*)
+        return 0 ;;
+    esac
   done < "$SCRIPTS_MANIFEST"
   return 1
 }

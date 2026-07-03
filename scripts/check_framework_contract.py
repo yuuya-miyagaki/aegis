@@ -383,7 +383,9 @@ def _distributed_md_files(root: Path) -> list:
     templates 版に差し替えて配布する。framework-repo ローカル変種（run_eval.py 参照など
     framework-only スクリプトを指示してよい側）を走査すると誤 FAIL するため、
     ここでも同じ差し替え規則で「配布される側」だけを集める。"""
-    files = sorted(root.glob(".claude/skills/*/SKILL.md"))
+    # skills は SKILL.md だけでなく配布される補助 md（deploy/platforms.md 等）も
+    # 走査する（grill-code 🟡: 補助 md に将来スクリプト指示が書かれた時の同型穴を予防）。
+    files = sorted(root.glob(".claude/skills/*/*.md"))
     overridden = {p.name for p in root.glob("templates/commands/*.md")}
     files += [p for p in sorted(root.glob(".claude/commands/*.md"))
               if p.name not in overridden]
@@ -401,7 +403,11 @@ def load_scripts_manifest(root: Path):
     whitespace 不一致は即 FAIL。"""
     manifest: dict[str, str] = {}
     path = root / SCRIPTS_MANIFEST_REL
-    for lineno, raw in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+    # read_bytes + split("\n") であって read_text + splitlines() ではない:
+    # text モードのユニバーサル改行と splitlines は \r\n の \r まで食べてしまい、
+    # bash reader（\r を class 値の一部として見る＝silent deny）との非対称を作る。
+    # 生バイト経由なら \r が行内に残り whitespace 厳格検査が FAIL させる。
+    for lineno, raw in enumerate(path.read_bytes().decode("utf-8").split("\n"), 1):
         stripped = raw.strip()
         if not stripped or stripped.startswith("#"):
             continue

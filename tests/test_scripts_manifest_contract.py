@@ -82,6 +82,14 @@ class TestManifestHealth(unittest.TestCase):
             fails = cfc.check_scripts_manifest(root)
             self.assertTrue(any("whitespace" in f.lower() for f in fails), fails)
 
+    def test_crlf_line_ending_fails(self):
+        """grill-code 🟢: CRLF 混入は bash 側で class 不一致＝silent deny になるため、
+        contract が \\r を whitespace として即 FAIL することを pin（fail-visible）。"""
+        with tempfile.TemporaryDirectory() as t:
+            root = _mkroot(Path(t), "scripts/good.py\tallow\r\n")
+            fails = cfc.check_scripts_manifest(root)
+            self.assertTrue(any("whitespace" in f.lower() for f in fails), fails)
+
 
 class TestPermissionsBidirectional(unittest.TestCase):
     def test_allow_missing_from_permissions_fails(self):

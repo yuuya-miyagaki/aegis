@@ -115,6 +115,26 @@ class TestManifestRunnable(unittest.TestCase):
         out = _hook(self.root, "python3 scripts/retro_report.py > hooks/lib/emit.sh")
         self.assertTrue(_denied(out), f"redirect must deny: {out[:200]!r}")
 
+    # grill-code 🔴: substring マッチは「スクリプトへの書込み」を実行と誤認した。
+    # 実行形（interpreter+パス or パスで始まる）以外は deny を pin する。
+    def test_write_to_allowlisted_script_denied(self):
+        out = _hook(self.root, "cp evil scripts/update-gate.sh")
+        self.assertTrue(_denied(out),
+                        f"write TO an allowlisted script must deny: {out[:200]!r}")
+
+    def test_mention_after_other_command_denied(self):
+        out = _hook(self.root, "echo before scripts/check_status.py")
+        self.assertTrue(_denied(out),
+                        f"non-invocation mention must deny: {out[:200]!r}")
+
+    def test_bare_script_path_invocation_allowed(self):
+        out = _hook(self.root, "scripts/update-gate.sh review approve")
+        self.assertTrue(_allowed(out), f"bare path invocation: {out[:200]!r}")
+
+    def test_dot_slash_invocation_allowed(self):
+        out = _hook(self.root, "./scripts/update-task.sh --size L")
+        self.assertTrue(_allowed(out), f"./ invocation: {out[:200]!r}")
+
 
 class TestManifestFailClosed(unittest.TestCase):
     def test_missing_manifest_denies_everything(self):
