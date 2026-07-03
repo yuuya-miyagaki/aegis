@@ -2,5 +2,5 @@
 
 ```
 verdict: SKIP
-reason: iter54=framework混在の大型diff（tracked追加行の連続run=86本 ≫ MAX_MUTANTS=25、かつコメント/argv化リファクタ/バージョン定数/REQUIRED差分など behavior-catching mutant を置けないハンク多数）。自動ドリルの coverage floor（全変更ハンクに mutant 必須）を満たせない既知クラス（iter43 前例・LEARNINGS conf9）。代替として RED-first TDD（新規4テストファイルを実装前に RED 確認→実装後 GREEN）＋核判定行への手動 mutation 実測（M2b/M3/M4/M5/M6 CAUGHT、M1=safety.sh の -ef ガードは case-sensitive Linux 専用の判別で当該 macOS では test_separate_uppercase_dir_not_misdetected が skipIf され再現不能＝Linux で捕捉）を docs/qa-reports/iter54-qa.md に記録。
+reason: framework イテレーション（iter55）で全コード変更を per-task コミット済み＝qa 承認時の working-tree diff（git diff HEAD）が空＝mutant を置く未コミット追加行が無い（想定どおりの縁ケース・qa-verification skill 記載）。手動 mutation 同等の代替実証: (1) 全タスク RED-first TDD（各テストが実装前に失敗を確認）(2) grill-code で manifest_script_in の substring→prefix 変更を『cp evil scripts/update-gate.sh が allow→deny』の RED→GREEN で実証（test_write_to_allowlisted_script_denied で pin）(3) fail-closed（manifest 欠落＝全 deny）を test_missing_manifest_denies_everything で実証 (4) stderr 正規化の回避形 deny を TestUnsafeRedirectsStayDenied で実証。full suite 1285 passed・contract PASS。
 ```

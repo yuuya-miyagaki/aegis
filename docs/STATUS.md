@@ -18,7 +18,7 @@ gate_approvals:
   qa: approved
   security: approved
   deploy: approved
-  dev_ready_for_client: pending
+  dev_ready_for_client: approved
 current_refs:
   requirements: []
   plan: docs/plans/2026-07-03-iter55-dogfood-feedback-plan.md
