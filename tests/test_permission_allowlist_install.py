@@ -193,30 +193,31 @@ def test_install_preserves_deny_hooks(tmp_path):
 # forcing an explicit allow/prompt decision (anti-drift; iter49/50 family).
 SCRIPTS_DIR = ROOT / "scripts"
 
-SCRIPT_CLASS = {
-    "check_status.py": "safe_auto_allow",
-    "check_framework_contract.py": "safe_auto_allow",
-    "status_doctor.py": "safe_auto_allow",
-    "retro_report.py": "safe_auto_allow",
-    "build-judge-card.py": "safe_auto_allow",
-    "check_reference_drift.py": "safe_auto_allow",
-    "learnings_search.py": "safe_auto_allow",
-    "lint_names.py": "safe_auto_allow",
-    # context_budget.py is read-only in its default `check` mode but
-    # --tighten/--seed WRITE the tracked scripts/context-budgets.json (a
-    # contract-gating config). A blanket Bash(...:*) rule can't exclude those
-    # write modes, so it must keep prompting (grill-code 🔴).
-    "context_budget.py": "must_prompt",
-    "record-test-result.py": "must_prompt",
-    "run-test-strength-drill.py": "must_prompt",
-    "run_eval.py": "must_prompt",
-    "eval_scaffold_smoke.py": "must_prompt",
-    "eval_scenario.py": "must_prompt",
-    "update-gate.sh": "must_prompt",
-    "update-task.sh": "must_prompt",
-    "_artifact_template_map.py": "not_cli",
-    "platform_manifest.py": "not_cli",
+# iter55: SCRIPT_CLASS は hooks/lib/scripts-manifest.tsv（single owner）由来。
+# allow → safe_auto_allow / ask・framework-only → must_prompt / import-only → not_cli。
+# 分類の理由（exec ガジェット・状態変異・context_budget の --tighten/--seed 書込み等）は
+# TSV ヘッダコメントに集約（旧: このファイルの手書き dict — 3重管理の最後の1枚だった）。
+_CLASS_FROM_MANIFEST = {
+    "allow": "safe_auto_allow",
+    "ask": "must_prompt",
+    "framework-only": "must_prompt",
+    "import-only": "not_cli",
 }
+
+
+def _load_script_class():
+    out = {}
+    text = (ROOT / "hooks" / "lib" / "scripts-manifest.tsv").read_text(encoding="utf-8")
+    for line in text.splitlines():
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#"):
+            continue
+        entry, cls = line.split("\t")  # 厳格 split（strip しない — contract が清潔さを保証）
+        out[pathlib.Path(entry).name] = _CLASS_FROM_MANIFEST[cls]
+    return out
+
+
+SCRIPT_CLASS = _load_script_class()
 
 SAFE_GIT_READS = ["git status", "git log", "git diff", "git show"]
 DESTRUCTIVE_GIT = ["git branch -D x", "git remote remove origin", "git checkout ."]
