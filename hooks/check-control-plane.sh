@@ -953,11 +953,17 @@ fi
 # Staging the framework files for a baseline commit is legitimate and is not a
 # content write to control plane, so ASK rather than DENY.
 if [ -n "$CMD_SAFE" ] && is_bare_git_stage "$CMD_SAFE"; then
-  emit_ask "[integrity] git add で制御プレーン (hooks/scripts/.claude 等) を staging しようとしています。ファイル内容は変更しません（baseline コミット等の正当な操作の可能性）。意図を確認してください。"
+  emit_ask "[integrity] git add で制御プレーン (hooks/scripts/.claude/STATUS.md 等) を staging しようとしています。ファイル内容は変更しません（baseline コミット等の正当な操作の可能性）。意図を確認してください。なおファイル名を含まない形（例: git add docs/）ならこの確認は出ません。"
   exit 0
 fi
 
 # Default: deny. Control plane path present, not allowlisted, not read-only.
-REASON=$(printf '[integrity] Bash command referencing control plane path blocked during project work (task_type=%s). Use Edit/Write tools for auditable changes, or set task_type=framework.' "$TASK_TYPE")
+# iter55: 許可済みスクリプトを含むのにチェーン演算子で不適格になったケースは
+# 専用文言で案内（ゲート戦闘6:「hook が不安定」誤認の解消）。
+if [ -n "$CMD_SAFE" ] && manifest_script_in "$CMD_SAFE"; then
+  emit_deny "[integrity] このコマンドは許可済みスクリプト（scripts-manifest）を含みますが、チェーン/リダイレクト演算子（; && || | > \$() \`）付きの複合コマンドでは実行できません。パイプ等を外し、スクリプトを単体コマンドとして実行してください。"
+  exit 0
+fi
+REASON=$(printf '[integrity] 制御プレーン path（hooks/ scripts/ templates/ .claude/ CLAUDE.md STATUS.md）を参照する Bash コマンドは project work（task_type=%s）中はブロックされます。ゲート値は scripts/update-gate.sh、task_type/task_size は scripts/update-task.sh を単体で実行してください。一般ファイルの編集は Edit/Write ツールを使用。framework ファイル自体の変更は task_type=framework が必要です。なお path 文字列の言及だけでも発火します（例: git add docs/STATUS.md → git add docs/ とする）。' "$TASK_TYPE")
 emit_deny "$REASON"
 exit 0
