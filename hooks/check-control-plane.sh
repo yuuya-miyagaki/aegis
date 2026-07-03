@@ -16,8 +16,8 @@
 #   they contain no chaining operators and no write indicators.
 #
 # Control plane paths: STATUS.md, CLAUDE.md, .claude/, hooks/, scripts/
-# Allowlist: update-gate.sh, check_status.py, check_framework_contract.py,
-#            record-test-result.py, run-test-strength-drill.py (evidence scripts)
+# Allowlist: hooks/lib/scripts-manifest.tsv の class allow|ask 行（single owner・iter55）。
+#            manifest 欠落/読取不能 = 全 deny（fail-closed）。
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -806,7 +806,28 @@ fi
 # Includes > and >> to block "allowlisted_script > file" write bypass.
 CHAIN_OPS='[;&|>]|\$\(|`'
 
-# --- Allowlist check ---
+# --- Allowlist check (iter55: manifest single-owner) ---
+# 実行可スクリプトは hooks/lib/scripts-manifest.tsv の class allow|ask 行。
+# 同じ manifest が templates/hooks.template.json permissions（contract 検査で
+# 双方向一致）と tests の SCRIPT_CLASS の由来元 = 3重管理ドリフトの封鎖。
+# record-test-result.py / run-test-strength-drill.py は class=ask（OBS-018:
+# 自身の監査されたロジック経由でしか書かず、no-chain ガードが `x && evil` /
+# `> hooks/...` を deny する前提は不変）。
+SCRIPTS_MANIFEST="${SCRIPT_DIR}/lib/scripts-manifest.tsv"
+
+# rc0 ⟺ $1 (コマンド文字列) が manifest の class allow|ask エントリを substring
+# として含む。manifest が読めなければ常に rc1（fail-closed）。
+manifest_script_in() {
+  local cmd="$1" entry cls
+  [ -r "$SCRIPTS_MANIFEST" ] || return 1
+  while IFS=$'\t' read -r entry cls || [ -n "$entry" ]; do
+    case "$entry" in ''|\#*) continue ;; esac
+    case "$cls" in allow|ask) ;; *) continue ;; esac
+    case "$cmd" in *"$entry"*) return 0 ;; esac
+  done < "$SCRIPTS_MANIFEST"
+  return 1
+}
+
 # Only if the command has NO chaining operators, check if it is solely an
 # allowlisted script invocation.
 is_allowlisted() {
@@ -815,18 +836,7 @@ is_allowlisted() {
   if printf '%s' "$cmd" | grep -qE "$CHAIN_OPS"; then
     return 1
   fi
-  # Match: the command is exactly an allowlisted script call (with args).
-  # record-test-result.py / run-test-strength-drill.py are evidence-recording
-  # scripts the agent runs during normal project work (OBS-018). They only
-  # append to the evidence log / write a drill report through their own logic,
-  # never via a shell write the user cannot audit — and the no-chain guard above
-  # still denies `record-test-result.py && evil` or a `> hooks/...` redirect.
-  case "$cmd" in
-    *scripts/check_framework_contract.py*|*scripts/check_status.py*|*scripts/update-gate.sh*|*scripts/record-test-result.py*|*scripts/run-test-strength-drill.py*)
-      return 0
-      ;;
-  esac
-  return 1
+  manifest_script_in "$cmd"
 }
 
 # OBS-017 catch-22: a fresh non-framework project must stage the installed

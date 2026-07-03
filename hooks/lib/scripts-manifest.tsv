@@ -1,0 +1,29 @@
+# scripts-manifest.tsv — scripts/ エントリポイントの分類（single owner・iter55）
+# 消費者: hooks/check-control-plane.sh（allow|ask = 実行可）
+#         scripts/check_framework_contract.py（3方向 drift 検査）
+#         templates/hooks.template.json permissions（class=allow と双方向一致）
+#         tests/test_permission_allowlist_install.py（SCRIPT_CLASS 由来元）
+# class: allow          = hook 実行可 + permissions.allow 掲載（プロンプトなし）
+#        ask            = hook 実行可 + permissions 非掲載（プロンプト＝人間のトリップワイヤ。
+#                         update-gate/update-task は状態変異、record-test-result/run-test-
+#                         strength-drill は引数コマンド実行ガジェットのため auto-allow 禁止）
+#        framework-only = 対象プロジェクトでは hook が deny（framework 開発専用）
+#        import-only    = CLI でなく import 専用モジュール
+scripts/check_status.py	allow
+scripts/check_framework_contract.py	allow
+scripts/status_doctor.py	allow
+scripts/retro_report.py	allow
+scripts/build-judge-card.py	allow
+scripts/check_reference_drift.py	allow
+scripts/learnings_search.py	allow
+scripts/lint_names.py	allow
+scripts/update-gate.sh	ask
+scripts/update-task.sh	ask
+scripts/record-test-result.py	ask
+scripts/run-test-strength-drill.py	ask
+scripts/context_budget.py	framework-only
+scripts/run_eval.py	framework-only
+scripts/eval_scaffold_smoke.py	framework-only
+scripts/eval_scenario.py	framework-only
+scripts/_artifact_template_map.py	import-only
+scripts/platform_manifest.py	import-only

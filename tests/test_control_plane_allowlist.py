@@ -41,6 +41,8 @@ def _scratch_root() -> tempfile.TemporaryDirectory:
     lib_dir.mkdir()
     for lib in ("extract-input.sh", "emit.sh", "safety.sh", "frontmatter.sh"):
         (lib_dir / lib).symlink_to(ROOT / "hooks" / "lib" / lib)
+    (lib_dir / "scripts-manifest.tsv").symlink_to(
+        ROOT / "hooks" / "lib" / "scripts-manifest.tsv")
     return tmp
 
 
