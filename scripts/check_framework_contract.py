@@ -365,6 +365,115 @@ def check_agent_names(roots) -> list:
     return failures
 
 
+# --- iter55: scripts-manifest 3-way drift check -----------------------------
+# ドッグフード一周目のゲート戦闘 7 件中 6 件の根本原因＝許可リストの3重管理
+# （hook case 文 / template permissions / SCRIPT_CLASS テスト map）ドリフト。
+# hooks/lib/scripts-manifest.tsv を単一正本とし、本検査が3方向で縛る。
+# CLAUDE.md は走査対象外（platform_manifest.py の「定義場所」言及＝実行指示でない）。
+SCRIPTS_MANIFEST_REL = "hooks/lib/scripts-manifest.tsv"
+SCRIPTS_MANIFEST_CLASSES = {"allow", "ask", "framework-only", "import-only"}
+SCRIPT_REF_RE = re.compile(r"scripts/[A-Za-z0-9_\-.]+\.(?:py|sh)")
+
+
+def _distributed_md_files(root: Path) -> list:
+    """方向3の走査集合＝install 先に配布される markdown（grill 致命1）。
+
+    setup.sh の install resolver（bin/setup.sh L156-160）は .claude/commands/ のうち
+    templates/commands/ に同名 override があるもの（validate.md / retro.md）を
+    templates 版に差し替えて配布する。framework-repo ローカル変種（run_eval.py 参照など
+    framework-only スクリプトを指示してよい側）を走査すると誤 FAIL するため、
+    ここでも同じ差し替え規則で「配布される側」だけを集める。"""
+    files = sorted(root.glob(".claude/skills/*/SKILL.md"))
+    overridden = {p.name for p in root.glob("templates/commands/*.md")}
+    files += [p for p in sorted(root.glob(".claude/commands/*.md"))
+              if p.name not in overridden]
+    files += sorted(root.glob("templates/commands/*.md"))
+    files += sorted(root.glob(".claude/rules/*.md"))
+    return files
+
+
+def load_scripts_manifest(root: Path):
+    """scripts-manifest.tsv → {'scripts/x.py': class}。壊れ行は ValueError。
+
+    grill 致命2: bash 側（IFS=$'\\t' read + case 完全一致）と字句レベルで同じ厳格さで
+    パースする。フィールドの前後空白は bash では黙って deny（class 不一致）になるため、
+    ここで strip して通すと「contract PASS・hook silent deny」の新種ドリフトになる —
+    whitespace 不一致は即 FAIL。"""
+    manifest: dict[str, str] = {}
+    path = root / SCRIPTS_MANIFEST_REL
+    for lineno, raw in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+        stripped = raw.strip()
+        if not stripped or stripped.startswith("#"):
+            continue
+        parts = raw.split("\t")
+        if len(parts) != 2:
+            raise ValueError(f"line {lineno}: expected '<path>\\t<class>': {raw!r}")
+        entry, cls = parts[0], parts[1]
+        if entry != entry.strip() or cls != cls.strip():
+            raise ValueError(
+                f"line {lineno}: leading/trailing whitespace in fields "
+                f"(bash reader matches exactly): {raw!r}")
+        if entry in manifest:
+            raise ValueError(f"line {lineno}: duplicate entry {entry}")
+        manifest[entry] = cls
+    return manifest
+
+
+def check_scripts_manifest(root: Path = ROOT) -> list:
+    failures: list[str] = []
+    manifest_path = root / SCRIPTS_MANIFEST_REL
+    if not manifest_path.is_file():
+        return [f"scripts-manifest: missing {SCRIPTS_MANIFEST_REL}"]
+    try:
+        manifest = load_scripts_manifest(root)
+    except ValueError as exc:
+        return [f"scripts-manifest: parse error: {exc}"]
+
+    # 方向1: 健全性（enum / 実在 / scripts/ 全エントリポイントの完全分類）
+    for entry, cls in manifest.items():
+        if cls not in SCRIPTS_MANIFEST_CLASSES:
+            failures.append(f"scripts-manifest: {entry} has unknown class {cls!r}")
+        if not (root / entry).is_file():
+            failures.append(f"scripts-manifest: {entry} does not exist")
+    scripts_dir = root / "scripts"
+    if scripts_dir.is_dir():
+        actual = {f"scripts/{p.name}" for p in scripts_dir.iterdir()
+                  if p.is_file() and p.suffix in (".py", ".sh")}
+        for missing in sorted(actual - set(manifest)):
+            failures.append(
+                f"scripts-manifest: {missing} is not classified — add a row "
+                "(allow/ask/framework-only/import-only)")
+
+    # 方向2: class=allow ⟺ template permissions（双方向）
+    template_path = root / "templates" / "hooks.template.json"
+    if template_path.is_file():
+        allow_entries = json.loads(template_path.read_text(encoding="utf-8")) \
+            .get("permissions", {}).get("allow", [])
+        joined = " ".join(allow_entries)
+        for entry, cls in manifest.items():
+            runner = "bash" if entry.endswith(".sh") else "python3"
+            canonical = f"Bash({runner} {entry}:*)"
+            if cls == "allow" and canonical not in allow_entries:
+                failures.append(
+                    f"scripts-manifest: class=allow {entry} missing from template "
+                    f"permissions (expected {canonical})")
+            if cls != "allow" and entry in joined:
+                failures.append(
+                    f"scripts-manifest: class={cls} {entry} must NOT appear in "
+                    "template permissions (human-approval tripwire)")
+
+    # 方向3: 配布される skill/command/rules の参照 ⊆ 実行可（allow|ask）
+    runnable = {e for e, c in manifest.items() if c in ("allow", "ask")}
+    for md in _distributed_md_files(root):
+        for ref in sorted(set(SCRIPT_REF_RE.findall(read_text(md)))):
+            if ref not in runnable:
+                failures.append(
+                    f"scripts-manifest: {md.relative_to(root)} references {ref} "
+                    "which is not runnable (class allow|ask) — the control-plane "
+                    "hook would deny the instruction")
+    return failures
+
+
 def word_count(text: str) -> int:
     return len(text.split())
 
@@ -557,6 +666,8 @@ def main() -> int:
     # paths are computed at module level from ROOT.  run_eval.py passes --root
     # but it always equals ROOT, so the ignored argument is harmless.
     failures: list[str] = []
+
+    failures.extend(check_scripts_manifest())
 
     for path in REQUIRED_FILES + REQUIRED_AGENT_FILES + REQUIRED_SKILL_FILES + REQUIRED_RULES_FILES + REQUIRED_COMMAND_FILES + REQUIRED_TEMPLATE_FILES + REQUIRED_HOOK_FILES:
         if not path.exists():
