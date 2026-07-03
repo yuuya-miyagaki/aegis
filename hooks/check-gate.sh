@@ -201,6 +201,31 @@ if is_root_external_absolute "$TARGET_FILE"; then
   exit 0
 fi
 
+# --- Repo-root prose (*.md): gates guard code, not prose (iter55) ---
+# DOGFOOD-LOG.md / README.md など repo 直下のメタ文書は Client モード・plan 未承認
+# でも編集可（ドッグフード ゲート戦闘2・4: 観測ログが書けずバッファ運用を強制された）。
+# ここに到達する時点で CLAUDE.md・hooks/scripts/.claude/templates は上の control
+# 検査で deny 済み、docs/* は先頭 allowlist で allow 済み。suffix は FS に合わせて
+# case-fold（.MD 変種）。サブディレクトリの .md はコード木の可能性があるため対象外。
+is_root_prose_md() {
+  local t="$1" d rc=1
+  d=$(dirname "$t")
+  if [ "$CASE_FOLD" = "1" ]; then shopt -s nocasematch; fi
+  case "$t" in
+    *.md)
+      case "$d" in
+        "$ROOT"|"$ROOT_REAL"|.) rc=0 ;;
+      esac ;;
+  esac
+  if [ "$CASE_FOLD" = "1" ]; then shopt -u nocasematch; fi
+  return $rc
+}
+
+if is_root_prose_md "$TARGET_FILE"; then
+  emit_allow
+  exit 0
+fi
+
 # Extract mode and plan gate from STATUS.md frontmatter.
 MODE=$(frontmatter_value "$STATUS_FILE" "mode")
 PLAN_GATE=$(gate_value "$STATUS_FILE" "plan")
