@@ -3,7 +3,7 @@ framework: aegis
 framework_version: "1.16.0"
 project_name: "Aegis"
 mode: Dev
-phase: qa
+phase: security
 task_type: framework
 task_size: L
 task_size_rationale: "iteration 55（framework・ドッグフード一周目フィードバック反映）= L。footprint は hooks/check-control-plane.sh（is_allowlisted manifest 化＋stderr リダイレクト正規化＋メッセージ）＋hooks/check-gate.sh（repo 直下 *.md allow）＋新規 hooks/lib/scripts-manifest.tsv＋bin/setup.sh（.tsv 配布）＋scripts/check_framework_contract.py（3方向 drift 検査）＋client-workflow/qa-verification SKILL.md＋新規テスト複数＝6+ ファイル。deny/ask 判定ロジック本体（allowlist 機構）に触れる＝moat 変更を含むため全ゲート必須。"
@@ -15,7 +15,7 @@ gate_approvals:
   brainstorm: approved
   plan: approved
   review: approved
-  qa: pending
+  qa: approved
   security: pending
   deploy: pending
   dev_ready_for_client: pending
@@ -24,7 +24,7 @@ current_refs:
   plan: docs/plans/2026-07-03-iter55-dogfood-feedback-plan.md
   spec: docs/specs/2026-07-03-iter55-dogfood-feedback-design.md
   review: docs/qa-reports/iter55-review.md
-  qa: null
+  qa: docs/qa-reports/iter55-qa.md
   security: null
   deploy: null
   translation: null
