@@ -454,13 +454,15 @@ copy_hooks() {
   # silently ship without it. The glob's no-match case is harmless (copy_file
   # SKIPs a non-existent source). Without this, installed hooks die at
   # `source lib/emit.sh` and the moat fails open (audit F6, 2026-06-07).
-  # K-9 (v1.6.2): hooks/lib/*.sh are framework-owned. Always force-overwrite,
-  # never SKIP, to prevent old libs from lingering across upgrades and
-  # silently breaking new hooks (DIST-02 / F6 同型). This calls copy_file_force
+  # K-9 (v1.6.2): hooks/lib/*.sh / *.tsv are framework-owned. Always force-
+  # overwrite, never SKIP, to prevent old libs from lingering across upgrades
+  # and silently breaking new hooks (DIST-02 / F6 同型). iter55: the *.tsv glob
+  # ships scripts-manifest.tsv — without it the installed allowlist is
+  # fail-closed and denies every framework script. This calls copy_file_force
   # directly (rather than copy_file_routed) because the whole lib/ glob is
   # unconditionally framework-owned — is_framework_owned("hooks/lib/...") would
   # return the same routing anyway.
-  for lib in "$FRAMEWORK_ROOT"/hooks/lib/*.sh; do
+  for lib in "$FRAMEWORK_ROOT"/hooks/lib/*.sh "$FRAMEWORK_ROOT"/hooks/lib/*.tsv; do
     [[ -e "$lib" ]] || continue
     copy_file_force "$lib" "$target_dir/hooks/lib/$(basename "$lib")"
   done

@@ -301,3 +301,33 @@ def test_script_class_consistent_with_should_lists():
         if n:
             assert SCRIPT_CLASS.get(n) == "must_prompt", \
                 f"SHOULD_NOT_MATCH {cmd!r} but SCRIPT_CLASS[{n}]={SCRIPT_CLASS.get(n)}"
+
+
+# --- iter55: scripts-manifest.tsv must ship with hooks/lib (F6-class install gap) ---
+
+def test_install_ships_scripts_manifest(tmp_path):
+    """setup.sh の lib 配布は *.sh glob だったため .tsv が配布されず、install 先で
+    allowlist が fail-closed 全 deny になる（F6 同型の install 死角）。"""
+    target = tmp_path / "proj"
+    _install(str(target), "full")
+    installed = target / "hooks" / "lib" / "scripts-manifest.tsv"
+    assert installed.is_file(), "scripts-manifest.tsv not shipped to install target"
+    src = (ROOT / "hooks" / "lib" / "scripts-manifest.tsv").read_text()
+    assert installed.read_text() == src, "installed manifest differs from source"
+
+
+def test_installed_hook_allows_manifest_script(tmp_path):
+    """installed tree での hook 実発火（scaffold smoke の精神）: feature タスク下で
+    class=allow スクリプトの素実行が通る。"""
+    target = tmp_path / "proj"
+    _install(str(target), "full")
+    (target / "docs").mkdir(exist_ok=True)
+    (target / "docs" / "STATUS.md").write_text(
+        "---\nframework: aegis\nmode: Dev\nphase: implement\n"
+        "task_type: feature\n---\n", encoding="utf-8")
+    payload = json.dumps({"tool_name": "Bash",
+                          "tool_input": {"command": "python3 scripts/retro_report.py"}})
+    r = subprocess.run(
+        ["bash", str(target / "hooks" / "check-control-plane.sh")],
+        input=payload, capture_output=True, text=True, cwd=str(target))
+    assert r.stdout.strip() == "{}", f"installed hook must allow: {r.stdout[:200]!r}"
