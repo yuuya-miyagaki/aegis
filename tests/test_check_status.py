@@ -389,6 +389,11 @@ class TempProjectWithHooks(TempProject):
         (lib_dir / "snapshot.sh").symlink_to(
             ROOT / "hooks" / "lib" / "snapshot.sh"
         )
+        # iter55: check-control-plane.sh の allowlist は scripts-manifest.tsv
+        # 由来（欠落＝fail-closed 全 deny）。allow 経路のテストに必須。
+        (lib_dir / "scripts-manifest.tsv").symlink_to(
+            ROOT / "hooks" / "lib" / "scripts-manifest.tsv"
+        )
         # Copy each hook script (not symlink — so dirname resolves to temp).
         import shutil
         for hook_name in [
@@ -1696,6 +1701,10 @@ class TestControlPlaneAllowlistBypass(unittest.TestCase):
         (lib_dir / "safety.sh").symlink_to(
             ROOT / "hooks" / "lib" / "safety.sh"
         )
+        # iter55: allowlist は scripts-manifest.tsv 由来（欠落＝fail-closed 全 deny）。
+        (lib_dir / "scripts-manifest.tsv").symlink_to(
+            ROOT / "hooks" / "lib" / "scripts-manifest.tsv"
+        )
         return tmpdir, root
 
     def _run_hook(self, root: str, cmd: str) -> tuple[int, str]:
@@ -1930,6 +1939,10 @@ class TestControlPlaneRealisticInput(unittest.TestCase):
         # K-5 (v1.6.2): safety.sh required by all deny hooks' fallback.
         (lib_dir / "safety.sh").symlink_to(
             ROOT / "hooks" / "lib" / "safety.sh"
+        )
+        # iter55: allowlist は scripts-manifest.tsv 由来（欠落＝fail-closed 全 deny）。
+        (lib_dir / "scripts-manifest.tsv").symlink_to(
+            ROOT / "hooks" / "lib" / "scripts-manifest.tsv"
         )
         return tmpdir, root
 

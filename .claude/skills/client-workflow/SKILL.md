@@ -25,22 +25,17 @@ user-invocable: false
 | 3 | **requirements** | `docs/requirements/PRD.md` | PRD の全セクションが埋まり、機能要件が列挙され、ユーザーが内容を承認 | PRD 承認後 `scope` へ |
 | 4 | **scope** | `docs/requirements/SCOPE.md`, `docs/requirements/NFR.md` | スコープ境界が明確で、NFR が定義され、ユーザーが承認 | SCOPE + NFR 承認後 `acceptance` へ |
 | 5 | **acceptance** | `docs/requirements/ACCEPTANCE.md` | 受入条件が機能要件・非機能要件と紐付き、判定基準が明確で、ユーザーが承認 | ACCEPTANCE 承認後 `handover` へ |
-| 6 | **handover** | `docs/handover/TO-DEV.md`, `docs/translation/mapping.md`（反復2回目以降は `docs/handover/CHANGES.md` も） | 引き渡し文書が正本ドキュメントを参照し、優先順位・リスク・未解決事項が記載され、ユーザーが承認。translation mapping が作成済みであること（`current_refs.translation` はまだ設定しない — 下記 Translation Artifact 節） | HANDOVER 承認後、`client_ready_for_dev` ゲートを申請 |
+| 6 | **handover** | `docs/handover/TO-DEV.md`, `docs/translation/mapping.md`（反復2回目以降は `docs/handover/CHANGES.md` も） | 引き渡し文書が正本ドキュメントを参照し、優先順位・リスク・未解決事項が記載され、ユーザーが承認。translation mapping が作成済みであること（ref 設定は承認直前 — 下記参照） | HANDOVER 承認後、`client_ready_for_dev` ゲートを申請 |
 
-## テンプレート対応表（正本: scripts/_artifact_template_map.py）
+## テンプレート対応表（正本: `_artifact_template_map.py`・テンプレ名は非自明）
 
-産出物は対応するテンプレートから作成する（テンプレ名は非自明 — TO-DEV は
-HANDOVER-TO-DEV.template.md）。
-
-| 産出物 | テンプレート |
-|--------|-------------|
-| docs/requirements/PRD.md | templates/PRD.template.md |
-| docs/requirements/SCOPE.md | templates/SCOPE.template.md |
-| docs/requirements/NFR.md | templates/NFR.template.md |
-| docs/requirements/ACCEPTANCE.md | templates/ACCEPTANCE.template.md |
-| docs/handover/TO-DEV.md | templates/HANDOVER-TO-DEV.template.md |
-| docs/handover/CHANGES.md | templates/CHANGES.template.md |
-| docs/translation/mapping.md | templates/TRANSLATION-MAPPING.template.md |
+- docs/requirements/PRD.md ← templates/PRD.template.md
+- docs/requirements/SCOPE.md ← templates/SCOPE.template.md
+- docs/requirements/NFR.md ← templates/NFR.template.md
+- docs/requirements/ACCEPTANCE.md ← templates/ACCEPTANCE.template.md
+- docs/handover/TO-DEV.md ← templates/HANDOVER-TO-DEV.template.md
+- docs/handover/CHANGES.md ← templates/CHANGES.template.md
+- docs/translation/mapping.md ← templates/TRANSLATION-MAPPING.template.md
 
 ## Translation Artifact
 
@@ -51,10 +46,9 @@ mapping.md はクライアント用語 → 機能仕様 → 実装ヒントの 3
 - 支援 Agent: `translation-specialist`（mapping 作成・更新を委任可能）
 - 支援 Skill: `translation-mapping`（手順ガイド）
 - Gate 契約: `client_ready_for_dev` 承認時に mapping.md の存在がチェックされる
-- **ref 設定のタイミング**: `current_refs.translation` は `client_ready_for_dev`
-  **承認の直前**に設定し、設定 → `bash scripts/update-gate.sh client_ready_for_dev approve`
-  を**連続で**実行する。gate が pending のまま ref を設定して間に完了検査（TaskCompleted）を
-  挟むと stale-ref 違反（pending gate + ref あり）で拒否される。
+- **ref 設定のタイミング**: `current_refs.translation` は**承認の直前**に設定し、
+  設定→承認（update-gate.sh）を連続実行する。pending のまま ref を置いて完了検査を
+  挟むと stale-ref 違反で拒否される。
 
 ## Spec Delta（反復2回目以降）
 
