@@ -22,9 +22,17 @@ _spec = importlib.util.spec_from_file_location(
 atm = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(atm)
 
-# Client フェーズで client-workflow が案内すべき産出物（TO-CLIENT は Dev 側なので除外）
-CLIENT_PREFIXES = ("docs/requirements/", "docs/handover/", "docs/translation/")
-CLIENT_EXCLUDE = {"docs/handover/TO-CLIENT.md"}
+_spec2 = importlib.util.spec_from_file_location(
+    "check_status", ROOT / "scripts" / "check_status.py")
+check_status = importlib.util.module_from_spec(_spec2)
+_spec2.loader.exec_module(check_status)
+
+# Client フェーズの産出物集合は check_status.CLIENT_GATE_ARTIFACTS（gate 検査の
+# 単一正本）＋ SPEC_DELTA_ARTIFACT（反復2回目以降の CHANGES.md）由来。
+# prefix ベースの推測は docs/handover/ 配下の Dev 側 ship 産出物
+# （MANUAL.md 等）を誤って要求する（初版 grill で検出）。
+CLIENT_ARTIFACTS = [p for p, _ in check_status.CLIENT_GATE_ARTIFACTS] + [
+    check_status.SPEC_DELTA_ARTIFACT[0]]
 
 
 class TestTranslationRefTiming(unittest.TestCase):
@@ -42,9 +50,8 @@ class TestTranslationRefTiming(unittest.TestCase):
 
 class TestTemplateTableParity(unittest.TestCase):
     def test_client_artifacts_and_templates_listed(self):
-        for artifact, template in atm.ARTIFACT_TO_TEMPLATE.items():
-            if not artifact.startswith(CLIENT_PREFIXES) or artifact in CLIENT_EXCLUDE:
-                continue
+        for artifact in CLIENT_ARTIFACTS:
+            template = atm.ARTIFACT_TO_TEMPLATE[artifact]
             with self.subTest(artifact=artifact):
                 self.assertIn(artifact, CW, f"{artifact} が client-workflow に未記載")
                 self.assertIn(template, CW, f"{template} が client-workflow に未記載")
