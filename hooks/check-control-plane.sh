@@ -806,6 +806,20 @@ fi
 # Includes > and >> to block "allowlisted_script > file" write bypass.
 CHAIN_OPS='[;&|>]|\$\(|`'
 
+# --- iter55: SAFE stderr リダイレクトの正規化（allow 側判定の前処理） ---
+# `2>/dev/null`（`2> /dev/null` 含む）と `2>&1` はファイル書込みが発生し得ないが、
+# > / & が CHAIN_OPS に該当して read-only 検査（`ls templates/ 2>/dev/null`）や
+# 素の allowlist スクリプトを carve-out から弾いていた（ドッグフード ゲート戦闘1）。
+# この 2 形だけを単語境界で除去する。2>>, 2>file, 2>/dev/nullish, fd1 の
+# >/dev/null は除去せず、除去後に残る演算子も従来どおり fail-closed。
+# CONTROL_PLANE 検出は生の $CMD / $INPUT で実施済み（緩めるのは allow 側のみ）。
+strip_safe_stderr_redirects() {
+  printf '%s' "$1" | sed -E \
+    -e 's,(^|[[:space:]])2>[[:space:]]?/dev/null([[:space:]]|$),\1\2,g' \
+    -e 's,(^|[[:space:]])2>&1([[:space:]]|$),\1\2,g'
+}
+CMD_SAFE=$(strip_safe_stderr_redirects "$CMD")
+
 # --- Allowlist check (iter55: manifest single-owner) ---
 # 実行可スクリプトは hooks/lib/scripts-manifest.tsv の class allow|ask 行。
 # 同じ manifest が templates/hooks.template.json permissions（contract 検査で
@@ -869,8 +883,8 @@ is_bare_git_stage() {
   return 0
 }
 
-# Check extracted command (already full fidelity).
-if [ -n "$CMD" ] && is_allowlisted "$CMD"; then
+# Check extracted command (already full fidelity, safe-redirects stripped).
+if [ -n "$CMD_SAFE" ] && is_allowlisted "$CMD_SAFE"; then
   emit_allow
   exit 0
 fi
@@ -886,7 +900,7 @@ fi
 # Allow read-only inspection of control plane (reading is not mutation). Two
 # forms: (a) a single read-only command, (b) a `|`-only pipeline whose every
 # segment is read-only. Both share the WRITE_INDICATORS source below.
-CHECK_CMD="$CMD"
+CHECK_CMD="$CMD_SAFE"
 READ_ONLY_STARTS='^(cat|head|tail|less|more|grep|egrep|fgrep|rg|find|ls|wc|diff|file|stat|md5sum|sha256sum) '
 # unlink/remove/rename/truncate require a call form `(` — bare substrings
 # false-positived on read-only greps like `grep -r "remove" hooks/` (P3-4).
@@ -938,7 +952,7 @@ fi
 # --- Bare `git add <paths>` staging carve-out (OBS-017 catch-22) ---
 # Staging the framework files for a baseline commit is legitimate and is not a
 # content write to control plane, so ASK rather than DENY.
-if [ -n "$CMD" ] && is_bare_git_stage "$CMD"; then
+if [ -n "$CMD_SAFE" ] && is_bare_git_stage "$CMD_SAFE"; then
   emit_ask "[integrity] git add で制御プレーン (hooks/scripts/.claude 等) を staging しようとしています。ファイル内容は変更しません（baseline コミット等の正当な操作の可能性）。意図を確認してください。"
   exit 0
 fi
