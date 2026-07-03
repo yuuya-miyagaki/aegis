@@ -107,6 +107,30 @@ class TestPermissionsBidirectional(unittest.TestCase):
             fails = cfc.check_scripts_manifest(root)
             self.assertTrue(any("good.py" in f for f in fails), fails)
 
+    def test_ghost_permission_entry_fails(self):
+        """盲検2次(review) 逆方向の隙間: scripts/ にも manifest にも無い permission
+        allow 行（幽霊エントリ）が腐っても沈黙していた。scripts/ を指す全 allow 行は
+        manifest の class=allow に対応することを縛る。"""
+        with tempfile.TemporaryDirectory() as t:
+            root = _mkroot(
+                Path(t), "scripts/good.py\tallow\n",
+                template={"permissions": {"allow": [
+                    "Bash(python3 scripts/good.py:*)",
+                    "Bash(python3 scripts/ghost.py:*)"]}})
+            fails = cfc.check_scripts_manifest(root)
+            self.assertTrue(any("ghost.py" in f for f in fails), fails)
+
+    def test_non_script_permission_entries_ignored(self):
+        """scripts/ を指さない allow 行（pytest・git status 等）は逆方向検査の対象外。"""
+        with tempfile.TemporaryDirectory() as t:
+            root = _mkroot(
+                Path(t), "scripts/good.py\tallow\n",
+                template={"permissions": {"allow": [
+                    "Bash(python3 scripts/good.py:*)",
+                    "Bash(python3 -m pytest:*)",
+                    "Bash(git status:*)"]}})
+            self.assertEqual(cfc.check_scripts_manifest(root), [])
+
 
 class TestSkillReferences(unittest.TestCase):
     def test_skill_ref_to_framework_only_fails(self):
@@ -132,6 +156,20 @@ class TestSkillReferences(unittest.TestCase):
                            scripts=("good.py", "gate.sh"),
                            skill="Run `bash scripts/gate.sh review approve`.\n")
             self.assertEqual(cfc.check_scripts_manifest(root), [])
+
+    def test_agent_ref_to_framework_only_fails(self):
+        """盲検2次(review) 方向3の死角: .claude/agents/*.md も配布され実行指示を
+        書き得る。framework-only スクリプトを指示していれば hook が deny する。"""
+        with tempfile.TemporaryDirectory() as t:
+            root = _mkroot(Path(t),
+                           "scripts/good.py\tallow\nscripts/tool.py\tframework-only\n",
+                           scripts=("good.py", "tool.py"))
+            ag = root / ".claude" / "agents"
+            ag.mkdir(parents=True)
+            (ag / "demo.md").write_text(
+                "Run `python3 scripts/tool.py` in your workflow.\n", encoding="utf-8")
+            fails = cfc.check_scripts_manifest(root)
+            self.assertTrue(any("tool.py" in f for f in fails), fails)
 
     def test_overridden_local_command_not_scanned(self):
         """grill 致命1: templates/commands/ に同名 override がある .claude/commands/ の

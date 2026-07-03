@@ -391,6 +391,8 @@ def _distributed_md_files(root: Path) -> list:
               if p.name not in overridden]
     files += sorted(root.glob("templates/commands/*.md"))
     files += sorted(root.glob(".claude/rules/*.md"))
+    # 盲検2次(review): agents も配布され実行指示を書き得る＝方向3の死角。
+    files += sorted(root.glob(".claude/agents/*.md"))
     return files
 
 
@@ -467,6 +469,17 @@ def check_scripts_manifest(root: Path = ROOT) -> list:
                 failures.append(
                     f"scripts-manifest: class={cls} {entry} must NOT appear in "
                     "template permissions (human-approval tripwire)")
+        # 逆方向（盲検2次 review）: scripts/ を指す permission allow 行は必ず
+        # manifest の class=allow に対応する。scripts/ にも manifest にも無い
+        # 幽霊エントリが腐っても沈黙する隙間を封鎖（scripts/ を指さない
+        # pytest・git 等の行は対象外）。
+        allow_names = {e for e, c in manifest.items() if c == "allow"}
+        for perm in allow_entries:
+            for ref in SCRIPT_REF_RE.findall(perm):
+                if ref not in allow_names:
+                    failures.append(
+                        f"scripts-manifest: template permissions allow {ref} but it is "
+                        "not a class=allow manifest entry (ghost/stale permission row)")
 
     # 方向3: 配布される skill/command/rules の参照 ⊆ 実行可（allow|ask）
     runnable = {e for e, c in manifest.items() if c in ("allow", "ask")}

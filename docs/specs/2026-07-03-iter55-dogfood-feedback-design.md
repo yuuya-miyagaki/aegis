@@ -96,8 +96,11 @@ context_budget.py は --tighten/--seed が契約ゲート設定を書くため f
 - 読込は pure-bash（`while IFS=$'\t' read`）。python 依存を持ち込まない（emit.sh の教訓:
   python3 依存 = fail-open リスク）
 - **fail-closed**: manifest が欠落・空・読取不能なら従来どおり全 deny（is_allowlisted が常に 1）
-- マッチ規則は現行踏襲: チェーン演算子（`[;&|>]|\$\(|` バッククォート）拒否 → 残った単体
-  コマンドに manifest エントリの substring マッチ（`[[ "$cmd" == *"$entry"* ]]`）
+- マッチ規則: チェーン演算子（`[;&|>]|\$\(|` バッククォート）拒否 → 残った単体コマンドが
+  manifest エントリの**実行形**（`python3|python|bash|sh <path>` / `<path>` / `./<path>` で
+  **始まる**）であること。**substring マッチは禁止**（`cp evil scripts/update-gate.sh` のような
+  許可スクリプトへの書込みまで allow する脆弱な規則＝grill-code 🔴 で封鎖済み）。env 代入
+  プレフィックスや quoted パスは不一致＝deny（安全側・汎用 deny が単体実行形を案内）
 - manifest 自体は hooks/lib/ 配下＝control plane。非 framework タスクからの改変は
   check-gate.sh（Edit/Write）と check-control-plane.sh 自身（Bash）が既に封鎖している —
   置換前の hook ハードコードと同じ信頼水準

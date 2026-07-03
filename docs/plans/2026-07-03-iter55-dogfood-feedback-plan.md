@@ -244,15 +244,22 @@ L809-830 の `is_allowlisted()` ブロックを以下に置換:
 # `> hooks/...` を deny する前提は不変）。
 SCRIPTS_MANIFEST="${SCRIPT_DIR}/lib/scripts-manifest.tsv"
 
-# rc0 ⟺ $1 が manifest の class allow|ask エントリを substring として含む。
-# manifest が読めなければ常に rc1（fail-closed）。
+# rc0 ⟺ $1 が manifest の class allow|ask スクリプトの実行形（interpreter+パス /
+# パス / ./パス で始まる）。manifest が読めなければ常に rc1（fail-closed）。
+# 【重要】substring マッチにしないこと＝`cp evil scripts/update-gate.sh`（許可
+# スクリプトへの書込み）まで allow する脆弱規則になる（grill-code 🔴 で封鎖済み）。
 manifest_script_in() {
   local cmd="$1" entry cls
   [ -r "$SCRIPTS_MANIFEST" ] || return 1
   while IFS=$'\t' read -r entry cls || [ -n "$entry" ]; do
     case "$entry" in ''|\#*) continue ;; esac
     case "$cls" in allow|ask) ;; *) continue ;; esac
-    case "$cmd" in *"$entry"*) return 0 ;; esac
+    case "$cmd" in
+      "$entry"|"$entry "*|"./$entry"|"./$entry "*|\
+      "python3 $entry"|"python3 $entry "*|"python $entry"|"python $entry "*|\
+      "bash $entry"|"bash $entry "*|"sh $entry"|"sh $entry "*)
+        return 0 ;;
+    esac
   done < "$SCRIPTS_MANIFEST"
   return 1
 }
