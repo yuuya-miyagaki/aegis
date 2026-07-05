@@ -143,7 +143,7 @@ mutant を作れないタスク（ドキュメント・設定・文言のみの�
 
 理由はユーザーが見る証拠に残る。安易なスキップは避け、コードがあるなら必ずドリルする。
 ただし **framework 改修などコードを per-task でコミット済みのタスク**は、qa 承認時の
-working-tree diff（`git diff HEAD`）が空＝skip になるのは*想定どおりの縁ケース*。
+working-tree diff（`git diff HEAD`）が空＝skip になるのは*想定どおりの縁ケース（欠陥ではない・撤去しない）*。
 skip 理由に**手動 mutation 同等の代替実証**（RED-first TDD・一時変異→赤化確認等）を明記する。
 スキップ時も claims 付き QA レポートを書き、`current_refs.qa` はそれを指すこと
 （test-strength.md は drill 再生成で claims を置けない。ref は実在ファイルなら受理）。

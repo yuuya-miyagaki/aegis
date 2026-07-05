@@ -2,17 +2,15 @@
 実在することを検証する。iter55 の install テストは「hook が allow する」ことのみ
 検証し「ファイルが存在する」ことを検証していなかった（M2 実測: retro_report.py
 が hook ALLOW なのに未配布で /retro が手動フォールバック化）。"""
-import importlib.util
 import pathlib
 import subprocess
+import sys
 import unittest
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "scripts"))
 
-_spec = importlib.util.spec_from_file_location(
-    "cfc_install", ROOT / "scripts" / "check_framework_contract.py")
-cfc = importlib.util.module_from_spec(_spec)
-_spec.loader.exec_module(cfc)
+import check_framework_contract as cfc  # noqa: E402
 
 
 class TestFullInstallRunnableScripts(unittest.TestCase):

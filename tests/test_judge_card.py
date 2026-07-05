@@ -497,6 +497,17 @@ class TestVerdict(unittest.TestCase):
         self.assertFalse(any("claims" in y for y in v.yellow), v.yellow)
         self.assertEqual(v.overall, 0)
 
+    # --- review: KNOWN_VERDICTS とテンプレ雛形の enum 記載の parity（2ミラー drift 防止） ---
+
+    def test_templates_list_all_known_verdicts(self):
+        for tpl in ("QA-REPORT", "REVIEW", "SECURITY-REVIEW"):
+            text = (ROOT_DIR / "templates" / f"{tpl}.template.md").read_text(
+                encoding="utf-8")
+            for kv in judge.KNOWN_VERDICTS:
+                self.assertIn(kv, text,
+                              f"{tpl}: verdict enum {kv} が claims 雛形に未記載"
+                              "（KNOWN_VERDICTS との drift）")
+
 
 class TestMain(unittest.TestCase):
     def _git(self, root, *a):

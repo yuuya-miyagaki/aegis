@@ -240,6 +240,19 @@ class TestSkillReferences(unittest.TestCase):
             fails = cfc.check_scripts_manifest(root)
             self.assertTrue(any("stale" in f for f in fails), fails)
 
+    def test_direction4_unshipped_typo_key_fails(self):
+        """review: manifest のどれにも一致しないキーは死蔵除外＝FAIL（typo 可視化）。"""
+        with tempfile.TemporaryDirectory() as t:
+            root = _mkroot(Path(t), "scripts/good.py\tallow\n")
+            prof = root / "templates" / "profiles"
+            prof.mkdir(parents=True)
+            (prof / "full.json").write_text(json.dumps({
+                "required": [], "recommended": ["scripts/good.py"],
+                "intentional_unshipped": {"scripts/goood.py": "理由"},
+            }), encoding="utf-8")
+            fails = cfc.check_scripts_manifest(root)
+            self.assertTrue(any("dead exemption" in f for f in fails), fails)
+
     def test_overridden_local_command_not_scanned(self):
         """grill 致命1: templates/commands/ に同名 override がある .claude/commands/ の
         framework-repo ローカル変種（framework-only スクリプト参照可）は走査対象外。

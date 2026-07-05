@@ -522,6 +522,12 @@ def check_scripts_manifest(root: Path = ROOT) -> list:
                     failures.append(
                         f"scripts-manifest: intentional_unshipped[{entry}] is stale — "
                         "the full profile actually distributes it (remove the entry)")
+                # review: typo'd キーは manifest のどれも除外せず死蔵する（本来の
+                # 対象は direction-4 FAIL で見えるが、死エントリ自体も可視化する）。
+                if entry not in manifest:
+                    failures.append(
+                        f"scripts-manifest: intentional_unshipped[{entry}] does not "
+                        "match any manifest entry (typo? dead exemption)")
             for entry, cls in sorted(manifest.items()):
                 if cls in ("allow", "ask") and entry not in distributed \
                         and entry not in unshipped:
