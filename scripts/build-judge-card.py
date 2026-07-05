@@ -394,7 +394,11 @@ def compute_verdict(gate: str, claims: dict | None, facts: dict,
         # 実施する。second-opinion 分岐内だけだと qa ゲートで未記入プレースホルダが
         # 🟢 沈黙通過し、「claims 未提出 🟡」より後退する（fail-visible 違反）。
         v1 = claims.get("verdict")
-        if v1 is not None and v1 not in KNOWN_VERDICTS:
+        if v1 is None:
+            # security 2nd-opinion Low: a claims block missing the verdict key
+            # was silent (v1=None skipped the value check). fail-visible.
+            yellow.append("claims に verdict キーがありません（要確認）")
+        elif v1 not in KNOWN_VERDICTS:
             yellow.append(f"1次 verdict 値が不正/未記入: {v1}")
 
     # tier-2: self-attested second opinion (advisory only, never blocks)

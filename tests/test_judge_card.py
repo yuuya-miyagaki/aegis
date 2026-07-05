@@ -506,6 +506,12 @@ class TestVerdict(unittest.TestCase):
         self.assertEqual(v.overall, 2)
         self.assertTrue(any("不正/未記入" in y for y in v.yellow), v.yellow)
 
+    def test_claims_without_verdict_key_is_visible(self):
+        """security 2nd-opinion Low: verdict キー欠落の claims は沈黙せず 🟡。"""
+        v = judge.compute_verdict("qa", {"tests_green": True}, self._facts(), None)
+        self.assertEqual(v.overall, 2)
+        self.assertTrue(any("verdict キー" in y for y in v.yellow), v.yellow)
+
     # --- review: KNOWN_VERDICTS とテンプレ雛形の enum 記載の parity（2ミラー drift 防止） ---
 
     def test_templates_list_all_known_verdicts(self):

@@ -109,6 +109,24 @@ def test_add_dot_before_paren_or_redirect_still_broad(tmp_path):
     assert '"permissionDecision":"deny"' in out, out
 
 
+def test_add_leading_dot_glob_still_broad(tmp_path):
+    """盲検2次 Major: 先頭ドットのグロブ（.en* / .e?v / .* / .env.*）は実 .env に
+    展開されうるため broad 維持。緩和対象は具体的な個別ドットファイル名のみ。"""
+    repo = _mkrepo(tmp_path / "r12")
+    for cmd in ("git add .en*", "git add .e?v", "git add .*",
+                "git add .env.*", "git add .[e]nv"):
+        out = _run(cmd, cwd=repo)
+        assert '"permissionDecision":"deny"' in out, f"{cmd} => {out}"
+
+
+def test_add_non_leading_dot_glob_is_not_broad(tmp_path):
+    """foo.txt* のような非先頭ドットのグロブは .env に展開されず緩和対象。"""
+    repo = _mkrepo(tmp_path / "r13")
+    (repo / "foo.txt").write_text("x\n")
+    out = _run("git add foo.txt*", cwd=repo)
+    assert '"permissionDecision":"deny"' not in out, out
+
+
 # --- 付随: 直接 .env deny 文言に safe variant 案内がある ---
 
 def test_direct_env_deny_mentions_safe_variant(tmp_path):

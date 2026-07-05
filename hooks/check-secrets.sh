@@ -152,9 +152,15 @@ fi
 # stages a whole directory: . / .. / ./ / ../ followed by EOL or any
 # NON-path character (negated class, not a delimiter enumeration — grill-code
 # 🔴: listing ;&| missed `)` and `>`, letting `(cd x && git add .)` slip).
+# The last branch `\.[^space]*[*?[]` catches a leading-dot GLOB (`.en*`, `.e?v`,
+# `.*`) — a glob can expand to the real .env and bypassed BOTH this check and the
+# literal-.env check above (blind security 2nd-opinion Major; the commit-time
+# staged-diff scan still blocked the leak, but the add moat must not silently
+# allow). Only the FIRST arg after `add` is inspected (regex anchored there), so
+# a non-leading-dot glob like `foo.txt*` stays allowed.
 # Known residual: dot-files whose 2nd char is outside [[:alnum:]._/-] (e.g.
 # `.~x`, `.@foo`) still read as broad => deny. Deny-side = safe; use `--`.
-if printf '%s' "$CMD_LC" | grep -qE "git[[:space:]]+${GIT_PRE_OPTS}add[[:space:]]+(-a|--all|\.\.?/?($|[^[:alnum:]._/-]))" 2>/dev/null; then
+if printf '%s' "$CMD_LC" | grep -qE "git[[:space:]]+${GIT_PRE_OPTS}add[[:space:]]+(-a|--all|\.\.?/?($|[^[:alnum:]._/-])|\.[^[:space:]]*[*?[])" 2>/dev/null; then
   ROOT=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
 
   # v0.13.0 Phase 0b NO-GO fix: broad staging must also catch high-risk credentials
