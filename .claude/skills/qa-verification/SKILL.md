@@ -48,9 +48,9 @@ user-invocable: false
 QA レポート完了前に以下を全て実施する:
 
 - [ ] テストスイートを実行し結果を記録した
-- [ ] lint / type-check / build を実行した（該当する場合）
+- [ ] lint/type-check/build を実行した（該当する場合）
 - [ ] plan の受入条件と突合した
-- [ ] 各検証項目に PASS / FAIL 判定を付与した
+- [ ] 各検証項目に PASS/FAIL 判定を付与した
 - [ ] FAIL 項目にはブロッカーとして原因を記録した
 
 ## 機能対照表（必須出力）

@@ -152,6 +152,8 @@ fi
 # stages a whole directory: . / .. / ./ / ../ followed by EOL or any
 # NON-path character (negated class, not a delimiter enumeration — grill-code
 # 🔴: listing ;&| missed `)` and `>`, letting `(cd x && git add .)` slip).
+# Known residual: dot-files whose 2nd char is outside [[:alnum:]._/-] (e.g.
+# `.~x`, `.@foo`) still read as broad => deny. Deny-side = safe; use `--`.
 if printf '%s' "$CMD_LC" | grep -qE "git[[:space:]]+${GIT_PRE_OPTS}add[[:space:]]+(-a|--all|\.\.?/?($|[^[:alnum:]._/-]))" 2>/dev/null; then
   ROOT=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
 

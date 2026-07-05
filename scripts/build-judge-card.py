@@ -389,6 +389,13 @@ def compute_verdict(gate: str, claims: dict | None, facts: dict,
     # claims sanity (advisory; missing claims must not hard-block — §1.5)
     if claims is None:
         yellow.append("claims 未提出（要確認）")
+    else:
+        # 盲検2次 Major (iter56): 1次 verdict の値検証は claims があれば全ゲートで
+        # 実施する。second-opinion 分岐内だけだと qa ゲートで未記入プレースホルダが
+        # 🟢 沈黙通過し、「claims 未提出 🟡」より後退する（fail-visible 違反）。
+        v1 = claims.get("verdict")
+        if v1 is not None and v1 not in KNOWN_VERDICTS:
+            yellow.append(f"1次 verdict 値が不正/未記入: {v1}")
 
     # tier-2: self-attested second opinion (advisory only, never blocks)
     if gate in SECOND_OPINION_GATES:
@@ -403,10 +410,9 @@ def compute_verdict(gate: str, claims: dict | None, facts: dict,
                 yellow.append(
                     f"1次/2次レビューの相違（self-attested）: 1次={v1} / 2次={v2}")
             # grill 致命2: 既知集合外の値（テンプレ未記入プレースホルダ含む）は
-            # 同値でも沈黙させない。
-            for label, val in (("1次", v1), ("2次", v2)):
-                if val is not None and val not in KNOWN_VERDICTS:
-                    yellow.append(f"{label} verdict 値が不正/未記入: {val}")
+            # 同値でも沈黙させない。1次は上の claims 常時検査が担当済み＝ここは2次のみ。
+            if v2 is not None and v2 not in KNOWN_VERDICTS:
+                yellow.append(f"2次 verdict 値が不正/未記入: {v2}")
             if "approve_with_notes" in (v1, v2):
                 notes = second_opinion.get("notes")
                 info.append(f"approve_with_notes の notes: {notes}" if notes

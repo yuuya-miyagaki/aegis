@@ -497,16 +497,29 @@ class TestVerdict(unittest.TestCase):
         self.assertFalse(any("claims" in y for y in v.yellow), v.yellow)
         self.assertEqual(v.overall, 0)
 
+    def test_qa_placeholder_verdict_is_visible(self):
+        """盲検2次 Major: 値不正検査が second-opinion 分岐内のみだと、qa ゲート
+        （SECOND_OPINION_GATES 非対象）で未記入テンプレが 🟢 沈黙通過し、従来の
+        「claims 未提出 🟡」より後退する。1次 verdict の検証は claims 存在時に常時。"""
+        ph = "<記入: approve / approve_with_notes / reject / blocked>"
+        v = judge.compute_verdict("qa", {"verdict": ph}, self._facts(), None)
+        self.assertEqual(v.overall, 2)
+        self.assertTrue(any("不正/未記入" in y for y in v.yellow), v.yellow)
+
     # --- review: KNOWN_VERDICTS とテンプレ雛形の enum 記載の parity（2ミラー drift 防止） ---
 
     def test_templates_list_all_known_verdicts(self):
+        # 盲検2次 Minor: assertIn の部分文字列判定は "approve" ⊂ "approve_with_notes"
+        # で自明成立する。プレースホルダを実パースし集合一致で両方向を固定する。
+        import re
         for tpl in ("QA-REPORT", "REVIEW", "SECURITY-REVIEW"):
             text = (ROOT_DIR / "templates" / f"{tpl}.template.md").read_text(
                 encoding="utf-8")
-            for kv in judge.KNOWN_VERDICTS:
-                self.assertIn(kv, text,
-                              f"{tpl}: verdict enum {kv} が claims 雛形に未記載"
-                              "（KNOWN_VERDICTS との drift）")
+            m = re.search(r"verdict: <記入: ([^>]+)>", text)
+            self.assertIsNotNone(m, f"{tpl}: claims 雛形の verdict 行が見つからない")
+            listed = {t.strip() for t in m.group(1).split("/")}
+            self.assertEqual(listed, set(judge.KNOWN_VERDICTS),
+                             f"{tpl}: 雛形の verdict 列挙が KNOWN_VERDICTS と不一致")
 
 
 class TestMain(unittest.TestCase):
