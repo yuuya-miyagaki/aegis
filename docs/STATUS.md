@@ -3,30 +3,30 @@ framework: aegis
 framework_version: "1.18.0"
 project_name: "Aegis"
 mode: Dev
-phase: docs
+phase: plan
 task_type: framework
-task_size: L
-task_size_rationale: "iteration 57（framework・主 moat 交代）= L。footprint は hooks/check-control-plane.sh 削除＋hooks/lib/cp-lock.sh（verify 追加）＋hooks/session-start.sh＋新規 hooks/check-runtime-state.sh＋新規 hooks/explain-oslock-eacces.sh＋templates/hooks.template.json＋profiles＋scripts/check_framework_contract.py＋テスト置換多数（SF カタログ lock 下 EACCES 回帰・test_control_plane_* 群の 1対1 置換）＝6+ ファイル。moat の主機構交代そのもの＝全ゲート必須。"
-iteration: 57
+task_size: M
+task_size_rationale: "iteration 58（framework・qa-browser 委譲プロンプト標準化・guidance のみ）= M。footprint は .claude/skills/qa-verification/SKILL.md（委譲ルール節を標準プロンプト雛形へ）＋tests/test_skill_guidance_tokens.py（load-bearing トークン pin）の2ファイル＝M（2-5）。moat 非該当（skill guidance のみ・hook/判定コード不変）＝M framework は review+qa+security 必須・deploy 自動 exempt。"
+iteration: 58
 ui_surface: false
-last_updated: "2026-07-05T13:41:37Z"
+last_updated: "2026-07-05T14:48:13Z"
 gate_approvals:
   client_ready_for_dev: n/a
   brainstorm: approved
-  plan: approved
-  review: approved
-  qa: approved
-  security: approved
-  deploy: approved
-  dev_ready_for_client: approved
+  plan: pending
+  review: pending
+  qa: pending
+  security: pending
+  deploy: pending
+  dev_ready_for_client: pending
 current_refs:
   requirements: []
-  plan: docs/plans/2026-07-05-iter57-oslock-promotion-plan.md
-  spec: docs/specs/2026-07-05-iter57-oslock-promotion-design.md
-  review: docs/qa-reports/iter57-review.md
-  qa: docs/qa-reports/iter57-qa.md
-  security: docs/qa-reports/iter57-security.md
-  deploy: docs/qa-reports/iter57-deploy.md
+  plan: null
+  spec: docs/specs/2026-07-05-iter58-qa-browser-delegation-design.md
+  review: null
+  qa: null
+  security: null
+  deploy: null
   translation: null
 external_evidence:
   - type: "second-opinion-v1-foundation-r1-r2"
@@ -37,14 +37,10 @@ external_evidence:
     scope: "v0.13.0 計画 5 ラウンドレビュー"
     findings: "Round 1〜5 で計 25 件の指摘（hook 出力スキーマ陳腐化、TaskCreated/Completed 制御方式、Plan 条件付き許可、effort 配分、pre-compact.sh 同種破損、`if` 単一 rule 制約等）"
     resolution: "Rev.5 で全件反映、Phase 0a 即時実装着手 GO。hotfix/v0122-hook-schema ブランチで開始。"
-next_action: "**【iter57 完了・phase=docs・全ゲート approved・push 手前で停止中】** ◆**現在地**: 主 moat 交代（OS-lock 昇格・check-control-plane 退役・残余ガード/advisory 新設）を review→qa→security→deploy→ship→docs 完走。**全 dev ゲート approved**（review/qa/security/deploy＋dev_ready_for_client）・**v1.18.0** bump 済（contract＋STATUS テンプレ＋live STATUS の3箇所）。full suite **1048 passed / 2 skipped**・contract/drift/budget/status_doctor PASS・scaffold smoke 全3プロファイル PASS。盲検2次: review=approve_with_notes（POC 陳腐化＋全数列挙テストギャップ→fix-forward）・security=approve_with_notes（**難読化 unlock の silent 保護回帰 Major→`_obfuscated_unlock_on_cp` で ASK 化・SF-009 記録**）。実装＝origin/main=584d22c から未 push（コミット群: 142733a…最新）。 ◆**⚠ 次にやること＝push のみ**: `gh auth switch --user yuuya-miyagaki` してから `git push`（tigereye アカウントは 403）。push 後にメモリ project-aegis-status を「iter57/v1.18.0 push 済・クローズ」に更新し rollover 判断。 ◆**設計正本**: spec=docs/specs/2026-07-05-iter57-oslock-promotion-design.md・plan=docs/plans/2026-07-05-iter57-oslock-promotion-plan.md・record=同 -brainstorm-record.md・レポート=docs/qa-reports/iter57-{review,qa,security,deploy}.md。 ◆**罠（iter41-57 で確立・必読）**: (a) gate 承認出力は **tail**（head は SIGPIPE で STATUS 書込み前中断）。(b) current_refs.<gate> は承認直前に設定（pending+ref は contract stale-ref FAIL）。(c) ref set→approve の間に record を挟むと stale-ref 赤＝set→approve を連続。(d) record-test-result は全コード編集後・**対象 gate ref を null にしてから**（full suite 内 contract テストの stale-ref 回避）。(e) judge `read_test_result` は **newest test-runner entry** で判定・observed は `marker_verified` 必須＝非クォート pytest を含む Bash が newest になると tests=unverified→record-test-result（src:manual）で再 record（外側 Bash は pytest 部をクォート＝strip で Q マスク）。(f) framework **焦点変更で未コミット追加実行行＋テストが hook を copy** なら本物の B1 drill 成立（混在 diff は skip）。(g) qa は **SECOND_OPINION_GATES（review/security）非対象**＝claims 付き QA レポートを ref にすれば 🟢。(h) **M は deploy 自動 exempt**（SIZE_ALLOWED_PHASES）。(i) task_type/size は update-task.sh のみ（raw Edit は tamper block）。(j) push は `gh auth switch --user yuuya-miyagaki`。(k) phase rollover(ship→brainstorm)は backward 遷移＝常時 allow。(l) B1 drill: 純コメントのみの追加ハンクは behavior-catching mutant 不能で coverage floor を割る→冗長コメントを除去し全ハンクを behavioral/text-coverable に整形（echo メッセージ変更は message を assert するテストで mutant 可）＝skip 回避。(m) full suite 実走中に suite 自身が spurious observed test-runner エントリ（vitest 等・marker false）を real evidence-log へ書く→record-test-result を suite 完走の**後**に置けば manual エントリが newest で勝つ。(n) `record-test-result.py` は command 引数を**実行して**合否記録＝実行可能な単一コマンド（`python3 -m pytest -q`・シェル機能不可）を渡す。説明文字列だと実行失敗で `red` が newest になり judge 🔴→正しいコマンドで再実行すれば green が newest で自己修復。(o) judge の 1次/2次相違は claims の**トップレベル `verdict:`（1次）**と `second_opinion.verdict`（2次）比較（build-judge-card:382）＝review/security レポートは両方明記して一致させる。docs-only review の tests=unverified🟡 は ack 可（test 実行は qa の領分）。(p) docs-only iteration の qa: `test-strength.drill` に `{\"skip\":true,\"reason\":...}`＝B1 SKIP。qa ref は claims 付き iter46-qa.md（test-strength.md は drill 再生成で claims 置けず）。(q) **size S は terminal=ship**（`SIZE_ALLOWED_PHASES[\"S\"]={brainstorm,implement,review,ship}`＝plan/qa/security/deploy/docs を含まない）。ship→docs の transition 検査は rc0 で通るが contract static 検査が『phase docs not allowed for size S』で FAIL→docs に遷移しない。S の LEARNINGS 更新・dev_ready_for_client 承認は **ship から**実施。必須ゲートは brainstorm+review のみ。 (r) **fingerprint は HEAD sha を混ぜ込む**（hooks/lib/fingerprint.sh＝新規未テストコミットが古い記録に一致する silent-green を防ぐ）＝green 記録は「記録時の HEAD」に束縛され、その後の**docs-only コミットでも HEAD が動けば次ゲートで tests=unverified🟡**。対処＝(a) 各ゲート承認の直前・そのゲート用の全コミット後に record-test-result、または (b) 連続ゲート（qa/security/deploy）でコードを変えないなら HEAD 固定のまま docs を未コミットで積み green を1回記録して一括承認・最後にまとめてコミット（iter57 実測・LEARNINGS conf9）。"
+next_action: "**【iter58 plan フェーズ・phase=plan・brainstorm approved・/clear 直後の再開点】** ◆**現在地**: iter57/v1.18.0 push 済クローズ（origin/main=5f87f9c）→ iter58 rollover 済（iteration=58・全 dev ゲート reset）→ brainstorm 完了・**ユーザー承認済**・brainstorm gate approved・task_size=M 設定済。設計正本: spec=docs/specs/2026-07-05-iter58-qa-browser-delegation-design.md・record=同 -brainstorm-record.md。テーマ＝qa-browser 委譲プロンプト標準化（**guidance のみ**・拘束5点＝①≤5項目連番 ②全項目にエビデンスが揃うまで最終報告禁止 ③SendMessage で同一エージェント再開 ④[n/N done] 進捗 ⑤エビデンス形式）を `qa-verification SKILL.md` の委譲ルール節にインライン化＋`tests/test_skill_guidance_tokens.py` で load-bearing トークン pin（決定論トリップワイヤ）。 ◆**⚠ 次にやること（ここから再開）**: (1) writing-plans で実装計画を docs/plans/2026-07-05-iter58-qa-browser-delegation-plan.md に作成（RED-first・token pin テストの RED 確認手順・語数予算 context_budget を割らない表現圧縮を明記）。(2) **grill-plan で spec+plan をグリル**（2段グリル1段目・致命反映）。(3) current_refs.plan set→`bash scripts/update-gate.sh plan approve`（罠 b/c: set→approve 連続）。(4) implement（TDD）→grill-code→review（盲検2次）→qa（B1 SKIP・claims 付き iter58-qa.md・罠 g/p/d/m/n/r）→security（skill guidance のみ＝moat 非該当だが M framework で必須・盲検2次）→**deploy は M で自動 exempt（罠 h）**→ship（**v1.18.0→v1.19.0**・contract＋STATUS テンプレ＋live STATUS の3箇所 bump・TO-CLIENT・LEARNINGS）→docs→dev_ready_for_client→**push 手前で停止**（push=gh auth switch --user yuuya-miyagaki）。 ◆**罠（iter41-58 で確立・必読）**: (a) gate 承認出力は **tail**（head は SIGPIPE で STATUS 書込み前中断）。(b) current_refs.<gate> は承認直前に設定（pending+ref は contract stale-ref FAIL）。(c) ref set→approve の間に record を挟むと stale-ref 赤＝set→approve を連続。(d) record-test-result は全コード編集後・**対象 gate ref を null にしてから**（full suite 内 contract テストの stale-ref 回避）。(e) judge `read_test_result` は **newest test-runner entry** で判定・observed は `marker_verified` 必須＝非クォート pytest を含む Bash が newest になると tests=unverified→record-test-result（src:manual）で再 record（外側 Bash は pytest 部をクォート＝strip で Q マスク）。(f) framework **焦点変更で未コミット追加実行行＋テストが hook を copy** なら本物の B1 drill 成立（混在 diff は skip）。(g) qa は **SECOND_OPINION_GATES（review/security）非対象**＝claims 付き QA レポートを ref にすれば 🟢。(h) **M は deploy 自動 exempt**（SIZE_ALLOWED_PHASES）。(i) task_type/size は update-task.sh のみ（raw Edit は tamper block）。(j) push は `gh auth switch --user yuuya-miyagaki`。(k) phase rollover(ship→brainstorm)は backward 遷移＝常時 allow。(l) B1 drill: 純コメントのみの追加ハンクは behavior-catching mutant 不能で coverage floor を割る→冗長コメントを除去し全ハンクを behavioral/text-coverable に整形（echo メッセージ変更は message を assert するテストで mutant 可）＝skip 回避。(m) full suite 実走中に suite 自身が spurious observed test-runner エントリ（vitest 等・marker false）を real evidence-log へ書く→record-test-result を suite 完走の**後**に置けば manual エントリが newest で勝つ。(n) `record-test-result.py` は command 引数を**実行して**合否記録＝実行可能な単一コマンド（`python3 -m pytest -q`・シェル機能不可）を渡す。説明文字列だと実行失敗で `red` が newest になり judge 🔴→正しいコマンドで再実行すれば green が newest で自己修復。(o) judge の 1次/2次相違は claims の**トップレベル `verdict:`（1次）**と `second_opinion.verdict`（2次）比較（build-judge-card:382）＝review/security レポートは両方明記して一致させる。docs-only review の tests=unverified🟡 は ack 可（test 実行は qa の領分）。(p) docs-only iteration の qa: `test-strength.drill` に `{\"skip\":true,\"reason\":...}`＝B1 SKIP。qa ref は claims 付き iter46-qa.md（test-strength.md は drill 再生成で claims 置けず）。(q) **size S は terminal=ship**（`SIZE_ALLOWED_PHASES[\"S\"]={brainstorm,implement,review,ship}`＝plan/qa/security/deploy/docs を含まない）。ship→docs の transition 検査は rc0 で通るが contract static 検査が『phase docs not allowed for size S』で FAIL→docs に遷移しない。S の LEARNINGS 更新・dev_ready_for_client 承認は **ship から**実施。必須ゲートは brainstorm+review のみ。 (r) **fingerprint は HEAD sha を混ぜ込む**（hooks/lib/fingerprint.sh＝新規未テストコミットが古い記録に一致する silent-green を防ぐ）＝green 記録は「記録時の HEAD」に束縛され、その後の**docs-only コミットでも HEAD が動けば次ゲートで tests=unverified🟡**。対処＝(a) 各ゲート承認の直前・そのゲート用の全コミット後に record-test-result、または (b) 連続ゲート（qa/security/deploy）でコードを変えないなら HEAD 固定のまま docs を未コミットで積み green を1回記録して一括承認・最後にまとめてコミット（iter57 実測・LEARNINGS conf9）。"
 blockers: []
 failure_tracking: null
 session_history:
-  - date: "2026-07-05"
-    mode: Dev
-    phase: "brainstorm"
-    note: "iter57 着手。iter56/v1.17.0 を push（origin/main=584d22c）後に rollover 実施（iteration=57・dev ゲート全 reset via update-gate.sh・phase docs→brainstorm 後方遷移・非 requirements refs null・task framework/L 継続＝update-task.sh 不要）。テーマ＝構造リアーキ（文字列判定→FS 実解決 realpath+inode・OS-lock cp-lock 主 moat 昇格・check-control-plane 979行 退役・静的アナライザ advisory 降格）。特記: iter56 クローズ時に2セッション並走が発生（qa docs コミット 991199b が別セッション割り込み・内容同一で実害なし・第三者検収 PASS）。教訓＝引き継ぎ前の静止監視必須。次＝brainstorm 設計探索。"
   - date: "2026-07-05"
     mode: Dev
     phase: "docs"
@@ -53,6 +49,10 @@ session_history:
     mode: Dev
     phase: "docs"
     note: "iter57 / v1.18.0 主 moat 交代（OS-lock 昇格・check-control-plane 979行 退役・残余ガード check-runtime-state／EACCES advisory explain-oslock-eacces 新設・aegis_cp_verify 全数照合）を全 dev ゲート approved まで完走（push 手前で停止）。review（fix-forward: 盲検2次 Minor2＝POC v162 の退役 hook 参照 fail-open／manifest 全数列挙テスト粒度低下＋divergence: advisory=PostToolUseFailure spec 同期）→qa（B1 SKIP・RED-first 代替実証・full 1045→fix 後 1048）→security（盲検2次 Major=**難読化 unlock 形の silent 保護回帰**＝旧 check-control-plane の shlex トークナイザが deny→新平文 grep が allow・unlock 後 write で moat 無効化を実測→`_obfuscated_unlock_on_cp` で ASK 化・回帰テスト3本・SF-009 記録。deps🟡 は依存ゼロで ack）→deploy（scaffold smoke 全3プロファイル PASS・installed tree で OS-lock apply+verify）→ship（v1.17→1.18・3箇所 bump・TO-CLIENT・LEARNINGS 2件蒸留）→docs。全実装未 push（push=gh auth switch --user yuuya-miyagaki）。教訓核: (1) 静的→syscall moat 交代で syscall は write 全形を包摂するが unlock 難読形は包摂しない＝『移植』主張は旧 deny の全被覆を検証してから（1次バイパス試行が write 形に偏り2次が unlock 軸を捕捉＝盲検の価値）。(2) test-evidence fingerprint は HEAD sha 束縛＝green 記録後のコミット（docs-only でも）で次ゲート unverified→記録は各ゲートの全コミット後に置くか HEAD 固定で一括承認（LEARNINGS conf9×2）。"
+  - date: "2026-07-05"
+    mode: Dev
+    phase: "plan"
+    note: "iter58 着手。iter57/v1.18.0 push 済クローズ後に rollover（iteration=58・dev ゲート全 reset via update-gate.sh・phase docs→brainstorm 後方遷移・非 requirements refs null・task framework 継続）。テーマ＝qa-browser 委譲プロンプト標準化（iter56 retro Try#2）。brainstorm 完了＝スコープ guidance のみ（ユーザー決定「おすすめ」= Option 1・決定論バックストップと browser-assist テンプレ化は descope）・拘束5点（≤5分割/全項目完了まで最終報告禁止/SendMessage 再開/[n/N] 進捗/エビデンス形式）を qa-verification SKILL.md にインライン＋test_skill_guidance_tokens.py で token pin。ユーザー設計承認済・brainstorm gate approved・task_size=M。設計正本 docs/specs/2026-07-05-iter58-qa-browser-delegation-{design,brainstorm-record}.md。ユーザー指示で一度 /clear して plan フェーズから再開（writing-plans→grill-plan→plan approve→implement）。"
 ---
 
 ## Summary
