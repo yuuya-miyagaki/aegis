@@ -1,9 +1,9 @@
 ---
 framework: aegis
-framework_version: "1.16.0"
+framework_version: "1.17.0"
 project_name: "Aegis"
 mode: Dev
-phase: plan
+phase: ship
 task_type: framework
 task_size: L
 task_size_rationale: "iteration 56（framework・ドッグフード二周目 M2 フィードバック反映）= L。footprint は hooks/check-secrets.sh（先頭ドット誤検知修正）＋scripts/build-judge-card.py（skip 経路 claims・verdict 名目差段階化）＋scripts/check_status.py または update-gate.sh（spec-delta 合格1行出力）＋templates/profiles/full.json（未配布4本追加）＋contract/install テスト＋subagent-dev / qa-verification SKILL.md＋新規テスト複数＝6+ ファイル。check-secrets の deny 判定変更＝moat 変更を含むため全ゲート必須。"
@@ -13,20 +13,20 @@ last_updated: "2026-07-05T00:00:00Z"
 gate_approvals:
   client_ready_for_dev: n/a
   brainstorm: approved
-  plan: pending
-  review: pending
-  qa: pending
-  security: pending
-  deploy: pending
+  plan: approved
+  review: approved
+  qa: approved
+  security: approved
+  deploy: approved
   dev_ready_for_client: pending
 current_refs:
   requirements: []
-  plan: null
+  plan: docs/plans/2026-07-05-iter56-m2-feedback-plan.md
   spec: docs/specs/2026-07-05-iter56-m2-feedback-design.md
-  review: null
-  qa: null
-  security: null
-  deploy: null
+  review: docs/qa-reports/iter56-review.md
+  qa: docs/qa-reports/iter56-qa.md
+  security: docs/qa-reports/iter56-security.md
+  deploy: docs/qa-reports/iter56-deploy.md
   translation: null
 external_evidence:
   - type: "second-opinion-v1-foundation-r1-r2"

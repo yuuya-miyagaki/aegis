@@ -1,19 +1,16 @@
 # Judge カード: review ゲート（機械生成）
 
-## 総合: 🟡 要確認
+## 総合: 🟢 承認可
 
 ## ティア1: 機械事実（✅検証済・高信頼）
-- テスト: unverified
+- テスト: green
 - 未完成マーカー(変更行): なし
 
 ## ティア2: 🔍 第2意見（self-attested・自己申告・低信頼）
 - あり: approve_with_notes
 
-## 🟡 要確認
-- テスト結果が未検証（記録なし/コード変更後）
+## 💬 情報（非ブロッキング）
+- approve_with_notes の notes: Major 1（qa ゲートの未記入 verdict 沈黙通過）＋Minor 4 — 全件反映済み（1次 verdict 常時検証・budget 余白・残穴コメント・②(b) テスト・parity 集合一致）
 
 ## あなたが取るアクション
 （LLM が平易日本語で記述）
-
-## ACK
-- テスト実行は qa ゲートの領分（review は仕様準拠+コード品質+盲検2次）。full suite 1285 passed・contract PASS は確認済みで qa ゲートで record-test-result により権威記録する。2次レビュー2体 approve_with_notes・全 notes 解消済み （2026-07-03 21:08）
