@@ -61,6 +61,19 @@
 > 敵対閉鎖は原理的に不可＝脅威モデル外）。Windows ネイティブは chmod が no-op ＝ OS-lock
 > 無効（公式サポート外）。各 SF の以下「状態（2026-06-21）」の layer-1/layer-2 記述は、
 > 「layer-1＝退役／layer-2＝主 moat に昇格」と読み替える。
+>
+> **iter57 security 盲検2次 追補（SF-009・難読化 unlock 形の後退→ASK 化）**: 退役した
+> `check-control-plane.sh` は shlex トークナイザで**難読化された unlock 形**（`chmod u+w hoo\ks/…`・
+> `chmod +w hooks""/…`・`"ho""oks"`・`$(echo hooks)/…`）を deny していたが、残余ガード
+> `check-runtime-state.sh` の平文 `LOCKED_CP` grep はこれを取りこぼし **silent に allow** していた
+> （難読化 **write** は OS-lock が形非依存に EACCES で遮断するが、難読化 **unlock** は主 moat の
+> 外＝静的判定のみ）。これは「旧 deny→新 allow」の silent regression。**対処**: `_obfuscated_unlock_on_cp`
+> を追加し、unlock ツール＋（バックスラッシュ/連結クォート/コマンド置換）＋正規化後に CP トークンを
+> 検出したら **ASK**（fail-visible・broad recursive chmod と同格）。deny でなく ASK なのは検出が
+> ヒューリスティック（パーサ非導入）ゆえ偽陽性を deny 側に倒さないため。**残余**: 深い `$()` 構築や
+> 変数間接（`D=hooks; chmod +w $D`）は依然すり抜けうるが、これらは意図的難読化＝事故防止の
+> 脅威モデル外（SF-004 と同じ原理的限界）。回帰固定 = `tests/test_runtime_state_hook.py::
+> TestUnlockFormDeny::test_obfuscated_unlock_on_cp_asks`。
 
 ### SF-001: control-plane フックのクォート/エスケープ トークン分割バイパス（Critical・pre-existing）
 

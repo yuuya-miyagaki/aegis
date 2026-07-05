@@ -182,10 +182,40 @@ _recursive_chmod_broad() {
   printf '%s' "$1" | grep -qE '(^|[^A-Za-z0-9_])chmod[[:space:]][^;|&]*-R' || return 1
   printf '%s' "$1" | grep -qE '[[:space:]](\.{1,2}/?|/|\*)([[:space:]]|$)'
 }
+# iter57 security 2nd-opinion (Major): the plain-text LOCKED_CP grep in
+# _unlock_form_on_cp misses SHELL-OBFUSCATED unlock forms the retired hook's
+# tokenizer caught — `chmod u+w hoo\ks/…`, `chmod +w hooks""/…`,
+# `chmod +w "ho""oks"/…`, `chmod +w $(echo hooks)/…`. A full tokenizer is what
+# the moat handover deliberately retired, so instead: an unlock tool whose
+# quote/backslash-stripped form reveals a stable-CP token (or that builds the
+# path via command substitution) is ASKed — the same fail-visible treatment as
+# broad recursive chmod. This turns a SILENT allow (旧 deny からの後退) into a
+# visible confirm without re-introducing a parser. Deep $()-built paths stay
+# out of the accident threat model (recorded in docs/security-followups.md).
+_obfuscated_unlock_on_cp() {
+  local cmd="$1" norm
+  printf '%s' "$cmd" | grep -qE "$UNLOCK_TOOLS" || return 1
+  # Strip backslashes and both quote types via param expansion (no parser).
+  norm="${cmd//\\/}"
+  norm="${norm//\"/}"
+  norm="${norm//\'/}"
+  # Only meaningful when obfuscation was actually present: stripping CHANGED the
+  # command (a quote/backslash existed), or a command substitution builds the
+  # path. A plain `chmod +w hooks/…` (norm == cmd, no $()) is already DENIED by
+  # _unlock_form_on_cp — do not downgrade it to ASK here.
+  if [ "$norm" = "$cmd" ] && ! printf '%s' "$cmd" | grep -qE '\$\(|`'; then
+    return 1
+  fi
+  # Left boundary keeps `webhooks`/`myscripts` out; right boundary accepts any
+  # non-word char (/, space, ), backtick, EOL) so a cmdsub form `$(echo hooks)/`
+  # — where the CP token is followed by `)` — is still revealed.
+  printf '%s' "$norm" | grep ${CASE_I[@]+"${CASE_I[@]}"} -qE \
+    '(^|[^[:alnum:]_./-])(hooks|scripts|templates)([^[:alnum:]_.]|$)|CLAUDE\.md|\.claude/(rules|skills|commands|agents)'
+}
 
 if [ -n "$CMD" ]; then
   if ! _writes_runtime_state "$CMD" && ! _unlock_form_on_cp "$CMD" \
-     && ! _recursive_chmod_broad "$CMD"; then
+     && ! _recursive_chmod_broad "$CMD" && ! _obfuscated_unlock_on_cp "$CMD"; then
     emit_allow
     exit 0
   fi
@@ -215,6 +245,11 @@ fi
 
 if [ -n "$CMD" ] && _recursive_chmod_broad "$CMD"; then
   emit_ask "[integrity] 再帰 chmod（-R）がリポジトリ全体（. / .. / / / * 等）に及びます。control-plane の OS-lock（主 moat）も解錠されるため確認してください。EACCES への対処なら chmod ではなく task_type=framework への切替（scripts/update-task.sh）が正です。"
+  exit 0
+fi
+
+if [ -n "$CMD" ] && _obfuscated_unlock_on_cp "$CMD"; then
+  emit_ask "[integrity] chmod/chflags/chattr が難読化された形（バックスラッシュ・連結クォート・コマンド置換）で control-plane（hooks/ scripts/ templates/ CLAUDE.md .claude/*）を解錠しようとしている可能性があります。OS-lock（主 moat）の解錠は行わず、framework の変更が正当なら scripts/update-task.sh --type framework で task_type を切り替えてください。"
   exit 0
 fi
 

@@ -225,6 +225,32 @@ class TestUnlockFormDeny(unittest.TestCase):
         out = _hook(self.root, "chmod -R 755 src/")
         self.assertTrue(_allowed(out), out[:200])
 
+    def test_obfuscated_unlock_on_cp_asks(self):
+        """iter57 security 2nd-opinion (Major): shell-obfuscated unlock forms the
+        retired hook's tokenizer caught (backslash / adjacent quotes / cmdsub)
+        must not SILENTLY ALLOW. They ASK (fail-visible) — heuristic, so ASK not
+        DENY. Was a silent 旧 deny→新 allow regression before this fix."""
+        for cmd in (r"chmod u+w hoo\ks/lib/emit.sh",
+                    'chmod +w hooks""/lib/emit.sh',
+                    'chmod +w "ho""oks"/lib/emit.sh',
+                    r"chmod -R u+w hoo\ks",
+                    "chmod +w $(echo hooks)/lib/emit.sh"):
+            with self.subTest(cmd=cmd):
+                out = _hook(self.root, cmd)
+                self.assertTrue(_asked(out), f"{cmd}: {out[:200]}")
+
+    def test_plain_unlock_still_denies_not_downgraded_to_ask(self):
+        """The obfuscation ASK path must NOT relax the plain-form DENY."""
+        out = _hook(self.root, "chmod u+w hooks/lib/emit.sh")
+        self.assertTrue(_denied(out), out[:200])
+
+    def test_obfuscated_chmod_without_cp_token_allowed(self):
+        """No false-positive: obfuscation markers with no stable-CP token stay
+        ALLOW (escaped space / quoted non-CP path are legitimate)."""
+        for cmd in (r"chmod +w my\ file.txt", 'chmod 644 "my notes".txt'):
+            with self.subTest(cmd=cmd):
+                self.assertTrue(_allowed(_hook(self.root, cmd)), cmd)
+
 
 class TestAllowlistReadOnlyStage(unittest.TestCase):
     """PORT-4〜7（旧 check-control-plane から移植）: manifest allowlist・
