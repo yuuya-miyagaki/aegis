@@ -138,14 +138,20 @@ STRIPPED=$(printf '%s' "$CMD_LC" | sed -E "s/${SAFE_ENV_SUFFIXES}//g")
 # Direct .env staging across all variants. Case-insensitive: on case-insensitive
 # FS (macOS/Windows default) `git add .ENV` stages the real `.env` secret.
 if printf '%s' "$STRIPPED" | grep -qE "git[[:space:]]+${GIT_PRE_OPTS}${GIT_STAGE_VERB}([[:space:]]+(--[A-Za-z][-A-Za-z0-9]*[[:space:]]+)*)?.*\.env" 2>/dev/null; then
-  emit_deny "[secrets] .env ファイルを git に追加しないでください。認証情報がリポジトリに漏洩します。"
+  # iter56 ①付随: .env.test 等は safe-list に入れない設計判断（中身無検査で
+  # 「テスト用だから安全」は成立しない）。回避策の案内のみ文言で行う。
+  emit_deny "[secrets] .env ファイルを git に追加しないでください。認証情報がリポジトリに漏洩します。プレースホルダのみのテンプレートは .env.example / .env.template / .env.sample 名なら追加できます。"
   exit 0
 fi
 
 # Broad staging that would include .env or high-risk credentials: git add -A, git add .
 # Only `add` (not stage / update-index) has the -A/--all/. broad-stage spellings.
 # C-1: matched on CMD_LC so `GIT ADD -a` folds too; `-A` is spelled `-a` here.
-if printf '%s' "$CMD_LC" | grep -qE "git[[:space:]]+${GIT_PRE_OPTS}add[[:space:]]+(-a|--all|\.)" 2>/dev/null; then
+# iter56 ①: a bare `\.` prefix-matched leading-dot FILENAMES (.env.example,
+# .gitignore — 2 real denies in dogfood M2). Broad-dot means a token that
+# stages a whole directory: . / .. / ./ / ../ followed by whitespace, EOL, or
+# a shell delimiter (;&| — `git add .&&git commit` must stay broad).
+if printf '%s' "$CMD_LC" | grep -qE "git[[:space:]]+${GIT_PRE_OPTS}add[[:space:]]+(-a|--all|\.\.?/?([[:space:];&|]|$))" 2>/dev/null; then
   ROOT=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
 
   # v0.13.0 Phase 0b NO-GO fix: broad staging must also catch high-risk credentials
