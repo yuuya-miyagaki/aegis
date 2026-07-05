@@ -18,8 +18,11 @@ import unittest
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 
+# iter57: check-control-plane.sh 退役 → 残余静的ガード check-runtime-state.sh が
+# runtime-state moat（主 moat は OS-lock だが、lock が守れない STATUS/settings
+# 書込みはこの hook が担う＝登録ドリフト検出対象として維持）。
 MOAT_HOOKS = [
-    "check-control-plane.sh",
+    "check-runtime-state.sh",
     "check-destructive.sh",
     "check-secrets.sh",
     "check-deploy-gate.sh",

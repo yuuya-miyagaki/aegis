@@ -470,6 +470,13 @@ copy_hooks() {
   while IFS= read -r script; do
     copy_file_routed "hooks/$script" "$FRAMEWORK_ROOT/hooks/$script" "$target_dir/hooks/$script"
   done <<< "$hooks_include"
+
+  # iter57: retired hooks — remove stale copies on upgrade. copy_hooks only
+  # overwrites files it ships, never prunes what a profile dropped; without
+  # this an old install keeps a wired-out check-control-plane.sh around (the
+  # template no longer registers it, so it is dead weight, but its presence
+  # misleads anyone auditing the installed moat).
+  rm -f "$target_dir/hooks/check-control-plane.sh"
 }
 
 # --- Ensure runtime artifacts are gitignored in the install target ---

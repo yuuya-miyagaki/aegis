@@ -55,7 +55,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash \"${CLAUDE_PROJECT_DIR:-.}\"/hooks/check-control-plane.sh",
+            "command": "bash \"${CLAUDE_PROJECT_DIR:-.}\"/hooks/check-runtime-state.sh",
             "timeout": 30
           },
           {
@@ -133,6 +133,10 @@
           {
             "type": "command",
             "command": "bash \"${CLAUDE_PROJECT_DIR:-.}\"/hooks/post-bash.sh"
+          },
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PROJECT_DIR:-.}\"/hooks/explain-oslock-eacces.sh"
           }
         ]
       }

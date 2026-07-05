@@ -36,7 +36,11 @@ VALID_PROFILES = ["minimal", "standard", "full"]
 CORE_ENFORCEMENT_HOOKS = [
     "check-gate.sh",
     "post-status-audit.sh",
-    "check-control-plane.sh",
+    # iter57: check-control-plane.sh retired. The primary control-plane moat is
+    # now the OS lock (hooks/lib/cp-lock.sh, applied by session-start.sh); the
+    # residual static guard for runtime-state (STATUS/settings, which the lock
+    # cannot cover) is check-runtime-state.sh.
+    "check-runtime-state.sh",
     "check-task-created.sh",
     "check-task-completed.sh",
 ]
@@ -151,7 +155,11 @@ REQUIRED_HOOK_FILES = [
     ROOT / "hooks/post-bash.sh",
     ROOT / "hooks/post-status-audit.sh",
     ROOT / "hooks/pre-compact.sh",
-    ROOT / "hooks/check-control-plane.sh",
+    # iter57: check-control-plane.sh retired → residual static guard +
+    # EACCES advisory. Both REQUIRED so a broken install missing either is
+    # caught (F6 lesson: unshipped hooks fail silently).
+    ROOT / "hooks/check-runtime-state.sh",
+    ROOT / "hooks/explain-oslock-eacces.sh",
     # lib/ helpers: F6 (functional-integrity audit) showed these are the hooks'
     # life support — a missing lib silently fail-opens every sourcing hook.
     ROOT / "hooks/lib/extract-input.sh",

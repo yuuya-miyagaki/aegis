@@ -13,6 +13,7 @@ fails open. Firing a hook is the only way to catch that (audit F6, 2026-06-07).
 from __future__ import annotations
 
 import json
+import os
 import re
 import shutil
 import subprocess
@@ -155,30 +156,52 @@ def verify_hooks_runnable(target: Path, profile: str) -> tuple[bool, str]:
                 f"stderr={r.stderr.strip()[:200]!r})"
             )
 
-    # (B-4) check-control-plane.sh must not deny everyday project commands at
-    # an install target (fresh scaffold STATUS has task_type=feature). P1-1:
-    # a raw-input control-plane match always hit transcript_path and denied
-    # nearly every Bash command — only the realistic envelope catches this.
-    if (hooks_dir / "check-control-plane.sh").exists():
-        r = _fire_hook(target, "hooks/check-control-plane.sh",
+    # (B-4) iter57: check-runtime-state.sh (the residual static guard that
+    # replaced check-control-plane.sh) must not deny everyday project commands
+    # at an install target (fresh scaffold STATUS has task_type=feature), yet
+    # must STILL deny a runtime-state write. F6 lesson: verify by FIRING the
+    # installed hook, not by static listing.
+    if (hooks_dir / "check-runtime-state.sh").exists():
+        r = _fire_hook(target, "hooks/check-runtime-state.sh",
                        _hook_stdin(target, "Bash", {"command": "git status"}))
         if r.returncode != 0 or r.stdout.strip() != "{}":
             return False, (
-                f"{profile}: check-control-plane.sh denied 'git status' at an "
+                f"{profile}: check-runtime-state.sh denied 'git status' at an "
                 f"install target (exit={r.returncode}, "
                 f"stdout={r.stdout.strip()!r}, "
                 f"stderr={r.stderr.strip()[:200]!r})"
             )
-        # And a control-plane write must STAY denied (no fail-open trade).
-        r = _fire_hook(target, "hooks/check-control-plane.sh",
+        # A runtime-state write (gate tamper via Bash) must STAY denied.
+        r = _fire_hook(target, "hooks/check-runtime-state.sh",
                        _hook_stdin(target, "Bash",
                                    {"command":
-                                    "sed -i 's/a/b/' hooks/check-gate.sh"}))
+                                    "sed -i 's/pending/approved/' docs/STATUS.md"}))
         if r.returncode != 0 or _decision(r.stdout) != "deny":
             return False, (
-                f"{profile}: check-control-plane.sh failed to deny a hook "
-                f"edit (exit={r.returncode}, stdout={r.stdout.strip()!r})"
+                f"{profile}: check-runtime-state.sh failed to deny a STATUS "
+                f"write (exit={r.returncode}, stdout={r.stdout.strip()!r})"
             )
+        # The primary control-plane moat is now the OS lock: applying it at the
+        # install target and verifying full consistency must succeed (rc0). A
+        # lock that half-applies or a verify that mis-reads state is the silent
+        # regression this smoke closes (grill 致命2 — half-locked detection).
+        cp_lock = hooks_dir / "lib" / "cp-lock.sh"
+        if cp_lock.exists() and os.name != "nt" and not (
+                hasattr(os, "geteuid") and os.geteuid() == 0):
+            r = subprocess.run(
+                ["bash", "-c",
+                 f'source "{cp_lock}"; aegis_cp_apply "{target}" feature '
+                 f'&& aegis_cp_verify "{target}" feature'],
+                capture_output=True, text=True)
+            # restore writability so the caller's tmp cleanup succeeds
+            subprocess.run(["bash", "-c",
+                            f'source "{cp_lock}"; aegis_cp_unlock "{target}"'],
+                           capture_output=True, text=True)
+            if r.returncode != 0:
+                return False, (
+                    f"{profile}: OS-lock apply+verify failed at install target "
+                    f"(rc={r.returncode}, stdout={r.stdout.strip()[:200]!r})"
+                )
 
     # E1: the observer must RECORD a Bash execution into the evidence log.
     # F6 lesson: install-path artifacts are verified by FIRING them, not by

@@ -20,7 +20,9 @@ import unittest
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 
 FALLBACK_HOOKS = [
-    "check-control-plane.sh",
+    # iter57: check-control-plane.sh 退役 → 残余静的ガード check-runtime-state.sh
+    # が同一の deny-side fallback ブロックを継承（corruption 時 deny に倒す）。
+    "check-runtime-state.sh",
     "check-secrets.sh",
     "check-destructive.sh",
     "check-gate.sh",

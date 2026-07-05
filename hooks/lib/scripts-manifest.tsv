@@ -1,5 +1,5 @@
 # scripts-manifest.tsv — scripts/ エントリポイントの分類（single owner・iter55）
-# 消費者: hooks/check-control-plane.sh（allow|ask = 実行可）
+# 消費者: hooks/check-runtime-state.sh（allow|ask = 実行可・iter57 で check-control-plane から交代）
 #         scripts/check_framework_contract.py（3方向 drift 検査）
 #         templates/hooks.template.json permissions（class=allow と双方向一致）
 #         tests/test_permission_allowlist_install.py（SCRIPT_CLASS 由来元）
