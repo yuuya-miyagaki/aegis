@@ -307,7 +307,7 @@ v1.0.0 で公式同名スキルとの衝突回避のため一部を `aegis-*` �
 
 ## 7. フック（Policy as Code）
 
-17 のランタイムフックが Claude Code のツール呼び出しを制御する。
+18 のランタイムフックが Claude Code のツール呼び出しを制御する。
 フック設定は `templates/hooks.template.json` に定義され、`bin/setup.sh` が `settings.local.json` として生成する。
 共有ライブラリは `hooks/lib/`（出力スキーマ＝`emit.sh`、破壊パターン＝`patterns.sh`、入力抽出＝`extract-input.sh`、frontmatter ＝`frontmatter.sh`、観測ログ＝`evidence.sh`/`fingerprint.sh`、phase→skill マップ＝`phase-skills.sh`、credential パターン＝`secrets-patterns.sh`、fail-closed integrity ＝`safety.sh`、untrusted 文中和＝`sanitize.sh`、layer-2 OS lock ＝`cp-lock.sh` の計 11 本）。
 `emit.sh` は pure-bash で外部依存ゼロ＝deny/block が fail-open しない。
@@ -449,7 +449,7 @@ TaskCreated / TaskCompleted
 |------------|----------|---------|
 | minimal | session-start のみ | 最小（コア文書＋STATUS 検証） |
 | standard | session-start, check-gate, post-status-audit, pre-compact | 推奨（基本ゲート＋状態保護） |
-| full | 全 17 フック | 全構成（全スキル・全エージェント・全スクリプト・TDD backstop） |
+| full | 全 18 フック | 全構成（全スキル・全エージェント・全スクリプト・TDD backstop） |
 
 `setup.sh` は profile の `required`/`recommended` に列挙されたファイルと `hooks_include` の hook を配布し、
 hook を含む場合は `hooks/lib/*.sh` を全て配布する。
@@ -520,7 +520,7 @@ python3 scripts/check_framework_contract.py --profile=standard --root <your-proj
 | エージェント（.claude/agents/） | 12 |
 | スキル（.claude/skills/） | 19（SKILL.md x18 + platforms.md x1） |
 | コマンド（.claude/commands/） | 8 |
-| フック（hooks/） | 29（メイン 17 + lib/ 12: emit / patterns / extract-input / frontmatter / evidence / fingerprint / phase-skills / secrets-patterns / safety / sanitize / cp-lock / snapshot） |
+| フック（hooks/） | 30（メイン 18 + lib/ 12: emit / patterns / extract-input / frontmatter / evidence / fingerprint / phase-skills / secrets-patterns / safety / sanitize / cp-lock / snapshot） |
 | スクリプト（scripts/） | 13 |
 | テンプレート（templates/） | 30（.template.md x26 + hooks.template.json + profiles x3） |
 | 拡張（extensions/） | 11 |

@@ -21,7 +21,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 
 DENY_HOOKS = [
-    "check-control-plane.sh",
+    "check-runtime-state.sh",
     "check-secrets.sh",
     "check-destructive.sh",
     "check-gate.sh",
@@ -32,7 +32,7 @@ DENY_HOOKS = [
 # どの lib を欠落させても fail-closed であるべき (各 hook が実際に require する lib のみ)
 # safety.sh は全 hook 共通の fallback ブロックで処理される。
 HOOK_LIB_DEPS = {
-    "check-control-plane.sh": ["emit.sh", "extract-input.sh"],
+    "check-runtime-state.sh": ["emit.sh", "extract-input.sh"],
     "check-secrets.sh":       ["emit.sh", "extract-input.sh", "secrets-patterns.sh"],
     "check-destructive.sh":   ["emit.sh", "extract-input.sh", "patterns.sh"],
     "check-gate.sh":          ["emit.sh", "extract-input.sh", "frontmatter.sh"],

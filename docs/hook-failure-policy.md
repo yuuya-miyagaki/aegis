@@ -19,7 +19,8 @@
 | check-deploy-mcp-gate.sh | moat | あり | deny | —（※2） |
 | check-skill-gate.sh | moat | あり | ask | allow |
 | check-cron-gate.sh | moat | あり | ask | allow |
-| check-control-plane.sh | moat | あり | deny（raw fallback） | —（※1） |
+| check-runtime-state.sh | moat | あり | deny（raw fallback） | —（※1） |
+| explain-oslock-eacces.sh | advisory | なし | 通常動作（fail-open） | allow |
 | check-task-created.sh | moat | あり | hard stop（placeholder subject で判定続行） | allow |
 | check-task-completed.sh | moat | あり | 差し戻し（exit 2） | allow |
 | post-bash.sh | advisory | なし | 通常動作 | allow |
@@ -28,8 +29,9 @@
 | pre-compact.sh | advisory | なし | 通常動作 | allow（※3） |
 | session-start.sh | advisory | あり | allow（劣化表示） | allow |
 
-※1 check-control-plane は入力パース失敗時に raw input へフォールバックし、
-control plane 言及があれば deny（fail-closed）。言及がなければ allow。
+※1 check-runtime-state（iter57 で check-control-plane から交代）は入力パース失敗時に
+raw input へフォールバックし、runtime-state / locked-CP 言及があれば deny（fail-closed）。
+言及がなければ allow。安定 CP への書込み自体の主 moat は OS-lock（hooks/lib/cp-lock.sh）。
 
 ※2 check-deploy-mcp-gate は stdin を参照しない（matcher 登録で対象 MCP tool に
 限定済みのため）。「入力パース失敗」という状態が存在せず、判定は常に

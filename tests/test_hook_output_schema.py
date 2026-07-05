@@ -293,21 +293,22 @@ class TestPreToolUseHooks(HookSchemaAssertions):
         if out:
             self.assertNotIn("permissionDecision", out, "passthrough must not deny")
 
-    # --- check-control-plane.sh ---------------------------------------
+    # --- check-runtime-state.sh ---------------------------------------
 
-    def test_check_control_plane_deny_bash_writing_to_hooks(self):
-        """Bash command targeting hooks/ during project work should deny."""
+    def test_check_runtime_state_deny_bash_writing_to_status(self):
+        """Bash command writing runtime-state (STATUS.md) during project work
+        should deny. (Writes to hooks/ are the OS lock's job now, not this hook.)"""
         self._write_status(
             "---\ntask_type: feature\nphase: implement\nmode: Dev\n"
             "gate_approvals:\n  plan: approved\n---\n"
         )
         payload = make_pretool_payload(
             "Bash",
-            {"command": "echo evil > hooks/bad.sh"},
+            {"command": "echo evil >> docs/STATUS.md"},
         )
-        rc, out, err = run_hook("check-control-plane.sh", payload, cwd=Path(self.tmp))
+        rc, out, err = run_hook("check-runtime-state.sh", payload, cwd=Path(self.tmp))
         if out:
-            self.assert_pretool_decision(out, "deny", hint="check-control-plane.sh hooks write")
+            self.assert_pretool_decision(out, "deny", hint="check-runtime-state.sh STATUS write")
 
     # --- check-secrets.sh ---------------------------------------------
 

@@ -31,7 +31,8 @@ from test_hook_output_schema import (  # noqa: E402
 )
 
 ROW_RE = re.compile(
-    r"^\| (check-[a-z-]+\.sh|post-[a-z-]+\.sh|pre-compact\.sh|session-start\.sh) \|")
+    r"^\| (check-[a-z-]+\.sh|post-[a-z-]+\.sh|explain-[a-z-]+\.sh"
+    r"|pre-compact\.sh|session-start\.sh) \|")
 
 # pre-compact staleness must not interfere: pin the interval high under both
 # the current and the post-T6 env var names.
@@ -197,27 +198,27 @@ class TestPython3AbsentBehavior(unittest.TestCase):
                     f"stderr={err[:200]}")
 
     def test_python3_absent_control_plane_raw_fallback_denies(self):
-        """check-control-plane: ROOT は SCRIPT_DIR 解決（override 非対応）のため、
-        既存 test_check_status.py の流儀どおり hook を一時 root へコピーし lib を
-        symlink して発火する。`\\"` 含み入力で bash fast-path も外れ、raw fallback
-        が control plane 言及を捕捉して deny（fail-closed）になること。"""
+        """check-runtime-state（iter57 で check-control-plane から交代）: ROOT は
+        SCRIPT_DIR 解決のため hook を一時 root へコピーし lib を symlink して発火する。
+        `\\"` 含み入力で bash fast-path も外れ、raw fallback が runtime-state /
+        locked-CP 言及を捕捉して deny（fail-closed）になること。"""
         import shutil
-        row = self.table["check-control-plane.sh"]
+        row = self.table["check-runtime-state.sh"]
         self.assertIn("deny", row["py_absent"])
         _write_status(self.tmp, FEATURE_STATUS)
         hooks_dir = self.tmp / "hooks"
         lib_dir = hooks_dir / "lib"
         lib_dir.mkdir(parents=True)
-        shutil.copy2(HOOKS / "check-control-plane.sh", hooks_dir)
-        for lib in ("extract-input.sh", "emit.sh"):
+        shutil.copy2(HOOKS / "check-runtime-state.sh", hooks_dir)
+        for lib in ("extract-input.sh", "emit.sh", "frontmatter.sh", "safety.sh"):
             (lib_dir / lib).symlink_to(HOOKS / "lib" / lib)
         broken = _python3_broken_env(self)
         env = os.environ.copy()
         env.update(broken)
         payload = make_pretool_payload(
-            "Bash", {"command": 'echo "x" > hooks/check-gate.sh'})
+            "Bash", {"command": 'echo "x" >> docs/STATUS.md'})
         r = subprocess.run(
-            ["bash", str(hooks_dir / "check-control-plane.sh")],
+            ["bash", str(hooks_dir / "check-runtime-state.sh")],
             input=json.dumps(payload), capture_output=True, text=True,
             check=False, cwd=str(self.tmp), env=env)
         out = json.loads(r.stdout) if r.stdout.strip() else {}
@@ -351,7 +352,7 @@ class TestParseFailureAllows(unittest.TestCase):
         # ※1: control-plane は raw fallback — RAW に control plane 言及なし → allow。
         hooks = [h for h, row in self.table.items()
                  if row["parse_fail"].startswith("allow")
-                 or h == "check-control-plane.sh"]
+                 or h == "check-runtime-state.sh"]
         self.assertGreaterEqual(len(hooks), 14)
         for hook in hooks:
             with self.subTest(hook=hook):

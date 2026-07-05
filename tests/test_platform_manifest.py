@@ -31,6 +31,7 @@ def test_tool_matching_events_subset_of_known_events():
 def test_verification_dates_parse_as_iso():
     assert set(pm.PLATFORM_VERIFIED) == {
         "models", "hook_events", "tool_names", "hook_output_schema",
+        "posttoolfailure_stderr",
     }
     for iso in pm.PLATFORM_VERIFIED.values():
         date.fromisoformat(iso)  # raises if malformed

@@ -121,7 +121,7 @@ run_F_01_safety_lib_missing() {
     > "$tmp/docs/STATUS.md"
   local payload out
   payload='{"tool_name":"Bash","tool_input":{"command":"ls"}}'
-  out=$(printf '%s' "$payload" | CLAUDE_PROJECT_DIR="$tmp" bash "$tmp/hooks/check-control-plane.sh")
+  out=$(printf '%s' "$payload" | CLAUDE_PROJECT_DIR="$tmp" bash "$tmp/hooks/check-runtime-state.sh")
   TOTAL=$((TOTAL+1))
   if printf '%s' "$out" | grep -q '"permissionDecision":"deny"'; then
     printf '  ✓ emit.sh missing → explicit deny\n'

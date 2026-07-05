@@ -13,6 +13,14 @@ ROOTUSER = hasattr(os, "geteuid") and os.geteuid() == 0
 NO_FS_LOCK = pytest.mark.skipif(
     WINDOWS or ROOTUSER, reason="chmod no-op on Windows / bypassed by root")
 
+# Probe whether the FS folds case (macOS/Windows default). On a case-insensitive
+# FS, `cp x HOOKS/lib/emit.sh` resolves HOOKS→hooks at the syscall, so the lock
+# blocks it inherently — this replaces the retired check-control-plane case-fold
+# static guard (iter54 C-1) for the Bash-write path.
+with tempfile.TemporaryDirectory() as _t:
+    (Path(_t) / "casefold_probe_lc").mkdir()
+    CASE_INSENSITIVE_FS = (Path(_t) / "CASEFOLD_PROBE_LC").is_dir()
+
 
 def _scratch():
     tmp = tempfile.TemporaryDirectory()
@@ -65,6 +73,24 @@ class TestSfCatalogUnderLock:
             ]
             for f in forms:
                 self._assert_blocked(root, f)
+        finally:
+            subprocess.run(["chmod", "-R", "u+w", tmp.name]); tmp.cleanup()
+
+    @pytest.mark.skipif(not CASE_INSENSITIVE_FS,
+                        reason="case-fold bypass only exists on a case-insensitive FS")
+    def test_uppercase_cp_write_blocked_under_lock(self):
+        """iter54 C-1 の後継: ケース非依存 FS で `cp x HOOKS/lib/emit.sh` は実
+        hooks/lib/emit.sh に解決する。静的 hook は退役したが OS-lock が syscall で
+        形非依存に遮断する（大文字表記でも EACCES）。"""
+        tmp = _scratch()
+        root = Path(tmp.name)
+        target = root / "hooks" / "lib" / "emit.sh"
+        try:
+            _lock(tmp.name)
+            before = target.read_text()
+            subprocess.run(["bash", "-c", "cp src.txt HOOKS/lib/emit.sh"],
+                           capture_output=True, cwd=str(root))
+            assert target.read_text() == before, "uppercase CP write must be blocked"
         finally:
             subprocess.run(["chmod", "-R", "u+w", tmp.name]); tmp.cleanup()
 

@@ -175,7 +175,7 @@ def test_install_preserves_deny_hooks(tmp_path):
     _install(str(target), "full")
     pre = json.dumps(_installed(target).get("hooks", {}).get("PreToolUse", []))
     assert "check-destructive.sh" in pre, "destructive deny-hook missing"
-    assert "check-control-plane.sh" in pre, "control-plane deny-hook missing"
+    assert "check-runtime-state.sh" in pre, "runtime-state deny-hook missing"
 
 
 # --- iter52: allow-list completeness guard (classification-map driven) ---
@@ -329,6 +329,6 @@ def test_installed_hook_allows_manifest_script(tmp_path):
     payload = json.dumps({"tool_name": "Bash",
                           "tool_input": {"command": "python3 scripts/retro_report.py"}})
     r = subprocess.run(
-        ["bash", str(target / "hooks" / "check-control-plane.sh")],
+        ["bash", str(target / "hooks" / "check-runtime-state.sh")],
         input=payload, capture_output=True, text=True, cwd=str(target))
     assert r.stdout.strip() == "{}", f"installed hook must allow: {r.stdout[:200]!r}"

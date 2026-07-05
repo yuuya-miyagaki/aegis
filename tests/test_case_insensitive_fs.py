@@ -87,35 +87,13 @@ class TestProbeHelper(unittest.TestCase):
 
 
 # ---------------------------------------------------------------------------
-# check-control-plane.sh
+# iter57: check-control-plane.sh 退役。安定 CP（hooks/scripts/templates/CLAUDE.md）
+# への **Bash write** の case-fold バイパス防御は、静的 hook ではなく OS-lock が担う
+# ようになった（syscall はケース非依存 FS で HOOKS/→hooks/ を解決して EACCES＝形非
+# 依存に遮断）。その回帰は tests/test_cp_lock_sf_catalog.py の case-fold 形が固定する。
+# check-gate（Edit/Write の CP 編集 deny）と check-secrets（credential 判定）の
+# case-fold は下記クラスで存置する（これらは退役しない）。
 # ---------------------------------------------------------------------------
-def _cp_scratch() -> tempfile.TemporaryDirectory:
-    tmp = tempfile.TemporaryDirectory()
-    p = Path(tmp.name)
-    (p / "docs").mkdir()
-    (p / "docs" / "STATUS.md").write_text(
-        "---\nframework: aegis\nmode: Dev\nphase: implement\n"
-        "task_type: feature\n---\n", encoding="utf-8")
-    hooks_dir = p / "hooks"
-    hooks_dir.mkdir()
-    shutil.copy2(ROOT / "hooks" / "check-control-plane.sh",
-                 hooks_dir / "check-control-plane.sh")
-    lib_dir = hooks_dir / "lib"
-    lib_dir.mkdir()
-    for lib in ("extract-input.sh", "emit.sh", "safety.sh", "frontmatter.sh"):
-        (lib_dir / lib).symlink_to(ROOT / "hooks" / "lib" / lib)
-    return tmp
-
-
-def _cp_hook(root: Path, cmd: str, env_extra: dict | None = None) -> str:
-    payload = json.dumps({"tool_name": "Bash", "tool_input": {"command": cmd}})
-    r = subprocess.run(
-        ["bash", str(root / "hooks" / "check-control-plane.sh")],
-        input=payload, capture_output=True, text=True, cwd=str(root),
-        env=_env(env_extra))
-    return r.stdout
-
-
 def _allowed(out: str) -> bool:
     return out.strip() == "{}"
 
@@ -127,99 +105,6 @@ def _denied(out: str) -> bool:
 def _denied_or_ask(out: str) -> bool:
     return ('"permissionDecision":"deny"' in out
             or '"permissionDecision":"ask"' in out)
-
-
-class TestControlPlaneCaseFold(unittest.TestCase):
-    """FORCE env で fold を強制＝どの FS でも決定論（実 FS プローブ経路は下の実測クラス）。"""
-
-    @classmethod
-    def setUpClass(cls):
-        cls._tmp = _cp_scratch()
-        cls.root = Path(cls._tmp.name)
-
-    @classmethod
-    def tearDownClass(cls):
-        cls._tmp.cleanup()
-
-    def test_uppercase_hooks_write_denied(self):
-        out = _cp_hook(self.root, "cp evil.sh HOOKS/lib/emit.sh", FORCE_ENV)
-        self.assertTrue(_denied(out), f"HOOKS/ write must deny: {out[:200]!r}")
-
-    def test_bare_uppercase_rm_denied(self):
-        """bare `rm -rf HOOKS` は regex 層（`hooks/` 要求）でなく resolver 専任
-        ＝高速ゲート fold（grill 穴1）の検証。"""
-        out = _cp_hook(self.root, "rm -rf HOOKS", FORCE_ENV)
-        self.assertTrue(_denied_or_ask(out), f"bare HOOKS rm must deny/ask: {out[:200]!r}")
-
-    def test_mixed_case_scripts_denied(self):
-        out = _cp_hook(self.root, "cp evil.sh Scripts/update-gate.sh", FORCE_ENV)
-        self.assertTrue(_denied(out), f"Scripts/ write must deny: {out[:200]!r}")
-
-    def test_claude_md_uppercase_redirect_denied(self):
-        out = _cp_hook(self.root, "echo pwned > CLAUDE.MD", FORCE_ENV)
-        self.assertTrue(_denied(out), f"CLAUDE.MD redirect must deny: {out[:200]!r}")
-
-    def test_uppercase_pwd_var_hooks_denied_or_ask(self):
-        out = _cp_hook(self.root, "cp evil.sh $PWD/HOOKS/lib/emit.sh", FORCE_ENV)
-        self.assertTrue(_denied_or_ask(out),
-                        f"$PWD/HOOKS write must deny/ask: {out[:200]!r}")
-
-    def test_lowercase_still_denied_with_fold(self):
-        out = _cp_hook(self.root, "cp evil.sh hooks/lib/emit.sh", FORCE_ENV)
-        self.assertTrue(_denied(out), f"lowercase must keep denying: {out[:200]!r}")
-
-    def test_non_cp_uppercase_allowed_with_fold(self):
-        out = _cp_hook(self.root, "cp a.txt HOOKSY/b.txt", FORCE_ENV)
-        self.assertTrue(_allowed(out), f"HOOKSY/ (non-CP) must allow: {out[:200]!r}")
-
-    def test_plain_command_allowed_with_fold(self):
-        out = _cp_hook(self.root, "ls -la && echo done", FORCE_ENV)
-        self.assertTrue(_allowed(out), f"plain command must allow: {out[:200]!r}")
-
-
-@unittest.skipUnless(CASE_INSENSITIVE_FS, "needs a case-insensitive FS (probe path)")
-class TestControlPlaneProbePath(unittest.TestCase):
-    """FORCE なし＝hook 自身のプローブが fold を有効化する実測経路。"""
-
-    @classmethod
-    def setUpClass(cls):
-        cls._tmp = _cp_scratch()
-        cls.root = Path(cls._tmp.name)
-
-    @classmethod
-    def tearDownClass(cls):
-        cls._tmp.cleanup()
-
-    def test_uppercase_hooks_write_denied_via_probe(self):
-        out = _cp_hook(self.root, "cp evil.sh HOOKS/lib/emit.sh")
-        self.assertTrue(_denied(out), f"probe path must deny HOOKS/: {out[:200]!r}")
-
-    def test_bare_uppercase_rm_denied_via_probe(self):
-        out = _cp_hook(self.root, "rm -rf HOOKS")
-        self.assertTrue(_denied_or_ask(out), f"probe path must deny/ask: {out[:200]!r}")
-
-
-class TestControlPlaneCaseSensitiveNonRegression(unittest.TestCase):
-    """FORCE なし・case-sensitive FS では現行挙動据置（ユーザー所有 HOOKS/ を誤ブロックしない）。"""
-
-    @classmethod
-    def setUpClass(cls):
-        cls._tmp = _cp_scratch()
-        cls.root = Path(cls._tmp.name)
-
-    @classmethod
-    def tearDownClass(cls):
-        cls._tmp.cleanup()
-
-    @unittest.skipIf(CASE_INSENSITIVE_FS, "needs a case-sensitive FS")
-    def test_uppercase_hooks_allowed_on_case_sensitive_fs(self):
-        out = _cp_hook(self.root, "cp note.txt HOOKS/readme.txt")
-        self.assertTrue(_allowed(out),
-                        f"case-sensitive FS: user-owned HOOKS/ must allow: {out[:200]!r}")
-
-    def test_lowercase_denied_without_force(self):
-        out = _cp_hook(self.root, "cp evil.sh hooks/lib/emit.sh")
-        self.assertTrue(_denied(out), f"baseline deny must hold: {out[:200]!r}")
 
 
 # ---------------------------------------------------------------------------
