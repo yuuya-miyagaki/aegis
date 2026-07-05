@@ -56,6 +56,12 @@ PLATFORM_VERIFIED = {
     "hook_events": "2026-06-14",
     "tool_names": "2026-06-14",
     "hook_output_schema": "2026-06-14",
+    # iter57: PostToolUseFailure envelope carries tool_response.stderr (string)
+    # and tool_input.command — verified against code.claude.com/docs/en/hooks.md
+    # (2026-07-05). explain-oslock-eacces.sh pattern-matches stderr for
+    # permission-denied AND command for a locked-CP mention (both required, so
+    # a benign non-zero exit like grep-no-match does not fire the advisory).
+    "posttoolfailure_stderr": "2026-07-05",
 }
 STALENESS_DAYS = 180
 
