@@ -502,9 +502,17 @@ def check_scripts_manifest(root: Path = ROOT) -> list:
     if full_profile_path.is_file():
         try:
             full_profile = json.loads(full_profile_path.read_text(encoding="utf-8"))
-            distributed = set(full_profile.get("required", [])) \
-                | set(full_profile.get("recommended", []))
+            required = full_profile.get("required", [])
+            recommended = full_profile.get("recommended", [])
             unshipped = full_profile.get("intentional_unshipped", {})
+            # grill-code 🟡: 型不正はスタックトレースでなく failure として返す
+            # （malformed profile を fail-graceful に可視化）。
+            if not (isinstance(required, list) and isinstance(recommended, list)
+                    and isinstance(unshipped, dict)):
+                return failures + [
+                    "scripts-manifest: malformed full profile (required/recommended "
+                    "must be lists, intentional_unshipped must be an object)"]
+            distributed = set(required) | set(recommended)
             for entry, reason in sorted(unshipped.items()):
                 if not (isinstance(reason, str) and reason.strip()):
                     failures.append(

@@ -97,6 +97,18 @@ def test_add_dot_before_shell_delimiter_still_broad(tmp_path):
     assert '"permissionDecision":"deny"' in out, out
 
 
+def test_add_dot_before_paren_or_redirect_still_broad(tmp_path):
+    """grill-code 🔴: デリミタ列挙（;&|）は `)` `>` を漏らす。境界は
+    「パス構成文字以外すべて」の否定クラスでなければならない。"""
+    repo = _mkrepo(tmp_path / "r11")
+    sub = repo / "sub"
+    sub.mkdir()
+    out = _run("(cd sub && git add .)", cwd=repo)
+    assert '"permissionDecision":"deny"' in out, out
+    out = _run("git add .>out", cwd=repo)
+    assert '"permissionDecision":"deny"' in out, out
+
+
 # --- 付随: 直接 .env deny 文言に safe variant 案内がある ---
 
 def test_direct_env_deny_mentions_safe_variant(tmp_path):

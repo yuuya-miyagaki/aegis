@@ -149,9 +149,10 @@ fi
 # C-1: matched on CMD_LC so `GIT ADD -a` folds too; `-A` is spelled `-a` here.
 # iter56 ①: a bare `\.` prefix-matched leading-dot FILENAMES (.env.example,
 # .gitignore — 2 real denies in dogfood M2). Broad-dot means a token that
-# stages a whole directory: . / .. / ./ / ../ followed by whitespace, EOL, or
-# a shell delimiter (;&| — `git add .&&git commit` must stay broad).
-if printf '%s' "$CMD_LC" | grep -qE "git[[:space:]]+${GIT_PRE_OPTS}add[[:space:]]+(-a|--all|\.\.?/?([[:space:];&|]|$))" 2>/dev/null; then
+# stages a whole directory: . / .. / ./ / ../ followed by EOL or any
+# NON-path character (negated class, not a delimiter enumeration — grill-code
+# 🔴: listing ;&| missed `)` and `>`, letting `(cd x && git add .)` slip).
+if printf '%s' "$CMD_LC" | grep -qE "git[[:space:]]+${GIT_PRE_OPTS}add[[:space:]]+(-a|--all|\.\.?/?($|[^[:alnum:]._/-]))" 2>/dev/null; then
   ROOT=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
 
   # v0.13.0 Phase 0b NO-GO fix: broad staging must also catch high-risk credentials

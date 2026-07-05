@@ -37,11 +37,13 @@
 - **現状**: `hooks/check-secrets.sh:149` の `add[[:space:]]+(-a|--all|\.)` — 末尾 `\.` が
   トークン境界非アンカーで、`.env.example`・`.gitignore` 等の先頭ドットファイル名に前方一致。
 - **修正**: broad-dot を「ディレクトリ全体を指すトークン」に限定:
-  `(-a|--all|\.\.?/?([[:space:];&|]|$))`
-  （境界は空白・行末に加えシェルデリミタ `;` `&` `|` を含める — grill 致命1:
-  `git add .&&git commit` のすり抜け＝moat 後退を防ぐ）
+  `(-a|--all|\.\.?/?($|[^[:alnum:]._/-]))`
+  （境界は「行末 or パス構成文字以外すべて」の**否定クラス**。grill-plan 致命1 の
+  デリミタ列挙 `;&|` は grill-code 🔴 で `)` `>` を漏らすことが実証されたため反転方式に確定 —
+  列挙方式は知らないデリミタに必ず負ける）
   - 正例（broad 維持）: `git add .`／`git add . foo`／`git add ./`／`git add ..`／
-    `git add ../`／`git add -A`／`git add --all`／`git add .&&git commit -m x`
+    `git add ../`／`git add -A`／`git add --all`／`git add .&&git commit -m x`／
+    `(cd sub && git add .)`／`git add .>out`
   - 負例（broad 扱いしない）: `git add .env.example`／`git add .gitignore`／
     `git add .github/workflows/ci.yml`
   - 注: `.env` 単体は先行の直接 .env 検査（:141）で引き続き deny（本修正の影響外）。
