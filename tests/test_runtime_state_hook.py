@@ -72,6 +72,29 @@ def _asked(out: str) -> bool:
     return '"permissionDecision":"ask"' in out
 
 
+def _manifest_entries() -> "tuple[list[str], list[str]]":
+    """Read hooks/lib/scripts-manifest.tsv (single owner, iter55) and return
+    (allow|ask paths, framework-only paths). iter57 review fix-forward: the
+    retired test_scripts_manifest_hook.py::TestManifestRunnable enumerated
+    EVERY entry; a representative subset would miss a per-script regression."""
+    manifest = ROOT / "hooks" / "lib" / "scripts-manifest.tsv"
+    allow_ask: list[str] = []
+    framework_only: list[str] = []
+    for line in manifest.read_text(encoding="utf-8").splitlines():
+        s = line.strip()
+        if not s or s.startswith("#"):
+            continue
+        parts = line.split("\t")
+        if len(parts) < 2:
+            continue
+        path, cls = parts[0].strip(), parts[1].strip()
+        if cls in ("allow", "ask"):
+            allow_ask.append(path)
+        elif cls == "framework-only":
+            framework_only.append(path)
+    return allow_ask, framework_only
+
+
 class TestRuntimeStateDeny(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -270,6 +293,33 @@ class TestAllowlistReadOnlyStage(unittest.TestCase):
         for cmd in ("git add -f docs/STATUS.md",
                     "git add docs/STATUS.md && git commit -m x"):
             with self.subTest(cmd=cmd):
+                out = _hook(self.root, cmd)
+                self.assertTrue(_denied(out), f"{cmd}: {out[:200]}")
+
+    def test_all_manifest_allow_ask_scripts_pass_in_runtime_context(self):
+        """iter57 review fix-forward (retired TestManifestRunnable の全数列挙を継承):
+        scripts-manifest.tsv の allow|ask 全エントリが runtime-state を伴う文脈でも
+        ALLOW されることを pin。新 hook では scripts/ は RUNTIME_STATE 外＝素の実行は
+        early-allow になるため、docs/STATUS.md を伴わせて manifest allowlist 経路を
+        実際に通す（将来いずれか1本を誤 deny する回帰を代表3本サブセットは捕捉できない)."""
+        allow_ask, _ = _manifest_entries()
+        self.assertGreaterEqual(len(allow_ask), 12, "manifest allow|ask 全数")
+        for path in allow_ask:
+            runner = "python3" if path.endswith(".py") else "bash"
+            cmd = f"{runner} {path} docs/STATUS.md"
+            with self.subTest(script=path):
+                out = _hook(self.root, cmd)
+                self.assertTrue(_allowed(out), f"{cmd}: {out[:200]}")
+
+    def test_all_framework_only_scripts_denied_in_runtime_context(self):
+        """framework-only クラスは非 framework タスク中に runtime-state を触ると DENY
+        （旧 TestManifestRunnable の framework-only DENY 回帰の受け皿）。"""
+        _, framework_only = _manifest_entries()
+        self.assertGreaterEqual(len(framework_only), 1, "manifest framework-only 全数")
+        for path in framework_only:
+            runner = "python3" if path.endswith(".py") else "bash"
+            cmd = f"{runner} {path} docs/STATUS.md"
+            with self.subTest(script=path):
                 out = _hook(self.root, cmd)
                 self.assertTrue(_denied(out), f"{cmd}: {out[:200]}")
 

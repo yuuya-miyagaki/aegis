@@ -44,7 +44,7 @@
     (2) lock 対象 CP を対象とする unlock 形: `chmod`/`chflags`/`chattr` ＋ CP パス token（rev.2 撤回理由②の
     「明確なポリシーメッセージで停止」を継承。既存 deny 挙動の移植であり新規発明ではない）。
     非 CP への chmod（`chmod 755 src/app.py` 等）は不干渉。
-  - **`hooks/explain-oslock-eacces.sh`（新規・advisory・PostToolUse Bash）**: tool 出力に
+  - **`hooks/explain-oslock-eacces.sh`（新規・advisory・PostToolUseFailure Bash）**: tool 出力に
     `Permission denied`/`EACCES` ＋ lock 対象 CP パスの共起を検知したら
     「aegis OS-lock の保護です。chmod での解錠は行わず、framework 作業なら task_type=framework で
     実施してください（update-task.sh）」を additionalContext で案内。純 advisory・fail-open 許容。
@@ -73,7 +73,10 @@ graph TD
   （呼び手 session-start が warn に整形）。
 - `check-runtime-state.sh`: 既存 hook 契約と同一（stdin JSON → emit.sh 経由の permissionDecision）。
   fail 方針は現行 check-control-plane と同じ fail-closed（safety fallback ブロック含む）。
-- `explain-oslock-eacces.sh`: PostToolUse JSON → additionalContext のみ（decision を返さない）。
+- `explain-oslock-eacces.sh`: PostToolUseFailure JSON → additionalContext のみ（decision を返さない）。
+  注（plan Step 5-0 実証後の精緻化）: 当初 PostToolUse を想定したが、失敗時 stderr が
+  envelope に信頼できる形で載るのは PostToolUseFailure であることを実証し、そちらへ配線した
+  （`scripts/platform_manifest.py` の PLATFORM_VERIFIED に 2026-07-05 記録）。
 
 ## データフロー / 構造（事故シナリオ別）
 
