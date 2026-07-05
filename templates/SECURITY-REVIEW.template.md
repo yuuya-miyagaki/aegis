@@ -39,4 +39,13 @@
 
 - 判定: approved / blocked
 - 次のアクション: <記入>
+## Claims（judge が機械読取する）
+
+```claims
+verdict: <記入: approve / approve_with_notes / reject / blocked>
+second_opinion:
+  verdict: <記入>
+  notes: <2次レビューの要旨 / なし>
+```
+
 <!-- exit-check: OWASP/STRIDE 確認・総合判定記入済み → ship へ -->

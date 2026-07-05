@@ -44,4 +44,13 @@ Stage 1 PASS の場合のみ実施する。
 
 - 判定: approved / blocked
 - 次のアクション: <記入>
+## Claims（judge が機械読取する）
+
+```claims
+verdict: <記入: approve / approve_with_notes / reject / blocked>
+second_opinion:
+  verdict: <記入>
+  notes: <2次レビューの要旨 / なし>
+```
+
 <!-- exit-check: Stage 1/2 判定・findings 対応済み → qa へ -->

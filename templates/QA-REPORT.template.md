@@ -43,4 +43,10 @@
 ## Blockers
 
 - なし / あれば記入
+## Claims（judge が機械読取する）
+
+```claims
+verdict: <記入: approve / approve_with_notes / reject / blocked>
+```
+
 <!-- exit-check: 全チェック実施・結果記入済み → security へ -->

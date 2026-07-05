@@ -65,5 +65,39 @@ class TestQaBrowserDelegationGranularity(unittest.TestCase):
                       "委譲粒度の根拠（ドッグフード実測 19 項目で停止 3 回）が消えている")
 
 
+class TestQaRefIsClaimsReport(unittest.TestCase):
+    """iter56 ②: qa ref の正本＝claims 付き QA レポート（judge は ref 先の claims
+    しか読まない）。test-strength.md を ref にする旧規約は claims を構造的に置けず
+    毎回 🟡 ack（M2 実測）＝skill×judge の契約矛盾。"""
+
+    def test_qa_ref_points_to_claims_report(self):
+        self.assertIn("claims 付き QA レポート", QA,
+                      "qa ref の正本規定（claims 付き QA レポート）が消えている")
+
+    def test_old_test_strength_ref_rule_gone(self):
+        # grill 致命3: 旧文言は途中に改行が入るため exact NotIn はすり抜ける。
+        # 空白正規化してから assert する。
+        normalized = " ".join(QA.split())
+        self.assertNotIn(
+            "`current_refs.qa` を `docs/qa-reports/test-strength.md` にする", normalized,
+            "judge が claims を読めない旧規約（test-strength.md を ref）が残っている")
+        self.assertNotIn(
+            "`docs/qa-reports/test-strength.md` にすること", normalized,
+            "skip 経路の旧規約が残っている")
+
+
+class TestSharedMutableResourceRule(unittest.TestCase):
+    """iter56 ④: 並列規則の共有可変資源ルール（M2 実測: 並行 integration テストが
+    同一テスト DB を TRUNCATE し合い偽 fail）。"""
+
+    def test_shared_resource_rule_present(self):
+        sd = (ROOT / ".claude" / "skills" / "subagent-dev" / "SKILL.md"
+              ).read_text(encoding="utf-8")
+        self.assertIn("共有可変資源", sd,
+                      "並列規則の共有可変資源ルール（M2: テスト DB 衝突）が消えている")
+        self.assertIn("同時に起動する1バッチ", sd,
+                      "integration 実行タスクの同時1体運用（バッチ定義込み）が消えている")
+
+
 if __name__ == "__main__":
     unittest.main()

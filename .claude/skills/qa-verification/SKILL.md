@@ -119,21 +119,18 @@ qa ゲート承認の前に実施する。承認時にハーネス（`pre_approv
      --spec docs/qa-reports/test-strength.drill \
      --report docs/qa-reports/test-strength.md
    ```
-5. **平易な日本語へ翻訳**して提示する（合否はハーネス決定。説明は合否を動かさない）:
-   - 合格✅例:「『割引計算』にわざとバグ（`>=`→`>`）を入れたらテスト〇〇が
-     気づいて赤くなりました。このテストは意味があります。」
-   - 不合格⚠️例:「バグを入れてもテストは緑のまま＝この部分は取りこぼします。
-     **やること: 100 円ちょうどのケースのテストを追加してください。**」
-6. `current_refs.qa` を `docs/qa-reports/test-strength.md` にする。
+5. **平易な日本語へ翻訳**して提示（合否はハーネス決定。説明は合否を動かさない）:
+   ✅例「わざとバグ（`>=`→`>`）を入れたらテスト〇〇が赤くなった＝このテストは有効」／
+   ⚠️例「バグを入れても緑のまま＝取りこぼし。**やること: 100円ちょうどのテストを追加**」
+6. claims 付き QA レポート（下記）を書き、`current_refs.qa` はそれを指す
+   （judge が読むのは ref先の claims のみ・test-strength.md は固定パス証拠として自動参照）。
 7. **コードを変更したら `.drill` を作り直す**（行番号がずれると承認時に弾かれる）。
-8. ドリル中は対象ファイルを開く watch テストや自動保存エディタを止める
-   （ハーネスは並行編集を検知すると安全のため承認を中止する）。
+8. ドリル中は watch テスト・自動保存エディタを止める（並行編集検知で承認中止になる）。
 
 ### テスト対象コードが無いタスク（スキップ宣言）
 
-ドキュメント・設定・文言のみの変更など、mutant を作れないタスクは、
-**スキップを明示**した `.drill` を書く（qa は update-gate.sh で n/a にできないため、
-証拠ファイル側で宣言する）:
+mutant を作れないタスク（ドキュメント・設定・文言のみの変更など）は
+**スキップを明示**した `.drill` を書く（qa は update-gate.sh で n/a 不可＝証拠側で宣言）:
 
 ```json
 {"skip": true, "reason": "ドキュメントのみの変更でテスト対象コードなし"}
@@ -145,14 +142,11 @@ qa ゲート承認の前に実施する。承認時にハーネス（`pre_approv
 > プレビューせず `update-gate.sh qa approve` に委ねる。
 
 理由はユーザーが見る証拠に残る。安易なスキップは避け、コードがあるなら必ずドリルする。
-ただし **framework 自体の改修などコードを per-task でコミット済みのタスク**は、qa 承認時の
-working-tree diff（`git diff HEAD`）が空＝mutant を置く追加行が無く skip になるのは
-*想定どおりの縁ケース（欠陥ではない・撤去しない）*。この場合は skip 理由に**手動 mutation
-同等の代替実証**（RED-first TDD・対象テストへの一時変異→赤化確認・canonical fixture
-パリティ等）を明記する。ドリルの本来のターゲット＝*未コミットのプロダクトコード*では従来
-どおり機能する。
-スキップ時もハーネスがレポートを生成するので、`current_refs.qa` を
-`docs/qa-reports/test-strength.md` にすること（さもないと完了時に証拠不足で弾かれる）。
+ただし **framework 改修などコードを per-task でコミット済みのタスク**は、qa 承認時の
+working-tree diff（`git diff HEAD`）が空＝skip になるのは*想定どおりの縁ケース*。
+skip 理由に**手動 mutation 同等の代替実証**（RED-first TDD・一時変異→赤化確認等）を明記する。
+スキップ時も claims 付き QA レポートを書き、`current_refs.qa` はそれを指すこと
+（test-strength.md は drill 再生成で claims を置けない。ref は実在ファイルなら受理）。
 
 > 前提: このドリルは git リポジトリ（とコミット履歴）を必要とする。git 未初期化なら
 > `git init && git add -A && git commit` を先に行う（初回コミット前でも動くが、git は必須）。
@@ -160,7 +154,7 @@ working-tree diff（`git diff HEAD`）が空＝mutant を置く追加行が無�
 ## QA レポート出力
 
 - `docs/qa-reports/` に `QA-REPORT.template.md` を使用して配置
-- 全検証項目の判定一覧を含める
+- 判定一覧と ```claims ブロック（雛形の `verdict` を記入）を含める
 - ブロッカーがあれば STATUS.md に記録
 
 ## 禁止事項
