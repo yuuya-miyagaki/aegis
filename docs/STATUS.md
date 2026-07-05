@@ -3,30 +3,30 @@ framework: aegis
 framework_version: "1.17.0"
 project_name: "Aegis"
 mode: Dev
-phase: docs
+phase: brainstorm
 task_type: framework
 task_size: L
-task_size_rationale: "iteration 56（framework・ドッグフード二周目 M2 フィードバック反映）= L。footprint は hooks/check-secrets.sh（先頭ドット誤検知修正）＋scripts/build-judge-card.py（skip 経路 claims・verdict 名目差段階化）＋scripts/check_status.py または update-gate.sh（spec-delta 合格1行出力）＋templates/profiles/full.json（未配布4本追加）＋contract/install テスト＋subagent-dev / qa-verification SKILL.md＋新規テスト複数＝6+ ファイル。check-secrets の deny 判定変更＝moat 変更を含むため全ゲート必須。"
-iteration: 56
+task_size_rationale: "iteration 57（framework・主 moat 交代）= L。footprint は hooks/check-control-plane.sh 削除＋hooks/lib/cp-lock.sh（verify 追加）＋hooks/session-start.sh＋新規 hooks/check-runtime-state.sh＋新規 hooks/explain-oslock-eacces.sh＋templates/hooks.template.json＋profiles＋scripts/check_framework_contract.py＋テスト置換多数（SF カタログ lock 下 EACCES 回帰・test_control_plane_* 群の 1対1 置換）＝6+ ファイル。moat の主機構交代そのもの＝全ゲート必須。"
+iteration: 57
 ui_surface: false
-last_updated: "2026-07-05T00:00:00Z"
+last_updated: "2026-07-05T09:20:00Z"
 gate_approvals:
   client_ready_for_dev: n/a
-  brainstorm: approved
-  plan: approved
-  review: approved
-  qa: approved
-  security: approved
-  deploy: approved
-  dev_ready_for_client: approved
+  brainstorm: pending
+  plan: pending
+  review: pending
+  qa: pending
+  security: pending
+  deploy: pending
+  dev_ready_for_client: pending
 current_refs:
   requirements: []
-  plan: docs/plans/2026-07-05-iter56-m2-feedback-plan.md
-  spec: docs/specs/2026-07-05-iter56-m2-feedback-design.md
-  review: docs/qa-reports/iter56-review.md
-  qa: docs/qa-reports/iter56-qa.md
-  security: docs/qa-reports/iter56-security.md
-  deploy: docs/qa-reports/iter56-deploy.md
+  plan: null
+  spec: docs/specs/2026-07-05-iter57-oslock-promotion-design.md
+  review: null
+  qa: null
+  security: null
+  deploy: null
   translation: null
 external_evidence:
   - type: "second-opinion-v1-foundation-r1-r2"
@@ -37,18 +37,14 @@ external_evidence:
     scope: "v0.13.0 計画 5 ラウンドレビュー"
     findings: "Round 1〜5 で計 25 件の指摘（hook 出力スキーマ陳腐化、TaskCreated/Completed 制御方式、Plan 条件付き許可、effort 配分、pre-compact.sh 同種破損、`if` 単一 rule 制約等）"
     resolution: "Rev.5 で全件反映、Phase 0a 即時実装着手 GO。hotfix/v0122-hook-schema ブランチで開始。"
-next_action: "**【iter56 / v1.17.0 全8ゲート approved・docs 完了・push 手前で停止中】** ◆**現在地**: dev 全ゲート（brainstorm/plan/review/qa/security/deploy）approved＋dev_ready_for_client 承認申請可。full suite 1322 passed・contract/status/drift/lint/budget 全 PASS。**未 push は iter56 実装コミット群**（push は `gh auth switch --user yuuya-miyagaki` 後に `git push origin main`・ユーザー確認待ち）。 ◆**実装済（M2 FB 6件＋可視性2件）**: ①check-secrets 先頭ドット誤検知（.env.example/.gitignore 解放・否定クラス＋グロブ節。grill-code 🔴=subshell/redirect すり抜け・盲検2次 Major=先頭ドットグロブ .en* の add-moat 回帰、両方封鎖済）②qa ref を claims 付き QA レポートに統一（skill×judge 整合）③verdict 名目差 🟡 抑止＋notes 情報行＋値不正 🟡（qa ゲート含む全ゲート常時＝盲検2次 Major 反映）④subagent-dev 共有可変資源ルール⑤spec-delta 合格1行⑥full 配布整合（未配布5本＋contract 方向4・intentional_unshipped 自己記述＋install 実在検証）⑦judge 是正手順文言＋gate テンプレ claims 雛形。 ◆**レビュー**: 10並列ファインダー＋盲検2次×2（review/security とも approve_with_notes→指摘全解消）。version 同期テストを single-owner 参照化（bump 毎の手更新を撤廃）。 ◆**次の一手**: dev_ready_for_client 承認 → push 承認確認 → push。**iter56 後の候補**: 構造リアーキ（FS 実解決/OS-lock 昇格・check-control-plane 退役＝最有力／intentional_unshipped の2レジストリ統合も候補）／ドッグフード LOG の残り（scope+acceptance 統合承認の軽量ルート・discovery exit チェックリスト・qa-browser 委譲プロンプト標準化）。 ◆**罠（iter41-55 で確立・必読）**: (a) gate 承認出力は **tail**（head は SIGPIPE で STATUS 書込み前中断）。(b) current_refs.<gate> は承認直前に設定（pending+ref は contract stale-ref FAIL）。(c) ref set→approve の間に record を挟むと stale-ref 赤＝set→approve を連続。(d) record-test-result は全コード編集後・**対象 gate ref を null にしてから**（full suite 内 contract テストの stale-ref 回避）。(e) judge `read_test_result` は **newest test-runner entry** で判定・observed は `marker_verified` 必須＝非クォート pytest を含む Bash が newest になると tests=unverified→record-test-result（src:manual）で再 record（外側 Bash は pytest 部をクォート＝strip で Q マスク）。(f) framework **焦点変更で未コミット追加実行行＋テストが hook を copy** なら本物の B1 drill 成立（混在 diff は skip）。(g) qa は **SECOND_OPINION_GATES（review/security）非対象**＝claims 付き QA レポートを ref にすれば 🟢。(h) **M は deploy 自動 exempt**（SIZE_ALLOWED_PHASES）。(i) task_type/size は update-task.sh のみ（raw Edit は tamper block）。(j) push は `gh auth switch --user yuuya-miyagaki`。(k) phase rollover(ship→brainstorm)は backward 遷移＝常時 allow。(l) B1 drill: 純コメントのみの追加ハンクは behavior-catching mutant 不能で coverage floor を割る→冗長コメントを除去し全ハンクを behavioral/text-coverable に整形（echo メッセージ変更は message を assert するテストで mutant 可）＝skip 回避。(m) full suite 実走中に suite 自身が spurious observed test-runner エントリ（vitest 等・marker false）を real evidence-log へ書く→record-test-result を suite 完走の**後**に置けば manual エントリが newest で勝つ。(n) `record-test-result.py` は command 引数を**実行して**合否記録＝実行可能な単一コマンド（`python3 -m pytest -q`・シェル機能不可）を渡す。説明文字列だと実行失敗で `red` が newest になり judge 🔴→正しいコマンドで再実行すれば green が newest で自己修復。(o) judge の 1次/2次相違は claims の**トップレベル `verdict:`（1次）**と `second_opinion.verdict`（2次）比較（build-judge-card:382）＝review/security レポートは両方明記して一致させる。docs-only review の tests=unverified🟡 は ack 可（test 実行は qa の領分）。(p) docs-only iteration の qa: `test-strength.drill` に `{\"skip\":true,\"reason\":...}`＝B1 SKIP。qa ref は claims 付き iter46-qa.md（test-strength.md は drill 再生成で claims 置けず）。(q) **size S は terminal=ship**（`SIZE_ALLOWED_PHASES[\"S\"]={brainstorm,implement,review,ship}`＝plan/qa/security/deploy/docs を含まない）。ship→docs の transition 検査は rc0 で通るが contract static 検査が『phase docs not allowed for size S』で FAIL→docs に遷移しない。S の LEARNINGS 更新・dev_ready_for_client 承認は **ship から**実施。必須ゲートは brainstorm+review のみ。"
+next_action: "**【iter57 brainstorm 完了・plan へ】** ◆**現在地**: rollover 済（iteration=57・全ゲート reset）→ brainstorm 完了＝**主 moat 交代の設計確定（案A 一気交代・ユーザー承認 2026-07-05）**。決定: cp-lock 昇格（fail-visible＋aegis_cp_verify 全数照合）・check-control-plane.sh 979行 退役・残余ミニフック hooks/check-runtime-state.sh 新設（runtime-state ガード＋chmod-unlock deny・scripts-manifest allowlist 継承・fail-closed）・EACCES 説明 advisory hooks/explain-oslock-eacces.sh 新設（rev.2 撤回理由②の恒久対策）・**公式サポート=macOS/Linux/WSL 限定**（Windows ネイティブは保護なしを README/manifest 明記・ユーザー決定）・check-secrets/check-gate 改修・意味ドリフト機械化・fable lineage はスコープ外。spec=docs/specs/2026-07-05-iter57-oslock-promotion-design.md・record=同 -brainstorm-record.md。rev.2（2026-06-21 撤回）との関係は record の「決定」節が正本。 ◆**次**: brainstorm 承認 → phase=plan → 実装計画（writing-plans・退役テストの 1対1 置換マッピング必須）→ grill-plan → plan 承認 → 実装。 ◆**罠（iter41-55 で確立・必読）**: (a) gate 承認出力は **tail**（head は SIGPIPE で STATUS 書込み前中断）。(b) current_refs.<gate> は承認直前に設定（pending+ref は contract stale-ref FAIL）。(c) ref set→approve の間に record を挟むと stale-ref 赤＝set→approve を連続。(d) record-test-result は全コード編集後・**対象 gate ref を null にしてから**（full suite 内 contract テストの stale-ref 回避）。(e) judge `read_test_result` は **newest test-runner entry** で判定・observed は `marker_verified` 必須＝非クォート pytest を含む Bash が newest になると tests=unverified→record-test-result（src:manual）で再 record（外側 Bash は pytest 部をクォート＝strip で Q マスク）。(f) framework **焦点変更で未コミット追加実行行＋テストが hook を copy** なら本物の B1 drill 成立（混在 diff は skip）。(g) qa は **SECOND_OPINION_GATES（review/security）非対象**＝claims 付き QA レポートを ref にすれば 🟢。(h) **M は deploy 自動 exempt**（SIZE_ALLOWED_PHASES）。(i) task_type/size は update-task.sh のみ（raw Edit は tamper block）。(j) push は `gh auth switch --user yuuya-miyagaki`。(k) phase rollover(ship→brainstorm)は backward 遷移＝常時 allow。(l) B1 drill: 純コメントのみの追加ハンクは behavior-catching mutant 不能で coverage floor を割る→冗長コメントを除去し全ハンクを behavioral/text-coverable に整形（echo メッセージ変更は message を assert するテストで mutant 可）＝skip 回避。(m) full suite 実走中に suite 自身が spurious observed test-runner エントリ（vitest 等・marker false）を real evidence-log へ書く→record-test-result を suite 完走の**後**に置けば manual エントリが newest で勝つ。(n) `record-test-result.py` は command 引数を**実行して**合否記録＝実行可能な単一コマンド（`python3 -m pytest -q`・シェル機能不可）を渡す。説明文字列だと実行失敗で `red` が newest になり judge 🔴→正しいコマンドで再実行すれば green が newest で自己修復。(o) judge の 1次/2次相違は claims の**トップレベル `verdict:`（1次）**と `second_opinion.verdict`（2次）比較（build-judge-card:382）＝review/security レポートは両方明記して一致させる。docs-only review の tests=unverified🟡 は ack 可（test 実行は qa の領分）。(p) docs-only iteration の qa: `test-strength.drill` に `{\"skip\":true,\"reason\":...}`＝B1 SKIP。qa ref は claims 付き iter46-qa.md（test-strength.md は drill 再生成で claims 置けず）。(q) **size S は terminal=ship**（`SIZE_ALLOWED_PHASES[\"S\"]={brainstorm,implement,review,ship}`＝plan/qa/security/deploy/docs を含まない）。ship→docs の transition 検査は rc0 で通るが contract static 検査が『phase docs not allowed for size S』で FAIL→docs に遷移しない。S の LEARNINGS 更新・dev_ready_for_client 承認は **ship から**実施。必須ゲートは brainstorm+review のみ。"
 blockers: []
 failure_tracking: null
 session_history:
   - date: "2026-07-05"
     mode: Dev
     phase: "brainstorm"
-    note: "iter56 着手。起票コミット 894eaff をユーザー承認のうえ push（origin/main=894eaff）→ rollover 実施（iteration=56・dev ゲート全 reset via update-gate.sh・phase docs→brainstorm 後方遷移・非 requirements refs null・task framework/L 継続＝update-task.sh 不要）。テーマ＝M2 フィードバック反映6件（backlog 正本 docs/plans/2026-07-05-iter56-dogfood-m2-feedback-backlog.md・根因裏取り済み）。次＝設計書作成→brainstorm 承認。"
-  - date: "2026-07-05"
-    mode: Dev
-    phase: "docs"
-    note: "ドッグフード二周目（M2・yoga-tsukinowa-lp iteration=2 キャンセル待ち）完走を受け **iter56 を起票**（起票のみ・rollover 未実施＝着手時に実施）。一次情報=DOGFOOD-M2-LOG.md／docs/LEARNINGS.md フレームワーク改善／docs/retro-m2-2026-07-05.md（いずれも yoga-tsukinowa-lp 側が正本）。**iter55 実効検証の確定: 回帰0件・チェックリスト6/6 ✅**（戦闘1〜7 すべて実使用で解消。戦闘7のみ hook ALLOW だがファイル未同梱という別レイヤ drift が露出=候補⑥）。M2 集計: 迷子0・実質ゲート戦闘0・人手介入1回・blocking 0・[P4]見逃し0・295 tests green(+103)・spec-delta 初実戦合格。候補6件を根因裏取り付きで backlog 化（docs/plans/2026-07-05-iter56-dogfood-m2-feedback-backlog.md）: ①check-secrets.sh:148 の広範 staging 検出でドット開始トークンが末尾非アンカー前方一致し .env.example/.gitignore を誤 deny（P1・2回再現・git add -- で回避可） ②drill skip 時に current_refs.qa=test-strength.md 規約（qa-verification skill）と build-judge-card.py:374 の ref 先限定 claims 読取が衝突し claims 構造的不能=毎回 🟡 ack。罠(p) の回避運用と配布 skill が矛盾（P1・推奨=skill を罠(p) に揃える） ③judge の 1次/2次 verdict 相違が approve vs approve_with_notes の名目差で発火し3ゲート連続 ack=build-judge-card.py:380-385 の文字列不一致判定（P2・段階化） ④subagent-dev 並列規則が共有テスト DB を無想定→並行 integration の偽 fail。wave 1体運用で解消済＝skill 明文化（P2） ⑤spec-delta 合格が無言=check_status.py:150（P2・承認出力に1行追加） ⑥full.json 配布 scripts 8本 vs manifest 実行可 12本の drift。retro_report.py/check_reference_drift.py/learnings_search.py/lint_names.py 未配布・install テストは hook allow のみ検証でファイル実在を未検証（P1・full へ4本追加＋配布整合の contract 検査）。候補外の記録のみ観測（引用符内 grep 交替演算子 deny・原因不明 deny 1件・.gitignore carve-out・qa-browser 途中停止の根治未達・judge deny 文面の是正手順案内なし）も backlog に収載。規模想定 L・check-secrets 判定変更=moat 変更のため全ゲート必須。iter55 は push 済（origin/main=9578612）・本起票コミットの push のみユーザー確認待ち。"
+    note: "iter57 着手。iter56/v1.17.0 を push（origin/main=584d22c）後に rollover 実施（iteration=57・dev ゲート全 reset via update-gate.sh・phase docs→brainstorm 後方遷移・非 requirements refs null・task framework/L 継続＝update-task.sh 不要）。テーマ＝構造リアーキ（文字列判定→FS 実解決 realpath+inode・OS-lock cp-lock 主 moat 昇格・check-control-plane 979行 退役・静的アナライザ advisory 降格）。特記: iter56 クローズ時に2セッション並走が発生（qa docs コミット 991199b が別セッション割り込み・内容同一で実害なし・第三者検収 PASS）。教訓＝引き継ぎ前の静止監視必須。次＝brainstorm 設計探索。"
   - date: "2026-07-05"
     mode: Dev
     phase: "docs"
@@ -88,3 +84,5 @@ Claude Code ネイティブの Aegis 運用フレームワーク。2026-06-05、
 - 2026-06-28: iter52（framework・permission prompt 交通整理＝read-only 完全性ガード＋allow 10→14・M）完了・push 済 origin/main=5660f99。詳細は git log 5660f99。
 - 2026-06-29: iter53（framework・破壊的コマンド警告の日本語化＋REGEX↔WARN parity ドリフトガード・M・v1.14.0 据置）完了・push 済 origin/main=69632d0。詳細は git log 69632d0。
 - 2026-07-02: iter54（framework・ドッグフード前 Critical バッチ修正・L・v1.14.0→v1.15.0）完了・push 済 origin/main=9a36d72＝完全クローズ。case-insensitive FS の moat バイパス封鎖（条件付き case-fold・deny-only）＋setup.sh fail-open install 封鎖＋drill quotepath。詳細は git log 9a36d72。
+- 2026-07-03: iter55 rollover＋設計着手（ドッグフード一周目 FB・許可リスト単一ソース化 scripts-manifest.tsv ほか）→ v1.16.0 完了・push 済 origin/main=9578612。詳細は git log 9578612。
+- 2026-07-05: iter56（M2 FB 6件＋可視性・v1.16.0→v1.17.0）完了・push 済 origin/main=584d22c。起票 backlog=docs/plans/2026-07-05-iter56-dogfood-m2-feedback-backlog.md。詳細は git log 584d22c。
