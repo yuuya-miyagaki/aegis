@@ -88,7 +88,7 @@ aegis/
 │   ├── check-gate.sh                 # PreToolUse(Edit/Write): ゲートチェック
 │   ├── check-tdd.sh                  # PreToolUse(Edit/Write): TDD チェック（full のみ）
 │   ├── check-client-info.sh          # PreToolUse(Edit/Write): Client 情報ガード
-│   ├── check-control-plane.sh        # PreToolUse(Bash): 制御面保護
+│   ├── check-runtime-state.sh        # PreToolUse(Bash): runtime-state(STATUS/settings)保護＋CP unlock 形 deny（主 CP moat は OS-lock）
 │   ├── check-destructive.sh          # PreToolUse(Bash): 破壊コマンド検出
 │   ├── check-secrets.sh              # PreToolUse(Bash): .env/鍵の commit 阻止
 │   ├── check-deploy-gate.sh          # PreToolUse(Bash): deploy ゲート
@@ -96,6 +96,7 @@ aegis/
 │   ├── check-skill-gate.sh           # PreToolUse(Skill): 制御層スキル確認
 │   ├── check-cron-gate.sh            # PreToolUse(CronCreate): スケジュール payload 確認
 │   ├── post-bash.sh                  # PostToolUseFailure(Bash): テスト失敗→ReAct
+│   ├── explain-oslock-eacces.sh      # PostToolUseFailure(Bash): OS-lock EACCES を説明（advisory）
 │   ├── post-status-audit.sh          # PostToolUse(Edit/Write): ゲート改竄検出
 │   ├── pre-compact.sh                # PreCompact: 状態未保存時ブロック
 │   ├── check-task-created.sh         # TaskCreated: gate ブロック時 hard stop
@@ -320,7 +321,7 @@ v1.0.0 で公式同名スキルとの衝突回避のため一部を `aegis-*` �
 | **check-gate.sh** | PreToolUse | Edit\|Write\|NotebookEdit | plan ゲート未承認時にコード編集をブロック。Client モード中の編集もブロック。非 framework タスクでの制御ファイル編集をブロック |
 | **check-tdd.sh** | PreToolUse | Edit\|Write\|NotebookEdit | テスト変更なしのプロダクションコード編集を警告（`ask`）。full のみ。`AEGIS_TDD_MODE=off` で無効化 |
 | **check-client-info.sh** | PreToolUse | Edit\|Write\|NotebookEdit | Client モードで `docs/client/context.md` が無い場合に要件編集をブロック |
-| **check-control-plane.sh** | PreToolUse | Bash | STATUS.md/CLAUDE.md/.claude/hooks/scripts への Bash 操作を非 framework タスク時にブロック（読取専用例外あり） |
+| **check-runtime-state.sh** | PreToolUse | Bash | runtime-state（`docs/STATUS.md`・`.claude/` 設定類）への Bash 書込みを非 framework タスク時に deny（allowlist・読取専用例外あり）＋CP への chmod/chflags/chattr 解錠形を deny＋ルート/glob への再帰 chmod を `ask`。安定 CP（hooks/scripts/templates/CLAUDE.md）への書込み自体の主 moat は OS-lock（`hooks/lib/cp-lock.sh`）。iter57 で `check-control-plane.sh` から交代 |
 | **check-destructive.sh** | PreToolUse | Bash | `rm -r`/`DROP TABLE`/`git push -f`/`git reset --hard` 等を検出して確認要求（`ask`）。ビルド成果物は例外 |
 | **check-secrets.sh** | PreToolUse | Bash | `.env`・PEM/SSH 鍵・credentials.json 等の `git add`/commit を deny。`.gitignore` 不備は `ask` |
 | **check-deploy-gate.sh** | PreToolUse | Bash | deploy コマンドを deploy ゲート未承認時に確認/ブロック |
@@ -328,12 +329,15 @@ v1.0.0 で公式同名スキルとの衝突回避のため一部を `aegis-*` �
 | **check-skill-gate.sh** | PreToolUse | Skill | 制御層を変更しうるスキル（update-config 等）を `ask` |
 | **check-cron-gate.sh** | PreToolUse | CronCreate | スケジュール payload にデプロイ/破壊コマンドを含む場合 `ask` |
 | **post-bash.sh** | PostToolUseFailure | Bash | テストコマンド失敗時に ReAct（Observe→Think→Act）を提案（informational） |
+| **explain-oslock-eacces.sh** | PostToolUseFailure | Bash | 失敗コマンドが CP パスへの EACCES/Permission denied なら OS-lock の保護と `task_type=framework` 切替を案内（advisory・fail-open） |
 | **post-status-audit.sh** | PostToolUse | Edit\|Write\|NotebookEdit | STATUS.md 編集後にゲート改竄を検出。スナップショットと比較し不正な `approved` 遷移をブロック |
 | **pre-compact.sh** | PreCompact | — | STATUS.md が 5 分以上未更新かつアクティブフェーズ中はコンテキスト圧縮をブロック |
 | **check-task-created.sh** | TaskCreated | — | phase=implement で plan ゲート未承認なら新タスク作成を hard stop（`continue:false`） |
 | **check-task-completed.sh** | TaskCompleted | — | 完了時に next_action 未更新／evidence 不整合を `exit 2` で差し戻し |
 
-- layer-2: cp-lock.sh が session-start で task_type 連動の OS write-lock を適用（POSIX/macOS）。
+- **主 CP moat: cp-lock.sh の OS write-lock**（session-start で task_type 連動・POSIX/macOS/WSL）。
+  session-start は apply 後に `aegis_cp_verify` で全数照合し不一致を強警告。Windows ネイティブは
+  chmod no-op＝保護なし（公式サポート外）。iter57 で静的 `check-control-plane.sh` は退役。
 
 ### 7.2 フック連携図
 
@@ -347,10 +351,14 @@ PreToolUse(Edit/Write/NotebookEdit)
   └─ check-client-info.sh  → Client 情報ガード
 
 PreToolUse(Bash)
-  ├─ check-control-plane.sh → 制御面ファイル保護
+  ├─ check-runtime-state.sh → runtime-state(STATUS/settings)保護＋CP unlock 形 deny（主 CP moat は OS-lock）
   ├─ check-destructive.sh   → 破壊コマンド警告
   ├─ check-secrets.sh       → .env/鍵の commit 阻止
   └─ check-deploy-gate.sh   → deploy ゲート
+
+PostToolUseFailure(Bash)
+  ├─ post-bash.sh              → テスト失敗→ReAct
+  └─ explain-oslock-eacces.sh → OS-lock EACCES を説明（advisory）
 
 PreToolUse(Skill / CronCreate / mcp deploy)
   ├─ check-skill-gate.sh        → 制御層スキル確認

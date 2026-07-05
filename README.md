@@ -95,22 +95,30 @@ How Aegis maps to Claude Code's built-in capabilities.
 | Auto Mode | — | **Keep PaC hooks.** Gate blocks and control-plane *path* protection (Edit/Write) are deterministic hard rules a probabilistic classifier cannot match. The Bash *command* moat is a threshold-raising layer with a known static-analysis limit (SF-004 — not a sandbox; see `docs/security-followups.md`), so "guarantee" applies to the path/gate surface, not arbitrary shell. |
 | Routines / scheduling | — | **N/A** — aegis ships no scheduling/cron surface, so there is nothing to delegate or retire here. |
 
-**Upgrade note (1.13.0):** A second, defense-in-depth layer
-(`hooks/lib/cp-lock.sh`) OS-locks the framework control-plane (`chmod -R a-w`)
-during non-framework work, keyed on `task_type` at session start. It is additive
-and backward-compatible, and is insurance against an undiscovered bypass in the
-static hook layer for the *accidental* case — it is not a sandbox (an agent that
-runs `chmod +w` / `os.chmod` first can still write).
+**Upgrade note (1.18.0 — primary moat handover):** The framework control-plane's
+**primary write moat is now the OS lock** (`hooks/lib/cp-lock.sh` — `chmod -R a-w`,
+syscall-enforced, form-independent), applied during non-framework work and keyed on
+`task_type` at session start. The former static command-analysis hook
+(`check-control-plane.sh`, ~979 lines) is **retired**; a small residual guard
+(`check-runtime-state.sh`) covers only what the lock cannot — Bash writes to
+run-time state (`docs/STATUS.md`, `.claude/` settings), which stay writable for the
+framework/harness. It is **not a sandbox**: an agent that runs `chmod +w` / `os.chmod`
+first can still write (accident-prevention scope, not adversarial). When a write
+hits the lock, `explain-oslock-eacces.sh` (advisory) surfaces the reason so the
+agent switches `task_type` instead of unlocking.
+- **Supported platforms: macOS / Linux / WSL.** On native Windows `chmod` is a
+  no-op, so the OS lock does not apply and the control-plane is **not protected**
+  there (out of official support). Edit/Write path protection (`check-gate.sh`) is
+  OS-independent and still applies everywhere.
 - The lock **persists on disk** between Claude sessions: while `task_type` is a
   project type, `hooks/`, `scripts/`, `CLAUDE.md`, `.claude/{rules,skills,commands,agents}`
   are read-only in your editor too. They unlock automatically in a `task_type:
   framework` session, or manually via `chmod -R u+w <path>`.
 - **Updating the framework** (e.g. `git pull` that rewrites vendored hooks) must
   be done in a `task_type: framework` session, otherwise the write hits EACCES.
-- On native Windows `chmod` is a no-op, so layer-1 (the static hooks) remains the
-  protection there. Both `.claude/settings.json` and `.claude/settings.local.json`
-  are **excluded** from the lock (Claude Code writes permission grants there);
-  they stay protected by layer-1.
+- Both `.claude/settings.json` and `.claude/settings.local.json` are **excluded**
+  from the lock (Claude Code writes permission grants there); they stay protected
+  by the Edit/Write path hook.
 
 ## Quick Start
 
@@ -163,8 +171,13 @@ pull-based loading). Project CLAUDE.md references skills by name.
 - **SessionStart**: injects current mode, phase, blockers; initializes gate snapshot
 - **PreToolUse (Edit/Write/NotebookEdit)**: blocks code edits when plan gate is not approved;
   blocks framework file edits during non-framework tasks
-- **PreToolUse (Bash)**: denies control plane file writes during non-framework tasks;
-  warns before destructive commands
+- **PreToolUse (Bash)**: denies run-time state writes (STATUS/settings) and CP-unlock
+  forms during non-framework tasks (`check-runtime-state.sh`); warns before destructive
+  commands. Control-plane *file* writes are stopped by the OS lock (see Upgrade note)
+- **SessionStart**: OS-locks the control-plane for non-framework tasks and verifies
+  the lock state (`hooks/lib/cp-lock.sh`)
+- **PostToolUseFailure (Bash)**: when a command hits an EACCES on a locked CP path,
+  advises switching `task_type` instead of `chmod` (`explain-oslock-eacces.sh`)
 - **PostToolUse (Bash)**: detects test runner failures and suggests ReAct approach
 - **PostToolUse (Edit/Write/NotebookEdit)**: detects unauthorized gate tampering in STATUS.md
 - **PreCompact**: blocks compaction when STATUS.md is stale (not updated within 5 min during active phase); allows with context summary when current

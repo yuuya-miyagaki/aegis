@@ -19,10 +19,15 @@
   authorized writer（`scripts/update-gate.sh`）以外が書き換えると `.gate-snapshot` 比較で検知・
   block する。`task_type`/`task_size` も同様（iter43・`update-task.sh`）。**tamper-evidence で
   あって偽造不能の証明ではない**（chmod 権を持つ敵対者・cross-session re-bless は下記「守らない」／SF-006 較正）。
-- **control-plane path の保護（Edit/Write は決定論的・Bash command は閾値）**: フック・スクリプト・
-  `CLAUDE.md`・`.claude/rules`・skills・templates への **Edit/Write は path 一致で決定論的に deny**
-  （非 framework タスク中）。同パスへの **Bash 経由の書込みは layer-1 静的解析（敷居上げ・SF-004
-  原理的限界）＋layer-2 OS lock（事故軽減・敵対者は `os.chmod` で解錠可）**の多層で、決定論ではない。
+- **control-plane path の保護（Edit/Write は決定論的・Bash command は OS-lock 主体）**: フック・
+  スクリプト・`CLAUDE.md`・`.claude/rules`・skills・templates への **Edit/Write は path 一致で
+  決定論的に deny**（非 framework タスク中・`check-gate.sh`）。同パスへの **Bash 経由の書込みは
+  iter57 で主 moat を OS-lock（`hooks/lib/cp-lock.sh`・chmod・syscall 強制・形非依存）に交代**した。
+  かつての layer-1 静的解析（`check-control-plane.sh`・979行）は退役し、lock が物理的に守れない
+  runtime-state（`docs/STATUS.md`・`.claude/` 設定類）の Bash 書込みだけを残余静的ガード
+  `check-runtime-state.sh` が担う。**事故スコープでは OS-lock が SF-001〜005 を形非依存に構造閉鎖**
+  するが、**敵対者は `os.chmod` で解錠して書ける（脅威モデル外）**点は不変＝決定論的な敵対防御ではない。
+  公式サポートは macOS/Linux/WSL（Windows ネイティブは chmod が no-op＝OS-lock 無効・保護なし）。
 - **事故的な secret commit の阻止**: 認証**ファイル名**（`.env`/PEM/SSH 鍵/
   credentials*.json 等）の git ステージ/コミットを block（最も高頻度な AI 事故）。
 - **完了 evidence の強制**: ゲート承認・完了主張に artifact/evidence を要求（fail-closed）。
@@ -45,6 +50,17 @@
 方針を貫く（SF-002 の glob 再分類・SF-004 の原理的限界実証・SF-007 の bypass 不能実証が先例）。
 
 ## OPEN
+
+> **iteration 57 状態更新（2026-07-05・SF-001〜005 一括）**: 主 moat を静的解析
+> （`check-control-plane.sh`・979行）から **OS-lock（`hooks/lib/cp-lock.sh`・chmod・
+> syscall 強制）に交代**し、静的層は退役した。lock がアクティブな間（POSIX/macOS の
+> 非 framework モード）、**SF-001〜005 の全形（クォート分割・glob・cmdsub・interpreter
+> `-c`・extglob）は syscall が形非依存に EACCES で遮断**する（`tests/test_cp_lock_sf_catalog.py`
+> が grill 由来バイパス形＋新規作成＋case-fold で回帰固定）。**ただし敵対者は `os.chmod` で
+> 解錠してから書けるため、いずれも CLOSED にはしない**（特に SF-004 は静的・OS どちらでも
+> 敵対閉鎖は原理的に不可＝脅威モデル外）。Windows ネイティブは chmod が no-op ＝ OS-lock
+> 無効（公式サポート外）。各 SF の以下「状態（2026-06-21）」の layer-1/layer-2 記述は、
+> 「layer-1＝退役／layer-2＝主 moat に昇格」と読み替える。
 
 ### SF-001: control-plane フックのクォート/エスケープ トークン分割バイパス（Critical・pre-existing）
 
