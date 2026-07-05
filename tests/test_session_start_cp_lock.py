@@ -73,6 +73,32 @@ class TestSessionStartLock:
         finally:
             subprocess.run(["chmod", "-R", "u+w", tmp.name]); tmp.cleanup()
 
+    def test_verify_mismatch_warns_with_remedy(self):
+        """iter57 主 moat 昇格: half-locked（ネスト1ファイルだけ writable）を
+        verify が検出し、強警告＋是正手順を CONTEXT に出す。sentinel（hooks/
+        dir 自体）は locked のままなので apply は no-op = verify だけが検出者。"""
+        tmp = _install("feature")
+        p = Path(tmp.name)
+        try:
+            r = _run_session_start(tmp.name)
+            assert r.returncode == 0
+            (p / "hooks" / "lib" / "frontmatter.sh").chmod(0o644)
+            r2 = _run_session_start(tmp.name)
+            assert r2.returncode == 0
+            assert "OS-lock 状態が期待と不一致" in r2.stdout
+            assert "aegis_cp_apply" in r2.stdout, "是正手順の案内が必要"
+        finally:
+            subprocess.run(["chmod", "-R", "u+w", tmp.name]); tmp.cleanup()
+
+    def test_verify_consistent_no_warning(self):
+        tmp = _install("feature")
+        try:
+            r = _run_session_start(tmp.name)
+            assert r.returncode == 0
+            assert "OS-lock 状態が期待と不一致" not in r.stdout
+        finally:
+            subprocess.run(["chmod", "-R", "u+w", tmp.name]); tmp.cleanup()
+
     def test_missing_lib_does_not_crash(self):
         tmp = _install("feature")
         p = Path(tmp.name)

@@ -266,12 +266,32 @@ if [ "${AEGIS_TDD_MODE:-}" = "off" ]; then
   CONTEXT="${CONTEXT} | [WARNING] AEGIS_TDD_MODE=off — TDD backstop はこのセッション無効（テスト無しの本番編集でも確認なし）"
 fi
 
-# layer-2: OS/FS write-lock of the stable control-plane, keyed on task_type.
-# Lock failure is non-fatal — warn into CONTEXT; layer-1 static moat stays active.
+# Main moat (iter57): OS/FS write-lock of the stable control-plane, keyed on
+# task_type. Apply failure and verify mismatch surface loudly (fail-visible) —
+# the residual static guard (check-runtime-state) and check-gate stay active
+# regardless, but they do not cover the stable-CP write forms the lock does.
 if command -v aegis_cp_apply >/dev/null 2>&1; then
-  aegis_cp_apply "$ROOT" "$TASK_TYPE" || CONTEXT="${CONTEXT} | [WARNING] control-plane lock/unlock 一部失敗（layer-2 未適用・layer-1 静的 moat は有効。framework 編集が EACCES なら該当ファイルを手動 chmod u+w）"
+  aegis_cp_apply "$ROOT" "$TASK_TYPE" || CONTEXT="${CONTEXT} | [WARNING] control-plane lock/unlock 一部失敗（OS-lock=主 moat 未適用の可能性。残余ガード check-runtime-state / check-gate は有効。framework 編集が EACCES なら該当ファイルを手動 chmod u+w）"
+  case "$(uname -s 2>/dev/null)" in
+    MINGW*|MSYS*|CYGWIN*)
+      # Windows native: chmod is a silent no-op — verify would spam the full
+      # mismatch list every session. One clear line instead (unsupported OS).
+      CONTEXT="${CONTEXT} | [WARNING] 本 OS（Windows ネイティブ）は公式サポート外 — OS-lock（主 moat）は無効・control-plane 保護なし"
+      ;;
+    *)
+      # Fail-visible: full-enumeration verify after apply. The sentinel probe
+      # inside apply only sees the hooks/ dir itself; a half-locked nested
+      # file is exactly what this catches (grill 致命2 / promotion contract).
+      if command -v aegis_cp_verify >/dev/null 2>&1; then
+        VERIFY_BAD=$( { aegis_cp_verify "$ROOT" "$TASK_TYPE" 2>/dev/null || true; } | head -3 | tr '\n' ' ')
+        if [ -n "$VERIFY_BAD" ]; then
+          CONTEXT="${CONTEXT} | [WARNING] OS-lock 状態が期待と不一致（主 moat・要是正）: ${VERIFY_BAD}— 是正: bash -c 'source hooks/lib/cp-lock.sh; aegis_cp_apply \"\$(pwd)\" ${TASK_TYPE}' を再実行"
+        fi
+      fi
+      ;;
+  esac
 else
-  CONTEXT="${CONTEXT} | [WARNING] cp-lock.sh 利用不可（layer-2 OS lock skip・layer-1 静的 moat は有効）"
+  CONTEXT="${CONTEXT} | [WARNING] cp-lock.sh 利用不可（主 moat=OS-lock が無効。残余ガード check-runtime-state / check-gate のみ）"
 fi
 
 emit_context SessionStart "$CONTEXT"
