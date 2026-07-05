@@ -445,6 +445,58 @@ class TestVerdict(unittest.TestCase):
                                   self._facts(deps="vuln"), {"verdict": "approve"})
         self.assertEqual(v.overall, 2)
 
+    # --- iter56 ③: verdict 名目差の段階化＋notes 情報行（M2: 3ゲート連続 ack） ---
+
+    def test_ok_class_pair_no_divergence_yellow(self):
+        v = judge.compute_verdict("review", {"verdict": "approve"},
+                                  self._facts(),
+                                  {"verdict": "approve_with_notes",
+                                   "notes": "minor 2件は解消済み"})
+        self.assertFalse(any("相違" in y for y in v.yellow), v.yellow)
+        self.assertEqual(v.overall, 0)
+
+    def test_ok_class_pair_emits_notes_info(self):
+        v = judge.compute_verdict("review", {"verdict": "approve"},
+                                  self._facts(),
+                                  {"verdict": "approve_with_notes",
+                                   "notes": "minor 2件は解消済み"})
+        self.assertTrue(any("minor 2件" in i for i in v.info), v.info)
+
+    def test_ok_class_pair_without_notes_emits_generic_info(self):
+        v = judge.compute_verdict("review", {"verdict": "approve"},
+                                  self._facts(), {"verdict": "approve_with_notes"})
+        self.assertTrue(any("notes" in i for i in v.info), v.info)
+
+    def test_unknown_verdict_divergence_still_yellow(self):
+        v = judge.compute_verdict("review", {"verdict": "approve"},
+                                  self._facts(), {"verdict": "lgtm"})
+        self.assertEqual(v.overall, 2)
+        self.assertTrue(any("相違" in y for y in v.yellow), v.yellow)
+
+    def test_placeholder_verdict_pair_is_visible(self):
+        """grill 致命2: 未記入テンプレ（両側とも既知集合外の同値）は相違 🟡 が
+        出ない＝沈黙通過を許さない。既知集合外の値は値不正 🟡 で可視化する。"""
+        ph = "<記入: approve / approve_with_notes / reject / blocked>"
+        v = judge.compute_verdict("review", {"verdict": ph},
+                                  self._facts(), {"verdict": ph})
+        self.assertEqual(v.overall, 2)
+        self.assertTrue(any("不正/未記入" in y for y in v.yellow), v.yellow)
+
+    # --- iter56 ⑦a: 未検証 🟡 の是正手順案内（M2: deny 文面に手順なし） ---
+
+    def test_tests_unverified_message_has_remediation(self):
+        v = judge.compute_verdict("review", {"verdict": "approve"},
+                                  self._facts(tests="unverified"),
+                                  {"verdict": "approve"})
+        self.assertTrue(any("record-test-result" in y for y in v.yellow), v.yellow)
+
+    # --- iter56 ②: qa ref=claims 付き QA レポートで claims 🟡 が出ない ---
+
+    def test_qa_claims_report_no_claims_yellow(self):
+        v = judge.compute_verdict("qa", {"verdict": "approve"}, self._facts(), None)
+        self.assertFalse(any("claims" in y for y in v.yellow), v.yellow)
+        self.assertEqual(v.overall, 0)
+
 
 class TestMain(unittest.TestCase):
     def _git(self, root, *a):

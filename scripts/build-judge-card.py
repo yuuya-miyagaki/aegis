@@ -328,16 +328,26 @@ def resolve_gate_report(root: Path, gate: str) -> Path | None:
 # gates that require a self-attested second opinion (tier-2)
 SECOND_OPINION_GATES = ("review", "security")
 
+# iter56 ③: verdict severity classes. approve × approve_with_notes is a nominal
+# difference, not a divergence (M2: 3 consecutive gates needed a meaningless
+# ack). Values OUTSIDE the known set are never treated as ok (fail-visible:
+# an unfilled template placeholder must not sail through silently).
+OK_VERDICTS = frozenset({"approve", "approve_with_notes"})
+KNOWN_VERDICTS = OK_VERDICTS | frozenset({"reject", "blocked"})
+
 
 class Verdict:
     # Plain class (not a dataclass): with `from __future__ import annotations`
     # a dataclass resolves field annotations via sys.modules[__module__], which
     # is absent when this file is loaded via importlib (record-test-result.py,
     # tests) and raises. A plain class is load-mechanism agnostic.
-    def __init__(self, overall: int, red=None, yellow=None):
+    def __init__(self, overall: int, red=None, yellow=None, info=None):
         self.overall = overall          # 0=🟢 / 1=🔴 / 2=🟡
         self.red = red if red is not None else []
         self.yellow = yellow if yellow is not None else []
+        # iter56 ③: non-blocking notes surfaced on the card — never counted
+        # in overall (visibility without an ack treadmill).
+        self.info = info if info is not None else []
 
 
 def compute_verdict(gate: str, claims: dict | None, facts: dict,
@@ -347,6 +357,7 @@ def compute_verdict(gate: str, claims: dict | None, facts: dict,
     blocks (assurance is self-attested)."""
     red: list[str] = []
     yellow: list[str] = []
+    info: list[str] = []
 
     # tier-1 facts run unconditionally (independent of what was claimed)
     if facts["stubs"]:
@@ -356,7 +367,11 @@ def compute_verdict(gate: str, claims: dict | None, facts: dict,
     if facts["tests"] == "red":
         red.append("テストが赤")
     elif facts["tests"] == "unverified":
-        yellow.append("テスト結果が未検証（記録なし/コード変更後）")
+        # iter56 ⑦a: the deny/ack text must carry its own remediation (M2:
+        # the bare message forced a docs dig every time).
+        yellow.append(
+            "テスト結果が未検証（記録なし/コード変更後）— 全編集後に "
+            "`python3 scripts/record-test-result.py \"python3 -m pytest -q\"` で再記録")
     if facts["deps"] == "unverified":
         yellow.append("依存監査が未検証")
     elif facts["deps"] == "vuln":
@@ -379,13 +394,26 @@ def compute_verdict(gate: str, claims: dict | None, facts: dict,
     if gate in SECOND_OPINION_GATES:
         if second_opinion is None:
             yellow.append("第2意見なし（self-attested・要確認）")
-        elif claims and second_opinion.get("verdict") != claims.get("verdict"):
-            yellow.append(
-                f"1次/2次レビューの相違（self-attested）: "
-                f"1次={claims.get('verdict')} / 2次={second_opinion.get('verdict')}")
+        elif claims:
+            v1, v2 = claims.get("verdict"), second_opinion.get("verdict")
+            # iter56 ③: approve × approve_with_notes は名目差 — 🟡 にしない。
+            # 未知値は ok 扱いしない（fail-visible）。
+            both_ok = v1 in OK_VERDICTS and v2 in OK_VERDICTS
+            if v1 != v2 and not both_ok:
+                yellow.append(
+                    f"1次/2次レビューの相違（self-attested）: 1次={v1} / 2次={v2}")
+            # grill 致命2: 既知集合外の値（テンプレ未記入プレースホルダ含む）は
+            # 同値でも沈黙させない。
+            for label, val in (("1次", v1), ("2次", v2)):
+                if val is not None and val not in KNOWN_VERDICTS:
+                    yellow.append(f"{label} verdict 値が不正/未記入: {val}")
+            if "approve_with_notes" in (v1, v2):
+                notes = second_opinion.get("notes")
+                info.append(f"approve_with_notes の notes: {notes}" if notes
+                            else "approve_with_notes — notes の解消状況を確認")
 
     overall = 1 if red else (2 if yellow else 0)
-    return Verdict(overall=overall, red=red, yellow=yellow)
+    return Verdict(overall=overall, red=red, yellow=yellow, info=info)
 
 
 def collect_facts(root: Path, gate: str) -> dict:
@@ -426,6 +454,8 @@ def render_card(report_out: Path, *, gate: str, v: Verdict, claims: dict | None,
         lines += ["", "## 🔴 ブロック要因"] + [f"- {r}" for r in v.red]
     if v.yellow:
         lines += ["", "## 🟡 要確認"] + [f"- {y}" for y in v.yellow]
+    if v.info:
+        lines += ["", "## 💬 情報（非ブロッキング）"] + [f"- {i}" for i in v.info]
     lines += ["", "## あなたが取るアクション", "（LLM が平易日本語で記述）", ""]
     report_out.parent.mkdir(parents=True, exist_ok=True)
     report_out.write_text("\n".join(lines), encoding="utf-8")
@@ -444,6 +474,8 @@ def build(root: Path, gate: str, report_out: Path) -> int:
             print(f"🔴 {r}")
         for y in v.yellow:
             print(f"🟡 {y}")
+        for i in v.info:
+            print(f"💬 {i}")
         return v.overall
     except Exception as exc:
         # The judge could not complete (e.g. not a git repo, transient git
