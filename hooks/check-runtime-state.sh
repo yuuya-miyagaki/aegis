@@ -71,8 +71,42 @@ fi
 RUNTIME_STATE='docs/STATUS\.md|(^|[^A-Za-z0-9_./-])STATUS\.md|\.claude/|\.claude([^A-Za-z0-9_/]|$)'
 # Stable-CP tokens, used ONLY for the unlock-form check (the lock itself is
 # the moat for these paths; boundary keeps a project's own src/hooks/ out).
-LOCKED_CP='(^|[^A-Za-z0-9_./-])(\./)*(hooks|scripts|templates)(/|[[:space:]]|$)|(^|[^A-Za-z0-9_./-])CLAUDE\.md'
+# iter57 review 🟡: the .claude/ subdirs also accept no-trailing-slash and
+# space/EOL boundaries so `chmod +w .claude/skills` routes to the OS-lock
+# unlock message (task_type=framework), not the misleading runtime-state one.
+LOCKED_CP='(^|[^A-Za-z0-9_./-])(\./)*(hooks|scripts|templates)(/|[[:space:]]|$)|(^|[^A-Za-z0-9_./-])CLAUDE\.md|\.claude/(rules|skills|commands|agents)(/|[[:space:]]|$)'
 UNLOCK_TOOLS='(^|[^A-Za-z0-9_])(chmod|chflags|chattr)([[:space:]]|$)'
+
+# Mask the CONTENT of every '...' / "..." quoted span with 'x', preserving the
+# quotes and everything outside them (ported verbatim from the retired
+# check-control-plane.sh — OBS-006). Single quotes take no escapes; inside
+# double quotes a backslash escapes the next char. Prints the masked string;
+# returns 1 on an UNBALANCED quote so the caller fails closed. Only safe when the
+# command has NO $(...)/backtick (an active sub inside "" would be hidden).
+mask_quoted() {
+  local s="$1"
+  local out="" i=0 ch state=none
+  while [ "$i" -lt "${#s}" ]; do
+    ch="${s:$i:1}"
+    case "$state" in
+      none)
+        case "$ch" in
+          "'") state=sq; out="${out}'" ;;
+          '"') state=dq; out="${out}\"" ;;
+          *)   out="${out}${ch}" ;;
+        esac ;;
+      sq)
+        if [ "$ch" = "'" ]; then state=none; out="${out}'"; else out="${out}x"; fi ;;
+      *)  # dq
+        if [ "$ch" = '\' ]; then out="${out}xx"; i=$((i + 1))
+        elif [ "$ch" = '"' ]; then state=none; out="${out}\""
+        else out="${out}x"; fi ;;
+    esac
+    i=$((i + 1))
+  done
+  [ "$state" = none ] || return 1
+  printf '%s' "$out"
+}
 
 # Command extraction (same contract as the retired hook): python3-first; the
 # bash fast-path would truncate at the first embedded escaped quote and could
@@ -87,8 +121,56 @@ if [ -n "$CMD" ]; then
   CMD=$(printf '%s' "$CMD" | tr '\n\r' ';;')
 fi
 
-_mentions_runtime_state() {
-  printf '%s' "$1" | grep ${CASE_I[@]+"${CASE_I[@]}"} -qE "$RUNTIME_STATE"
+# True when the command WRITES to (not merely mentions) runtime-state. OBS-006:
+# a runtime-state path inside a quoted literal that is not a write target
+# (`git commit -m "...STATUS.md..."`, `echo "see docs/STATUS.md"`) is NOT a write
+# and must be allowed. Strategy (ported from the retired hook's
+# cmd_mentions_control_plane, keyed on RUNTIME_STATE):
+#   - $(...) / backtick present → masking is unsafe → raw fail-closed grep.
+#   - else mask quoted literals; (a) an unquoted runtime-state path anywhere, or
+#     (b) a redirect target (quote-stripped from the RAW command) that is
+#     runtime-state → write-eligible. A path surviving ONLY inside quotes → not.
+_writes_runtime_state() {
+  local cmd="$1" masked redir target
+  if printf '%s' "$cmd" | grep -qE '\$\(|`'; then
+    printf '%s' "$cmd" | grep ${CASE_I[@]+"${CASE_I[@]}"} -qE "$RUNTIME_STATE"
+    return $?
+  fi
+  masked=$(mask_quoted "$cmd") || return 0   # unbalanced quotes → fail closed
+  # (a) unquoted runtime-state path anywhere in the masked command.
+  if printf '%s' "$masked" | grep ${CASE_I[@]+"${CASE_I[@]}"} -qE "$RUNTIME_STATE"; then
+    return 0
+  fi
+  # (b) a redirect target (quote-stripped) that is runtime-state — even when the
+  # path sat inside the quotes of the target token (`> "docs/STATUS.md"`).
+  while IFS= read -r redir || [ -n "$redir" ]; do
+    target=$(printf '%s' "$redir" | sed -E 's/^[[:space:]]*>>?[[:space:]]*//')
+    case "$target" in
+      \"*\") target="${target#\"}"; target="${target%\"}" ;;
+      \'*\') target="${target#\'}"; target="${target%\'}" ;;
+    esac
+    [ -n "$target" ] || continue
+    if printf '%s' "$target" | grep ${CASE_I[@]+"${CASE_I[@]}"} -qE "$RUNTIME_STATE"; then
+      return 0
+    fi
+  done < <(printf '%s' "$cmd" | grep -oE ">>?[[:space:]]*(\"[^\"]*\"|'[^']*'|[^[:space:]|&;<>]+)")
+  # (c) runtime-state survives ONLY inside a quoted literal (a/b cleared the
+  # unquoted forms and redirect targets). A quoted token can still be a WRITE
+  # DESTINATION for many commands (`python3 -c 'open("docs/STATUS.md","w")'`,
+  # cp/mv/tee/sed -i/perl -i/…), so relax via an ALLOWLIST of no-write "message"
+  # commands — NEVER a blocklist of writers (a writer not on the list leaks).
+  # echo/printf/`git commit` cannot write FILE CONTENT to a path argument (their
+  # only working-tree write is a redirect, already cleared in (b)); a chain
+  # operator that could introduce a writer is fail-closed.
+  if printf '%s' "$cmd" | grep ${CASE_I[@]+"${CASE_I[@]}"} -qE "$RUNTIME_STATE"; then
+    if printf '%s' "$cmd" | grep -qE '[;&|]'; then
+      return 0
+    fi
+    if ! printf '%s' "$cmd" | grep -qE '^[[:space:]]*(echo|printf|git[[:space:]]+commit)([[:space:]]|$)'; then
+      return 0
+    fi
+  fi
+  return 1
 }
 _unlock_form_on_cp() {
   printf '%s' "$1" | grep -qE "$UNLOCK_TOOLS" || return 1
@@ -102,7 +184,7 @@ _recursive_chmod_broad() {
 }
 
 if [ -n "$CMD" ]; then
-  if ! _mentions_runtime_state "$CMD" && ! _unlock_form_on_cp "$CMD" \
+  if ! _writes_runtime_state "$CMD" && ! _unlock_form_on_cp "$CMD" \
      && ! _recursive_chmod_broad "$CMD"; then
     emit_allow
     exit 0

@@ -118,6 +118,48 @@ class TestRuntimeStateDeny(unittest.TestCase):
         self.assertIn("update-gate.sh", out)
         self.assertIn("update-task.sh", out)
 
+    # --- OBS-006 quoted-literal rescue (iter57 review 🔴 regression fix) ---
+
+    def test_commit_message_mentioning_status_allowed(self):
+        """`git commit -m "...docs/STATUS.md..."` は書込みでない引用リテラル → allow。"""
+        for cmd in ('git commit -m "fix docs/STATUS.md rendering"',
+                    "git commit -m 'update STATUS.md handling'",
+                    'echo "see docs/STATUS.md for details"',
+                    'printf "%s" ".claude/settings.json is here"'):
+            with self.subTest(cmd=cmd):
+                self.assertTrue(_allowed(_hook(self.root, cmd)), f"{cmd}: {_hook(self.root, cmd)[:200]}")
+
+    def test_unquoted_status_write_still_denied(self):
+        """未クォートの書込みターゲットは救済しない（deny 維持）。"""
+        for cmd in ("sed -i 's/pending/approved/' docs/STATUS.md",
+                    "echo x > docs/STATUS.md",
+                    'echo x > "docs/STATUS.md"'):
+            with self.subTest(cmd=cmd):
+                self.assertTrue(_denied(_hook(self.root, cmd)), f"{cmd}: {_hook(self.root, cmd)[:200]}")
+
+    def test_cmdsub_with_status_mention_fail_closed(self):
+        """$(...) 併用は mask 不能 → raw fail-closed で deny 維持。"""
+        out = _hook(self.root, 'echo "$(cat docs/STATUS.md)"')
+        self.assertTrue(_denied(out), out[:200])
+
+    def test_quoted_write_via_non_message_command_denied(self):
+        """(c) 救済は echo/printf/git commit 限定。python3 -c で引用リテラル内の
+        STATUS へ書くのは write＝deny（allowlist でない書き手を素通しにしない）。"""
+        for cmd in ('python3 -c \'open("docs/STATUS.md","w").write("x")\'',
+                    "perl -i -pe 's/a/b/' 'docs/STATUS.md'",
+                    'echo x; cp evil "docs/STATUS.md"'):
+            with self.subTest(cmd=cmd):
+                self.assertTrue(_denied(_hook(self.root, cmd)),
+                                f"{cmd}: {_hook(self.root, cmd)[:200]}")
+
+    def test_unlock_claude_subdir_no_slash_uses_oslock_message(self):
+        """🟡: chmod +w .claude/skills（末尾スラッシュ無し）は OS-lock 解錠 deny
+        ＝task_type=framework 案内メッセージを出す（runtime-state 汎用文言でない）。"""
+        out = _hook(self.root, "chmod +w .claude/skills")
+        self.assertTrue(_denied(out), out[:200])
+        self.assertIn("OS-lock", out)
+        self.assertIn("task_type", out)
+
 
 class TestUnlockFormDeny(unittest.TestCase):
     @classmethod
