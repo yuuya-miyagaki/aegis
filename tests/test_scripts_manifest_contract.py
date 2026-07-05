@@ -171,6 +171,75 @@ class TestSkillReferences(unittest.TestCase):
             fails = cfc.check_scripts_manifest(root)
             self.assertTrue(any("tool.py" in f for f in fails), fails)
 
+    def test_direction4_runnable_scripts_distributed_in_full_profile(self):
+        """方向4 (iter56 ⑥): manifest の実行可クラス（allow|ask）は full プロファイル
+        が配布する。M2 実測: retro_report.py が hook ALLOW なのに install 先に無く
+        /retro が手動フォールバック化（F6=install 経路の死角の再発形）。"""
+        manifest = cfc.load_scripts_manifest(ROOT)
+        full = json.loads(
+            (ROOT / "templates" / "profiles" / "full.json").read_text(encoding="utf-8"))
+        distributed = set(full["required"]) | set(full["recommended"])
+        unshipped = set(full.get("intentional_unshipped", {}))
+        runnable = {e for e, c in manifest.items() if c in ("allow", "ask")}
+        self.assertLessEqual(runnable - unshipped, distributed,
+                             sorted(runnable - unshipped - distributed))
+
+    def test_direction4_detects_missing_distribution(self):
+        """合成違反: allow スクリプトが full.json に無ければ FAIL する。"""
+        with tempfile.TemporaryDirectory() as t:
+            root = _mkroot(Path(t), "scripts/good.py\tallow\n")
+            prof = root / "templates" / "profiles"
+            prof.mkdir(parents=True)
+            (prof / "full.json").write_text(
+                json.dumps({"required": [], "recommended": []}), encoding="utf-8")
+            fails = cfc.check_scripts_manifest(root)
+            self.assertTrue(any("full profile" in f for f in fails), fails)
+
+    def test_direction4_skipped_when_full_profile_absent(self):
+        """full.json の無い合成 root（既存テスト群）では方向4は発火しない。"""
+        with tempfile.TemporaryDirectory() as t:
+            root = _mkroot(Path(t), "scripts/good.py\tallow\n")
+            self.assertEqual(cfc.check_scripts_manifest(root), [])
+
+    def test_direction4_intentional_unshipped_exempts_with_reason(self):
+        """意図的非同梱は full.json の intentional_unshipped（理由必須）で明示すれば
+        FAIL しない（例: check_framework_contract.py = maintainer 専用）。"""
+        with tempfile.TemporaryDirectory() as t:
+            root = _mkroot(Path(t), "scripts/good.py\tallow\n")
+            prof = root / "templates" / "profiles"
+            prof.mkdir(parents=True)
+            (prof / "full.json").write_text(json.dumps({
+                "required": [], "recommended": [],
+                "intentional_unshipped": {"scripts/good.py": "maintainer 専用"},
+            }), encoding="utf-8")
+            self.assertEqual(cfc.check_scripts_manifest(root), [])
+
+    def test_direction4_unshipped_empty_reason_fails(self):
+        """理由なしの除外＝サイレント許容は禁止。"""
+        with tempfile.TemporaryDirectory() as t:
+            root = _mkroot(Path(t), "scripts/good.py\tallow\n")
+            prof = root / "templates" / "profiles"
+            prof.mkdir(parents=True)
+            (prof / "full.json").write_text(json.dumps({
+                "required": [], "recommended": [],
+                "intentional_unshipped": {"scripts/good.py": ""},
+            }), encoding="utf-8")
+            fails = cfc.check_scripts_manifest(root)
+            self.assertTrue(any("non-empty reason" in f for f in fails), fails)
+
+    def test_direction4_unshipped_stale_entry_fails(self):
+        """実際は同梱済みのエントリが intentional_unshipped に残っていたら rot＝FAIL。"""
+        with tempfile.TemporaryDirectory() as t:
+            root = _mkroot(Path(t), "scripts/good.py\tallow\n")
+            prof = root / "templates" / "profiles"
+            prof.mkdir(parents=True)
+            (prof / "full.json").write_text(json.dumps({
+                "required": [], "recommended": ["scripts/good.py"],
+                "intentional_unshipped": {"scripts/good.py": "理由"},
+            }), encoding="utf-8")
+            fails = cfc.check_scripts_manifest(root)
+            self.assertTrue(any("stale" in f for f in fails), fails)
+
     def test_overridden_local_command_not_scanned(self):
         """grill 致命1: templates/commands/ に同名 override がある .claude/commands/ の
         framework-repo ローカル変種（framework-only スクリプト参照可）は走査対象外。

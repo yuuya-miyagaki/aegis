@@ -490,6 +490,38 @@ def check_scripts_manifest(root: Path = ROOT) -> list:
                     f"scripts-manifest: {md.relative_to(root)} references {ref} "
                     "which is not runnable (class allow|ask) — the control-plane "
                     "hook would deny the instruction")
+
+    # 方向4 (iter56 ⑥): 実行可クラス（allow|ask）のスクリプトは full プロファイル
+    # が配布する。hook が ALLOW してもファイルが install されなければ silent
+    # 手動フォールバック（M2 実測: /retro）— F6（install 経路の死角）の再発形。
+    # minimal/standard は意図的劣化（scaffold-safe 変種）のため対象外。
+    # 意図的な非同梱は full.json 側の intentional_unshipped（理由必須）で明示する
+    # （例: check_framework_contract.py = maintainer 専用・依存閉包を引き込まない）。
+    # 無意図の欠落だけを FAIL させ、意図はプロファイル自身が自己記述する。
+    full_profile_path = root / "templates" / "profiles" / "full.json"
+    if full_profile_path.is_file():
+        try:
+            full_profile = json.loads(full_profile_path.read_text(encoding="utf-8"))
+            distributed = set(full_profile.get("required", [])) \
+                | set(full_profile.get("recommended", []))
+            unshipped = full_profile.get("intentional_unshipped", {})
+            for entry, reason in sorted(unshipped.items()):
+                if not (isinstance(reason, str) and reason.strip()):
+                    failures.append(
+                        f"scripts-manifest: intentional_unshipped[{entry}] needs a "
+                        "non-empty reason (no silent exemptions)")
+                if entry in distributed:
+                    failures.append(
+                        f"scripts-manifest: intentional_unshipped[{entry}] is stale — "
+                        "the full profile actually distributes it (remove the entry)")
+            for entry, cls in sorted(manifest.items()):
+                if cls in ("allow", "ask") and entry not in distributed \
+                        and entry not in unshipped:
+                    failures.append(
+                        f"scripts-manifest: class={cls} {entry} is not distributed "
+                        "by the full profile (add to templates/profiles/full.json)")
+        except (json.JSONDecodeError, OSError) as exc:
+            failures.append(f"scripts-manifest: cannot read full profile: {exc}")
     return failures
 
 

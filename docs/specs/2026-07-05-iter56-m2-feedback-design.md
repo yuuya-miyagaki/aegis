@@ -120,6 +120,16 @@
      manifest の実行可クラス（allow|ask）⊆ full プロファイル配布 scripts
      （framework-only / import-only は対象外）。
   3. install テストを「full install 先での実在検証」に拡張（iter55 の穴＝F6 教訓の再発防止）。
+- **実装中に確定した精緻化（方向4の初回実走が検出）**:
+  - backlog の「4本」は数え漏れで、実際は `check_framework_contract.py`（class=allow・
+    validate.md が条件付き参照）も未配布だった。ただしこれは**既存の設計判断で意図的非同梱**
+    （maintainer 専用・依存閉包 context_budget+run_eval を install に引き込まない・
+    INTENTIONAL_UNSHIPPED に理由登録済み）→ 同梱しない。
+  - 意図的非同梱の正本を **full.json の `intentional_unshipped`（理由必須）**として
+    プロファイル自身に自己記述させ、方向4はそれを除外する。空理由・同梱済み stale
+    エントリは FAIL（サイレント許容と rot の両方を封鎖）。
+  - `check_reference_drift.py` は `platform_manifest.py` をハード import → 依存閉包として
+    `platform_manifest.py`（import-only）も full 配布に追加（referential integrity テストが検出）。
 - **非対象**: minimal/standard は現状維持（scaffold-safe retro.md 変種の意図的劣化は
   full 以外でそのまま有効）。
 

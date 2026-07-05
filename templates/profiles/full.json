@@ -39,6 +39,11 @@
     "scripts/build-judge-card.py",
     "scripts/record-test-result.py",
     "scripts/status_doctor.py",
+    "scripts/retro_report.py",
+    "scripts/check_reference_drift.py",
+    "scripts/learnings_search.py",
+    "scripts/lint_names.py",
+    "scripts/platform_manifest.py",
     "scripts/_artifact_template_map.py",
     ".claude/skills/tdd/SKILL.md",
     ".claude/skills/subagent-dev/SKILL.md",
@@ -118,5 +123,8 @@
     "check-cron-gate.sh",
     "check-task-created.sh",
     "check-task-completed.sh"
-  ]
+  ],
+  "intentional_unshipped": {
+    "scripts/check_framework_contract.py": "contract/version ツールチェーンは maintainer 専用（install 単体は新版を観測できず field no-op が by-design）。依存閉包 context_budget+run_eval を install に引き込まないため意図的に非同梱。validate.md は『If available』の条件付き参照。"
+  }
 }
