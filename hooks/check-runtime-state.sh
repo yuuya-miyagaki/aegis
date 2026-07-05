@@ -136,6 +136,130 @@ if [ -n "$CMD" ] && _recursive_chmod_broad "$CMD"; then
   exit 0
 fi
 
+# ---------------------------------------------------------------------------
+# Allow-side carve-outs, ported VERBATIM from the retired check-control-plane.sh
+# (iter55 contracts: manifest single-owner, safe-stderr strip, read-only forms,
+# bare git stage). Deny detection above ran on the RAW $CMD; stripping only
+# feeds the allow side (never widens what was already matched for deny).
+# ---------------------------------------------------------------------------
+SCRIPTS_MANIFEST="${SCRIPT_DIR}/lib/scripts-manifest.tsv"
+
+# Chain/redirect operators that indicate compound or write commands. If present,
+# the command is never eligible for allowlist or read-only pass-through.
+CHAIN_OPS='[;&|>]|\$\(|`'
+
+# SAFE stderr redirects only: `2>/dev/null` / `2>&1` cannot write a file but
+# their > / & hit CHAIN_OPS and knocked read-only forms out of the carve-out
+# (iter55 gate-battle 1). 2>>, 2>file, fd1 >/dev/null are NOT stripped.
+strip_safe_stderr_redirects() {
+  printf '%s' "$1" | sed -E \
+    -e 's,(^|[[:space:]])2>[[:space:]]?/dev/null([[:space:]]|$),\1\2,g' \
+    -e 's,(^|[[:space:]])2>&1([[:space:]]|$),\1\2,g'
+}
+CMD_SAFE=$(strip_safe_stderr_redirects "$CMD")
+
+# Execution-form prefix match against the manifest (class allow|ask only).
+# Substring matching would mistake a WRITE TO an allowlisted script for an
+# execution (iter55 grill-code 🔴). manifest unreadable => rc 1 => fail-closed.
+manifest_script_in() {
+  local cmd="$1" entry cls
+  [ -r "$SCRIPTS_MANIFEST" ] || return 1
+  while IFS=$'\t' read -r entry cls || [ -n "$entry" ]; do
+    case "$entry" in ''|\#*) continue ;; esac
+    case "$cls" in allow|ask) ;; *) continue ;; esac
+    case "$cmd" in
+      "$entry"|"$entry "*|"./$entry"|"./$entry "*|\
+      "python3 $entry"|"python3 $entry "*|"python $entry"|"python $entry "*|\
+      "bash $entry"|"bash $entry "*|"sh $entry"|"sh $entry "*)
+        return 0 ;;
+    esac
+  done < "$SCRIPTS_MANIFEST"
+  return 1
+}
+
+is_allowlisted() {
+  local cmd="$1"
+  # Reject if command contains chain operators.
+  if printf '%s' "$cmd" | grep -qE "$CHAIN_OPS"; then
+    return 1
+  fi
+  manifest_script_in "$cmd"
+}
+
+if [ -n "$CMD_SAFE" ] && is_allowlisted "$CMD_SAFE"; then
+  emit_allow
+  exit 0
+fi
+
+# --- Read-only command checks (reading runtime-state is not mutation) ---
+CHECK_CMD="$CMD_SAFE"
+READ_ONLY_STARTS='^(cat|head|tail|less|more|grep|egrep|fgrep|rg|find|ls|wc|diff|file|stat|md5sum|sha256sum) '
+WRITE_INDICATORS='(^|[^A-Za-z0-9_])sed\s+-i|>\s*[^&]|>>\s|(^|[^A-Za-z0-9_])(tee|cp|mv|chmod|rm|mkdir|touch|install|ln)\s|write_text|write_bytes|open\(.*[wax]|\.write\(|Path\(.*\.write|(unlink|remove|rename|truncate)[[:space:]]*\(|(^|[^A-Za-z0-9_])-(exec|execdir|ok|okdir|delete|fprint0?|fprintf|fls)($|[^A-Za-z0-9_])'
+
+# (a) single read-only command: no chain/redirect operators at all.
+if [ -n "$CHECK_CMD" ] && ! printf '%s' "$CHECK_CMD" | grep -qE "$CHAIN_OPS"; then
+  if printf '%s' "$CHECK_CMD" | grep -qE "$READ_ONLY_STARTS" && \
+     ! printf '%s' "$CHECK_CMD" | grep -qE "$WRITE_INDICATORS"; then
+    emit_allow
+    exit 0
+  fi
+fi
+
+# (b) read-only PIPELINE: a `|`-only pipe whose EVERY segment is independently
+# read-only. Only `|` is tolerated — ; & < > $() ` keep disqualifying.
+if [ -n "$CHECK_CMD" ] && printf '%s' "$CHECK_CMD" | grep -q '|' \
+   && ! printf '%s' "$CHECK_CMD" | grep -qE '[;&<>]|\$\(|`|\|\|'; then
+  READ_ONLY_SEG='^[[:space:]]*(cat|head|tail|less|more|grep|egrep|fgrep|rg|find|ls|wc|diff|file|stat|md5sum|sha256sum)([[:space:]]|$)'
+  pipe_all_ro=yes
+  # `|| [ -n "$_seg" ]` processes the FINAL segment too (tr leaves no trailing
+  # newline there — dropping it would fail OPEN on `| tee` / `| sh`).
+  while IFS= read -r _seg || [ -n "$_seg" ]; do
+    if ! printf '%s' "$_seg" | grep -qE "$READ_ONLY_SEG" \
+       || printf '%s' "$_seg" | grep -qE "$WRITE_INDICATORS"; then
+      pipe_all_ro=no
+      break
+    fi
+  done < <(printf '%s' "$CHECK_CMD" | tr '|' '\n')
+  if [ "$pipe_all_ro" = "yes" ]; then
+    emit_allow
+    exit 0
+  fi
+fi
+
+# --- Bare `git add <paths>` staging carve-out (OBS-017 catch-22) ---
+# Staging only records paths; it does not modify file CONTENT. ASK, not DENY.
+# Broad/forced flags (-A/--all/-f/--force) and any chain/redirect keep denying.
+is_bare_git_stage() {
+  local cmd="$1"
+  # Must be a git add/stage invocation (optionally `git -C <dir> add`).
+  printf '%s' "$cmd" | grep -qE \
+    '(^|[^A-Za-z0-9_])git[[:space:]]+(-C[[:space:]]+[^[:space:]]+[[:space:]]+)?(add|stage)([[:space:]]|$)' \
+    || return 1
+  # Reject any chain/redirect operator (same guard the allowlist uses).
+  if printf '%s' "$cmd" | grep -qE "$CHAIN_OPS"; then
+    return 1
+  fi
+  # Reject broad/forced staging flags. The short-cluster alt catches -A, -f and
+  # combinations (-Af, -vfA); the long forms are matched explicitly.
+  if printf '%s' "$cmd" | grep -qE \
+       '(^|[[:space:]])(--all|--force|-[A-Za-z]*[Af][A-Za-z]*)([[:space:]]|$)'; then
+    return 1
+  fi
+  return 0
+}
+
+if [ -n "$CMD_SAFE" ] && is_bare_git_stage "$CMD_SAFE"; then
+  emit_ask "[integrity] git add で runtime-state（docs/STATUS.md・.claude/ 設定類）を staging しようとしています。ファイル内容は変更しません（baseline コミット等の正当な操作の可能性）。意図を確認してください。なおファイル名を含まない形（例: git add docs/）ならこの確認は出ません。"
+  exit 0
+fi
+
+# Allowlisted script disqualified only by chaining — dedicated guidance
+# (iter55 gate-battle 6: prevents the "hook is flaky" misread).
+if [ -n "$CMD_SAFE" ] && manifest_script_in "$CMD_SAFE"; then
+  emit_deny "[integrity] このコマンドは許可済みスクリプト（scripts-manifest）を含みますが、チェーン/リダイレクト演算子（; && || | > \$() \`）付きの複合コマンドでは実行できません。パイプ等を外し、スクリプトを単体コマンドとして実行してください。"
+  exit 0
+fi
+
 # Default: deny. runtime-state referenced, not an authorized path.
 emit_deny "[integrity] runtime-state（docs/STATUS.md・.claude/ 設定類）へ書込みうる Bash コマンドは project work（task_type=${TASK_TYPE}）中はブロックされます。ゲート値は scripts/update-gate.sh、task_type/task_size は scripts/update-task.sh を単体で実行してください。読取りは cat/grep 等の単体コマンドなら許可されます。"
 exit 0

@@ -161,6 +161,77 @@ class TestUnlockFormDeny(unittest.TestCase):
         self.assertTrue(_allowed(out), out[:200])
 
 
+class TestAllowlistReadOnlyStage(unittest.TestCase):
+    """PORT-4〜7（旧 check-control-plane から移植）: manifest allowlist・
+    read-only 迂回・safe-stderr strip・bare git stage ask の契約維持。"""
+
+    @classmethod
+    def setUpClass(cls):
+        cls._tmp = _scratch_root()
+        cls.root = Path(cls._tmp.name)
+
+    @classmethod
+    def tearDownClass(cls):
+        cls._tmp.cleanup()
+
+    def test_manifest_script_with_status_arg_allowed(self):
+        for cmd in ("python3 scripts/check_status.py docs/STATUS.md",
+                    "./scripts/status_doctor.py docs/STATUS.md",
+                    "bash scripts/update-gate.sh review approve"):
+            with self.subTest(cmd=cmd):
+                self.assertTrue(_allowed(_hook(self.root, cmd)), cmd)
+
+    def test_manifest_script_chained_denied_with_guidance(self):
+        out = _hook(self.root,
+                    "python3 scripts/check_status.py docs/STATUS.md && rm -rf x")
+        self.assertTrue(_denied(out), out[:200])
+        self.assertIn("単体コマンド", out)
+
+    def test_missing_manifest_fail_closed(self):
+        with _scratch_root(include_manifest=False) as name:
+            root = Path(name)
+            out = _hook(root, "python3 scripts/check_status.py docs/STATUS.md")
+            self.assertTrue(_denied(out), out[:200])
+
+    def test_read_only_single_allowed(self):
+        for cmd in ("cat docs/STATUS.md", "grep -n phase docs/STATUS.md",
+                    "head -5 docs/STATUS.md", "wc -l docs/STATUS.md"):
+            with self.subTest(cmd=cmd):
+                self.assertTrue(_allowed(_hook(self.root, cmd)), cmd)
+
+    def test_read_only_with_safe_stderr_allowed(self):
+        for cmd in ("cat docs/STATUS.md 2>/dev/null",
+                    "grep -n phase docs/STATUS.md 2>&1"):
+            with self.subTest(cmd=cmd):
+                self.assertTrue(_allowed(_hook(self.root, cmd)), cmd)
+
+    def test_read_only_pipeline_allowed(self):
+        out = _hook(self.root, "grep -n phase docs/STATUS.md | head -3")
+        self.assertTrue(_allowed(out), out[:200])
+
+    def test_read_with_redirect_denied(self):
+        out = _hook(self.root, "cat docs/STATUS.md > /tmp/x")
+        self.assertTrue(_denied(out), out[:200])
+
+    def test_write_indicator_in_pipeline_denied(self):
+        out = _hook(self.root, "cat docs/STATUS.md | tee /tmp/x")
+        self.assertTrue(_denied(out), out[:200])
+
+    def test_git_stage_status_asks(self):
+        for cmd in ("git add docs/STATUS.md",
+                    "git add .claude/settings.local.json"):
+            with self.subTest(cmd=cmd):
+                out = _hook(self.root, cmd)
+                self.assertTrue(_asked(out), f"{cmd}: {out[:200]}")
+
+    def test_git_stage_forced_or_chained_denied(self):
+        for cmd in ("git add -f docs/STATUS.md",
+                    "git add docs/STATUS.md && git commit -m x"):
+            with self.subTest(cmd=cmd):
+                out = _hook(self.root, cmd)
+                self.assertTrue(_denied(out), f"{cmd}: {out[:200]}")
+
+
 class TestFrameworkAndFailClosed(unittest.TestCase):
     def test_framework_task_allows_everything(self):
         with _scratch_root(task_type="framework") as name:
