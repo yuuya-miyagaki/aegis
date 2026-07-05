@@ -3,29 +3,29 @@ framework: aegis
 framework_version: "1.19.0"
 project_name: "Aegis"
 mode: Dev
-phase: docs
+phase: plan
 task_type: framework
 task_size: M
-task_size_rationale: "iteration 58（framework・qa-browser 委譲プロンプト標準化・guidance のみ）= M。footprint は .claude/skills/qa-verification/SKILL.md（委譲ルール節を標準プロンプト雛形へ）＋tests/test_skill_guidance_tokens.py（load-bearing トークン pin）＋.claude/agents/qa.md（Browser QA 節を skill 参照へ縮約＝grill-plan 致命1: 委譲 guidance の単一正本化）の3ファイル＝M（2-5）。moat 非該当（skill guidance のみ・hook/判定コード不変）＝M framework は review+qa+security 必須・deploy 自動 exempt。"
-iteration: 58
+task_size_rationale: "iteration 59（framework・サブエージェント継続 SendMessage の SoT を routing.md に定義・guidance のみ）= M。footprint は .claude/rules/routing.md（継続定義追加＋principle 圧縮）＋scripts/context-budgets.json（routing.md budget 75→90・pinned ファイルへの正当追加の受容）＋tests/test_skill_guidance_tokens.py（継続定義の token pin）の3ファイル＝M（2-5）。moat 非該当（rule/skill guidance のみ・hook/判定コード不変）＝M framework は review+qa+security 必須・deploy 自動 exempt。"
+iteration: 59
 ui_surface: false
-last_updated: "2026-07-05T15:50:36Z"
+last_updated: "2026-07-05T16:22:59Z"
 gate_approvals:
   client_ready_for_dev: n/a
   brainstorm: approved
-  plan: approved
-  review: approved
-  qa: approved
-  security: approved
+  plan: pending
+  review: pending
+  qa: pending
+  security: pending
   deploy: pending
-  dev_ready_for_client: approved
+  dev_ready_for_client: pending
 current_refs:
   requirements: []
-  plan: docs/plans/2026-07-05-iter58-qa-browser-delegation-plan.md
-  spec: docs/specs/2026-07-05-iter58-qa-browser-delegation-design.md
-  review: docs/qa-reports/iter58-review.md
-  qa: docs/qa-reports/iter58-qa.md
-  security: docs/qa-reports/iter58-security.md
+  plan: null
+  spec: docs/specs/2026-07-06-iter59-subagent-continuation-sot-design.md
+  review: null
+  qa: null
+  security: null
   deploy: null
   translation: null
 external_evidence:
@@ -37,14 +37,10 @@ external_evidence:
     scope: "v0.13.0 計画 5 ラウンドレビュー"
     findings: "Round 1〜5 で計 25 件の指摘（hook 出力スキーマ陳腐化、TaskCreated/Completed 制御方式、Plan 条件付き許可、effort 配分、pre-compact.sh 同種破損、`if` 単一 rule 制約等）"
     resolution: "Rev.5 で全件反映、Phase 0a 即時実装着手 GO。hotfix/v0122-hook-schema ブランチで開始。"
-next_action: "**【iter58 docs 完了・全 dev ゲート approved・push 手前で停止】** ◆**現在地**: iter58/v1.19.0（qa-browser 委譲プロンプト標準化・guidance のみ）を brainstorm→plan（grill-plan 致命1「qa.md SoT 一本化」＋要検討1-5 反映）→implement(TDD・commit 8de3f8a)→grill-code(Critical/Major 0)→review(1次 approve・盲検2次 approve_with_notes・note1=SendMessage SoT 起票/note2-3=据置記録)→qa(B1 SKIP＋RED-first 代替実証・full 1050 passed)→security(1次 approve・盲検2次 approve・後退なし・deps🟡=依存ゼロ ack)→**deploy は M で exempt**→ship(v1.18→1.19・3箇所 bump・TO-CLIENT)→docs(LEARNINGS 3件)まで**全 dev ゲート approved**。実装=8de3f8a・ship/docs 成果は未コミット（evidence 5本・plan・version bump・TO-CLIENT・LEARNINGS）。 ◆**⚠ 次にやること（ここから再開）**: (1) dev_ready_for_client を承認済みなら **ship/docs をコミット**（8de3f8a に続く docs コミット）。(2) **push＝ユーザー確認待ちで停止中**（`gh auth switch --user yuuya-miyagaki` 後に push で iter58 クローズ→origin/main 更新）。 ◆**次イテレーション候補**: SendMessage 継続機構の SoT 定義（subagent-dev/routing.md へ1行・review 2次 note1・起票=TO-CLIENT/iter58-review.md）。 ◆**罠（iter41-58 で確立・必読）**: (a) gate 承認出力は **tail**（head は SIGPIPE で STATUS 書込み前中断）。(b) current_refs.<gate> は承認直前に設定（pending+ref は contract stale-ref FAIL）。(c) ref set→approve の間に record を挟むと stale-ref 赤＝set→approve を連続。(d) record-test-result は全コード編集後・**対象 gate ref を null にしてから**（full suite 内 contract テストの stale-ref 回避）。(e) judge `read_test_result` は **newest test-runner entry** で判定・observed は `marker_verified` 必須＝非クォート pytest を含む Bash が newest になると tests=unverified→record-test-result（src:manual）で再 record（外側 Bash は pytest 部をクォート＝strip で Q マスク）。(f) framework **焦点変更で未コミット追加実行行＋テストが hook を copy** なら本物の B1 drill 成立（混在 diff は skip）。(g) qa は **SECOND_OPINION_GATES（review/security）非対象**＝claims 付き QA レポートを ref にすれば 🟢。(h) **M は deploy 自動 exempt**（SIZE_ALLOWED_PHASES）。(i) task_type/size は update-task.sh のみ（raw Edit は tamper block）。(j) push は `gh auth switch --user yuuya-miyagaki`。(k) phase rollover(ship→brainstorm)は backward 遷移＝常時 allow。(l) B1 drill: 純コメントのみの追加ハンクは behavior-catching mutant 不能で coverage floor を割る→冗長コメントを除去し全ハンクを behavioral/text-coverable に整形（echo メッセージ変更は message を assert するテストで mutant 可）＝skip 回避。(m) full suite 実走中に suite 自身が spurious observed test-runner エントリ（vitest 等・marker false）を real evidence-log へ書く→record-test-result を suite 完走の**後**に置けば manual エントリが newest で勝つ。(n) `record-test-result.py` は command 引数を**実行して**合否記録＝実行可能な単一コマンド（`python3 -m pytest -q`・シェル機能不可）を渡す。説明文字列だと実行失敗で `red` が newest になり judge 🔴→正しいコマンドで再実行すれば green が newest で自己修復。(o) judge の 1次/2次相違は claims の**トップレベル `verdict:`（1次）**と `second_opinion.verdict`（2次）比較（build-judge-card:382）＝review/security レポートは両方明記して一致させる。docs-only review の tests=unverified🟡 は ack 可（test 実行は qa の領分）。(p) docs-only iteration の qa: `test-strength.drill` に `{\"skip\":true,\"reason\":...}`＝B1 SKIP。qa ref は claims 付き iter46-qa.md（test-strength.md は drill 再生成で claims 置けず）。(q) **size S は terminal=ship**（`SIZE_ALLOWED_PHASES[\"S\"]={brainstorm,implement,review,ship}`＝plan/qa/security/deploy/docs を含まない）。ship→docs の transition 検査は rc0 で通るが contract static 検査が『phase docs not allowed for size S』で FAIL→docs に遷移しない。S の LEARNINGS 更新・dev_ready_for_client 承認は **ship から**実施。必須ゲートは brainstorm+review のみ。 (r) **fingerprint は HEAD sha を混ぜ込む**（hooks/lib/fingerprint.sh＝新規未テストコミットが古い記録に一致する silent-green を防ぐ）＝green 記録は「記録時の HEAD」に束縛され、その後の**docs-only コミットでも HEAD が動けば次ゲートで tests=unverified🟡**。対処＝(a) 各ゲート承認の直前・そのゲート用の全コミット後に record-test-result、または (b) 連続ゲート（qa/security/deploy）でコードを変えないなら HEAD 固定のまま docs を未コミットで積み green を1回記録して一括承認・最後にまとめてコミット（iter57 実測・LEARNINGS conf9）。"
+next_action: "**【iter59 plan フェーズ・phase=plan・brainstorm approved・/clear 直後の再開点】** ◆**現在地**: iter58/v1.19.0 push 済クローズ（origin/main=78a2702）→ iter59 rollover 済（iteration=59・全 dev ゲート reset）→ brainstorm 完了・**ユーザー設計承認済**・brainstorm gate approved・task_size=M。テーマ＝サブエージェント継続（SendMessage）の SoT を **routing.md に定義**（guidance のみ・dangling 解消＝iter58 review 2次 note1）。設計正本: spec=docs/specs/2026-07-06-iter59-subagent-continuation-sot-design.md・record=同 -brainstorm-record.md。核心設計＝routing.md に「## Subagent continuation」節（SendMessage で停止サブエージェントを同一継続・運用 guidance・非強制・maxTurns/3-failure 有界）＋principle 1文化圧縮＋**context-budgets.json で routing.md budget 75→90（pinned ファイルへの正当追加の受容＝iter58 の bump 却下とは状況が違う: routing.md は agent roster が check_reference_drift #1 で drift-pin＝圧縮不能）**＋test で継続定義を token pin（iter58 の presence 保証教訓を反映）。qa-verification は不変（headroom 6 を守る）。 ◆**⚠ 次にやること（ここから再開）**: (1) writing-plans で実装計画を docs/plans/2026-07-06-iter59-subagent-continuation-sot-plan.md に作成（RED-first・routing.md 継続定義の実文言＋budget 90 の実測≤確認＋check_reference_drift #1 が agent roster を触らず PASS 維持を明記）。(2) grill-plan で spec+plan をグリル（2段グリル1段目・致命反映）。(3) current_refs.plan set→update-gate.sh plan approve（罠 b/c: set→approve 連続）。(4) implement（TDD）→grill-code→review（盲検2次）→qa（B1 SKIP・claims 付き iter59-qa.md・罠 g/p/d/m/n/r）→security（rule/skill guidance のみ＝moat 非該当だが M framework で必須・盲検2次）→**deploy は M で自動 exempt（罠 h）**→ship（**v1.19.0→v1.20.0**・contract＋STATUS テンプレ＋live STATUS の3箇所 bump・TO-CLIENT・LEARNINGS）→docs→dev_ready_for_client→**push 手前で停止**（push=gh auth switch --user yuuya-miyagaki）。 ◆**罠（iter41-59 で確立・必読）**: (a) gate 承認出力は **tail**（head は SIGPIPE で STATUS 書込み前中断）。(b) current_refs.<gate> は承認直前に設定（pending+ref は contract stale-ref FAIL）。(c) ref set→approve の間に record を挟むと stale-ref 赤＝set→approve を連続。(d) record-test-result は全コード編集後・**対象 gate ref を null にしてから**（full suite 内 contract テストの stale-ref 回避）。(e) judge `read_test_result` は **newest test-runner entry** で判定・observed は `marker_verified` 必須＝非クォート pytest を含む Bash が newest になると tests=unverified→record-test-result（src:manual）で再 record（外側 Bash は pytest 部をクォート＝strip で Q マスク）。(f) framework **焦点変更で未コミット追加実行行＋テストが hook を copy** なら本物の B1 drill 成立（混在 diff は skip）。(g) qa は **SECOND_OPINION_GATES（review/security）非対象**＝claims 付き QA レポートを ref にすれば 🟢。(h) **M は deploy 自動 exempt**（SIZE_ALLOWED_PHASES）。(i) task_type/size は update-task.sh のみ（raw Edit は tamper block）。(j) push は `gh auth switch --user yuuya-miyagaki`。(k) phase rollover(ship→brainstorm)は backward 遷移＝常時 allow。(l) B1 drill: 純コメントのみの追加ハンクは behavior-catching mutant 不能で coverage floor を割る→冗長コメントを除去し全ハンクを behavioral/text-coverable に整形（echo メッセージ変更は message を assert するテストで mutant 可）＝skip 回避。(m) full suite 実走中に suite 自身が spurious observed test-runner エントリ（vitest 等・marker false）を real evidence-log へ書く→record-test-result を suite 完走の**後**に置けば manual エントリが newest で勝つ。(n) `record-test-result.py` は command 引数を**実行して**合否記録＝実行可能な単一コマンド（`python3 -m pytest -q`・シェル機能不可）を渡す。説明文字列だと実行失敗で `red` が newest になり judge 🔴→正しいコマンドで再実行すれば green が newest で自己修復。(o) judge の 1次/2次相違は claims の**トップレベル `verdict:`（1次）**と `second_opinion.verdict`（2次）比較（build-judge-card:382）＝review/security レポートは両方明記して一致させる。docs-only review の tests=unverified🟡 は ack 可（test 実行は qa の領分）。(p) docs-only iteration の qa: `test-strength.drill` に `{\"skip\":true,\"reason\":...}`＝B1 SKIP。qa ref は claims 付き iter46-qa.md（test-strength.md は drill 再生成で claims 置けず）。(q) **size S は terminal=ship**（`SIZE_ALLOWED_PHASES[\"S\"]={brainstorm,implement,review,ship}`＝plan/qa/security/deploy/docs を含まない）。ship→docs の transition 検査は rc0 で通るが contract static 検査が『phase docs not allowed for size S』で FAIL→docs に遷移しない。S の LEARNINGS 更新・dev_ready_for_client 承認は **ship から**実施。必須ゲートは brainstorm+review のみ。 (r) **fingerprint は HEAD sha を混ぜ込む**（hooks/lib/fingerprint.sh＝新規未テストコミットが古い記録に一致する silent-green を防ぐ）＝green 記録は「記録時の HEAD」に束縛され、その後の**docs-only コミットでも HEAD が動けば次ゲートで tests=unverified🟡**。対処＝(a) 各ゲート承認の直前・そのゲート用の全コミット後に record-test-result、または (b) 連続ゲート（qa/security/deploy）でコードを変えないなら HEAD 固定のまま docs を未コミットで積み green を1回記録して一括承認・最後にまとめてコミット（iter57 実測・LEARNINGS conf9）。"
 blockers: []
 failure_tracking: null
 session_history:
-  - date: "2026-07-05"
-    mode: Dev
-    phase: "docs"
-    note: "iter56 / v1.17.0 全8ゲート approved・docs 完了（push 手前で停止）。M2 FB 6件＋可視性2件を1イテレーション一括実装（TDD）。brainstorm→plan（grill-plan 致命5件反映）→implement→grill-code（🔴1: broad-dot 境界をデリミタ列挙→否定クラス反転）→review（10並列ファインダー＋盲検2次 approve_with_notes・Major=qa ゲートで未記入 verdict 沈黙通過→1次 verdict 検証を全ゲート常時化で解消）→qa（B1 SKIP・RED-first 代替実証・full suite 1319→1322 passed）→security（盲検2次 Major=先頭ドットグロブ .en* の add-moat 純回帰を実 repo 実測で検出→グロブ節 \\.[^space]*[*?[] 追加で封鎖・commit ゲートは元々漏洩阻止・Low=verdict キー欠落の沈黙も可視化）→deploy（install 契約検証・外部デプロイなし）→ship（v1.16→1.17・LEARNINGS 蒸留2件・version 同期テストを single-owner 参照化で bump 毎手更新を撤廃）。全実装コミット未 push（push は gh auth switch 後・ユーザー確認待ち）。教訓核: moat 緩和は列挙でなく否定クラス＋グロブ展開考慮／値検査の fail-visible 保証は『どの分岐に置くか』で到達範囲が決まる（LEARNINGS conf9/conf8 追記）。"
   - date: "2026-07-05"
     mode: Dev
     phase: "docs"
@@ -53,6 +49,10 @@ session_history:
     mode: Dev
     phase: "docs"
     note: "iter58 / v1.19.0（qa-browser 委譲プロンプト標準化・guidance のみ）を全 dev ゲート approved まで完走（push 手前で停止）。plan（writing-plans）→grill-plan（致命1=qa.md の重複委譲 guidance が SoT を割る→qa.md を skill 参照へ縮約で解消／要検討1=長文完全一致 pin を短核2本へ／要検討3↔5=intro 圧縮で headroom 優先）→implement(TDD・commit 8de3f8a：委譲節を拘束5点雛形へ＋短核 token pin＋語数相殺 449/455)→grill-code(Critical/Major 0・🟢2=SendMessage 重複/`$B か`スペース・実測反証済)→review(1次 approve・盲検2次 approve_with_notes・note1=SendMessage 機構 SoT 未定義→次iter起票/note2=3-failure リンク据置/note3=[n/N done] 非pin 監視項目)→qa(B1 SKIP＝コミット済で working-tree 空・RED-first 代替実証: `最終報告を出さない`削除→FAIL・`SendMessage`全2箇所削除→FAIL・復元で緑・full 1050 passed)→security(1次 approve・盲検2次 approve・後退なし=moat/保護コード不変・secrets0・削除ブロックは存置チェックリストで被覆・browser 検査は qa-browser.md が正本・deps🟡=依存ゼロ ack)→deploy=M で自動 exempt→ship(v1.18→1.19・contract/STATUS テンプレ/live STATUS の3箇所 bump・TO-CLIENT)→docs(LEARNINGS 3件蒸留)。実装 commit=8de3f8a・ship/docs 成果は未コミット（push 前にまとめてコミット予定）。**教訓核**: (1) spurious cross-runner evidence は並走セッションだと record 後に着地して green を潰す→writer 非含スコープの最小 record で安定 green（trap m 拡張・LEARNINGS conf9）。(2) token pin は presence 保証＝重複トークンは単一削除で不発・RED 実証は全出現削除で（conf8）。(3) budget 逼迫下の guidance 追加は同一ファイル内の逐語重複除去で相殺（引き上げ=ラチェット違反・別ファイル圧縮=footprint 増を回避・conf7）。⚠ 実装中に別 Claude セッション（別 cwd prefix）の pytest が evidence-log を汚染＝メモリの『2セッション並走→静止監視必須』が実務で効いた。"
+  - date: "2026-07-06"
+    mode: Dev
+    phase: "plan"
+    note: "iter59 着手。iter58/v1.19.0 push 済クローズ（origin/main=78a2702）後に rollover（iteration=59・dev ゲート全 reset via update-gate.sh・phase docs→brainstorm 後方遷移・非 requirements refs null・task framework 継続）。テーマ＝サブエージェント継続（SendMessage）の SoT を routing.md に定義（iter58 review 2次 note1 の dangling 解消）。brainstorm 完了＝スコープは routing.md に「## Subagent continuation」節（SendMessage で停止サブエージェントを同一継続・運用 guidance・非強制・maxTurns/3-failure 有界）＋principle 圧縮＋context-budgets.json で routing.md budget 75→90＋test で継続定義 token pin。qa-verification 不変。**placement 探索の実測知見**: routing.md の agent roster は check_reference_drift #1 が agents/ と双方向 mirror で drift-pin＝圧縮不能→「圧縮して追加」不能を実測→ユーザー判断で budget 引き上げへ（iter58 の bump 却下とは状況が違う＝pinned への正当追加の受容）。ユーザー設計承認済・brainstorm gate approved・task_size=M。設計正本 docs/specs/2026-07-06-iter59-subagent-continuation-sot-{design,brainstorm-record}.md。次: /clear→writing-plans→grill-plan→plan approve→implement。"
 ---
 
 ## Summary
