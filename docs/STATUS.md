@@ -3,7 +3,7 @@ framework: aegis
 framework_version: "1.17.0"
 project_name: "Aegis"
 mode: Dev
-phase: qa
+phase: security
 task_type: framework
 task_size: L
 task_size_rationale: "iteration 57（framework・主 moat 交代）= L。footprint は hooks/check-control-plane.sh 削除＋hooks/lib/cp-lock.sh（verify 追加）＋hooks/session-start.sh＋新規 hooks/check-runtime-state.sh＋新規 hooks/explain-oslock-eacces.sh＋templates/hooks.template.json＋profiles＋scripts/check_framework_contract.py＋テスト置換多数（SF カタログ lock 下 EACCES 回帰・test_control_plane_* 群の 1対1 置換）＝6+ ファイル。moat の主機構交代そのもの＝全ゲート必須。"
@@ -15,7 +15,7 @@ gate_approvals:
   brainstorm: approved
   plan: approved
   review: approved
-  qa: pending
+  qa: approved
   security: pending
   deploy: pending
   dev_ready_for_client: pending
@@ -24,7 +24,7 @@ current_refs:
   plan: docs/plans/2026-07-05-iter57-oslock-promotion-plan.md
   spec: docs/specs/2026-07-05-iter57-oslock-promotion-design.md
   review: docs/qa-reports/iter57-review.md
-  qa: null
+  qa: docs/qa-reports/iter57-qa.md
   security: null
   deploy: null
   translation: null

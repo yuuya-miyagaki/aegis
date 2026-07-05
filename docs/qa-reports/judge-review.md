@@ -10,7 +10,7 @@
 - あり: approve_with_notes
 
 ## 💬 情報（非ブロッキング）
-- approve_with_notes の notes: Major 1（qa ゲートの未記入 verdict 沈黙通過）＋Minor 4 — 全件反映済み（1次 verdict 常時検証・budget 余白・残穴コメント・②(b) テスト・parity 集合一致）
+- approve_with_notes の notes: Minor 2（POC v162 の退役 hook 参照＝fail-open 誤報告／manifest 全数列挙テストの粒度低下）＋divergence 2（advisory=PostToolUseFailure の正しい精緻化・plan Task8 表記）— 全て fix-forward 反映済み（POC を OS-lock 検証へ書換・全数列挙テスト復元・spec 同期）
 
 ## あなたが取るアクション
 （LLM が平易日本語で記述）
