@@ -46,7 +46,10 @@ aegis_cp_lock() {
   while IFS= read -r p; do
     [ -n "$p" ] || continue
     # find -exec, not chmod -R (recurses under the hook sandbox; see header).
-    find "$p" -exec chmod a-w {} + 2>/dev/null || rc=1
+    # ! -type l (iter57): chmod FOLLOWS symlinks — locking through a link
+    # would chmod a REAL file OUTSIDE the CP (iter55 symlink-pierce lesson).
+    # A symlink entry itself has no meaningful mode; skip it entirely.
+    find "$p" ! -type l -exec chmod a-w {} + 2>/dev/null || rc=1
   done < <(aegis_cp_paths "$root")
   return "$rc"
 }
@@ -58,7 +61,8 @@ aegis_cp_unlock() {
   while IFS= read -r p; do
     [ -n "$p" ] || continue
     # find -exec, not chmod -R (recurses under the hook sandbox; see header).
-    find "$p" -exec chmod u+w {} + 2>/dev/null || rc=1
+    # ! -type l: same symlink-pierce guard as aegis_cp_lock.
+    find "$p" ! -type l -exec chmod u+w {} + 2>/dev/null || rc=1
   done < <(aegis_cp_paths "$root")
   return "$rc"
 }
@@ -88,4 +92,31 @@ aegis_cp_apply() {
     fi
     aegis_cp_lock "$root"
   fi
+}
+
+# aegis_cp_verify <root> <task_type> — full-enumeration check that the ACTUAL
+# FS state matches the EXPECTED lock state for task_type. Prints each
+# mismatching path (one per line) to stdout; rc 0 = consistent, 1 = mismatch
+# (or bad args). iter57 (moat promotion): the sentinel probe in aegis_cp_apply
+# is a cheap 1-point read used only to SKIP a redundant chmod; verify is the
+# promoted moat's fail-visible net — it walks every path. `-perm -u+w` is
+# POSIX (works on BSD/macOS and GNU find alike); GNU-only `-writable` is NOT
+# used. `! -type l`: a symlink's mode always reads 0777, so links would be
+# permanent false positives under lock; they are also never chmod'd (above).
+aegis_cp_verify() {
+  local root="$1" task_type="$2" p bad rc=0
+  [ -n "$root" ] || return 1
+  while IFS= read -r p; do
+    [ -n "$p" ] || continue
+    if [ "$task_type" = "framework" ]; then
+      bad=$(find "$p" ! -type l ! -perm -u+w 2>/dev/null)
+    else
+      bad=$(find "$p" ! -type l -perm -u+w 2>/dev/null)
+    fi
+    if [ -n "$bad" ]; then
+      printf '%s\n' "$bad"
+      rc=1
+    fi
+  done < <(aegis_cp_paths "$root")
+  return "$rc"
 }
