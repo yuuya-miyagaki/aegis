@@ -122,29 +122,35 @@ def _client_artifact_issues(root: Path) -> list[str]:
     return issues
 
 
-def _spec_delta_required(root: Path) -> bool:
-    """True when STATUS.md iteration > 1 (a prior cycle exists, so the client
-    must review what changed). iteration absent / non-integer / <=1 => False
-    (fail-open). Never raises. Value is stripped before the digit test so a
-    trailing space does not silently disable the check."""
+def _spec_delta_iteration(root: Path) -> int | None:
+    """STATUS.md iteration when > 1 (a prior cycle exists, so the client must
+    review what changed), else None. iteration absent / non-integer / <=1 =>
+    None (fail-open). Never raises. Value is stripped before the digit test so
+    a trailing space does not silently disable the check. iter56 ⑤: returns the
+    value (not just a bool) so the gate approval log can name the iteration."""
     status_path = root / "docs" / "STATUS.md"
     if not status_path.exists():
-        return False
+        return None
     try:
         fm = extract_frontmatter(status_path.read_text(encoding="utf-8"))
     except (OSError, UnicodeDecodeError):
-        return False
+        return None
     if not fm:
-        return False
+        return None
     it = extract_scalar_value(fm, "iteration")
     if it is None:
-        return False
+        return None
     it = it.strip()
     # isascii() guard: str.isdigit() is True for non-ASCII digits (e.g. "²"),
     # but int("²") raises. ascii + digit => [0-9]+ => int() is safe.
     if not (it.isascii() and it.isdigit()):
-        return False
-    return int(it) > 1
+        return None
+    value = int(it)
+    return value if value > 1 else None
+
+
+def _spec_delta_required(root: Path) -> bool:
+    return _spec_delta_iteration(root) is not None
 
 
 def _spec_delta_issues(root: Path) -> list[str]:
@@ -1020,6 +1026,11 @@ def check_gate_prerequisites(
             print("       （mapping.md の作り方は "
                   ".claude/skills/translation-mapping/SKILL.md）")
             return 1
+        # iter56 ⑤: required かつ合格時のみ肯定1行（対象外は無言のまま）。
+        # 出力のみの追加 — 判定ロジックは動かさない。
+        delta_iter = _spec_delta_iteration(root)
+        if delta_iter is not None:
+            print(f"[spec-delta] CHANGES.md 検査 OK（iteration={delta_iter}）")
         return 0
 
     # --- Phase order check ---

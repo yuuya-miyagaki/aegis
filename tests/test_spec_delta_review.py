@@ -147,6 +147,25 @@ class TestLaterIterationRequiresDelta(unittest.TestCase):
             self.assertEqual(rc, 0,
                 f"no-change valve must APPROVE. out=\n{out}")
 
+    def test_pass_emits_positive_line(self):
+        """iter56 ⑤: required かつ合格時は承認ログに肯定1行（M2: 合格が無言で
+        「検査が走って合格」と「対象外」を承認ログから区別できなかった）。"""
+        with tempfile.TemporaryDirectory() as td:
+            p = Path(td)
+            _make_project(p, 2, changes=_filled("spec-delta"))
+            rc, out = _pre_approve(p)
+            self.assertEqual(rc, 0, out)
+            self.assertIn("[spec-delta] CHANGES.md 検査 OK（iteration=2）", out)
+
+    def test_iteration1_stays_silent(self):
+        """対象外（iteration<=1）は現状どおり無言。"""
+        with tempfile.TemporaryDirectory() as td:
+            p = Path(td)
+            _make_project(p, 1, changes=None)
+            rc, out = _pre_approve(p)
+            self.assertEqual(rc, 0, out)
+            self.assertNotIn("[spec-delta]", out)
+
     def test_non_ascii_digit_iteration_failopen_no_crash(self):
         # iteration "²" (superscript): str.isdigit() is True but int() raises.
         # _spec_delta_required must fail-open (not required), not crash the gate.
