@@ -57,12 +57,28 @@ class TestTemplateTableParity(unittest.TestCase):
                 self.assertIn(template, CW, f"{template} が client-workflow に未記載")
 
 
-class TestQaBrowserDelegationGranularity(unittest.TestCase):
+class TestQaBrowserDelegation(unittest.TestCase):
+    """iter58: qa-browser 標準委譲プロンプトの load-bearing トークン pin。
+    完了拘束・再開プロトコルの核心命令が silent 消失したら FAIL（決定論トリップワイヤ）。
+    長文完全一致は正当な言い換えで false RED を招くため、短核トークンで pin する
+    （grill-plan 要検討1）。進捗形式 `[n/N done]`・エビデンス brace は軟らかい要素＝pin しない。"""
+
     def test_granularity_guidance_present(self):
         self.assertIn("5 項目程度", QA,
                       "qa-browser 委譲粒度ガイド（5 項目程度）が消えている")
         self.assertIn("19 項目", QA,
                       "委譲粒度の根拠（ドッグフード実測 19 項目で停止 3 回）が消えている")
+
+    def test_completion_constraint_present(self):
+        # 完全性の核＋報告抑制の核を短核で pin（長文完全一致は言い換えで false RED）。
+        self.assertIn("全項目のエビデンス", QA,
+                      "完了拘束の完全性（全項目のエビデンス充足）が消えている")
+        self.assertIn("最終報告を出さない", QA,
+                      "完了拘束の報告抑制（最終報告を出さない）が消えている")
+
+    def test_resume_protocol_present(self):
+        self.assertIn("SendMessage", QA,
+                      "再開プロトコル（SendMessage で同一エージェント継続）が消えている")
 
 
 class TestQaRefIsClaimsReport(unittest.TestCase):

@@ -36,19 +36,17 @@ color: cyan
 
 ## Browser QA (when ui_surface: true)
 
-When `STATUS.md` has `ui_surface: true`, delegate browser verification
-to the `qa-browser` agent. The qa-browser agent uses gstack `$B` (when
-available) for browser navigation, interaction, and diagnostics.
-When `$B` is unavailable, Playwright MCP is used as fallback.
-Include in the delegation:
-
-- which pages/states to verify
-- specific interactions to test
-- expected console/network behavior
+When `STATUS.md` has `ui_surface: true`, delegate browser verification to
+the `qa-browser` agent. Structure the delegation using the standard
+delegation prompt in the `qa-verification` skill ("qa-browser 委譲ルール":
+split into <=5 numbered items, withhold the final report until every item
+has evidence, and resume a stalled agent via SendMessage rather than
+re-delegating). qa-browser uses gstack `$B` when available, Playwright MCP
+otherwise.
 
 The qa-browser agent returns structured evidence (pass/fail results,
-screenshot paths, error listings) but does not write files.
-Incorporate the returned evidence into the QA report yourself.
+screenshot paths, error listings) but does not write files. Incorporate the
+returned evidence into the QA report yourself.
 
 ## Boundaries
 
