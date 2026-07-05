@@ -10,7 +10,7 @@
 - あり: approve_with_notes
 
 ## 💬 情報（非ブロッキング）
-- approve_with_notes の notes: Minor 2（POC v162 の退役 hook 参照＝fail-open 誤報告／manifest 全数列挙テストの粒度低下）＋divergence 2（advisory=PostToolUseFailure の正しい精緻化・plan Task8 表記）— 全て fix-forward 反映済み（POC を OS-lock 検証へ書換・全数列挙テスト復元・spec 同期）
+- approve_with_notes の notes: divergence 3件は全て軽微・非ブロッカー。note1(SendMessage の機構 SoT 未定義)=フォローアップ起票（別レイヤ改修＝スコープ分離）／note2(3-failure 未リンク)=qa 文脈で理解可・budget 逼迫のため本文追記せず本レポートに意図固定／note3([n/N done] 非pin)=false RED とのトレードオフで妥当・2次も現判断維持と評価・対応不要。仕様乖離/バグ/契約違反なし。
 
 ## あなたが取るアクション
 （LLM が平易日本語で記述）
