@@ -18,7 +18,7 @@ gate_approvals:
   qa: approved
   security: approved
   deploy: pending
-  dev_ready_for_client: pending
+  dev_ready_for_client: approved
 current_refs:
   requirements: []
   plan: docs/plans/2026-07-06-iter59-subagent-continuation-sot-plan.md
