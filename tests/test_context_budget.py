@@ -156,6 +156,20 @@ class TestRoutingExcludeAntiAbuse(unittest.TestCase):
             self.assertNotIn(prose, excluded,
                              f"prose '{prose}' が除外領域に混入＝budget 回避の濫用")
 
+    def test_only_routing_uses_exclude_markers(self):
+        # allowlist トリップワイヤ（grill-code 🟡）: 除外マーカーを使ってよい budget-target は
+        # routing.md のみ。除外機構は汎用（_strip_excluded は全 target に効く）だが濫用ガードは
+        # routing.md 特化ゆえ、新規 excluder は無ガードで bloat 隠しの穴になる。ここで FAIL させ
+        # 「専用の濫用ガードを付けてから allowlist を更新せよ」を機械強制する。iter_targets（skills/
+        # rules）に実 _EXCLUDE_RE を当てる（CLAUDE.md 等の非 target・マーカー言及は対象外）。
+        excluders = sorted(
+            str(p.relative_to(ROOT)) for p in context_budget.iter_targets(ROOT)
+            if context_budget._EXCLUDE_RE.search(p.read_text(encoding="utf-8")))
+        self.assertEqual(
+            excluders, [".claude/rules/routing.md"],
+            "budget-exclude マーカーは routing.md のみ許可。新 excluder は専用濫用ガードを "
+            f"追加してから allowlist を更新せよ: {excluders}")
+
 
 class TestRealRepo(unittest.TestCase):
     def test_real_repo_check_is_green(self):
