@@ -93,7 +93,7 @@ graph TD
 
 ## エラー処理
 
-- unmatched/nested マーカー → strip せず全語計数（fail-graceful・安全側＝bloat を隠さない）。
+- **unmatched** マーカー（start に対応する end が無い）→ 無マッチ＝strip せず全語計数（fail-graceful・安全側＝bloat を隠さない）。**nested は非対応**（非貪欲は first-start..first-end を strip＝nested pair は strip-safe でない・review 盲検2次 note1）＝マーカーは入れ子にしない。routing.md は単一領域（濫用ガードの `len==1` で担保）。
 - 濫用ガードテストが「除外領域 ≠ drift roster」を検出したら FAIL（bloat 隠し検知）。
 - budget 更新後 `context_budget.py` exit 0・`check_framework_contract`/`check_reference_drift` PASS を確認。
 

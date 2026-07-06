@@ -151,10 +151,19 @@ class TestRoutingExcludeAntiAbuse(unittest.TestCase):
         for a in agent_stems:
             self.assertIn(f"`{a}`", excluded,
                           f"drift roster の `{a}` が除外領域外＝除外が roster と不一致")
-        # (b) budget が測るべき prose は除外領域に無い（bloat 隠しの濫用防止）
-        for prose in ("SendMessage", "harness-enforced", "Principle"):
-            self.assertNotIn(prose, excluded,
-                             f"prose '{prose}' が除外領域に混入＝budget 回避の濫用")
+        # (b) 除外領域は roster 行のみ＝各行が backtick agent 名を含む行 or 既知 scaffold 行。
+        # review 盲検2次 note2: 「⊇ agent 名 ∧ ∌ 固定 sentinel」だけだと、sentinel を避けた自由
+        # prose を roster 領域に混ぜて budget を隠す濫用が素通りする。各行が roster 行であることを
+        # 強制し「除外領域 == roster」を真に担保する（agent 追加は行に backtick 名が入るので追従）。
+        scaffold = "Each agent's own file defines its domain."
+        for line in excluded.strip().splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            is_roster = line.startswith("Subagents:") or line == scaffold or any(
+                f"`{a}`" in line for a in agent_stems)
+            self.assertTrue(is_roster,
+                            f"除外領域に roster でない行が混入＝budget 隠しの濫用: {line!r}")
 
     def test_only_routing_uses_exclude_markers(self):
         # allowlist トリップワイヤ（grill-code 🟡）: 除外マーカーを使ってよい budget-target は

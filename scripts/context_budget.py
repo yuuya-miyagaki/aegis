@@ -25,8 +25,9 @@ def word_count(text: str) -> int:
 # Budget-exclude markers: content whose growth is governed by ANOTHER invariant
 # (e.g. the routing roster, drift-pinned to .claude/agents/) is wrapped in these
 # and excluded from the word count, so the budget measures bloat-prone free prose
-# only. Unmatched/nested markers strip nothing (fail-graceful = count everything,
-# never hide bloat). Non-greedy: a start with no matching end does not match.
+# only. An unmatched start (no matching end) matches nothing = counts everything
+# (fail-graceful, never hides bloat). Do NOT nest markers: the non-greedy match
+# runs first-start..first-end, so a nested pair is NOT strip-safe.
 _EXCLUDE_RE = re.compile(
     r"<!--\s*aegis:budget-exclude-start\s*-->.*?<!--\s*aegis:budget-exclude-end\s*-->",
     re.DOTALL,
