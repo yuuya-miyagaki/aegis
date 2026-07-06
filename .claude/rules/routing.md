@@ -6,10 +6,12 @@ Subagents only when they make work clearer/safer/smaller; else keep in session c
 
 ## Agents
 
+<!-- aegis:budget-exclude-start -->
 Subagents: `planner`, `implementer`, `reviewer`, `qa`, `security`, `ui`,
 `qa-browser`, `integration-specialist`, `translation-specialist`,
 `reviewer-testing`, `reviewer-performance`, `reviewer-maintainability`.
 Each agent's own file defines its domain.
+<!-- aegis:budget-exclude-end -->
 
 `brainstorm` runs in session context (live user dialogue), not as a subagent.
 `browser-assist` skill (`.claude/skills/browser-assist/SKILL.md`) is available to any agent needing browser automation.

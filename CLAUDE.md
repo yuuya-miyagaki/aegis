@@ -56,6 +56,7 @@ L0 `CLAUDE.md`+`STATUS.md` (always-on), L1 phase refs, L2 task files, L3 on-dema
 
 - Prefer repo files over chat history. Pull-based.
 - Summarize at phase transitions. Update `docs/STATUS.md` before pauses.
+- Budget counts bloat-prone prose; invariant-pinned structure may be `<!-- aegis:budget-exclude-start/end -->`-wrapped out of the count when a test pins region==content. See `scripts/context_budget.py`.
 
 ## Skills
 

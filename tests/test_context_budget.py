@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 import shutil
 import sys
 import tempfile
@@ -102,6 +103,58 @@ class TestRatchet(unittest.TestCase):
         self.assertEqual(data["budgets"][".claude/skills/foo/SKILL.md"], 999)
         self.assertEqual(data["budgets"][".claude/skills/bar/SKILL.md"], 55)
         self.assertIn("default_skill_words", data)
+
+
+class TestBudgetExclude(unittest.TestCase):
+    def setUp(self):
+        self.tmp = Path(tempfile.mkdtemp(prefix="aegis-ctxbudget-x-"))
+        self.addCleanup(shutil.rmtree, self.tmp, ignore_errors=True)
+
+    def test_excluded_region_not_counted(self):
+        # prose 10語 ＋ 除外領域(マーカー3+100+3=106語) → 計数=10（除外なしなら116）
+        body = ("w " * 10 + "\n<!-- aegis:budget-exclude-start -->\n"
+                + "x " * 100 + "\n<!-- aegis:budget-exclude-end -->\n")
+        p = Path(self.tmp) / ".claude" / "rules" / "r.md"
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_text(body, encoding="utf-8")
+        _registry(self.tmp, {"budgets": {".claude/rules/r.md": 20}})
+        self.assertEqual(context_budget.check(self.tmp), [])  # 10 ≤ 20
+
+    def test_unmatched_marker_counts_everything(self):
+        # start だけ（end 無し）→ strip せず全計数（fail-graceful・bloat を隠さない）
+        body = ("w " * 10 + "\n<!-- aegis:budget-exclude-start -->\n" + "x " * 100 + "\n")
+        p = Path(self.tmp) / ".claude" / "rules" / "r.md"
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_text(body, encoding="utf-8")
+        _registry(self.tmp, {"budgets": {".claude/rules/r.md": 20}})
+        failures = context_budget.check(self.tmp)
+        self.assertTrue(any("rules/r.md" in f for f in failures), failures)
+
+
+class TestRoutingExcludeAntiAbuse(unittest.TestCase):
+    """濫用ガード: routing.md の除外領域は drift 支配の roster のみ。任意 prose を
+    包んで budget を回避できないことを固定（除外領域 ⊇ 全 agent 名 かつ ⊉ 対象 prose）。"""
+
+    def test_excluded_is_drift_roster_not_prose(self):
+        routing = (ROOT / ".claude" / "rules" / "routing.md").read_text(encoding="utf-8")
+        regions = re.findall(
+            r"<!--\s*aegis:budget-exclude-start\s*-->(.*?)<!--\s*aegis:budget-exclude-end\s*-->",
+            routing, re.DOTALL)
+        # 多領域濫用の封鎖: routing.md の除外は roster ただ1つのみ（2つ目のマーカー対で
+        # prose を包む濫用を検知＝grill-plan 要検討2）。
+        self.assertEqual(len(regions), 1,
+                         f"routing.md の budget-exclude 領域は roster の1つのみであるべき（実際 {len(regions)} 個）")
+        excluded = regions[0]
+        # (a) drift 支配の全 agent（.claude/agents/*.md）が除外領域内（roster が除外対象）
+        agent_stems = sorted(p.stem for p in (ROOT / ".claude" / "agents").glob("*.md"))
+        self.assertTrue(agent_stems, "agents/ が空")
+        for a in agent_stems:
+            self.assertIn(f"`{a}`", excluded,
+                          f"drift roster の `{a}` が除外領域外＝除外が roster と不一致")
+        # (b) budget が測るべき prose は除外領域に無い（bloat 隠しの濫用防止）
+        for prose in ("SendMessage", "harness-enforced", "Principle"):
+            self.assertNotIn(prose, excluded,
+                             f"prose '{prose}' が除外領域に混入＝budget 回避の濫用")
 
 
 class TestRealRepo(unittest.TestCase):

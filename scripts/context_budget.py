@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import math
+import re
 import sys
 from pathlib import Path
 
@@ -19,6 +20,25 @@ DEFAULT_RULE_WORDS = 500
 
 def word_count(text: str) -> int:
     return len(text.split())
+
+
+# Budget-exclude markers: content whose growth is governed by ANOTHER invariant
+# (e.g. the routing roster, drift-pinned to .claude/agents/) is wrapped in these
+# and excluded from the word count, so the budget measures bloat-prone free prose
+# only. Unmatched/nested markers strip nothing (fail-graceful = count everything,
+# never hide bloat). Non-greedy: a start with no matching end does not match.
+_EXCLUDE_RE = re.compile(
+    r"<!--\s*aegis:budget-exclude-start\s*-->.*?<!--\s*aegis:budget-exclude-end\s*-->",
+    re.DOTALL,
+)
+
+
+def _strip_excluded(text: str) -> str:
+    return _EXCLUDE_RE.sub("", text)
+
+
+def _budget_word_count(text: str) -> int:
+    return word_count(_strip_excluded(text))
 
 
 def registry_path(root: Path) -> Path:
@@ -69,7 +89,7 @@ def check(root: Path = ROOT) -> list[str]:
     failures: list[str] = []
     for p in iter_targets(root):
         rel = str(p.relative_to(root))
-        count = word_count(p.read_text(encoding="utf-8"))
+        count = _budget_word_count(p.read_text(encoding="utf-8"))
         budget = budget_for(rel, data)
         if count > budget:
             failures.append(f"{rel} is too large: {count} words > {budget}")
@@ -85,7 +105,7 @@ def tighten(root: Path = ROOT) -> list[tuple[str, int]]:
     changed: list[tuple[str, int]] = []
     for p in iter_targets(root):
         rel = str(p.relative_to(root))
-        count = word_count(p.read_text(encoding="utf-8"))
+        count = _budget_word_count(p.read_text(encoding="utf-8"))
         if rel not in budgets or count < budgets[rel]:
             budgets[rel] = count
             changed.append((rel, count))
@@ -106,7 +126,7 @@ def seed(root: Path = ROOT, headroom: float = 1.1) -> list[tuple[str, int]]:
         rel = str(p.relative_to(root))
         if rel in budgets:
             continue
-        count = word_count(p.read_text(encoding="utf-8"))
+        count = _budget_word_count(p.read_text(encoding="utf-8"))
         # round() first: float math like 50 * 1.1 == 55.00000000000001 would
         # otherwise ceil to 56. We want the intended +10%, not float noise.
         budgets[rel] = math.ceil(round(count * headroom, 6))
