@@ -3,7 +3,7 @@ framework: aegis
 framework_version: "1.20.0"
 project_name: "Aegis"
 mode: Dev
-phase: brainstorm
+phase: implement
 task_type: framework
 task_size: M
 task_size_rationale: "iteration 60（framework・budget ratchet policy 見直し＝drift 支配構造の計数除外）= M。footprint は scripts/context_budget.py（_strip_excluded 除外ロジック）＋.claude/rules/routing.md（roster を budget-exclude マーカーで囲む）＋scripts/context-budgets.json（routing.md 90→70）＋tests/test_context_budget.py（除外＋濫用ガード）＋CLAUDE.md（Context Budget Policy 節）の5ファイル＝M（2-5）。moat 非該当（計数ロジック＋guidance・hook/判定/enforcement コード不変）＝M framework は review+qa+security 必須・deploy 自動 exempt。"
@@ -13,7 +13,7 @@ last_updated: "2026-07-06T00:00:00Z"
 gate_approvals:
   client_ready_for_dev: n/a
   brainstorm: approved
-  plan: pending
+  plan: approved
   review: pending
   qa: pending
   security: pending
@@ -21,7 +21,7 @@ gate_approvals:
   dev_ready_for_client: pending
 current_refs:
   requirements: []
-  plan: null
+  plan: docs/plans/2026-07-06-iter60-budget-exclusion-plan.md
   spec: docs/specs/2026-07-06-iter60-budget-exclusion-design.md
   review: null
   qa: null

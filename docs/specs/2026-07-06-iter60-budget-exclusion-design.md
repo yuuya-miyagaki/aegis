@@ -42,8 +42,10 @@ budget の計数を「**別 invariant が支配する drift-pin 済構造を除�
    unmatched は fail-graceful で全語計数）。(b) **濫用ガード**: `routing.md` の除外領域が **`check_reference_drift #1` が
    支配する roster と一致**することを assert（＝任意 prose を包んで budget を回避できない）。
 5. **`CLAUDE.md`（改修・「## Context Budget Policy」節）**: policy を明文化＝「budget は bloat しうる自由 prose を測る／
-   drift 等**別 invariant が pin 済の構造は除外可（テストで裏打ち必須）**／除外対象を持たない floor は floor-0 が
-   正当 signal＝genuine prose 追加時は co-bump（iter59 規則）」。CLAUDE.md は budget 対象外（targets は skills/rules のみ）。
+   drift 等**別 invariant が pin 済の構造は除外可（テストで裏打ち必須）**」の**terse 1行**＋詳細は `context_budget.py` へ
+   ポインタ。**⚠ 実装時訂正**: CLAUDE.md は context_budget レジストリの対象外だが、`check_framework_contract.py` の
+   `MAX_CLAUDE_WORDS=650` で**別途 kernel budget が強制される**（当初「対象外＝無制約」は誤り・baseline 618/650・headroom 32）。
+   よって policy は verbose 2項でなく terse 1行（~23語）に収める。floor co-bump（iter59 規則）は LEARNINGS 既載ゆえ CLAUDE.md では再掲せず。
 
 ## 濫用ガード（最重要・非自明）
 
