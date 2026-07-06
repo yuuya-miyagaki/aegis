@@ -128,8 +128,12 @@ class TestSubagentContinuationSoT(unittest.TestCase):
                       "サブエージェント継続機構（SendMessage）の定義が routing.md から消えている")
 
     def test_continuation_is_guidance_not_enforced(self):
-        self.assertIn("harness-enforced", ROUTING,
-                      "継続が guidance（非ハーネス強制・maxTurns/3-failure で有界）である旨が消えている")
+        # 否定語 "not" を含む句で pin する（review 盲検2次）。単トークン
+        # "harness-enforced" だと "not" 脱落による意味反転（guidance→強制の主張）を
+        # presence-pin がすり抜ける（false-PASS）。"not harness-enforced" 句で
+        # 節削除と "not" 反転の両方を捕捉する。
+        self.assertIn("not harness-enforced", ROUTING,
+                      "継続が guidance（非ハーネス強制・maxTurns/3-failure で有界）である旨が消えた/反転している")
 
 
 if __name__ == "__main__":
