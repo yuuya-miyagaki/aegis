@@ -18,7 +18,7 @@
     ".claude/skills/translation-mapping/SKILL.md": 142,
     ".claude/skills/uat/SKILL.md": 200,
     ".claude/skills/user-manual/SKILL.md": 175,
-    ".claude/rules/routing.md": 75,
+    ".claude/rules/routing.md": 90,
     ".claude/rules/state-machine.md": 290
   },
   "default_skill_words": 1500,

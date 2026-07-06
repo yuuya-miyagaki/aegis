@@ -16,6 +16,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 CW = (ROOT / ".claude" / "skills" / "client-workflow" / "SKILL.md").read_text(encoding="utf-8")
 QA = (ROOT / ".claude" / "skills" / "qa-verification" / "SKILL.md").read_text(encoding="utf-8")
+ROUTING = (ROOT / ".claude" / "rules" / "routing.md").read_text(encoding="utf-8")
 
 _spec = importlib.util.spec_from_file_location(
     "atm", ROOT / "scripts" / "_artifact_template_map.py")
@@ -113,6 +114,22 @@ class TestSharedMutableResourceRule(unittest.TestCase):
                       "並列規則の共有可変資源ルール（M2: テスト DB 衝突）が消えている")
         self.assertIn("同時に起動する1バッチ", sd,
                       "integration 実行タスクの同時1体運用（バッチ定義込み）が消えている")
+
+
+class TestSubagentContinuationSoT(unittest.TestCase):
+    """iter59: routing.md が SendMessage 継続の単一正本（SoT）。iter58 review 2次
+    note1 の dangling（機構定義が正本ファイルに無い）を解消。load-bearing 核＝機構名
+    SendMessage ＋ 非強制性 harness-enforced を短核 token pin。両トークンとも routing.md
+    内で一意ゆえ単一削除で RED（iter58 の presence 保証教訓・重複は不発の反省を反映）。
+    長文完全一致は正当な言い換えで false RED を招くため避ける。"""
+
+    def test_continuation_mechanism_present(self):
+        self.assertIn("SendMessage", ROUTING,
+                      "サブエージェント継続機構（SendMessage）の定義が routing.md から消えている")
+
+    def test_continuation_is_guidance_not_enforced(self):
+        self.assertIn("harness-enforced", ROUTING,
+                      "継続が guidance（非ハーネス強制・maxTurns/3-failure で有界）である旨が消えている")
 
 
 if __name__ == "__main__":
