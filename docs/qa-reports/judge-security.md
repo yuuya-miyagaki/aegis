@@ -15,10 +15,10 @@
 - 依存監査が未検証
 
 ## 💬 情報（非ブロッキング）
-- approve_with_notes の notes: 独立文脈・read-only 拘束委譲での盲検2次。既存 enforcement 弱体化ゼロ（追加のみ・fail-closed source と byte-identity fallback 無傷・REGEX/WARN 24=24 index 整合・sed 注入と phantom-regression 遮断を実証）。Major-1（fd redirect stash）/Major-2（巨大 snapshot で session-start ハング＝brick 不可条件違反・119s実測）/Minor-3（フラグ先行 force checkout）を検出→全件 ship 前 fix-forward 済み・residual なし。secrets 0・外部依存追加なし・pure bash 維持。
+- approve_with_notes — notes の解消状況を確認
 
 ## あなたが取るアクション
 （LLM が平易日本語で記述）
 
 ## ACK
-- 依存宣言ファイルなし（pure bash・外部依存ゼロ）＝依存監査は非該当。secrets 0・moat 後退ゼロは1次/盲検2次とも確認済み。full-review R10 F6 でこの恒久 🟡 の info 降格を iter 候補に起票済み。 （2026-07-07 14:09）
+- deps監査: 依存パッケージ変更ゼロ（diffはmd/json/pytestのみ・package管理ファイル無変更）＝iter59/61と同じ🟡 ack前例。approve_with_notesのnotes解消: Major-1 pycキャッシュ汚染はtouch+full suite再実走recorded greenでship前解消済（恒久対策はPhase 1-5起票・レポート記録済）・Minor-1 git switch/Minor-2 assigned pathはresidual受容＋別テーマ起票をレポートに記録済 （2026-07-07 18:40）

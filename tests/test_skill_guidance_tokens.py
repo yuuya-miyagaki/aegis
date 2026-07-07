@@ -17,6 +17,9 @@ ROOT = Path(__file__).resolve().parents[1]
 CW = (ROOT / ".claude" / "skills" / "client-workflow" / "SKILL.md").read_text(encoding="utf-8")
 QA = (ROOT / ".claude" / "skills" / "qa-verification" / "SKILL.md").read_text(encoding="utf-8")
 ROUTING = (ROOT / ".claude" / "rules" / "routing.md").read_text(encoding="utf-8")
+RG = (ROOT / ".claude" / "skills" / "aegis-review-gate" / "SKILL.md").read_text(encoding="utf-8")
+SG = (ROOT / ".claude" / "skills" / "aegis-security-gate" / "SKILL.md").read_text(encoding="utf-8")
+SD = (ROOT / ".claude" / "skills" / "subagent-dev" / "SKILL.md").read_text(encoding="utf-8")
 
 _spec = importlib.util.spec_from_file_location(
     "atm", ROOT / "scripts" / "_artifact_template_map.py")
@@ -108,11 +111,9 @@ class TestSharedMutableResourceRule(unittest.TestCase):
     同一テスト DB を TRUNCATE し合い偽 fail）。"""
 
     def test_shared_resource_rule_present(self):
-        sd = (ROOT / ".claude" / "skills" / "subagent-dev" / "SKILL.md"
-              ).read_text(encoding="utf-8")
-        self.assertIn("共有可変資源", sd,
+        self.assertIn("共有可変資源", SD,
                       "並列規則の共有可変資源ルール（M2: テスト DB 衝突）が消えている")
-        self.assertIn("同時に起動する1バッチ", sd,
+        self.assertIn("同時に起動する1バッチ", SD,
                       "integration 実行タスクの同時1体運用（バッチ定義込み）が消えている")
 
 
@@ -134,6 +135,76 @@ class TestSubagentContinuationSoT(unittest.TestCase):
         # 節削除と "not" 反転の両方を捕捉する。
         self.assertIn("not harness-enforced", ROUTING,
                       "継続が guidance（非ハーネス強制・maxTurns/3-failure で有界）である旨が消えた/反転している")
+
+
+class TestVerificationDelegationSoT(unittest.TestCase):
+    """iter62: 検証系委譲の標準拘束雛形（全体レビュー R1 文言層）。routing.md が単一正本
+    （6拘束・6点目 read-only は無条件）、qa-verification／aegis-review-gate／
+    aegis-security-gate／subagent-dev の4経路が参照。iter60 事故（security 盲検2次の
+    `git checkout docs/*` が親の未コミット gate 簿記を revert）の文言層防御＝
+    機械層(patterns.sh)・復旧層(snapshot 退行ガード)は iter61 で封鎖済み。
+    短核 token pin（長文完全一致は言い換えで false RED）＋否定句 pin（iter59: 単トークン
+    だと NOT 脱落の意味反転を false-PASS）＋一意 count==1（単一削除・重複増殖の両方で RED）。
+    正本節の拘束3は SendMessage の語を意図的に使わない（TestSubagentContinuationSoT の
+    routing.md 内一意性〔単一削除で RED〕を保全するため。grill-plan 要検討2）。"""
+
+    def test_sot_section_present_and_unique(self):
+        self.assertEqual(
+            ROUTING.count("## Verification delegation"), 1,
+            "検証系委譲拘束の単一正本節が routing.md に1つだけ存在すべき（消失/重複）")
+
+    def test_readonly_negation_phrase_present(self):
+        # 否定句で pin（"NOT" 脱落による read-only→書込み許可の意味反転を捕捉）。
+        self.assertIn("MUST NOT modify existing files", ROUTING,
+                      "6点目 read-only の禁止句（MUST NOT modify existing files）が消えた/反転している")
+        # 盲検2次 Minor-1: 6点目には否定が2つある（ファイル変更禁止・git コマンド実行禁止）。
+        # 後半の "MUST NOT run" だけを "may run" 等へ反転させると、列挙 token
+        # （checkout/...）と前半句を温存したまま iter60 事故そのものの許可文に
+        # silent 変異するため、第2否定も独立に pin する。
+        self.assertIn("MUST NOT run", ROUTING,
+                      "6点目の git コマンド禁止句（MUST NOT run）が消えた/反転している")
+
+    def test_banned_git_commands_enumerated(self):
+        # 連結 token で pin（1コマンド脱落でも RED）。iter60 事故は checkout、iter61 機械層は
+        # restore/stash も封鎖済み＝文言層は同じ集合＋reset/clean を列挙する。
+        self.assertEqual(
+            ROUTING.count("checkout/restore/reset/clean/stash"), 1,
+            "禁止 git コマンド列挙（checkout/restore/reset/clean/stash）が消えた/欠けた/重複した")
+
+    def test_dirty_tree_protocol_present(self):
+        self.assertIn("stop, report, do not touch it", ROUTING,
+                      "tree 汚染時の停止・報告・自己復旧禁止プロトコルが消えている")
+
+    def test_readonly_is_unconditional(self):
+        self.assertIn("6 is unconditional", ROUTING,
+                      "6点目 read-only の無条件適用宣言が消えている（1-5 は itemized 作業向け）")
+
+    def test_consumers_reference_sot(self):
+        # 4経路すべてが正本節名を参照する（正本改名・節削除・参照落ちの両側検知）。
+        for name, text in (("qa-verification", QA), ("aegis-review-gate", RG),
+                           ("aegis-security-gate", SG), ("subagent-dev", SD)):
+            with self.subTest(consumer=name):
+                self.assertIn("Verification delegation", text,
+                              f"{name} から委譲拘束 SoT への参照が消えている")
+
+    def test_consumers_carry_readonly_core(self):
+        # 参照だけでなく read-only 核（tree 変更禁止）を委譲文言側にも保持する
+        # （iter60: 参照先を読まない subagent には届かない＝核はインライン必須）。
+        for name, text in (("qa-verification", QA), ("aegis-review-gate", RG),
+                           ("aegis-security-gate", SG), ("subagent-dev", SD)):
+            with self.subTest(consumer=name):
+                self.assertIn("tree 変更禁止", text,
+                              f"{name} の委譲文言から read-only 核（tree 変更禁止）が消えている")
+
+    def test_sendmessage_stays_unique_in_routing(self):
+        # docstring の「拘束3は SendMessage の語を使わない」を機械強制する（iter62 review
+        # 1次 verify で CONFIRMED のギャップ）。iter59 pin（test_continuation_mechanism_present）
+        # は assertIn のため2つ目の SendMessage 追加では緑のまま＝docstring が根拠にする
+        # 一意性〔単一削除で RED〕が silent 崩壊する。count==1 で増殖・削除の両方を捕捉。
+        self.assertEqual(
+            ROUTING.count("SendMessage"), 1,
+            "routing.md の SendMessage は Subagent continuation 節の1回のみであるべき"
+            "（増殖は iter59 pin の単一削除検知を無効化・消失は継続機構定義の喪失）")
 
 
 if __name__ == "__main__":

@@ -10,7 +10,7 @@
     ".claude/skills/docs-sync/SKILL.md": 135,
     ".claude/skills/integration-assist/SKILL.md": 285,
     ".claude/skills/maintenance/SKILL.md": 241,
-    ".claude/skills/qa-verification/SKILL.md": 455,
+    ".claude/skills/qa-verification/SKILL.md": 459,
     ".claude/skills/session-recovery/SKILL.md": 336,
     ".claude/skills/ship-and-docs/SKILL.md": 405,
     ".claude/skills/subagent-dev/SKILL.md": 442,
@@ -18,7 +18,7 @@
     ".claude/skills/translation-mapping/SKILL.md": 142,
     ".claude/skills/uat/SKILL.md": 200,
     ".claude/skills/user-manual/SKILL.md": 175,
-    ".claude/rules/routing.md": 70,
+    ".claude/rules/routing.md": 181,
     ".claude/rules/state-machine.md": 290
   },
   "default_skill_words": 1500,

@@ -1,60 +1,39 @@
 {
-  "test_command": "python3 -m pytest tests/test_check_destructive_coverage.py tests/test_snapshot_writers.py tests/test_destructive_warning_language.py -q",
-  "timeout_seconds": 240,
+  "test_command": "python3 -m pytest tests/test_skill_guidance_tokens.py tests/test_context_budget.py -q",
+  "timeout_seconds": 120,
   "mutants": [
-    {
-      "file": "hooks/lib/patterns.sh",
-      "line": 37,
-      "original": "  'git\\s+(-C\\s+\\S+\\s+)?checkout\\s+([^-][^;&|[:space:]]*)?([*?]|/($|[[:space:];&|]))'",
-      "mutated": "  'git\\s+(-C\\s+\\S+\\s+)?checkout\\s+([^-][^;&|[:space:]]*)?([%]|/($|[[:space:];&|]))'"
-    },
-    {
-      "file": "hooks/lib/patterns.sh",
-      "line": 67,
-      "original": "  \"破壊的: git stash drop/clear は退避済みの変更を削除します（復元できません）。\"",
-      "mutated": "  \"destructive: stash drop/clear deletes stashed changes.\""
-    },
-    {
-      "file": "hooks/lib/snapshot.sh",
-      "line": 80,
-      "original": "      *\"${nl}  ${gate}: pending\"*) return 0 ;;",
-      "mutated": "      *\"${nl}  ${gate}: neverneverx\"*) return 0 ;;"
-    },
-    {
-      "file": "hooks/session-start.sh",
-      "line": 41,
-      "original": "SNAPSHOT_REGRESSION_WARNING=\"\"",
-      "mutated": "SNAPSHOT_REGRESSION_WARNING=\"復旧アンカーとして温存\""
-    },
-    {
-      "file": "hooks/session-start.sh",
-      "line": 44,
-      "original": "     && aegis_snapshot_gate_regression \"$ROOT\"; then",
-      "mutated": "     && false; then"
-    },
-    {
-      "file": "hooks/session-start.sh",
-      "line": 103,
-      "original": "  CONTEXT=\"${CONTEXT} | ${SNAPSHOT_REGRESSION_WARNING}\"",
-      "mutated": "  CONTEXT=\"${CONTEXT}\""
-    },
-    {
-      "file": "tests/test_check_destructive_coverage.py",
-      "line": 54,
-      "original": "        \"git checkout docs/*\",                        # the iter60 incident command",
-      "mutated": "        \"git checkout docs123\",                        # the iter60 incident command"
-    },
-    {
-      "file": "tests/test_destructive_warning_language.py",
-      "line": 82,
-      "original": "        self.assertEqual(len(warns), 24, \"expected 24 CMD warnings\")  # iter61: +8 tree-revert forms",
-      "mutated": "        self.assertEqual(len(warns), 23, \"expected 23 CMD warnings\")  # iter61: +8 tree-revert forms"
-    },
-    {
-      "file": "tests/test_snapshot_writers.py",
-      "line": 138,
-      "original": "                    \"  brainstorm: approved\", \"  brainstorm: pending\"",
-      "mutated": "                    \"  brainstorm: approved\", \"  brainstorm: approved\""
-    }
+    {"file": ".claude/rules/routing.md", "line": 35,
+     "original": "6. Read-only: MUST NOT modify existing files, MUST NOT run",
+     "mutated": "6. Read-only: MUST NOT modify existing files, may run"},
+    {"file": ".claude/skills/aegis-review-gate/SKILL.md", "line": 81,
+     "original": "委譲プロンプトには routing.md「Verification delegation」の6拘束を必ず含める（核＝read-only: tree 変更禁止・`git checkout/restore/reset/clean/stash` 禁止）。",
+     "mutated": "委譲プロンプトには routing.md「Verification delegation」の6拘束を必ず含める（核＝read-only: tree 変更可・`git checkout/restore/reset/clean/stash` 禁止）。"},
+    {"file": ".claude/skills/aegis-security-gate/SKILL.md", "line": 72,
+     "original": "委譲プロンプトには routing.md「Verification delegation」の6拘束を必ず含める（核＝read-only: tree 変更禁止・`git checkout/restore/reset/clean/stash` 禁止）。",
+     "mutated": "委譲プロンプトには routing.md「Verification delegatio」の6拘束を必ず含める（核＝read-only: tree 変更禁止・`git checkout/restore/reset/clean/stash` 禁止）。"},
+    {"file": ".claude/skills/qa-verification/SKILL.md", "line": 65,
+     "original": "6. **read-only**: tree 変更禁止＝既存ファイル編集・`git checkout/restore/reset/clean/stash` 実行禁止。書込みは指定パスへの新規 evidence 成果物のみ。汚れたら停止して報告し、自己復旧しない。正本: routing.md「Verification delegation」。",
+     "mutated": "6. **read-only**: tree 変更許可＝既存ファイル編集・`git checkout/restore/reset/clean/stash` 実行禁止。書込みは指定パスへの新規 evidence 成果物のみ。汚れたら停止して報告し、自己復旧しない。正本: routing.md「Verification delegation」。"},
+    {"file": ".claude/skills/subagent-dev/SKILL.md", "line": 25,
+     "original": "5. **レビュー/検証系サブエージェント**（Step 3/3.5/4 の reviewer 系）の委譲プロンプトには routing.md「Verification delegation」の6拘束（核＝read-only・tree 変更禁止）を含める",
+     "mutated": "5. **レビュー/検証系サブエージェント**（Step 3/3.5/4 の reviewer 系）の委譲プロンプトには routing.md「Verification delegation」の6拘束（核＝read-only・tree 変更自由）を含める"},
+    {"file": "scripts/context-budgets.json", "line": 13,
+     "original": "    \".claude/skills/qa-verification/SKILL.md\": 459,",
+     "mutated": "    \".claude/skills/qa-verification/SKILL.md\": 100,"},
+    {"file": "scripts/context-budgets.json", "line": 21,
+     "original": "    \".claude/rules/routing.md\": 181,",
+     "mutated": "    \".claude/rules/routing.md\": 100,"},
+    {"file": "tests/test_skill_guidance_tokens.py", "line": 20,
+     "original": "RG = (ROOT / \".claude\" / \"skills\" / \"aegis-review-gate\" / \"SKILL.md\").read_text(encoding=\"utf-8\")",
+     "mutated": "RG = (ROOT / \".claude\" / \"skills\" / \"aegis-review-gatex\" / \"SKILL.md\").read_text(encoding=\"utf-8\")"},
+    {"file": "tests/test_skill_guidance_tokens.py", "line": 114,
+     "original": "        self.assertIn(\"共有可変資源\", SD,",
+     "mutated": "        self.assertNotIn(\"共有可変資源\", SD,"},
+    {"file": "tests/test_skill_guidance_tokens.py", "line": 116,
+     "original": "        self.assertIn(\"同時に起動する1バッチ\", SD,",
+     "mutated": "        self.assertNotIn(\"同時に起動する1バッチ\", SD,"},
+    {"file": "tests/test_skill_guidance_tokens.py", "line": 153,
+     "original": "            ROUTING.count(\"## Verification delegation\"), 1,",
+     "mutated": "            ROUTING.count(\"## Verification delegation\"), 2,"}
   ]
 }

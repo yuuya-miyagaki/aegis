@@ -20,3 +20,19 @@ Each agent's own file defines its domain.
 
 Resume a stalled subagent via SendMessage (same agent, context preserved), not a fresh re-dispatch.
 Guidance, not harness-enforced; bounded by each agent's `maxTurns` and the 3-failure rule.
+
+## Verification delegation
+
+Standard constraints for every verification dispatch (review first and
+blind-second, security, qa, qa-browser, specialist reviewers). Carry them in
+the delegation prompt. 1-5 apply as written to itemized work; 6 is unconditional.
+
+1. Split: bounded batch, numbered items.
+2. Completion: no final report until every item has evidence; partial is never final.
+3. Resume: continue the same agent (see Subagent continuation).
+4. Progress: report per item.
+5. Evidence: per item {action, expected, observed, verdict}.
+6. Read-only: MUST NOT modify existing files, MUST NOT run
+   git checkout/restore/reset/clean/stash; the only allowed writes are new
+   evidence artifacts on the assigned path. If the tree gets dirty:
+   stop, report, do not touch it.

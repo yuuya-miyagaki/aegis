@@ -69,5 +69,7 @@ second_opinion:
   divergence_points: ["..."]
 ```
 
+委譲プロンプトには routing.md「Verification delegation」の6拘束を必ず含める（核＝read-only: tree 変更禁止・`git checkout/restore/reset/clean/stash` 禁止）。
+
 注: ハーネスは2次の存在と相違のみ強制でき、実走/盲検は検証できない（カードで
 self-attested と明示される）。形式的に書かず、実際に独立レビューを回すこと。

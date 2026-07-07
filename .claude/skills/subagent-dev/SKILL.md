@@ -22,6 +22,7 @@ user-invocable: false
    ではなく、そのタスクのセクションのみ）
 3. 各タスクの完了後、**2 段階レビュー** を実施する
 4. 両方のレビューが合格してからタスクを完了マークする
+5. **レビュー/検証系サブエージェント**（Step 3/3.5/4 の reviewer 系）の委譲プロンプトには routing.md「Verification delegation」の6拘束（核＝read-only・tree 変更禁止）を含める
 
 ## プロセス
 

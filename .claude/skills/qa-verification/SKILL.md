@@ -62,6 +62,7 @@ QA 開始前に以下を作成:
 3. **再開**: 停止時は新規委譲でなく **SendMessage** で同一エージェントを継続。
 4. **進捗**: 各項目完了ごとに `[n/N done]` を報告。
 5. **エビデンス**: 項目ごとに `{操作, 期待, 実測, PASS/FAIL, screenshot/console}`。
+6. **read-only**: tree 変更禁止＝既存ファイル編集・`git checkout/restore/reset/clean/stash` 実行禁止。書込みは指定パスへの新規 evidence 成果物のみ。汚れたら停止して報告し、自己復旧しない。正本: routing.md「Verification delegation」。
 
 返却を QA レポートに統合。SendMessage 再開も不能なら未完項目を blocker に記録（3-failure ルール）。
 qa-browser は browser-assist（`.claude/skills/browser-assist/SKILL.md`）を使い、`$B` かPlaywright MCP で検証。
