@@ -40,3 +40,45 @@ aegis_write_snapshot() {
   }
   return 0
 }
+
+# aegis_snapshot_gate_regression <root> — rc 0 when the EXISTING snapshot holds
+# an earned gate value (approved / n/a) that current STATUS.md shows as pending.
+# Consumed by session-start.sh so an accidental docs/ revert (full-review
+# 2026-07-06 R1 / iter60 incident) cannot launder the recovery anchor away at
+# the next session boundary. Fail-open toward CURRENT behaviour: missing or
+# unreadable snapshot/STATUS -> rc 1 (caller regenerates as before). Authorized
+# writers refresh the snapshot on every legitimate reset, so a normal rollover
+# never trips this.
+#
+# The current STATUS gate_approvals block is read ONCE with a single `sed`
+# (not one fork per snapshot line — that was O(lines) process spawns and hung
+# session-start for minutes on a bloated/corrupt snapshot; 2nd-review security
+# Major-2). No bash associative array: hooks target bash 3.2 (macOS default),
+# which lacks `declare -A`. The block string is newline-prefixed and each
+# earned gate is matched as a whole line via case. Gate names are restricted to
+# [a-z_] as defense in depth so a tampered snapshot line cannot become a glob.
+aegis_snapshot_gate_regression() {
+  local root="$1"
+  [ -n "$root" ] || return 1
+  local status_file="${root}/docs/STATUS.md"
+  local snapshot_file="${root}/.claude/.gate-snapshot"
+  [ -f "$status_file" ] || return 1
+  [ -f "$snapshot_file" ] || return 1
+  local nl cur_block line gate
+  nl=$'\n'
+  cur_block=$(sed -n '/^gate_approvals:/,/^[a-z]/p' "$status_file" 2>/dev/null)
+  cur_block="${nl}${cur_block}"   # newline-anchor the first line too
+  while IFS= read -r line; do
+    case "$line" in
+      '  '*': approved'|'  '*': n/a') ;;
+      *) continue ;;
+    esac
+    gate="${line%%:*}"; gate="${gate#  }"
+    case "$gate" in ''|*[!a-z_]*) continue ;; esac
+    # earned in the snapshot but pending now == a regression -> preserve anchor
+    case "$cur_block" in
+      *"${nl}  ${gate}: pending"*) return 0 ;;
+    esac
+  done < "$snapshot_file"
+  return 1
+}

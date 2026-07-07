@@ -29,6 +29,18 @@ AEGIS_DESTRUCTIVE_CMD_REGEX=(
   'git\s+filter-branch'
   'git\s+update-ref\s+-d'
   'git\s+reflog\s+expire.*--expire=now'
+  # iter61 (full-review R1): tree-revert forms a verification subagent used in
+  # the iter60 incident. Only shapes a branch name cannot take are matched
+  # (glob / trailing slash / multi-arg / ' -- '); a single bare pathspec is
+  # indistinguishable from a branch switch and stays allowed (accepted residue).
+  'git\s+(-C\s+\S+\s+)?restore\s+[^-[:space:]]'
+  'git\s+(-C\s+\S+\s+)?checkout\s+([^-][^;&|[:space:]]*)?([*?]|/($|[[:space:];&|]))'
+  'git\s+(-C\s+\S+\s+)?checkout\s+[^-][^;&|[:space:]]*\s+([^-;&|#>[:space:]0-9]|[0-9]+[^>;&|[:space:]])'
+  'git\s+(-C\s+\S+\s+)?(checkout|restore)\s+[^;&|]*\s--\s'
+  'git\s+(-C\s+\S+\s+)?stash(\s*$|\s+(push|save)($|[^a-zA-Z])|\s*[0-9]*[;&|)#<>]|\s+-)'
+  'git\s+(-C\s+\S+\s+)?stash\s+(drop|clear)($|[^a-zA-Z])'
+  'git\s+(-C\s+\S+\s+)?checkout\s+(--?[a-zA-Z][a-zA-Z=-]*\s+)*(-[a-zA-Z]*f[a-zA-Z]*($|[[:space:]])|--force($|[^-a-zA-Z]))'
+  'git\s+(-C\s+\S+\s+)?restore\s+(.*--(worktree|source)|-[a-zA-Z]*W)'
   'npx\s+rimraf'
   'find\s+.+\s+-delete'
   '(^|[^[:alnum:]_])dd\s+.*\bof='
@@ -47,6 +59,14 @@ AEGIS_DESTRUCTIVE_CMD_WARN=(
   "破壊的: git filter-branch はリポジトリ履歴を書き換えます（元に戻せません）。"
   "破壊的: git update-ref -d は参照(ref)を完全に削除します（復元不可）。"
   "破壊的: git reflog expire --expire=now は reflog を消去します（復旧手段が失われます）。"
+  "破壊的: git restore <パス> は指定ファイルの未コミット変更を破棄します（復元できません）。"
+  "破壊的: グロブ/ディレクトリ指定の git checkout はパスとして扱われ、該当ファイルの未コミット変更を一括破棄します（復元できません）。"
+  "破壊的: 複数引数の git checkout はパス指定として扱われ、未コミット変更を破棄します（復元できません）。"
+  "破壊的: -- 付きの git checkout/restore は指定パスの未コミット変更を破棄します（復元できません）。"
+  "破壊的: git stash は未コミット変更を作業ツリーから退避・除去します（並走セッション/親セッションの進行中作業が消えたように見えます）。"
+  "破壊的: git stash drop/clear は退避済みの変更を削除します（復元できません）。"
+  "破壊的: git checkout -f/--force は競合する未コミット変更を黙って破棄します（復元できません）。"
+  "破壊的: --source/--worktree 付きの git restore は指定パスの未コミット変更を破棄します（復元できません）。"
   "破壊的: npx rimraf はファイルを再帰的に一括削除します（復元できません）。"
   "破壊的: find -delete は該当ファイルを一括削除します（復元できません）。"
   "破壊的: dd はデバイス/ファイルに直接書き込みます（生ブロックを上書き・復元不可）。"

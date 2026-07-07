@@ -1,6 +1,9 @@
 # テスト強度ドリル結果（機械ブロック・ハーネス生成）
 
 ```
-verdict: SKIP
-reason: iter59 はサブエージェント継続（SendMessage）の SoT 定義（guidance のみ・.claude/rules/routing.md ＋ context-budgets.json ＋ token pin テスト）でコードは per-task コミット済み（実装 b2c2851・review fix-forward 89fb52f）＝qa 承認時の working-tree diff（git diff HEAD）は空で mutant を置く未コミット追加行が無い（想定どおりの縁ケース・qa-verification skill 記載）。テスト対象の振る舞いコード（判定/hook）は不変＝mutation drill 非該当。手動 mutation 同等の代替実証（RED-first・実走で確認）: (1) 実装時 RED-first: 追加2メソッド（TestSubagentContinuationSoT）が routing.md 追記前に FAILED（`SendMessage`/`harness-enforced` の grep count 0 を事前実測）→追記後 GREEN（2 passed）。token pin が継続定義の silent 消失を機械検出することを実証。(2) review 盲検2次の fix-forward 実証: 継続 pin を `harness-enforced` 単トークン→`not harness-enforced` 句へ強化。反転版（`Guidance, not harness-enforced`→`not`脱落で`Guidance, harness-enforced`）に対し、旧 pin=True（false-PASS＝反転見逃し）／新 pin=False（RED＝反転捕捉）を python 実走で確認＝強化 pin が意味反転を機械検出することを実証。(3) drift 回帰: 新節の `maxTurns`（大文字T）/`SendMessage`（非バッククォート）が check_reference_drift #1 の agent roster 抽出に誤マッチしないことを実走 PASS で確認。full suite 1052 passed / 2 skipped（現 HEAD 89fb52f に manual green 記録）・context_budget exit 0（routing.md 90/90 境界 PASS）・check_framework_contract PASS・check_reference_drift PASS。
+verdict: PASS
+mutants_total: 9
+mutants_caught: 9
+baseline: green
+survived: []
 ```

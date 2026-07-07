@@ -34,8 +34,18 @@ fi
 # iter43: single-source via aegis_write_snapshot (captures gate/phase/mode +
 # task_type/task_size). Best-effort: if the helper is unavailable the session
 # still proceeds (advisory layer).
+# iter61 (full-review 2026-07-06 R1): NOT unconditional anymore. If the existing
+# snapshot holds earned gate values that STATUS.md has lost (the iter60 docs/
+# revert incident), regenerating here would launder the revert into the baseline
+# and destroy the only recovery anchor — preserve it and warn instead.
+SNAPSHOT_REGRESSION_WARNING=""
 if command -v aegis_write_snapshot >/dev/null 2>&1; then
-  aegis_write_snapshot "$ROOT" || true
+  if command -v aegis_snapshot_gate_regression >/dev/null 2>&1 \
+     && aegis_snapshot_gate_regression "$ROOT"; then
+    SNAPSHOT_REGRESSION_WARNING="[WARNING] .claude/.gate-snapshot に docs/STATUS.md が失った承認済みゲートが残っています（revert/改竄の可能性）。snapshot を復旧アンカーとして温存しました。復旧するには STATUS.md の gate_approvals を snapshot の値に戻してください（snapshot と一致させる Edit は audit を通過します）。意図的にゲートをやり直す場合のみ .claude/.gate-snapshot を削除してください（次回起動時に再生成されます）。"
+  else
+    aegis_write_snapshot "$ROOT" || true
+  fi
 fi
 
 # E1: rotate + touch the evidence log. The (possibly empty) file is the
@@ -88,6 +98,9 @@ fi
 # BLOCKERS injection moved into the untrusted "project data" envelope below (R2/C1).
 if [ -n "$GATES" ]; then
   CONTEXT="${CONTEXT} | gates:${GATES}"
+fi
+if [ -n "$SNAPSHOT_REGRESSION_WARNING" ]; then
+  CONTEXT="${CONTEXT} | ${SNAPSHOT_REGRESSION_WARNING}"
 fi
 
 # Second-opinion file detection (PaC: enforced by check_framework_contract.py).

@@ -79,7 +79,7 @@ class TestWarnArraysAreJapanese(unittest.TestCase):
 
     def test_cmd_warn_all_japanese(self):
         warns = _bash_array("AEGIS_DESTRUCTIVE_CMD_WARN")
-        self.assertEqual(len(warns), 16, "expected 16 CMD warnings")
+        self.assertEqual(len(warns), 24, "expected 24 CMD warnings")  # iter61: +8 tree-revert forms
         for w in warns:
             with self.subTest(warn=w):
                 self.assertTrue(_has_japanese(w), f"English destructive WARN: {w!r}")

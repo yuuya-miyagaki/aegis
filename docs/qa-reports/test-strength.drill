@@ -1,1 +1,60 @@
-{"skip": true, "reason": "iter60 は budget ratchet policy 見直し（drift 支配構造の計数除外）。context_budget.py は振る舞いコードで mutation drill 可だが、コードは per-task コミット済み（実装 acc2ad4・grill-code fix-forward c971894・review fix-forward f8974f1）＝qa 承認時の working-tree diff（git diff HEAD）は空で auto-drill が拾う未コミット追加行が無い（想定どおりの縁ケース・qa-verification skill 記載）＝B1 SKIP。代わりに **実 mutation を手動で実演**（iter59 の token-pin demo より強い・実測で確認）: (M1) `_strip_excluded` を恒等（`return text`・strip 無効）に変異→`test_excluded_region_not_counted` が FAILED→git revert で GREEN＝除外ロジックの中核を守ることを実証。(M2) `_budget_word_count` を `word_count(text)`（strip 抜き）に変異→`test_real_repo_check_is_green` が FAILED（routing.md が 90>70 で予算超過）→revert で GREEN＝計数が除外を通す3経路統一を守ることを実証。(RED-first) 実装時に除外2＋濫用ガード が routing マーカー/実装前に FAILED（116>20／0領域）→実装後 GREEN。(fix) grill-code allowlist トリップワイヤ（偽マーカーが _EXCLUDE_RE にマッチ＝別 target で FAIL）＋review 行単位 ==roster ガード（smuggle prose 行を検知）を実走確認。full suite 1056 passed / 2 skipped（現 HEAD f8974f1 に manual green 記録）・context_budget exit 0（routing.md 70/70 境界 PASS）・check_framework_contract exit 0（CLAUDE.md 641/650）・check_reference_drift exit 0（roster 引き続き pin）。"}
+{
+  "test_command": "python3 -m pytest tests/test_check_destructive_coverage.py tests/test_snapshot_writers.py tests/test_destructive_warning_language.py -q",
+  "timeout_seconds": 240,
+  "mutants": [
+    {
+      "file": "hooks/lib/patterns.sh",
+      "line": 37,
+      "original": "  'git\\s+(-C\\s+\\S+\\s+)?checkout\\s+([^-][^;&|[:space:]]*)?([*?]|/($|[[:space:];&|]))'",
+      "mutated": "  'git\\s+(-C\\s+\\S+\\s+)?checkout\\s+([^-][^;&|[:space:]]*)?([%]|/($|[[:space:];&|]))'"
+    },
+    {
+      "file": "hooks/lib/patterns.sh",
+      "line": 67,
+      "original": "  \"破壊的: git stash drop/clear は退避済みの変更を削除します（復元できません）。\"",
+      "mutated": "  \"destructive: stash drop/clear deletes stashed changes.\""
+    },
+    {
+      "file": "hooks/lib/snapshot.sh",
+      "line": 80,
+      "original": "      *\"${nl}  ${gate}: pending\"*) return 0 ;;",
+      "mutated": "      *\"${nl}  ${gate}: neverneverx\"*) return 0 ;;"
+    },
+    {
+      "file": "hooks/session-start.sh",
+      "line": 41,
+      "original": "SNAPSHOT_REGRESSION_WARNING=\"\"",
+      "mutated": "SNAPSHOT_REGRESSION_WARNING=\"復旧アンカーとして温存\""
+    },
+    {
+      "file": "hooks/session-start.sh",
+      "line": 44,
+      "original": "     && aegis_snapshot_gate_regression \"$ROOT\"; then",
+      "mutated": "     && false; then"
+    },
+    {
+      "file": "hooks/session-start.sh",
+      "line": 103,
+      "original": "  CONTEXT=\"${CONTEXT} | ${SNAPSHOT_REGRESSION_WARNING}\"",
+      "mutated": "  CONTEXT=\"${CONTEXT}\""
+    },
+    {
+      "file": "tests/test_check_destructive_coverage.py",
+      "line": 54,
+      "original": "        \"git checkout docs/*\",                        # the iter60 incident command",
+      "mutated": "        \"git checkout docs123\",                        # the iter60 incident command"
+    },
+    {
+      "file": "tests/test_destructive_warning_language.py",
+      "line": 82,
+      "original": "        self.assertEqual(len(warns), 24, \"expected 24 CMD warnings\")  # iter61: +8 tree-revert forms",
+      "mutated": "        self.assertEqual(len(warns), 23, \"expected 23 CMD warnings\")  # iter61: +8 tree-revert forms"
+    },
+    {
+      "file": "tests/test_snapshot_writers.py",
+      "line": 138,
+      "original": "                    \"  brainstorm: approved\", \"  brainstorm: pending\"",
+      "mutated": "                    \"  brainstorm: approved\", \"  brainstorm: approved\""
+    }
+  ]
+}

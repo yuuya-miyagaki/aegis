@@ -1,15 +1,15 @@
 ---
 framework: aegis
-framework_version: "1.21.0"
+framework_version: "1.22.0"
 project_name: "Aegis"
 mode: Dev
 phase: docs
 task_type: framework
 task_size: M
-task_size_rationale: "iteration 60（framework・budget ratchet policy 見直し＝drift 支配構造の計数除外）= M。footprint は scripts/context_budget.py（_strip_excluded 除外ロジック）＋.claude/rules/routing.md（roster を budget-exclude マーカーで囲む）＋scripts/context-budgets.json（routing.md 90→70）＋tests/test_context_budget.py（除外＋濫用ガード）＋CLAUDE.md（Context Budget Policy 節）の5ファイル＝M（2-5）。moat 非該当（計数ロジック＋guidance・hook/判定/enforcement コード不変）＝M framework は review+qa+security 必須・deploy 自動 exempt。"
-iteration: 60
+task_size_rationale: "iteration 61（framework・iter60 事故クラスの機械防御＝destructive patterns 拡張＋snapshot 退行ガード）= M。footprint は hooks/lib/patterns.sh（git checkout pathspec/stash 系パターン追加）＋hooks/lib/snapshot.sh（gate 退行検知ヘルパ）＋hooks/session-start.sh（snapshot 無条件再生成→退行検知つき条件化）＋tests/test_check_destructive_coverage.py（新パターン挙動）＋tests/test_snapshot_writers.py（退行ガード）の5ファイル＝M（2-5）。moat 該当（enforcement コード変更＝check-destructive のパターンデータ＋tamper-evidence の復旧アンカー保全）＝review+qa+security 必須・盲検2次は read-only 拘束を委譲文言に明示・deploy は M で自動 exempt。"
+iteration: 61
 ui_surface: false
-last_updated: "2026-07-06T00:00:00Z"
+last_updated: "2026-07-07T00:00:00Z"
 gate_approvals:
   client_ready_for_dev: n/a
   brainstorm: approved
@@ -21,11 +21,11 @@ gate_approvals:
   dev_ready_for_client: approved
 current_refs:
   requirements: []
-  plan: docs/plans/2026-07-06-iter60-budget-exclusion-plan.md
-  spec: docs/specs/2026-07-06-iter60-budget-exclusion-design.md
-  review: docs/qa-reports/iter60-review.md
-  qa: docs/qa-reports/iter60-qa.md
-  security: docs/qa-reports/iter60-security.md
+  plan: docs/plans/2026-07-07-iter61-incident-class-machine-defense-plan.md
+  spec: null
+  review: docs/qa-reports/iter61-review.md
+  qa: docs/qa-reports/iter61-qa.md
+  security: docs/qa-reports/iter61-security.md
   deploy: null
   translation: null
 external_evidence:
@@ -37,14 +37,10 @@ external_evidence:
     scope: "v0.13.0 計画 5 ラウンドレビュー"
     findings: "Round 1〜5 で計 25 件の指摘（hook 出力スキーマ陳腐化、TaskCreated/Completed 制御方式、Plan 条件付き許可、effort 配分、pre-compact.sh 同種破損、`if` 単一 rule 制約等）"
     resolution: "Rev.5 で全件反映、Phase 0a 即時実装着手 GO。hotfix/v0122-hook-schema ブランチで開始。"
-next_action: "**【iter60 docs フェーズ・phase=docs・全 dev ゲート approved・push 手前で停止中】** ◆**現在地**: 全 dev ゲート approved（brainstorm/plan/review/qa/security・deploy は M で自動 exempt）。テーマ＝budget ratchet policy 見直し＝drift 支配構造（roster）を budget 計数から除外。実装 commit=acc2ad4・grill-code fix-forward=c971894（allowlist トリップワイヤ）・review fix-forward=f8974f1（行単位==roster 強化）。ship（v1.20.0→**v1.21.0** MINOR・3箇所 bump 済）＋TO-CLIENT＋LEARNINGS 2件（計数除外パターン／subagent git-checkout 事故）まで完了。**⚠ 本 iter 中に運用事故＋復旧**: security 盲検2次エージェントが `git checkout docs/*` で親の未コミット gate 簿記を revert→snapshot（docs 外）が earned 状態保持ゆえ STATUS を snapshot に一致させて復旧済（f8974f1 無傷）。**次にやること＝(1) ship/docs/evidence/version を1コミット（未コミット）→(2) dev_ready_for_client 承認→(3) push 手前で停止しユーザー確認**（push=gh auth switch --user yuuya-miyagaki）。iter59/v1.20.0 は push 済（origin/main=c4e18b0）。**その後の予定＝v1.21.0 push 後に aegis 全体レビュー**（6 dimension: moat/gate-flow/context-budget/skill-guidance/distribution/test-strength・多エージェント fan-out）。 ◆**罠（iter41-59 で確立・必読）**: (a) gate 承認出力は **tail**（head は SIGPIPE で STATUS 書込み前中断）。(b) current_refs.<gate> は承認直前に設定（pending+ref は contract stale-ref FAIL）。(c) ref set→approve の間に record を挟むと stale-ref 赤＝set→approve を連続。(d) record-test-result は全コード編集後・**対象 gate ref を null にしてから**（full suite 内 contract テストの stale-ref 回避）。(e) judge `read_test_result` は **newest test-runner entry** で判定・observed は `marker_verified` 必須＝非クォート pytest を含む Bash が newest になると tests=unverified→record-test-result（src:manual）で再 record（外側 Bash は pytest 部をクォート＝strip で Q マスク）。(f) framework **焦点変更で未コミット追加実行行＋テストが hook を copy** なら本物の B1 drill 成立（混在 diff は skip）。(g) qa は **SECOND_OPINION_GATES（review/security）非対象**＝claims 付き QA レポートを ref にすれば 🟢。(h) **M は deploy 自動 exempt**（SIZE_ALLOWED_PHASES）。(i) task_type/size は update-task.sh のみ（raw Edit は tamper block）。(j) push は `gh auth switch --user yuuya-miyagaki`。(k) phase rollover(ship→brainstorm)は backward 遷移＝常時 allow。(l) B1 drill: 純コメントのみの追加ハンクは behavior-catching mutant 不能で coverage floor を割る→冗長コメントを除去し全ハンクを behavioral/text-coverable に整形（echo メッセージ変更は message を assert するテストで mutant 可）＝skip 回避。(m) full suite 実走中に suite 自身が spurious observed test-runner エントリ（vitest 等・marker false）を real evidence-log へ書く→record-test-result を suite 完走の**後**に置けば manual エントリが newest で勝つ。(n) `record-test-result.py` は command 引数を**実行して**合否記録＝実行可能な単一コマンド（`python3 -m pytest -q`・シェル機能不可）を渡す。説明文字列だと実行失敗で `red` が newest になり judge 🔴→正しいコマンドで再実行すれば green が newest で自己修復。(o) judge の 1次/2次相違は claims の**トップレベル `verdict:`（1次）**と `second_opinion.verdict`（2次）比較（build-judge-card:382）＝review/security レポートは両方明記して一致させる。docs-only review の tests=unverified🟡 は ack 可（test 実行は qa の領分）。(p) docs-only iteration の qa: `test-strength.drill` に `{\"skip\":true,\"reason\":...}`＝B1 SKIP。qa ref は claims 付き iter46-qa.md（test-strength.md は drill 再生成で claims 置けず）。(q) **size S は terminal=ship**（`SIZE_ALLOWED_PHASES[\"S\"]={brainstorm,implement,review,ship}`＝plan/qa/security/deploy/docs を含まない）。ship→docs の transition 検査は rc0 で通るが contract static 検査が『phase docs not allowed for size S』で FAIL→docs に遷移しない。S の LEARNINGS 更新・dev_ready_for_client 承認は **ship から**実施。必須ゲートは brainstorm+review のみ。 (r) **fingerprint は HEAD sha を混ぜ込む**（hooks/lib/fingerprint.sh＝新規未テストコミットが古い記録に一致する silent-green を防ぐ）＝green 記録は「記録時の HEAD」に束縛され、その後の**docs-only コミットでも HEAD が動けば次ゲートで tests=unverified🟡**。対処＝(a) 各ゲート承認の直前・そのゲート用の全コミット後に record-test-result、または (b) 連続ゲート（qa/security/deploy）でコードを変えないなら HEAD 固定のまま docs を未コミットで積み green を1回記録して一括承認・最後にまとめてコミット（iter57 実測・LEARNINGS conf9）。"
+next_action: "**【iter61 docs フェーズ・全 dev ゲート approved・push 手前で停止中】** iter61/v1.22.0（iter60 事故クラスの機械防御＝全体レビュー Phase 0）完走。全 dev ゲート approved（deploy は M で自動 exempt）。実装＝patterns.sh に git checkout/restore/stash 系9パターン＋snapshot 退行ガード＋session-start 条件化。**次にやること＝(1) 実装+docs+STATUS を1コミット（未コミット）→(2) push 手前で停止しユーザー確認**（push=gh auth switch --user yuuya-miyagaki）。**その後の予定＝Phase 0 残り: iter62=委譲拘束 SoT 標準化（R1 文言層・routing.md に検証系委譲雛形＋tree 変更禁止・token-pin）／iter63=setup.sh self-heal unlock（R3）。以降 Phase 1（罠の根切り: fingerprint tree-hash 化・judge skip-and-continue・S サイズ修復・approve --ref 原子化・drill NO_RUN 拒否）**。正本＝docs/full-review-2026-07-06-six-dimensions-evolution.md §4。◆罠の正本は full-review §2 R6 分類表と LEARNINGS。要点のみ: gate 承認出力は tail／ref set→approve は連続／record-test-result は全編集後・suite 完走後・実行可能単一コマンド／M は deploy 自動 exempt。"
 blockers: []
 failure_tracking: null
 session_history:
-  - date: "2026-07-05"
-    mode: Dev
-    phase: "docs"
-    note: "iter58 / v1.19.0（qa-browser 委譲プロンプト標準化・guidance のみ）を全 dev ゲート approved まで完走（push 手前で停止）。plan（writing-plans）→grill-plan（致命1=qa.md の重複委譲 guidance が SoT を割る→qa.md を skill 参照へ縮約で解消／要検討1=長文完全一致 pin を短核2本へ／要検討3↔5=intro 圧縮で headroom 優先）→implement(TDD・commit 8de3f8a：委譲節を拘束5点雛形へ＋短核 token pin＋語数相殺 449/455)→grill-code(Critical/Major 0・🟢2=SendMessage 重複/`$B か`スペース・実測反証済)→review(1次 approve・盲検2次 approve_with_notes・note1=SendMessage 機構 SoT 未定義→次iter起票/note2=3-failure リンク据置/note3=[n/N done] 非pin 監視項目)→qa(B1 SKIP＝コミット済で working-tree 空・RED-first 代替実証: `最終報告を出さない`削除→FAIL・`SendMessage`全2箇所削除→FAIL・復元で緑・full 1050 passed)→security(1次 approve・盲検2次 approve・後退なし=moat/保護コード不変・secrets0・削除ブロックは存置チェックリストで被覆・browser 検査は qa-browser.md が正本・deps🟡=依存ゼロ ack)→deploy=M で自動 exempt→ship(v1.18→1.19・contract/STATUS テンプレ/live STATUS の3箇所 bump・TO-CLIENT)→docs(LEARNINGS 3件蒸留)。実装 commit=8de3f8a・ship/docs 成果は未コミット（push 前にまとめてコミット予定）。**教訓核**: (1) spurious cross-runner evidence は並走セッションだと record 後に着地して green を潰す→writer 非含スコープの最小 record で安定 green（trap m 拡張・LEARNINGS conf9）。(2) token pin は presence 保証＝重複トークンは単一削除で不発・RED 実証は全出現削除で（conf8）。(3) budget 逼迫下の guidance 追加は同一ファイル内の逐語重複除去で相殺（引き上げ=ラチェット違反・別ファイル圧縮=footprint 増を回避・conf7）。⚠ 実装中に別 Claude セッション（別 cwd prefix）の pytest が evidence-log を汚染＝メモリの『2セッション並走→静止監視必須』が実務で効いた。"
   - date: "2026-07-06"
     mode: Dev
     phase: "docs"
@@ -53,6 +49,10 @@ session_history:
     mode: Dev
     phase: "docs"
     note: "iter60 / v1.21.0（budget ratchet policy 見直し＝drift 支配構造の計数除外）を全 dev ゲート approved まで完走（push 手前で停止）。context_budget.py に `<!-- aegis:budget-exclude-start/end -->` マーカー領域を計数前 strip する `_strip_excluded`/`_budget_word_count`（check/tighten/seed 3経路統一）＋routing.md roster をマーカー囲み＋budget 90→70（prose のみ計数）＋濫用ガード3重（行単位==roster／len==1／allowlist トリップワイヤ）＋CLAUDE.md terse policy。iter59 headroom-0 の根本（roster が floor 押上げ）を計数正常化で解消。plan→grill-plan(致命ゼロ・B1 は SKIP＋実 mutation demo に訂正/多領域封鎖/相対緑基準)→implement(acc2ad4)→grill-code(🟡 allowlist トリップワイヤ fix-forward c971894)→review(1次 approve・盲検2次 approve_with_notes: note1 nested コメント誤り・note2 ガード⊆弱述語→行単位==roster 強化 fix-forward f8974f1)→qa(B1 SKIP＋実 mutation M1/M2・full 1056)→security(1次 approve・盲検2次 approve_with_notes・Minor2件 residual)→ship(v1.20→1.21・3箇所 bump)→docs。実装未 push。**⚠ 運用事故＋復旧**: security 盲検2次エージェントが検証後 `git checkout docs/*` で親の未コミット gate 簿記（STATUS review/qa approved・drill）を revert→`.claude/.gate-snapshot`(docs 外)が earned 状態保持ゆえ STATUS を snapshot に一致させて復旧（f8974f1 無傷）。**教訓核**: (1) budget floor は別 invariant 支配の圧縮不能構造に食われる＝それを計数除外し budget を自由 prose に正す（headroom 水増しより筋）＋濫用ガード必須（conf8）。(2) 検証サブエージェントに git checkout/reset を許すと親の未コミット作業を破壊＝委譲は read-only 明示・tree 変更禁止／snapshot が docs 外＝STATUS 壊れても真実源（conf9）。"
+  - date: "2026-07-07"
+    mode: Dev
+    phase: "docs"
+    note: "iter61 / v1.22.0（iter60 事故クラスの機械防御＝全体レビュー Phase 0 の機械層＋復旧層）を全 dev ゲート approved まで完走（push 手前で停止）。動機正本＝docs/full-review-2026-07-06-six-dimensions-evolution.md §2 R1。実装: hooks/lib/patterns.sh に git checkout(glob/末尾/複数引数/`--`/`-f`)・restore・stash(fd redirect 含む)系9パターン追加（誤爆ゼロ＝ブランチ切替/stash pop/restore --staged は allow）＋hooks/lib/snapshot.sh に aegis_snapshot_gate_regression（earned→pending 後退検知）＋session-start.sh の snapshot 再生成を退行検知つき条件化（復旧アンカー温存＋日本語警告）。plan(Rev.5)→grill-plan(条件付きGO・致命3=確定文言B クォート不均衡で全編集 brick/redirect 誤爆/`checkout -- pathspec`・`stash -u` 見逃し→全反映)→implement(TDD RED-first 両タスク)→grill-code(fix-forward要・M-1 `checkout -f`/M-2 `restore --source` 素通り→パターン追加)→review(1次 approve・盲検2次 approve_with_notes: M-1 先頭グロブ `git checkout *` 素通り→glob prefix optional 化で fix-forward)→qa(実 B1 drill 9/9 caught・full 1061)→security(1次 approve・盲検2次 approve_with_notes: Major-1 fd redirect stash/Major-2 巨大 snapshot で session-start 119s ハング=brick 違反/Minor-3 フラグ先行 force→全て ship 前 fix-forward・residual なし・deps🟡 ack)→ship(v1.21→1.22 MINOR・3箇所 bump・TO-CLIENT)→docs(LEARNINGS 3件)。実装未 push（push=gh auth switch --user yuuya-miyagaki）。**教訓核**: (1) conf9 の委譲文言は防御3層のうち文言層のみ＝機械層(破壊検知)+復旧層(snapshot 保全)が別途要る＝『LEARNINGS に記録』と『機械で再発防止』は別物（conf9）。(2) hooks は bash 3.2 互換＝`declare -A` 不可・ループ内 sed fork は敵対入力で hook を DoS（brick 不変条件違反）＝単一 read+bash 内処理へ（conf9）。(3) grill-plan は実 grep/`bash -n` で確定文言を検証させると実装地雷(構文/誤爆/見逃し)を設計段階で潰せる（conf8）。"
 ---
 
 ## Summary
