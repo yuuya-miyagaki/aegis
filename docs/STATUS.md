@@ -1,15 +1,15 @@
 ---
 framework: aegis
-framework_version: "1.23.0"
+framework_version: "1.24.0"
 project_name: "Aegis"
 mode: Dev
 phase: docs
 task_type: framework
-task_size: L
-task_size_rationale: "iteration 62（framework・委譲拘束 SoT 標準化＝全体レビュー R1 文言層）= L。footprint は .claude/rules/routing.md（検証系委譲の標準拘束雛形＝単一正本・6点目 tree 変更禁止）＋.claude/skills/qa-verification/SKILL.md（qa-browser 委譲ルールに6点目追加）＋.claude/skills/aegis-review-gate/SKILL.md＋.claude/skills/aegis-security-gate/SKILL.md（盲検2次ディスパッチに拘束参照）＋.claude/skills/subagent-dev/SKILL.md（レビュー系委譲に拘束参照）＋tests/test_skill_guidance_tokens.py（token-pin）＋scripts/context-budgets.json（routing.md ほか budget raise）の7ファイル＝L（6+）。guidance 層のみ（enforcement コード不変・moat 非該当だが検証委譲の事故クラス防御＝review+qa+security 必須・L のため deploy も必須〔iter54 前例=framework は deploy 対象なし宣言レポートで承認〕）。"
-iteration: 62
+task_size: M
+task_size_rationale: "iteration 63（framework・setup.sh self-heal unlock＝全体レビュー R3・正規 upgrade が OS-lock 済み install で cp: Permission denied 死する問題）= M。footprint 見込みは bin/setup.sh（冒頭 self-heal unlock＋lock 起因エラーメッセージ）＋locked-target 回帰テスト（tests/test_setup_upgrade_overwrite.py 拡張 or 新規）の 2-4 ファイル＝M（2-5）。distribution 経路かつ cp-lock（moat layer-2）隣接のため review+qa+security 必須・M のため deploy skip。S は R2 罠（check-gate.sh が plan gate を無条件要求・S に plan フェーズ無し）で構造的に不能のため M を採用（LEARNINGS: framework-M が唯一クリーン）。"
+iteration: 63
 ui_surface: false
-last_updated: "2026-07-07T08:00:00Z"
+last_updated: "2026-07-08T10:45:00Z"
 gate_approvals:
   client_ready_for_dev: n/a
   brainstorm: approved
@@ -17,16 +17,16 @@ gate_approvals:
   review: approved
   qa: approved
   security: approved
-  deploy: approved
+  deploy: pending
   dev_ready_for_client: approved
 current_refs:
   requirements: []
-  plan: docs/plans/2026-07-07-iter62-delegation-constraints-sot-plan.md
-  spec: docs/specs/2026-07-07-iter62-delegation-constraints-sot-design.md
-  review: docs/qa-reports/iter62-review.md
-  qa: docs/qa-reports/iter62-qa.md
-  security: docs/qa-reports/iter62-security.md
-  deploy: docs/qa-reports/iter62-deploy.md
+  plan: docs/plans/2026-07-07-iter63-setup-self-heal-plan.md
+  spec: docs/specs/2026-07-07-iter63-setup-self-heal-design.md
+  review: docs/qa-reports/iter63-review.md
+  qa: docs/qa-reports/iter63-qa.md
+  security: docs/qa-reports/iter63-security.md
+  deploy: null
   translation: null
 external_evidence:
   - type: "second-opinion-v1-foundation-r1-r2"
@@ -37,14 +37,10 @@ external_evidence:
     scope: "v0.13.0 計画 5 ラウンドレビュー"
     findings: "Round 1〜5 で計 25 件の指摘（hook 出力スキーマ陳腐化、TaskCreated/Completed 制御方式、Plan 条件付き許可、effort 配分、pre-compact.sh 同種破損、`if` 単一 rule 制約等）"
     resolution: "Rev.5 で全件反映、Phase 0a 即時実装着手 GO。hotfix/v0122-hook-schema ブランチで開始。"
-next_action: "**【iter62 完全クローズ・push 済（feat=5df536b・origin/main 同期）】** iter62/v1.23.0（委譲拘束 SoT 標準化＝R1 文言層）完了＝全体レビュー Phase 0 完了（iter61 機械層＋復旧層／iter62 文言層で R1 三層封鎖）。**次にやること＝iter63 rollover（iteration=63・dev ゲート全 reset・phase=brainstorm）→テーマ=setup.sh self-heal unlock（R3・正規 upgrade が OS-lock 済み install で cp: Permission denied 死する問題。修正方向=setup.sh 冒頭 aegis_cp_unlock＋locked-target 回帰テスト＋lock 起因エラーメッセージ）**。以降＝Phase 1 罠の根切り（fingerprint tree-hash 化・judge skip-and-continue・S サイズ修復・approve --ref 原子化・drill NO_RUN 拒否＋pyc キャッシュ恒久対策〔iter62 起票〕）→Phase 2 純化→Phase 3 plugin/CI。別テーマ起票分: git switch の文言・機械両層列挙／assigned path 明示責務。正本＝docs/full-review-2026-07-06-six-dimensions-evolution.md §4。◆罠の正本は full-review §2 R6 分類表と LEARNINGS。要点のみ: gate 承認出力は tail／ref set→approve は連続／record-test-result は全編集後・suite 完走後・実行可能単一コマンド／drill 後は再実走してから ship（pyc 汚染）。"
+next_action: "**【iter63 docs フェーズ・全 dev ゲート approved・push 手前で停止中】** iter63/v1.24.0（setup.sh self-heal unlock・R3）完走。全 dev ゲート approved（M＝deploy 自動 exempt・security は**1次 in-session**＋盲検2次 approve_with_notes・Major0）。ship=版上げ3箇所（check_framework_contract.py/STATUS/STATUS.template）＋TO-CLIENT＋README Upgrade note 追記／docs=LEARNINGS 2件。**次にやること＝(1) 実装+docs+STATUS を1コミット →(2) push 手前で停止しユーザー確認**（push=gh auth switch --user yuuya-miyagaki）。**その後の予定＝full-review §4 Phase 1（罠の根切り: fingerprint tree-hash 化〔本 iter OR marker LOW-1 も解消〕・judge skip-and-continue・S サイズ修復・approve --ref 原子化・drill NO_RUN 拒否＋pyc 恒久対策〔iter62 起票〕）→Phase 2 純化〔ship→docs の snapshot 再同期 helper 化も検討〕→Phase 3 plugin/CI**。正本＝docs/full-review-2026-07-06-six-dimensions-evolution.md §4。◆罠の正本は full-review §2 R6＋LEARNINGS。要点: gate 承認出力は tail／ref set→approve は連続／drill 後は再実走してから ship（pyc 汚染）／単一セッション ship→docs は snapshot 再同期。"
 blockers: []
 failure_tracking: null
 session_history:
-  - date: "2026-07-06"
-    mode: Dev
-    phase: "docs"
-    note: "iter60 / v1.21.0（budget ratchet policy 見直し＝drift 支配構造の計数除外）を全 dev ゲート approved まで完走（push 手前で停止）。context_budget.py に `<!-- aegis:budget-exclude-start/end -->` マーカー領域を計数前 strip する `_strip_excluded`/`_budget_word_count`（check/tighten/seed 3経路統一）＋routing.md roster をマーカー囲み＋budget 90→70（prose のみ計数）＋濫用ガード3重（行単位==roster／len==1／allowlist トリップワイヤ）＋CLAUDE.md terse policy。iter59 headroom-0 の根本（roster が floor 押上げ）を計数正常化で解消。plan→grill-plan(致命ゼロ・B1 は SKIP＋実 mutation demo に訂正/多領域封鎖/相対緑基準)→implement(acc2ad4)→grill-code(🟡 allowlist トリップワイヤ fix-forward c971894)→review(1次 approve・盲検2次 approve_with_notes: note1 nested コメント誤り・note2 ガード⊆弱述語→行単位==roster 強化 fix-forward f8974f1)→qa(B1 SKIP＋実 mutation M1/M2・full 1056)→security(1次 approve・盲検2次 approve_with_notes・Minor2件 residual)→ship(v1.20→1.21・3箇所 bump)→docs。実装未 push。**⚠ 運用事故＋復旧**: security 盲検2次エージェントが検証後 `git checkout docs/*` で親の未コミット gate 簿記（STATUS review/qa approved・drill）を revert→`.claude/.gate-snapshot`(docs 外)が earned 状態保持ゆえ STATUS を snapshot に一致させて復旧（f8974f1 無傷）。**教訓核**: (1) budget floor は別 invariant 支配の圧縮不能構造に食われる＝それを計数除外し budget を自由 prose に正す（headroom 水増しより筋）＋濫用ガード必須（conf8）。(2) 検証サブエージェントに git checkout/reset を許すと親の未コミット作業を破壊＝委譲は read-only 明示・tree 変更禁止／snapshot が docs 外＝STATUS 壊れても真実源（conf9）。"
   - date: "2026-07-07"
     mode: Dev
     phase: "docs"
@@ -53,6 +49,10 @@ session_history:
     mode: Dev
     phase: "docs"
     note: "iter62 / v1.23.0（委譲拘束 SoT 標準化＝全体レビュー R1 文言層・iter60 事故クラス3層防御の最終層）を全 dev ゲート approved まで完走（push 手前で停止）。動機正本＝docs/full-review-2026-07-06-six-dimensions-evolution.md §2 R1 修正方向(1)・§4 Phase 0-1。実装: routing.md に「## Verification delegation」節（6拘束・6点目 read-only 無条件＝既存ファイル変更禁止・git checkout/restore/reset/clean/stash 禁止・書込みは指定パスの新規 evidence のみ・汚れたら停止報告/自己復旧禁止・SendMessage 非使用で iter59 pin 一意性保全）＋4経路参照（qa-verification 6点目／review-gate・security-gate 盲検2次／subagent-dev コアルール5）＋pin 9本（見出し一意 count==1・否定句2・連結列挙・汚染時プロトコル・無条件宣言・4経路参照＋核・SendMessage count==1）＋budget 実測 raise（routing 70→181・qa 455→459）。L＝deploy gate 込み全9フェーズ（iter54 前例の対象なし宣言レポート）。brainstorm→plan(grill-plan 致命3=rc偽検証/deploy claims 形式/-k 空マッチ→全反映)→implement(TDD 7本 RED 実証→GREEN・full 1070)→grill-code(致命ゼロ・実 drill 可能性を指摘)→review(1次=xhigh 10角度 finder→8メカ dedup→6並列 verify→sweep・approve・CONFIRMED 1件 fix-forward=SendMessage count==1／盲検2次=approve_with_notes・Minor-1 第2否定 MUST NOT run pin 漏れ=may run 反転が全 pin 温存で iter60 許可文化→fix-forward・変異 RED 実証)→qa(B1 実 drill 11/11 caught・skip なし＝md/json/テスト全ハンク mutant・full 1071 recorded green)→security(1次 approve／盲検2次 approve_with_notes・Major-1=drill の同長 mutant＋同秒 revert が pyc ミラーキャッシュ汚染→偽 RED live→touch+再実走+再 record で ship 前解消・恒久対策 PYTHONDONTWRITEBYTECODE は Phase 1-5 起票・Minor=git switch 列挙外/assigned path 責務は residual 受容+別テーマ)→deploy(iter54 形式・claims approve)→ship(v1.22→1.23 MINOR・bump 3箇所・TO-CLIENT)→docs(LEARNINGS 3件)。全委譲（finder 11・verifier 6・盲検2次 2）に新6拘束を自己適用＝tree 変更ゼロ。実装未 push（push=gh auth switch --user yuuya-miyagaki）。**教訓核**: (1) 同長 mutant の pyc キャッシュ汚染＝ソース無汚染のテスト改変経路・drill 後は再実走してから ship（conf9）。(2) 否定が複数ある拘束文は否定ごとに独立 pin＋docstring 宣言の不変条件は assert 化するまで守られない（conf8）。(3) guidance diff（md+json+test）でも実 B1 drill は成立＝skip 前例の上書き（conf8）。"
+  - date: "2026-07-08"
+    mode: Dev
+    phase: "docs"
+    note: "iter63 / v1.24.0（setup.sh self-heal unlock＝全体レビュー R3・正規 upgrade が OS-lock 済み install で cp: Permission denied 死する問題）を全 dev ゲート approved まで完走（M＝deploy skip・push 手前で停止）。動機正本＝docs/full-review-2026-07-06-six-dimensions-evolution.md §2 R3・§4 Phase 0-3。実装: bin/setup.sh に selfheal_unlock_target（copy 前・aegis マーカー AND 実 lock 検出でのみ発火・対象は cp-lock 正本 CP 集合限定・symlink 非追従・再 lock は次回 session-start 任せ・NOTE 2行で窓可視）＋explain_unwritable_dst（mkdir/cp を if! → 帰属 abort 化・最近傍実在祖先の non-writable 帰属・誤帰属なし）＋opt-out AEGIS_SETUP_SELFHEAL=off は fail-closed＋回帰テスト tests/test_setup_locked_target_upgrade.py 4本（T1 self-heal/T2 fresh 無副作用/T3 opt-out fail-closed/T4 非 aegis 不介入）。brainstorm→plan(grill-plan 致命3=祖先遡り/ROOTUSER skip/bump3箇所目 反映)→implement(TDD RED-first)→grill-code→review(1次+盲検2次 approve_with_notes・Major0・full 1076 passed/2 skipped)→qa(B1 実 drill 7/7 caught・drill 後再実走 record〔pyc 教訓〕)→security(**1次を in-session 実施**＝1次委譲の 3×watchdog600s ハング〔インフラ故障〕を回避／盲検2次のみフレッシュ委譲 approve_with_notes・265s 完走。Findings HIGH/MEDIUM/LOW 0・🟡 dep監査N/A＋approve_with_notes notes〔OR marker・unlock窓〕を ack・Major0・両レビュー収束)→ship(v1.23→1.24 MINOR・bump 3箇所〔check_framework_contract.py/STATUS/STATUS.template〕・TO-CLIENT・README Upgrade note に self-heal 追記)→docs(LEARNINGS 2件)。実装未 push（push=gh auth switch --user yuuya-miyagaki）。**教訓核**: (1) 検証委譲がインフラ故障で詰まったら 1次を in-session に引き取り盲検2次だけ委譲（3失敗は goal で数える・security 1次は構造的に委譲必須でない）（conf7）。(2) 単一セッションで ship→docs 自走時、ゲート操作が無く snapshot が前フェーズ固定→phase-skip 誤 block＝aegis_write_snapshot で正規再同期（conf7）。"
 ---
 
 ## Summary
@@ -90,3 +90,4 @@ Claude Code ネイティブの Aegis 運用フレームワーク。2026-06-05、
 - 2026-07-02: iter54（framework・ドッグフード前 Critical バッチ修正・L・v1.14.0→v1.15.0）完了・push 済 origin/main=9a36d72＝完全クローズ。case-insensitive FS の moat バイパス封鎖（条件付き case-fold・deny-only）＋setup.sh fail-open install 封鎖＋drill quotepath。詳細は git log 9a36d72。
 - 2026-07-03: iter55 rollover＋設計着手（ドッグフード一周目 FB・許可リスト単一ソース化 scripts-manifest.tsv ほか）→ v1.16.0 完了・push 済 origin/main=9578612。詳細は git log 9578612。
 - 2026-07-05: iter56（M2 FB 6件＋可視性・v1.16.0→v1.17.0）完了・push 済 origin/main=584d22c。起票 backlog=docs/plans/2026-07-05-iter56-dogfood-m2-feedback-backlog.md。詳細は git log 584d22c。
+- 2026-07-06: iter60（framework・budget ratchet policy 見直し＝drift 支配構造の計数除外・M・v1.20.0→v1.21.0）完了・push 済（origin/main=60b1e22 に内包）。budget-exclude 機構＋濫用ガード3重で iter59 headroom-0 解消。⚠security 盲検2次の `git checkout` 事故→snapshot 復旧（→iter61 で機械防御化）。詳細は git log 9ae1f2f/dfc4ce1。

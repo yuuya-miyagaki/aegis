@@ -145,6 +145,35 @@ if [[ "$FRAMEWORK_VERSION" == "unknown" ]] || [[ -z "$FRAMEWORK_VERSION" ]]; the
 fi
 [[ -z "$FRAMEWORK_VERSION" ]] && FRAMEWORK_VERSION="unknown"
 
+# R3 (iter63): attributed abort for an unwritable destination. Under set -e a
+# failed cp used to kill the install with only cp's one-line stderr — no
+# cause, no remedy, and a mixed-version tree left behind. Attribute the
+# OS-lock only when the evidence points at it (dst or its nearest existing
+# ancestor dir is non-writable); any other failure stays a generic error
+# (no false blame). A deep `mkdir -p` failure (creating hooks/lib inside a
+# read-only hooks/) leaves the IMMEDIATE parent non-existent, so we walk up
+# to the nearest EXISTING ancestor before testing writability.
+explain_unwritable_dst() {
+  local dst="$1" why="" d
+  if [ -e "$dst" ] && [ ! -w "$dst" ]; then
+    why="$dst is not writable"
+  else
+    d="$(dirname "$dst")"
+    while [ ! -d "$d" ] && [ "$d" != "/" ] && [ "$d" != "." ]; do
+      d="$(dirname "$d")"
+    done
+    if [ -d "$d" ] && [ ! -w "$d" ]; then
+      why="directory $d is not writable"
+    fi
+  fi
+  echo "ERROR: copy failed: $dst" >&2
+  if [ -n "$why" ]; then
+    echo "       $why — likely the aegis OS-lock (hooks/lib/cp-lock.sh, chmod a-w) or a read-only target." >&2
+    echo "       setup.sh self-heals the OS-lock unless AEGIS_SETUP_SELFHEAL=off was set (or the heal itself failed above);" >&2
+    echo "       re-run without it, or unlock manually: source hooks/lib/cp-lock.sh && aegis_cp_unlock <target>" >&2
+  fi
+}
+
 # --- Template mapping ---
 resolve_source() {
   local rel_path="$1"
@@ -193,8 +222,16 @@ copy_file() {
     fi
     echo "  OVERWRITE (user file, backed up): $dst"
   fi
-  mkdir -p "$(dirname "$dst")"
-  cp "$src" "$dst"
+  # R3 (iter63): explained abort instead of set -e's bare death — see
+  # explain_unwritable_dst.
+  if ! mkdir -p "$(dirname "$dst")"; then
+    explain_unwritable_dst "$dst"
+    exit 1
+  fi
+  if ! cp "$src" "$dst"; then
+    explain_unwritable_dst "$dst"
+    exit 1
+  fi
   INSTALLED_PATHS+=("$dst")
   echo "  COPY: $dst"
 }
@@ -221,8 +258,16 @@ copy_file_force() {
   if [[ -f "$dst" ]]; then
     cp "$dst" "${dst}.bak.$(date +%s)" 2>/dev/null || true
   fi
-  mkdir -p "$(dirname "$dst")"
-  cp -f "$src" "$dst"
+  # R3 (iter63): explained abort instead of set -e's bare death — see
+  # explain_unwritable_dst.
+  if ! mkdir -p "$(dirname "$dst")"; then
+    explain_unwritable_dst "$dst"
+    exit 1
+  fi
+  if ! cp -f "$src" "$dst"; then
+    explain_unwritable_dst "$dst"
+    exit 1
+  fi
   INSTALLED_PATHS+=("$dst")
   echo "  COPY (force): $dst"
 }
@@ -576,6 +621,45 @@ create_framework_baseline() {
   fi
 }
 
+# R3 (iter63): self-heal the OS-lock before copying. cp-lock (moat layer-2)
+# chmod a-w's the stable CP at session-start for non-framework task types —
+# so the DOCUMENTED upgrade path (status_doctor: "Re-run bin/setup.sh") died
+# with `cp: Permission denied` on every install that had ever been used.
+# Gated on BOTH (a) an aegis-install marker and (b) an actual lock finding
+# (aegis_cp_verify), so a random --target dir with its own read-only hooks/
+# is never chmod'd. Re-lock is intentionally NOT done here: the target's next
+# session-start (aegis_cp_apply) restores the right state for its task_type;
+# the NOTE keeps the unlocked window visible. AEGIS_SETUP_SELFHEAL=off
+# (lowercase, AEGIS_NUDGE convention) disables the heal — a locked target then
+# fails CLOSED with the attributed error from explain_unwritable_dst.
+selfheal_unlock_target() {
+  local target="$1"
+  if [ "${AEGIS_SETUP_SELFHEAL:-on}" = "off" ]; then
+    return 0
+  fi
+  if [ ! -f "$target/.claude/.aegis-install-version" ] \
+     && [ ! -f "$target/hooks/lib/cp-lock.sh" ]; then
+    return 0
+  fi
+  local cplib="$FRAMEWORK_ROOT/hooks/lib/cp-lock.sh"
+  if [ ! -f "$cplib" ]; then
+    echo "  WARNING: hooks/lib/cp-lock.sh missing in framework; cannot self-heal OS-lock" >&2
+    return 0
+  fi
+  # shellcheck source=/dev/null
+  source "$cplib"
+  # aegis_cp_verify: rc1 = findings — must not abort under set -e.
+  local locked
+  locked=$(aegis_cp_verify "$target" framework 2>/dev/null) || true
+  [ -n "$locked" ] || return 0
+  if aegis_cp_unlock "$target"; then
+    echo "  NOTE: target was OS-locked (aegis cp-lock); write access restored for this upgrade."
+    echo "        The lock re-engages at the target's next session start."
+  else
+    echo "  WARNING: could not fully unlock the OS-locked control plane; copies below may fail." >&2
+  fi
+}
+
 # Paths setup.sh actually wrote (copied or generated). The baseline commit
 # stages exactly these — never whole directories — so pre-existing user files
 # inside a framework dir (e.g. docs/user-note.md) are not swept in (C1 / E1).
@@ -586,6 +670,10 @@ echo "Aegis Setup"
 echo "  Profile: $PROFILE"
 echo "  Target:  $TARGET"
 echo ""
+
+# R3 (iter63): heal an OS-locked install before any copy (details at the
+# function definition).
+selfheal_unlock_target "$TARGET"
 
 # 1. Copy required files
 # C-2 (iter54): capture-with-rc-check, not `< <(parse_json_array ...)` — a

@@ -116,6 +116,13 @@ agent switches `task_type` instead of unlocking.
   framework` session, or manually via `chmod -R u+w <path>`.
 - **Updating the framework** (e.g. `git pull` that rewrites vendored hooks) must
   be done in a `task_type: framework` session, otherwise the write hits EACCES.
+- **Re-running `bin/setup.sh`** to upgrade an installed target **self-heals** the OS
+  lock (1.24.0): it temporarily unlocks the target's control-plane before copying —
+  gated on an aegis-install marker **and** an actual lock finding, so an unrelated
+  read-only `--target` is never touched — so the documented upgrade path no longer
+  dies with `cp: Permission denied` on an install that has been used. The lock
+  re-engages at the target's next session start. Opt out with `AEGIS_SETUP_SELFHEAL=off`
+  (a locked target then fails closed with an attributed error).
 - Both `.claude/settings.json` and `.claude/settings.local.json` are **excluded**
   from the lock (Claude Code writes permission grants there); they stay protected
   by the Edit/Write path hook.

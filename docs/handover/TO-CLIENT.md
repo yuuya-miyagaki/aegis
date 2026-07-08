@@ -1,4 +1,4 @@
-# 納品サマリー — iteration 62（v1.23.0）
+# 納品サマリー — iteration 63（v1.24.0）
 
 <!-- 正本: ship-and-docs skill -->
 <!-- exit-check: TO-CLIENT 完成・証拠参照済み・既知ギャップ記載済み → docs へ -->
@@ -7,45 +7,43 @@
 
 ## 納品サマリー
 
-- リリース / ビルド: aegis v1.23.0（iter62）
-- 日付: 2026-07-07
-- 担当者: aegis dev フロー（多エージェント・盲検2次）
-- 操作マニュアル: 不要（guidance 層の変更＝エンドユーザー操作面の変化なし）
+- リリース / ビルド: aegis v1.24.0（iter63・MINOR＝後方互換の新能力）
+- 日付: 2026-07-08
+- 担当者: aegis dev フロー（security 1次は in-session・盲検2次は多エージェント）
+- 操作マニュアル: 不要（installer 内部の自己修復＝保守者の操作手順に新規ステップなし。挙動変化は本サマリに記載）
 - 運用 RUNBOOK: 不要（新規運用手順なし）
 - UAT 結果: 不要（ACCEPTANCE 未定義の framework イテレーション）
 
 ## 実装範囲
 
-- 完了: 委譲拘束の SoT 標準化（full-review 2026-07-06 R1 の**文言層**＝iter60 事故クラス3層防御の最終層）。
-  1. **単一正本の設置**（.claude/rules/routing.md「Verification delegation」節）: 検証系ディスパッチ全種（review 1次/盲検2次・security・qa・qa-browser・specialist reviewers）の標準6拘束を定義。6点目 read-only は無条件＝既存ファイル変更禁止・`git checkout/restore/reset/clean/stash` 実行禁止・書込みは指定パスへの新規 evidence 成果物のみ・tree が汚れたら停止して報告し自己復旧しない。
-  2. **4経路からの参照＋核のインライン**: qa-verification（qa-browser 委譲ルールに6点目）・aegis-review-gate／aegis-security-gate（盲検2次の委譲プロンプトへ6拘束を必ず含める）・subagent-dev（コアルール5点目）。iter60 で実際に事故を起こした security 盲検2次経路を含む全経路を被覆。
-  3. **drift の機械封鎖**（tests/test_skill_guidance_tokens.py・pin 9本）: 見出し一意（count==1）・否定句2本（MUST NOT modify／MUST NOT run＝反転検知）・禁止コマンド連結列挙（1個脱落で RED）・汚染時プロトコル・無条件宣言・4経路の参照＋核・SendMessage 一意性（iter59 pin の増殖崩壊も封鎖）。
-  4. **budget 簿記**: routing 70→181・qa-verification 455→459（実測と厳密一致＝追加分ちょうどの raise・iter59 教訓準拠）。
-- 本 iter で dev フロー自体が新拘束を自己適用（レビュー/検証の全11+2エージェント委譲に6拘束を明記）＝ドッグフード済み。
+- 完了: `bin/setup.sh` の self-heal unlock（full-review 2026-07-06 **R3**＝正規 upgrade 手順が OS-lock 済み install で死ぬ問題の解消）。
+  1. **self-heal unlock**（`selfheal_unlock_target()`・全 copy 前に発火）: cp-lock（moat layer-2）が非 framework task_type のセッション開始時に安定 control-plane を `chmod a-w` するため、status_doctor が案内する正規 upgrade 手順（`bin/setup.sh` 再実行）が「一度でも使われた install」で `cp: Permission denied` により途中死し、混在版（mixed-version）の木を残していた。これを、**(a) aegis install マーカー かつ (b) 実 lock 検出（`aegis_cp_verify`）** の AND ゲートでのみ発火する一時 unlock で解消。対象は cp-lock 正本の CP path 集合に限定（任意 dir を触らない・symlink 非追従）。再 lock は意図的に行わず、target の次回 session-start が task_type に応じて復元（NOTE 2行で unlock 窓を可視化）。
+  2. **帰属エラー**（`explain_unwritable_dst()`・`copy_file`/`copy_file_force` の mkdir/cp を `if ! …; then explain; exit 1` 型へ）: `set -e` の無説明即死を、原因（dst or 最近傍実在祖先 dir の non-writable）を帰属し remediation（env を外して再実行／手動 unlock）を示す明示 abort に置換。無関係な失敗は誤帰属せず generic ERROR のみ。
+  3. **opt-out は fail-closed**: `AEGIS_SETUP_SELFHEAL=off`（小文字・AEGIS_NUDGE 慣習）は heal を無効化する＝機能を**減らす**方向のみで、locked target は帰属エラーで fail-closed。バイパス lever にならない。
+  4. **回帰テスト新設**（`tests/test_setup_locked_target_upgrade.py`・4本）: T1 locked-upgrade self-heal（stale 化→lock→再 install=rc0・ソース一致・`.bak`・NOTE・unlock 維持）／T2 fresh install 無副作用／T3 opt-out fail-closed／T4 非 aegis dir 不介入（perms byte 不変）。ROOTUSER は lock 依存 T1/T3/T4 を skip（repo 慣習）。
 
 ## 証拠
 
-- 仕様: docs/plans/2026-07-07-iter62-delegation-constraints-sot-plan.md（grill-plan 致命3反映）
-- レビュー: docs/qa-reports/iter62-review.md（1次 approve〔xhigh 10角度→6検証→sweep〕＋盲検2次 approve_with_notes・fix-forward 2件済）
-- QA: docs/qa-reports/iter62-qa.md（full 1071 passed＋**B1 実 drill 11/11 caught・skip なし**）
-- セキュリティ: docs/qa-reports/iter62-security.md（1次 approve＋盲検2次 approve_with_notes・Major-1〔drill の pyc キャッシュ汚染＝diff 外の runner 欠陥〕は ship 前解消済）
-- デプロイ: docs/qa-reports/iter62-deploy.md（対象なし宣言・全 prior gate 確認）
-- 動機の正本: docs/full-review-2026-07-06-six-dimensions-evolution.md §2 R1・§4 Phase 0-1
+- 実装計画: docs/plans/2026-07-07-iter63-setup-self-heal-plan.md（grill-plan 致命3=祖先遡り/ROOTUSER skip/bump3箇所目 反映）
+- 設計: docs/specs/2026-07-07-iter63-setup-self-heal-design.md（推奨アプローチ1-4・セキュリティ考慮 受容残余）
+- レビュー: docs/qa-reports/iter63-review.md（1次 approve_with_notes〔7項目 action/expected/observed/verdict〕＋盲検2次 approve_with_notes・Major 0・full 1076 passed/2 skipped）
+- QA: docs/qa-reports/iter63-qa.md（**B1 実 drill 7/7 caught**〔初回生存1→テスト強化で封鎖＝drill 実効性実証〕・full suite drill 後再実走 recorded green〔pyc 教訓〕）
+- セキュリティ: docs/qa-reports/iter63-security.md（1次 approve〔in-session・6節 実 evidence・Findings HIGH/MEDIUM/LOW 0〕＋盲検2次 approve_with_notes・docs/qa-reports/iter63-security-2nd.md）。🟡 依存監査 N/A＋approve_with_notes notes を ack 承認（judge-security.md）。
+- 動機の正本: docs/full-review-2026-07-06-six-dimensions-evolution.md §2 R3・§4 Phase 0-3
 
 ## 既知のギャップ
 
-- 文言層は self-attested（親が拘束を委譲プロンプトへ実際に含めることはハーネス強制不能）＝機械層（iter61 patterns.sh）・復旧層（snapshot 退行ガード）との3層防御で被覆。将来の SubagentStart hook 注入は full-review 将来項目。
-- 禁止列挙に `git switch` は含めない（機械層が branch switch を意図的に allow＝誤爆ゼロ方針と整合。破壊形は一般禁止句が防衛線）— 列挙追加は文言・機械の両層セットで別テーマ。
-- 「assigned path」の指定責務（委譲時に書込み先パスを必ず明示）は同別テーマで文言化予定。
-- **drill runner の pyc キャッシュ汚染**（同バイト長 mutant＋同秒 revert で macOS ミラーキャッシュに変異バイトコードが残留→偽 RED/偽 GREEN）: 恒久対策＝子プロセスへ `PYTHONDONTWRITEBYTECODE=1`＋restore 後 mtime バンプを Phase 1-5（drill 強化）へ起票。
+- **unlock 窓（受容残余 (a)）**: setup 完了〜次回 session-start まで target CP が writable。通常の framework-mode セッションと等価な露出で、実行者＝upgrade を行う owner 自身。NOTE 出力で可視・監査可能。
+- **session 内 setup 実行によるバイパス（受容残余 (b)）**: エージェントが target セッション内で framework clone の setup.sh を走らせて moat を外す経路は layer-2 脅威モデル（偶発書込み防御）の scope 外＝owner の `chmod u+w` 常時可能と等価。
+- **marker leg の OR（LOW-1・1次＋盲検2次が独立に同定）**: 発火 (a) は `.aegis-install-version` **or** `hooks/lib/cp-lock.sh` の OR。非 aegis dir でも後者を持ち かつ CP 名 dir を read-only にして実 lock 検出も満たすと `chmod u+w` されうるが、影響は owner 書込み復元のみ（昇格/chown/setuid/symlink 追従なし）。fingerprint 厳格化（tree-hash 等）は **Phase 1 罠根切り**（full-review §2 R6）で別途対処。
 
 ## 配備と運用
 
-- 環境: Claude Code ネイティブ。rules/skills は setup.sh で verbatim 配布（新規 script/hook なし＝contract 変更不要）。
+- 環境: Claude Code ネイティブ。変更は `bin/setup.sh`（installer）のみ＝新規 script/hook なし・公開契約（scripts-manifest / hook 集合）変更なし。
 - アクセス: 変更なし。
-- 監視: なし。
+- 監視: なし。unlock 発火時は setup 出力に NOTE 2行（「target was OS-locked … restored for this upgrade」／「lock re-engages at the target's next session start」）。
 
 ## 次の推奨アクション
 
-- iter63: setup.sh の self-heal unlock（R3・正規 upgrade が locked install で死ぬ問題）。
-- 以降: full-review §4 Phase 1（罠の根切り: fingerprint tree-hash 化・judge skip-and-continue・S サイズ修復・approve --ref 原子化・**drill NO_RUN 拒否＋pyc キャッシュ対策**）。
+- 実装 + docs + STATUS を 1 コミット → **push 手前で停止しユーザー確認**（push = gh auth switch --user yuuya-miyagaki）。
+- 以降: full-review §4 **Phase 1（罠の根切り）**: fingerprint tree-hash 化（本 iter の OR marker LOW-1 も解消）・judge skip-and-continue・S サイズ修復・approve --ref 原子化・drill NO_RUN 拒否＋**pyc キャッシュ恒久対策**〔iter62 起票〕。→ Phase 2 純化 → Phase 3 plugin/CI。
