@@ -37,7 +37,7 @@ external_evidence:
     scope: "v0.13.0 計画 5 ラウンドレビュー"
     findings: "Round 1〜5 で計 25 件の指摘（hook 出力スキーマ陳腐化、TaskCreated/Completed 制御方式、Plan 条件付き許可、effort 配分、pre-compact.sh 同種破損、`if` 単一 rule 制約等）"
     resolution: "Rev.5 で全件反映、Phase 0a 即時実装着手 GO。hotfix/v0122-hook-schema ブランチで開始。"
-next_action: "**【iter64 docs フェーズ完了・dev_ready_for_client ゲート申請待ち】** 全 dev ゲート approved（brainstorm/plan/review/qa/security・deploy=M skip）。実装コミット済 992ff4f（fingerprint tree-hash 化＋setup OR marker 厳格化・v1.25.0 bump 込み amend 予定）。**次にやること＝ユーザー確認の上で `bash scripts/update-gate.sh dev_ready_for_client approve`→final commit amend→push 手前で停止**（push=`gh auth switch --user yuuya-miyagaki` 後）。証拠: review/qa/security=docs/qa-reports/iter64-*.md・TO-CLIENT 更新済・LEARNINGS 3件＋iter57 conf9(罠r) 解消更新。◆残: full-review §4 Phase 1 残り（judge skip-and-continue 1-2／approve --ref 原子化 1-3〔本 iter で遭遇〕／S サイズ修復 1-4／drill コメントラン floor 除外 1-5〔本 iter で skip を採らせた限界〕）。◆環境注意: aegis 内で Claude Code を起動（親 repo セッションでは hooks 無効）。"
+next_action: "**【iter64 完全クローズ・push 済 origin/main=3a69f2d】** iter64 / v1.25.0（fingerprint tree-hash 化＝R6 根1／setup OR marker 厳格化＝iter63 LOW-1 解消）を全 dev ゲート approved まで完走し push 済（詳細は session_history 末尾＋git show 3a69f2d）。**次にやること＝iter65 の rollover**（新テーマ着手時に `brainstorm` へリセット・dev ゲート pending 化・iteration→65・requirements 以外の refs=null・state-machine.md「Iteration」節に従う）。◆候補テーマ＝full-review §4 Phase 1 残り: judge read_test_result skip-and-continue（1-2・R6 根2＝罠 e,m）／update-gate approve --ref 原子化＋SIGPIPE（1-3・iter64 で実地遭遇）／S サイズ修復（1-4）／drill コメントラン floor 除外（1-5・iter64 で skip を採らせた限界）／record 引数事前検証（1-6）。◆環境注意: aegis 内で Claude Code を起動（親 repo セッションでは hooks 無効）。"
 blockers: []
 failure_tracking: null
 session_history:
