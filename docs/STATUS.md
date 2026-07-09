@@ -1,15 +1,15 @@
 ---
 framework: aegis
-framework_version: "1.24.0"
+framework_version: "1.25.0"
 project_name: "Aegis"
 mode: Dev
 phase: docs
 task_type: framework
 task_size: M
-task_size_rationale: "iteration 63（framework・setup.sh self-heal unlock＝全体レビュー R3・正規 upgrade が OS-lock 済み install で cp: Permission denied 死する問題）= M。footprint 見込みは bin/setup.sh（冒頭 self-heal unlock＋lock 起因エラーメッセージ）＋locked-target 回帰テスト（tests/test_setup_upgrade_overwrite.py 拡張 or 新規）の 2-4 ファイル＝M（2-5）。distribution 経路かつ cp-lock（moat layer-2）隣接のため review+qa+security 必須・M のため deploy skip。S は R2 罠（check-gate.sh が plan gate を無条件要求・S に plan フェーズ無し）で構造的に不能のため M を採用（LEARNINGS: framework-M が唯一クリーン）。"
-iteration: 63
+task_size_rationale: "iteration 64（framework・全体レビュー §4 Phase 1 項目 1-1: fingerprint を HEAD sha 束縛から非 docs/.claude tree-hash 化＝R6 根1〔罠 r,b,c,d〕。併せて iter63 OR marker LOW-1〔setup.sh selfheal 帰属判定 leg(b) の OR〕を authoritative stamp 単独要求へ厳格化）= M。footprint 見込み: hooks/lib/fingerprint.sh＋tests/test_fingerprint_lib.py＋bin/setup.sh＋tests/test_setup_locked_target_upgrade.py の 2-5 コア/テストファイル＝M（2-5）。evidence moat 中核（fingerprint.sh は E1 単一所有者）かつ distribution（setup.sh）隣接のため review+qa+security 必須・M のため deploy skip。S は R2 罠（check-gate.sh が plan gate を無条件要求・S に plan フェーズ無し・本 iter未修正）で構造的に不能のため M を採用（LEARNINGS: framework-M が唯一クリーン）。"
+iteration: 64
 ui_surface: false
-last_updated: "2026-07-08T10:45:00Z"
+last_updated: "2026-07-08T12:50:00Z"
 gate_approvals:
   client_ready_for_dev: n/a
   brainstorm: approved
@@ -21,11 +21,11 @@ gate_approvals:
   dev_ready_for_client: approved
 current_refs:
   requirements: []
-  plan: docs/plans/2026-07-07-iter63-setup-self-heal-plan.md
-  spec: docs/specs/2026-07-07-iter63-setup-self-heal-design.md
-  review: docs/qa-reports/iter63-review.md
-  qa: docs/qa-reports/iter63-qa.md
-  security: docs/qa-reports/iter63-security.md
+  plan: docs/plans/2026-07-08-iter64-fingerprint-tree-hash-plan.md
+  spec: docs/specs/2026-07-08-iter64-fingerprint-tree-hash-design.md
+  review: docs/qa-reports/iter64-review.md
+  qa: docs/qa-reports/iter64-qa.md
+  security: docs/qa-reports/iter64-security.md
   deploy: null
   translation: null
 external_evidence:
@@ -37,14 +37,10 @@ external_evidence:
     scope: "v0.13.0 計画 5 ラウンドレビュー"
     findings: "Round 1〜5 で計 25 件の指摘（hook 出力スキーマ陳腐化、TaskCreated/Completed 制御方式、Plan 条件付き許可、effort 配分、pre-compact.sh 同種破損、`if` 単一 rule 制約等）"
     resolution: "Rev.5 で全件反映、Phase 0a 即時実装着手 GO。hotfix/v0122-hook-schema ブランチで開始。"
-next_action: "**【iter63 docs フェーズ・全 dev ゲート approved・push 手前で停止中】** iter63/v1.24.0（setup.sh self-heal unlock・R3）完走。全 dev ゲート approved（M＝deploy 自動 exempt・security は**1次 in-session**＋盲検2次 approve_with_notes・Major0）。ship=版上げ3箇所（check_framework_contract.py/STATUS/STATUS.template）＋TO-CLIENT＋README Upgrade note 追記／docs=LEARNINGS 2件。**次にやること＝(1) 実装+docs+STATUS を1コミット →(2) push 手前で停止しユーザー確認**（push=gh auth switch --user yuuya-miyagaki）。**その後の予定＝full-review §4 Phase 1（罠の根切り: fingerprint tree-hash 化〔本 iter OR marker LOW-1 も解消〕・judge skip-and-continue・S サイズ修復・approve --ref 原子化・drill NO_RUN 拒否＋pyc 恒久対策〔iter62 起票〕）→Phase 2 純化〔ship→docs の snapshot 再同期 helper 化も検討〕→Phase 3 plugin/CI**。正本＝docs/full-review-2026-07-06-six-dimensions-evolution.md §4。◆罠の正本は full-review §2 R6＋LEARNINGS。要点: gate 承認出力は tail／ref set→approve は連続／drill 後は再実走してから ship（pyc 汚染）／単一セッション ship→docs は snapshot 再同期。"
+next_action: "**【iter64 docs フェーズ完了・dev_ready_for_client ゲート申請待ち】** 全 dev ゲート approved（brainstorm/plan/review/qa/security・deploy=M skip）。実装コミット済 992ff4f（fingerprint tree-hash 化＋setup OR marker 厳格化・v1.25.0 bump 込み amend 予定）。**次にやること＝ユーザー確認の上で `bash scripts/update-gate.sh dev_ready_for_client approve`→final commit amend→push 手前で停止**（push=`gh auth switch --user yuuya-miyagaki` 後）。証拠: review/qa/security=docs/qa-reports/iter64-*.md・TO-CLIENT 更新済・LEARNINGS 3件＋iter57 conf9(罠r) 解消更新。◆残: full-review §4 Phase 1 残り（judge skip-and-continue 1-2／approve --ref 原子化 1-3〔本 iter で遭遇〕／S サイズ修復 1-4／drill コメントラン floor 除外 1-5〔本 iter で skip を採らせた限界〕）。◆環境注意: aegis 内で Claude Code を起動（親 repo セッションでは hooks 無効）。"
 blockers: []
 failure_tracking: null
 session_history:
-  - date: "2026-07-07"
-    mode: Dev
-    phase: "docs"
-    note: "iter61 / v1.22.0（iter60 事故クラスの機械防御＝全体レビュー Phase 0 の機械層＋復旧層）を全 dev ゲート approved まで完走（push 手前で停止）。動機正本＝docs/full-review-2026-07-06-six-dimensions-evolution.md §2 R1。実装: hooks/lib/patterns.sh に git checkout(glob/末尾/複数引数/`--`/`-f`)・restore・stash(fd redirect 含む)系9パターン追加（誤爆ゼロ＝ブランチ切替/stash pop/restore --staged は allow）＋hooks/lib/snapshot.sh に aegis_snapshot_gate_regression（earned→pending 後退検知）＋session-start.sh の snapshot 再生成を退行検知つき条件化（復旧アンカー温存＋日本語警告）。plan(Rev.5)→grill-plan(条件付きGO・致命3=確定文言B クォート不均衡で全編集 brick/redirect 誤爆/`checkout -- pathspec`・`stash -u` 見逃し→全反映)→implement(TDD RED-first 両タスク)→grill-code(fix-forward要・M-1 `checkout -f`/M-2 `restore --source` 素通り→パターン追加)→review(1次 approve・盲検2次 approve_with_notes: M-1 先頭グロブ `git checkout *` 素通り→glob prefix optional 化で fix-forward)→qa(実 B1 drill 9/9 caught・full 1061)→security(1次 approve・盲検2次 approve_with_notes: Major-1 fd redirect stash/Major-2 巨大 snapshot で session-start 119s ハング=brick 違反/Minor-3 フラグ先行 force→全て ship 前 fix-forward・residual なし・deps🟡 ack)→ship(v1.21→1.22 MINOR・3箇所 bump・TO-CLIENT)→docs(LEARNINGS 3件)。実装未 push（push=gh auth switch --user yuuya-miyagaki）。**教訓核**: (1) conf9 の委譲文言は防御3層のうち文言層のみ＝機械層(破壊検知)+復旧層(snapshot 保全)が別途要る＝『LEARNINGS に記録』と『機械で再発防止』は別物（conf9）。(2) hooks は bash 3.2 互換＝`declare -A` 不可・ループ内 sed fork は敵対入力で hook を DoS（brick 不変条件違反）＝単一 read+bash 内処理へ（conf9）。(3) grill-plan は実 grep/`bash -n` で確定文言を検証させると実装地雷(構文/誤爆/見逃し)を設計段階で潰せる（conf8）。"
   - date: "2026-07-07"
     mode: Dev
     phase: "docs"
@@ -53,6 +49,10 @@ session_history:
     mode: Dev
     phase: "docs"
     note: "iter63 / v1.24.0（setup.sh self-heal unlock＝全体レビュー R3・正規 upgrade が OS-lock 済み install で cp: Permission denied 死する問題）を全 dev ゲート approved まで完走（M＝deploy skip・push 手前で停止）。動機正本＝docs/full-review-2026-07-06-six-dimensions-evolution.md §2 R3・§4 Phase 0-3。実装: bin/setup.sh に selfheal_unlock_target（copy 前・aegis マーカー AND 実 lock 検出でのみ発火・対象は cp-lock 正本 CP 集合限定・symlink 非追従・再 lock は次回 session-start 任せ・NOTE 2行で窓可視）＋explain_unwritable_dst（mkdir/cp を if! → 帰属 abort 化・最近傍実在祖先の non-writable 帰属・誤帰属なし）＋opt-out AEGIS_SETUP_SELFHEAL=off は fail-closed＋回帰テスト tests/test_setup_locked_target_upgrade.py 4本（T1 self-heal/T2 fresh 無副作用/T3 opt-out fail-closed/T4 非 aegis 不介入）。brainstorm→plan(grill-plan 致命3=祖先遡り/ROOTUSER skip/bump3箇所目 反映)→implement(TDD RED-first)→grill-code→review(1次+盲検2次 approve_with_notes・Major0・full 1076 passed/2 skipped)→qa(B1 実 drill 7/7 caught・drill 後再実走 record〔pyc 教訓〕)→security(**1次を in-session 実施**＝1次委譲の 3×watchdog600s ハング〔インフラ故障〕を回避／盲検2次のみフレッシュ委譲 approve_with_notes・265s 完走。Findings HIGH/MEDIUM/LOW 0・🟡 dep監査N/A＋approve_with_notes notes〔OR marker・unlock窓〕を ack・Major0・両レビュー収束)→ship(v1.23→1.24 MINOR・bump 3箇所〔check_framework_contract.py/STATUS/STATUS.template〕・TO-CLIENT・README Upgrade note に self-heal 追記)→docs(LEARNINGS 2件)。実装未 push（push=gh auth switch --user yuuya-miyagaki）。**教訓核**: (1) 検証委譲がインフラ故障で詰まったら 1次を in-session に引き取り盲検2次だけ委譲（3失敗は goal で数える・security 1次は構造的に委譲必須でない）（conf7）。(2) 単一セッションで ship→docs 自走時、ゲート操作が無く snapshot が前フェーズ固定→phase-skip 誤 block＝aegis_write_snapshot で正規再同期（conf7）。"
+  - date: "2026-07-09"
+    mode: Dev
+    phase: "docs"
+    note: "iter64 / v1.25.0（fingerprint tree-hash 化＝全体レビュー R6 根1・§4 Phase 1「1-1」＋setup OR marker 厳格化＝iter63 LOW-1 解消）を全 dev ゲート approved まで完走（M＝deploy skip・push 手前で停止）。動機正本＝docs/full-review-2026-07-06-six-dimensions-evolution.md §2 R6 根1・§4 Phase 1（1-1）／iter63 LOW-1。実装: hooks/lib/fingerprint.sh のハッシュ入力 `head:<sha>` を「非 docs/.claude の committed tree-hash」（`git ls-tree -r HEAD` を docs/・.claude/ 除外→sha256・char-class `[.]claude/` でリテラルドット固定）に置換＝docs-only コミットで green が無効化する罠 r を根切りしつつ code コミットで fp が動く silent-green 防止を完全保存・token 契約/consumer 不変＋bin/setup.sh selfheal 身元判定を `.aegis-install-version` OR cp-lock.sh から stamp 単独へ（stamp K-11 2026-06-13 が cp-lock 2026-06-21 より先行導入で正規 self-heal 不喪失）。新規テスト4（docs-only 不感/aclaude 誤除外回帰/root-docs ファイル包含/without-stamp fail-closed）RED-first。brainstorm→plan(grill-plan 致命1=escaping over-exclusion〔$'\\t\\.claude/' が bash で bare-dot 化〕→char-class を実 grep 実証で反映)→implement(TDD RED-first)→grill-code(致命0)→review(1次 in-session＋テスト強度 23 passed 無回帰＋盲検2次 approve_with_notes・mutant flip で歯・fix-forward: docs 非対称コメント＋root-docs テスト)→qa(B1 drill=**skip**〔実装コミット済 992ff4f・diff 空／純コメントハンクは coverage floor 除外の既知限界 §1-5〕＋代替実証: 4新規 RED-first＋4種一時変異 RED＋coverage 空白3件を実 git 安全確認・full 1080 recorded green)→security(1次 in-session＋盲検2次 security 動的実証〔injection 6種非実行・clean→clean pin・移行 fail-closed・OR marker 発火面縮小・date-ordering git log 裏取り〕・Findings HIGH/MEDIUM/LOW 0・両者 approve 収束・**iter63 LOW-1 をクローズ**・deps🟡 ack)→ship(v1.24→1.25 MINOR・bump 3箇所〔check_framework_contract.py/STATUS/STATUS.template〕・TO-CLIENT・README を stamp 単独に更新)→docs(LEARNINGS 3件＋iter57 conf9 罠 r を解消済みに更新)。実装コミット済（992ff4f・qa skip のため per-task commit・ship で bump 込み amend 予定）・未 push（push=gh auth switch --user yuuya-miyagaki）。**教訓核**: (1) シェルで組む grep のドットは `\\.` でなく `[.]` で固定（ANSI-C クォートがバックスラッシュを剥がし bare-dot 化＝silent-green 穴・grill-plan 実 grep で捕捉）（conf8）。(2) コメント修正の孤立ハンクは B1 floor を満たせず commit→skip が sanctioned（conf7）。(3) gate ref は承認前に置くと pending→null-ref 不変条件違反で contract red＝record green→ref→承認を pytest 挟まず連続（conf8・全体レビュー 1-3 罠が実地顕在化）。"
 ---
 
 ## Summary

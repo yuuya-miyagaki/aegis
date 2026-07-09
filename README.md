@@ -118,7 +118,8 @@ agent switches `task_type` instead of unlocking.
   be done in a `task_type: framework` session, otherwise the write hits EACCES.
 - **Re-running `bin/setup.sh`** to upgrade an installed target **self-heals** the OS
   lock (1.24.0): it temporarily unlocks the target's control-plane before copying —
-  gated on an aegis-install marker **and** an actual lock finding, so an unrelated
+  gated on the authoritative aegis-install stamp (`.claude/.aegis-install-version`, the
+  sole identity proof since 1.25.0) **and** an actual lock finding, so an unrelated
   read-only `--target` is never touched — so the documented upgrade path no longer
   dies with `cp: Permission denied` on an install that has been used. The lock
   re-engages at the target's next session start. Opt out with `AEGIS_SETUP_SELFHEAL=off`

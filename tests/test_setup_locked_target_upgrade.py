@@ -117,3 +117,27 @@ def test_non_aegis_readonly_target_is_not_unlocked(tmp_path):
         assert mode == 0o555                      # perms untouched (no unlock)
     finally:
         _unlock_all(tmp_path)
+
+
+@pytest.mark.skipif(ROOTUSER, reason="chmod a-w does not bind root")
+def test_cplock_present_without_stamp_does_not_self_heal(tmp_path):
+    # LOW-1 (iter64): the authoritative install stamp (.aegis-install-version) is
+    # the ONLY identity proof for self-heal. hooks/lib/cp-lock.sh is a plain
+    # framework file, not an install marker. Full-install, then remove the stamp
+    # (cp-lock.sh remains) and lock: the old OR gate fired self-heal on cp-lock.sh
+    # alone (rc0 + "OS-locked"); the stamp-only gate returns early → fails closed
+    # with the attributed error, lock untouched.
+    target = tmp_path / "proj"
+    try:
+        _run(str(target), check=True)
+        (target / ".claude" / ".aegis-install-version").unlink()
+        hook = target / "hooks" / "check-gate.sh"
+        hook.write_text("#!/usr/bin/env bash\n# STALE\nexit 0\n")  # force a copy
+        _lock(str(target))
+        r = _run(str(target))
+        assert r.returncode != 0
+        assert "OS-locked" not in r.stdout        # self-heal did NOT fire
+        assert "is not writable" in r.stderr      # attributed fail-closed
+        assert not os.access(str(target / "hooks"), os.W_OK)  # lock untouched
+    finally:
+        _unlock_all(tmp_path)

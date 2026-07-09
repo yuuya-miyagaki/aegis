@@ -625,9 +625,14 @@ create_framework_baseline() {
 # chmod a-w's the stable CP at session-start for non-framework task types —
 # so the DOCUMENTED upgrade path (status_doctor: "Re-run bin/setup.sh") died
 # with `cp: Permission denied` on every install that had ever been used.
-# Gated on BOTH (a) an aegis-install marker and (b) an actual lock finding
-# (aegis_cp_verify), so a random --target dir with its own read-only hooks/
-# is never chmod'd. Re-lock is intentionally NOT done here: the target's next
+# Gated on BOTH (a) the authoritative install stamp (.aegis-install-version) and
+# (b) an actual lock finding (aegis_cp_verify), so a random --target dir with its
+# own read-only hooks/ is never chmod'd. The stamp is the ONLY identity proof
+# (LOW-1): hooks/lib/cp-lock.sh is a plain framework file, and the stamp (K-11,
+# 2026-06-13) predates cp-lock (2026-06-21) so every OS-lockable install carries
+# it — requiring the stamp alone loses no legitimate self-heal, and the stamp
+# sits outside the locked CP set so it stays readable under lock. Re-lock is
+# intentionally NOT done here: the target's next
 # session-start (aegis_cp_apply) restores the right state for its task_type;
 # the NOTE keeps the unlocked window visible. AEGIS_SETUP_SELFHEAL=off
 # (lowercase, AEGIS_NUDGE convention) disables the heal — a locked target then
@@ -637,8 +642,7 @@ selfheal_unlock_target() {
   if [ "${AEGIS_SETUP_SELFHEAL:-on}" = "off" ]; then
     return 0
   fi
-  if [ ! -f "$target/.claude/.aegis-install-version" ] \
-     && [ ! -f "$target/hooks/lib/cp-lock.sh" ]; then
+  if [ ! -f "$target/.claude/.aegis-install-version" ]; then
     return 0
   fi
   local cplib="$FRAMEWORK_ROOT/hooks/lib/cp-lock.sh"

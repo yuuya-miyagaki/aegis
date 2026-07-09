@@ -2,11 +2,14 @@
 """fingerprint.sh — worktree fingerprint 単一所有者の契約テスト。
 
 トークン契約: stdout 1行 = 64-hex sha256 | "oversize" | "nogit" | "error"、
-常に rc=0。判定対象: HEAD コミット sha（無ければ empty-tree 定数）＋
-HEAD 比の変更ファイル＋未追跡ファイル。docs/ と .claude/ プレフィックスは
-除外（build-judge-card NONCODE_PREFIXES と同義）。
-HEAD sha をハッシュ入力に混入する理由: クリーンツリー同士の fp 一致で
-未テストの新コミットが green 認証されるのを防ぐ（grill-plan 🔴1）。
+常に rc=0。判定対象: 非 docs/.claude の committed tree-hash（HEAD の
+`git ls-tree -r` から docs/・.claude/ 行を除外→sha256）＋ HEAD 比の変更
+ファイル＋未追跡ファイル。docs/ と .claude/ プレフィックスは除外
+（build-judge-card NONCODE_PREFIXES と同義）。
+committed tree-hash を混入する理由（旧 head:<sha> の置換・R6 根1）:
+コード変更コミットは blob sha が動き fp が動く＝クリーンツリー同士の fp 一致で
+未テストの新コミットが green 認証されるのを防ぐ（silent-green 防止）。同時に
+docs/.claude-only コミットは非除外行が不変＝fp 不変（罠 r 根切り）。
 """
 from __future__ import annotations
 
@@ -113,6 +116,27 @@ class TestFingerprint(unittest.TestCase):
         self.assertRegex(b, HEX64)
         self.assertNotEqual(a, b)
 
+    def test_docs_only_commit_does_not_change_fp(self):
+        # R6 根1（罠 r）根切り: docs-only コミットは非 docs tree を動かさない＝
+        # fp 不変。旧 head:<sha> 実装では HEAD 進行で fp が動き a≠b（RED）。
+        (self.root / "app.py").write_text("print(1)\n")
+        subprocess.run(["git", "-C", str(self.root), "add", "app.py"],
+                       check=True)
+        subprocess.run(["git", "-C", str(self.root), "-c", "user.email=t@t",
+                        "-c", "user.name=t", "commit", "-q", "-m", "code"],
+                       check=True)
+        a = run_fp(self.root)  # クリーンツリー
+        (self.root / "docs").mkdir()
+        (self.root / "docs" / "NOTE.md").write_text("hi\n")
+        subprocess.run(["git", "-C", str(self.root), "add", "docs/NOTE.md"],
+                       check=True)
+        subprocess.run(["git", "-C", str(self.root), "-c", "user.email=t@t",
+                        "-c", "user.name=t", "commit", "-q", "-m", "docs only"],
+                       check=True)
+        b = run_fp(self.root)  # クリーンツリー・docs-only コミット後
+        self.assertRegex(b, HEX64)
+        self.assertEqual(a, b)
+
 
 class TestFingerprintHardening(unittest.TestCase):
     """grill-code 所見: 非ASCII名・無区切り連結・読取不能の silent-green 封鎖。"""
@@ -183,6 +207,51 @@ class TestFingerprintHardening(unittest.TestCase):
         deleted = run_fp(self.root)
         self.assertRegex(deleted, HEX64)
         self.assertNotEqual(clean, deleted)
+
+    def test_committed_dir_resembling_dotclaude_is_not_excluded(self):
+        # grill-plan 致命1: committed tree の '.claude/' 除外はリテラル。
+        # bare-dot（正規表現 any-char）だと 'aclaude/' 等「1文字+claude/」の
+        # コード dir を誤除外し、その変更が fp に反映されない silent-green 穴。
+        # aclaude/code.py をコミット→内容変更して再コミット。両ツリー clean なので
+        # committed 成分のみ差。誤除外あり=A==B（RED）、char-class [.] で保持=A≠B。
+        d = self.root / "aclaude"
+        d.mkdir()
+        (d / "code.py").write_text("print(1)\n")
+        subprocess.run(["git", "-C", str(self.root), "add", "aclaude/code.py"],
+                       check=True)
+        subprocess.run(["git", "-C", str(self.root), "-c", "user.email=t@t",
+                        "-c", "user.name=t", "commit", "-q", "-m", "c1"],
+                       check=True)
+        a = run_fp(self.root)
+        (d / "code.py").write_text("print(2)\n")
+        subprocess.run(["git", "-C", str(self.root), "add", "aclaude/code.py"],
+                       check=True)
+        subprocess.run(["git", "-C", str(self.root), "-c", "user.email=t@t",
+                        "-c", "user.name=t", "commit", "-q", "-m", "c2"],
+                       check=True)
+        b = run_fp(self.root)
+        self.assertRegex(b, HEX64)
+        self.assertNotEqual(a, b)
+
+    def test_root_file_named_docs_is_not_excluded(self):
+        # review (reviewer-testing 指摘): 除外は末尾スラッシュ必須。ルート直下の
+        # 「docs」という名の *ファイル*（ディレクトリでない）はコードとして扱われ、
+        # その変更が fp に反映されねばならない。`${tab}docs/` を `${tab}docs` に
+        # 弱めると誤除外＝silent-green になるため、その退行を pin する。
+        (self.root / "docs").write_text("v1\n")  # a FILE at root, not the docs/ dir
+        subprocess.run(["git", "-C", str(self.root), "add", "docs"], check=True)
+        subprocess.run(["git", "-C", str(self.root), "-c", "user.email=t@t",
+                        "-c", "user.name=t", "commit", "-q", "-m", "c1"],
+                       check=True)
+        a = run_fp(self.root)
+        (self.root / "docs").write_text("v2\n")
+        subprocess.run(["git", "-C", str(self.root), "add", "docs"], check=True)
+        subprocess.run(["git", "-C", str(self.root), "-c", "user.email=t@t",
+                        "-c", "user.name=t", "commit", "-q", "-m", "c2"],
+                       check=True)
+        b = run_fp(self.root)
+        self.assertRegex(b, HEX64)
+        self.assertNotEqual(a, b)
 
 
 if __name__ == "__main__":

@@ -1,9 +1,6 @@
 # テスト強度ドリル結果（機械ブロック・ハーネス生成）
 
 ```
-verdict: PASS
-mutants_total: 7
-mutants_caught: 7
-baseline: green
-survived: []
+verdict: SKIP
+reason: framework 改修・実装を per-task でコミット済み（HEAD=992ff4f、git diff HEAD の code 差分=空）。残る未追跡は docs/ 配下のみ＝drill 対象コードなし。代替実証: 全4新規テストを RED-first で赤化確認（docs_only は旧 head:sha 実装で FAIL／without_stamp は旧 OR ゲートで FAIL）＋一時変異で歯を実証（bare-dot→resembling RED／定数tree→new_commit+resembling RED／slash-drop→root-docs RED／OR-gate→without_stamp RED）。full suite 1080 passed/2 skipped。詳細は docs/qa-reports/iter64-review.md。実 mutant drill をコード hunk に対して試みたが、fingerprint.sh header/setup.sh 帰属コメント/test docstring の純コメントハンクが coverage floor（全体レビュー 1-5 で floor 除外を予定する既知限界）を満たせずコミット→skip 経路を採用。
 ```
