@@ -357,6 +357,61 @@ class TestCheckPhaseTransition(unittest.TestCase):
             self.assertEqual(rc, 0, f"Expected allow (S ship→docs adjacent), got: {out}")
 
 
+class TestPhaseTransitionTerminalEmptyListDeny(unittest.TestCase):
+    """Fix 2: forward transition out of a task_size terminal must be an explicit
+    deny, not a fall-through.
+
+    In the real enum SIZE_ALLOWED_PHASES['S'] ends at docs (== DEV_PHASE_ORDER
+    last), so `allowed_after_old` for a forward transition is never empty and the
+    hole is dormant. To exercise the hole as defense-in-depth against a future
+    task_size whose terminal precedes docs, this test temporarily removes 'docs'
+    from the S set so that 'ship' becomes the terminal. A forward ship→docs
+    transition then has an EMPTY allowed_after_old.
+
+    Before Fix 2: empty allowed_after_old skips the adjacency check, and the
+    docs prerequisite gates (review/qa/security/deploy) are filtered to the S set
+    (which no longer contains qa/security/deploy), so nothing is missing → the
+    function wrongly returns 0.
+    After Fix 2: empty allowed_after_old → explicit deny (return 1).
+
+    Uses in-process import (the module-level SIZE_ALLOWED_PHASES must be patched,
+    which subprocess CLI invocation cannot reach). The patch is restored in a
+    finally block to avoid polluting later tests.
+    """
+
+    @staticmethod
+    def _load_module():
+        import importlib.util
+
+        spec = importlib.util.spec_from_file_location(
+            "check_status_inproc", ROOT / "scripts" / "check_status.py"
+        )
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        return mod
+
+    def test_S_ship_to_docs_when_docs_not_terminal_is_denied(self):
+        mod = self._load_module()
+        original = mod.SIZE_ALLOWED_PHASES["S"]
+        # Remove 'docs' so 'ship' becomes the S terminal → allowed_after_old empty.
+        patched = set(original) - {"docs"}
+        content = make_status_md(
+            phase="docs", task_size="S",
+            approvals={"brainstorm": "approved", "review": "approved"},
+        )
+        try:
+            mod.SIZE_ALLOWED_PHASES["S"] = patched
+            with TempProject(content) as root:
+                rc = mod.check_phase_transition("ship", "docs", Path(root))
+            self.assertEqual(
+                rc, 1,
+                "Forward transition out of a task_size terminal (empty "
+                "allowed_after_old) must be an explicit deny, not a fall-through.",
+            )
+        finally:
+            mod.SIZE_ALLOWED_PHASES["S"] = original
+
+
 class TestSizeAllowedPhasesStatic(unittest.TestCase):
     """Fix 3a: docs is a valid terminal phase for task_size 'S' (unifies S with
     M/L terminals). The static validator (default invocation, no --check flag)

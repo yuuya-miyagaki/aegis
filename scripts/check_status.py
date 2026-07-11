@@ -1256,7 +1256,9 @@ def check_phase_transition(old_phase: str, new_phase: str, root: Path) -> int:
     2. Non-Dev intra-mode phases: always allowed.
     3. Backward/same transitions: always allowed (rework).
     4. Forward transitions: must go to the NEXT allowed phase
-       (per SIZE_ALLOWED_PHASES). Phase skipping is denied.
+       (per SIZE_ALLOWED_PHASES). Phase skipping is denied. A forward
+       transition out of the task_size terminal phase (no allowed phase
+       beyond old_phase) is explicitly denied.
     5. Prerequisite gates for the target phase must be met.
     """
     CLIENT_PHASES = MODE_PHASES["Client"]
@@ -1341,7 +1343,21 @@ def check_phase_transition(old_phase: str, new_phase: str, root: Path) -> int:
         if DEV_PHASE_ORDER.index(p) > old_idx and p in allowed
     ]
 
-    if allowed_after_old and new_phase != allowed_after_old[0]:
+    if not allowed_after_old:
+        # old_phase is the terminal allowed phase for this task_size — no forward
+        # transition exists beyond it. Explicit deny (defense in depth): without
+        # this, an empty allowed_after_old would skip the adjacency check and fall
+        # through to the prerequisite gate check, which could pass spuriously.
+        print(
+            f"ERROR: Phase skip detected: {old_phase}→{new_phase}."
+        )
+        print(
+            f"       '{old_phase}' is the terminal phase for task_size={task_size}; "
+            f"no forward transition beyond it is allowed."
+        )
+        return 1
+
+    if new_phase != allowed_after_old[0]:
         next_allowed = allowed_after_old[0]
         print(
             f"ERROR: Phase skip detected: {old_phase}→{new_phase}."
