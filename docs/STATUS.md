@@ -3,7 +3,7 @@ framework: aegis
 framework_version: "1.26.0"
 project_name: "Aegis"
 mode: Dev
-phase: implement
+phase: review
 task_type: framework
 task_size: M
 task_size_rationale: "iteration 66（framework・SF-010 封鎖＋frontmatter 読取意味論統一）M 確定（brainstorm Step D・update-task.sh 経由）。設計正本: docs/specs/2026-07-12-iter66-sf010-parser-unification-design.md（Fix ①: post-status-audit migration-grace を『snapshot に task_type 行なし＝真の旧フォーマット』限定に絞る／Fix ②: frontmatter_value を library 級スコープ化〔---あり→frontmatter 内 first-match・未終端→空 fail-closed・bare→whole-file 温存〕／Fix ③: snapshot 生成スコープ化＝baseline 毒込み封鎖／Fix ④: gate_value 本文 fallback を ---無しファイル限定〔F-2〕／Fix ⑤: python extract_scalar_value 行順 first-match 化〔F-1〕＋extract_approval_map 先勝ち化／parity drift-guard テスト）。footprint: hooks/lib/frontmatter.sh＋hooks/lib/snapshot.sh＋hooks/post-status-audit.sh＋scripts/check_status.py＋hooks/check-gate.sh(dedup)＋tests＝M（2-5）。control-plane（audit/gate 強制ロジック）を触るため review+qa+security 必須・M のため deploy skip。"
@@ -37,7 +37,7 @@ external_evidence:
     scope: "v0.13.0 計画 5 ラウンドレビュー"
     findings: "Round 1〜5 で計 25 件の指摘（hook 出力スキーマ陳腐化、TaskCreated/Completed 制御方式、Plan 条件付き許可、effort 配分、pre-compact.sh 同種破損、`if` 単一 rule 制約等）"
     resolution: "Rev.5 で全件反映、Phase 0a 即時実装着手 GO。hotfix/v0122-hook-schema ブランチで開始。"
-next_action: "**【iter66 implement 着手】** plan approved（計画正本=docs/plans/2026-07-12-iter66-sf010-parser-unification-implementation-plan.md・grill-plan 致命2＝gate loop grace 未カバー/読点 census 欠如を反映済 a8620d1）。Task 0（census・親セッション）→Task 1-6（implementer=opus 委譲・TDD RED-first・per-task commit・親=fable が Stage1 仕様準拠を diff 検証）→Task 7（parity drift-guard）→grill-code→review へ。◆既知 flaky=test_update_gate_lock（回帰外・full-review R10 test#8）。◆環境注意: aegis 内で Claude Code 起動。push=active gh は yuuya-miyagaki（切替不要）。"
+next_action: "**【iter66 review 着手】** implement 完了（Task 0-7 全完・per-task commit abf6d04〜fba9b08・全 Stage1 PASS）＋grill-code 完了（Critical0・🟡3＋🟢1 を fix-forward 1934c98＝regression 関数読点スコープ化〔census 盲点・小文字 $status_file〕/---判定終端許容整合/snapshot gate 節ガード）。full 1127 passed/2 skipped・contract PASS。次=review 1次（finder=opus 4角度: gate迂回/正規フロー回帰/パーサ整合/テスト強度・read-only 6拘束）→親 verify=fable→盲検2次=fable→record green→ref→review gate 承認申請。◆既知 flaky=test_update_gate_lock（回帰外）。◆環境注意: push=active gh は yuuya-miyagaki（切替不要）。"
 blockers: []
 failure_tracking: null
 session_history:

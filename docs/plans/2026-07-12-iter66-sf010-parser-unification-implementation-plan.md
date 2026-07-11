@@ -78,6 +78,7 @@ main 直コミット・per-task commit（iter65 踏襲）。push は全ゲート
 - [ ] **Step 1: census 実行**
 
 Run: `grep -rnE '(grep|sed|awk).*(STATUS_FILE|STATUS\.md)' hooks/ scripts/*.sh | grep -v frontmatter.sh`
+Run: `grep -rnE '(grep|sed|awk)[^|]*"\$\{?(status_file|sf)\}?"' hooks/ scripts/*.sh`（**盲点補正**: 小文字ローカル変数 `$status_file` 経由の読点は 1 本目の regex に不感。grill-code 2026-07-12 で `hooks/lib/snapshot.sh:85` の `aegis_snapshot_gate_regression` 内 whole-file sed を見逃していたことが実証された — fix-forward でスコープ化済み。以後の census は両方を実行する）
 
 - [ ] **Step 2: 分類台帳の確認**（plan 作成時の事前実施結果。implement 時に再実行し、**新規 hit がないこと**を確認。増えていたら分類を追記してから進む）
 
@@ -91,6 +92,7 @@ Run: `grep -rnE '(grep|sed|awk).*(STATUS_FILE|STATUS\.md)' hooks/ scripts/*.sh |
 | `hooks/session-start.sh:132`（session_history） | advisory（同上） | 変換不要・理由記録 |
 | `scripts/update-task.sh:128-136`（sed/awk 書換） | authorized writer（書込側） | 対象外。※sed は無アドレスで全 `^key:` 行を authorized 値に書換＝本文行も収束方向（緩和ではない）と記録 |
 | `scripts/update-gate.sh:320`（sed 書換） | authorized writer | 対象外（同上） |
+| `hooks/lib/snapshot.sh:85`（regression 関数・**census 盲点＝grill-code で発見**） | enforcement 隣接（session-start の復旧アンカー判定・混入は温存方向のみだが意味論不統一） | fix-forward で `frontmatter_section` へスコープ化 |
 
 - [ ] **Step 3: 台帳を qa evidence 用に記録**（本表を implement 時の実行結果で確定し、review レポートから参照）
 
