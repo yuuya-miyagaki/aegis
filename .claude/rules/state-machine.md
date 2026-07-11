@@ -42,6 +42,6 @@ Phase gates:
 
 | type | required gates | S (1 file) | M (2-5) | L (6+) |
 |------|---------------|------------|---------|--------|
-| feature/refactor/framework | review+qa+security+deploy | impl->review->ship | skip deploy | all |
+| feature/refactor/framework | review+qa+security+deploy | impl->review->ship->docs | skip deploy | all |
 | bugfix | review; brainstorm+plan=n/a (bug-diagnosis) | same | same | same |
 | hotfix | review preferred; brainstorm+plan=n/a (bug-diagnosis simplified) | same | same | same |
