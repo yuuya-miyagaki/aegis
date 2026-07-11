@@ -327,7 +327,10 @@ SF-001 系の網羅的閉鎖（rounds 5-11）で**実用的なシェル難読化
 - **本 iter で封鎖済みの姉妹経路（参考）**: 同 finding の本文 spoof 経路（frontmatter に task_size 無し・**本文**行頭 `task_size: S`＝`frontmatter_value` whole-file grep が拾う）は `b9c95f7` で check-gate の task_size 読取を frontmatter スコープ化して封鎖済み。
 - **修正方向（次反復・専用 brainstorm/plan 推奨）**:
   - migration-grace を「真の旧フォーマット snapshot（task_type すら無い）」限定に絞る（task_type は必須キー＝現行 snapshot には常在。task_type 在で task_size 空→値 は raw-Edit＝block）。正規 update-task.sh 経路は snapshot 同期済みで tamper 判定に到達しないため無影響。migration ケース（真の旧 snapshot）は grace 温存。
-  - 併せて bash（check-gate/audit/snapshot の whole-file grep）と python（frontmatter-scope extract_frontmatter）の**パーサ二重実装 drift** を統一検討（gate_approvals 重複キーの先勝ち/後勝ち乖離＝同 finding 2(b) Minor も同根）。
+  - 併せて bash（check-gate/audit/snapshot の whole-file grep）と python（frontmatter-scope extract_frontmatter）の**パーサ二重実装 drift** を統一検討。次の同根 3 件を明示スコープに含める:
+    - (i) gate_approvals 重複キーの先勝ち(bash `grep -m1`)/後勝ち(python `extract_approval_map` dict 上書き) 乖離（1次 finding 2(b) Minor）。
+    - (ii) **`extract_scalar_value`（check_status.py:264-273）の引用形優先**（盲検2次 F-1・Minor conf8）: `task_size: M` の後に `task_size: "S"` を raw 追記すると、audit 比較（bash 先勝ち）は M→M で tamper 非検知のまま、python 消費側（`check_phase_transition` の S 隣接判定・`task_size != "S"` strict-gate 免除）だけが S を読む＝audit-evading な enforcement 緩和（python=S/bash=M の割れ・実測）。check-gate 自体は騙されない（コード編集ゲートは緩まない）。
+    - (iii) **`gate_value` の `raw_section` 本文フォールバック**（盲検2次 F-2・Minor conf9・pre-existing）: frontmatter に gate_approvals 節が無い STATUS では本文の gate_approvals ブロックが gate 判定に採用され allow になり得る（旧版でも同様＝この diff の回帰ではない）。empty-baseline class では audit を逃れ得るため SF-010 修正時に gate_approvals 側も対象化。
   - control-plane（post-status-audit.sh）変更＋migration 正当性の edge を含むため、review fix-forward で急がず専用反復で設計する（rushed な control-plane 変更は新規バグ源）。
 - **状態**: **OPEN**。iter65 security gate で residual として明示 ack 予定。次反復（iter66 候補）で対応。
 
