@@ -253,8 +253,17 @@ fi
 # structurally impossible (plan can never reach approved for S). For S the pre-implement
 # approval is the brainstorm gate; every other size (M/L/unset/invalid) keeps
 # the conservative plan-gate check — the gate is never loosened by an unknown
-# or malformed task_size. Pure bash: only frontmatter_value / gate_value.
-TASK_SIZE=$(frontmatter_value "$STATUS_FILE" "task_size")
+# or malformed task_size. Pure bash: only read_frontmatter / gate_value.
+#
+# task_size is read within the FRONTMATTER SCOPE only (between the leading `---`
+# pair), NOT whole-file. task_size is an OPTIONAL frontmatter key, so a whole-file
+# read (frontmatter_value) would pick up a body line like `task_size: S` when the
+# frontmatter omits the key — letting a raw body edit of docs/STATUS.md spoof the
+# gate into the S branch (review finding, iter65). Frontmatter-scoping matches
+# python extract_frontmatter semantics. mode/task_type stay on frontmatter_value:
+# they are mandatory keys that always appear in the frontmatter (file-order first),
+# so a body line cannot win their grep -m1; only optional task_size is spoofable.
+TASK_SIZE=$(read_frontmatter "$STATUS_FILE" | grep -m1 '^task_size:' | sed 's/^task_size:[[:space:]]*//; s/^"//; s/"$//' || true)
 
 if [ "$TASK_SIZE" = "S" ]; then
   BRAINSTORM_GATE=$(gate_value "$STATUS_FILE" "brainstorm")

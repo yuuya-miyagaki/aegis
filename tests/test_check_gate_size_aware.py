@@ -205,6 +205,30 @@ class TestCheckGateSizeAware(unittest.TestCase):
                         f"S + missing brainstorm key must deny (fail-closed), got: {out!r}")
 
 
+    def test_i_body_task_size_spoof_does_not_reach_S_branch(self):
+        """(i) frontmatter に task_size 無し・本文行頭に `task_size: S` の spoof → deny。
+
+        check-gate は task_size を frontmatter スコープ（`---`〜`---` 間）で読むため、
+        本文行は S 分岐を誘導できない。plan=pending なので else 分岐（plan gate）に
+        落ちて deny が正。review 1次 finder（gate 迂回）が検出した本文 spoof 経路の
+        回帰ピン（iter65）。size-aware 化以前は task_size 非参照で本文行が無意味
+        だったが、size を読むようになり whole-file grep の緩さが gate 弱体化に転化した
+        ため frontmatter-scope 読みへ是正。"""
+        txt = (
+            "---\nframework: aegis\nmode: Dev\nphase: implement\n"
+            "task_type: feature\n"
+            "gate_approvals:\n  brainstorm: approved\n  plan: pending\n---\n"
+            "\n## body\ntask_size: S\n"
+        )
+        with _scratch_root(txt) as name:
+            root = Path(name)
+            out = _hook(root, _src(root))
+        self.assertTrue(
+            _denied(out),
+            f"body task_size spoof must NOT reach the S branch (frontmatter-scoped "
+            f"read); expected plan-gate deny, got: {out!r}")
+
+
 class TestSizeGateDriftGuard(unittest.TestCase):
     """check-gate.sh の size→gate ハードコードが python SoT から drift したら赤く落ちる guard。
 
