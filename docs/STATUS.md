@@ -3,13 +3,13 @@ framework: aegis
 framework_version: "1.26.0"
 project_name: "Aegis"
 mode: Dev
-phase: ship
+phase: docs
 task_type: framework
 task_size: M
 task_size_rationale: "iteration 65（framework・全体レビュー §4 Phase 1 項目 1-4「S サイズ修復」＝R2🔴）M 確定（brainstorm Step D・update-task.sh 経由）。設計正本: docs/specs/2026-07-10-iter65-s-size-repair-design.md（Fix 1: check-gate.sh を pure-bash size-aware 化＝S→brainstorm gate/他→plan gate・python 委譲は fail-open 退行のため不採用／Fix 2: check_phase_transition 空リスト穴封鎖／Fix 3a: SIZE_ALLOWED_PHASES[S] に docs 追加＝罠 q 根絶／drift-guard テスト／state-machine.md 表同期）。footprint: hooks/check-gate.sh＋scripts/check_status.py＋tests＋.claude/rules/state-machine.md＝M（2-5）。control-plane（gate 強制ロジック）を触るため review+qa+security 必須・M のため deploy skip。"
 iteration: 65
 ui_surface: false
-last_updated: "2026-07-12T03:00:00Z"
+last_updated: "2026-07-12T06:00:00Z"
 gate_approvals:
   client_ready_for_dev: n/a
   brainstorm: approved
@@ -37,14 +37,10 @@ external_evidence:
     scope: "v0.13.0 計画 5 ラウンドレビュー"
     findings: "Round 1〜5 で計 25 件の指摘（hook 出力スキーマ陳腐化、TaskCreated/Completed 制御方式、Plan 条件付き許可、effort 配分、pre-compact.sh 同種破損、`if` 単一 rule 制約等）"
     resolution: "Rev.5 で全件反映、Phase 0a 即時実装着手 GO。hotfix/v0122-hook-schema ブランチで開始。"
-next_action: "**【qa 完了→承認・security フェーズへ】** テーマ＝S サイズ修復（R2🔴・iter65）。qa=approve（機能対照表7件PASS・B1 drill skip〔per-task committed〕＋qa一次 fresh 変異4/4 kill〔M1-M4〕・full suite 1096 passed/2 skipped 緑記録）。**次にやること＝security（1次 in-session or 委譲＋盲検2次=fable・SF-010〔task_size empty-baseline raw-Edit×migration-grace 穴・F-1/F-2 パーサ drift〕を明示 residual ack〔ユーザー承認で次反復 iter66 分離〕）→ship→docs**。◆既知 flaky=test_update_gate_lock（lock 待ちタイミング・diff 不接触＝回帰外）。◆ref→approve は pytest 挟まず連続（iter64 conf8）。◆push 手前まで自走承認済。"
+next_action: "**【docs 完了・dev_ready_for_client 申請待ち＝push 手前】** iter65 / v1.26.0（S サイズ修復・R2🔴）は全 dev ゲート approved（brainstorm/plan/review/qa/security・M で deploy skip）＋ship（bump 3箇所・TO-CLIENT）＋docs（LEARNINGS 更新・session_history に iter65・iter62 剪定）まで完了。実装コミット c17be50〜（docs コミットは本 next_action 反映後）。**次にやること＝ユーザーに (1) dev_ready_for_client 承認 と (2) push（`gh auth switch --user yuuya-miyagaki` 後）の可否を確認**。承認後 `bash scripts/update-gate.sh dev_ready_for_client approve`→iteration rollover（iter66）。◆**残存 SF-010**（task_size empty-baseline raw-Edit×migration-grace・Medium・OPEN）＋F-1/F-2 パーサ drift は iter66 の第一候補テーマ（ユーザー承認で分離済）。◆既知 flaky=test_update_gate_lock（回帰外）。"
 blockers: []
 failure_tracking: null
 session_history:
-  - date: "2026-07-07"
-    mode: Dev
-    phase: "docs"
-    note: "iter62 / v1.23.0（委譲拘束 SoT 標準化＝全体レビュー R1 文言層・iter60 事故クラス3層防御の最終層）を全 dev ゲート approved まで完走（push 手前で停止）。動機正本＝docs/full-review-2026-07-06-six-dimensions-evolution.md §2 R1 修正方向(1)・§4 Phase 0-1。実装: routing.md に「## Verification delegation」節（6拘束・6点目 read-only 無条件＝既存ファイル変更禁止・git checkout/restore/reset/clean/stash 禁止・書込みは指定パスの新規 evidence のみ・汚れたら停止報告/自己復旧禁止・SendMessage 非使用で iter59 pin 一意性保全）＋4経路参照（qa-verification 6点目／review-gate・security-gate 盲検2次／subagent-dev コアルール5）＋pin 9本（見出し一意 count==1・否定句2・連結列挙・汚染時プロトコル・無条件宣言・4経路参照＋核・SendMessage count==1）＋budget 実測 raise（routing 70→181・qa 455→459）。L＝deploy gate 込み全9フェーズ（iter54 前例の対象なし宣言レポート）。brainstorm→plan(grill-plan 致命3=rc偽検証/deploy claims 形式/-k 空マッチ→全反映)→implement(TDD 7本 RED 実証→GREEN・full 1070)→grill-code(致命ゼロ・実 drill 可能性を指摘)→review(1次=xhigh 10角度 finder→8メカ dedup→6並列 verify→sweep・approve・CONFIRMED 1件 fix-forward=SendMessage count==1／盲検2次=approve_with_notes・Minor-1 第2否定 MUST NOT run pin 漏れ=may run 反転が全 pin 温存で iter60 許可文化→fix-forward・変異 RED 実証)→qa(B1 実 drill 11/11 caught・skip なし＝md/json/テスト全ハンク mutant・full 1071 recorded green)→security(1次 approve／盲検2次 approve_with_notes・Major-1=drill の同長 mutant＋同秒 revert が pyc ミラーキャッシュ汚染→偽 RED live→touch+再実走+再 record で ship 前解消・恒久対策 PYTHONDONTWRITEBYTECODE は Phase 1-5 起票・Minor=git switch 列挙外/assigned path 責務は residual 受容+別テーマ)→deploy(iter54 形式・claims approve)→ship(v1.22→1.23 MINOR・bump 3箇所・TO-CLIENT)→docs(LEARNINGS 3件)。全委譲（finder 11・verifier 6・盲検2次 2）に新6拘束を自己適用＝tree 変更ゼロ。実装未 push（push=gh auth switch --user yuuya-miyagaki）。**教訓核**: (1) 同長 mutant の pyc キャッシュ汚染＝ソース無汚染のテスト改変経路・drill 後は再実走してから ship（conf9）。(2) 否定が複数ある拘束文は否定ごとに独立 pin＋docstring 宣言の不変条件は assert 化するまで守られない（conf8）。(3) guidance diff（md+json+test）でも実 B1 drill は成立＝skip 前例の上書き（conf8）。"
   - date: "2026-07-08"
     mode: Dev
     phase: "docs"
@@ -53,6 +49,10 @@ session_history:
     mode: Dev
     phase: "docs"
     note: "iter64 / v1.25.0（fingerprint tree-hash 化＝全体レビュー R6 根1・§4 Phase 1「1-1」＋setup OR marker 厳格化＝iter63 LOW-1 解消）を全 dev ゲート approved まで完走（M＝deploy skip・push 手前で停止）。動機正本＝docs/full-review-2026-07-06-six-dimensions-evolution.md §2 R6 根1・§4 Phase 1（1-1）／iter63 LOW-1。実装: hooks/lib/fingerprint.sh のハッシュ入力 `head:<sha>` を「非 docs/.claude の committed tree-hash」（`git ls-tree -r HEAD` を docs/・.claude/ 除外→sha256・char-class `[.]claude/` でリテラルドット固定）に置換＝docs-only コミットで green が無効化する罠 r を根切りしつつ code コミットで fp が動く silent-green 防止を完全保存・token 契約/consumer 不変＋bin/setup.sh selfheal 身元判定を `.aegis-install-version` OR cp-lock.sh から stamp 単独へ（stamp K-11 2026-06-13 が cp-lock 2026-06-21 より先行導入で正規 self-heal 不喪失）。新規テスト4（docs-only 不感/aclaude 誤除外回帰/root-docs ファイル包含/without-stamp fail-closed）RED-first。brainstorm→plan(grill-plan 致命1=escaping over-exclusion〔$'\\t\\.claude/' が bash で bare-dot 化〕→char-class を実 grep 実証で反映)→implement(TDD RED-first)→grill-code(致命0)→review(1次 in-session＋テスト強度 23 passed 無回帰＋盲検2次 approve_with_notes・mutant flip で歯・fix-forward: docs 非対称コメント＋root-docs テスト)→qa(B1 drill=**skip**〔実装コミット済 992ff4f・diff 空／純コメントハンクは coverage floor 除外の既知限界 §1-5〕＋代替実証: 4新規 RED-first＋4種一時変異 RED＋coverage 空白3件を実 git 安全確認・full 1080 recorded green)→security(1次 in-session＋盲検2次 security 動的実証〔injection 6種非実行・clean→clean pin・移行 fail-closed・OR marker 発火面縮小・date-ordering git log 裏取り〕・Findings HIGH/MEDIUM/LOW 0・両者 approve 収束・**iter63 LOW-1 をクローズ**・deps🟡 ack)→ship(v1.24→1.25 MINOR・bump 3箇所〔check_framework_contract.py/STATUS/STATUS.template〕・TO-CLIENT・README を stamp 単独に更新)→docs(LEARNINGS 3件＋iter57 conf9 罠 r を解消済みに更新)。実装コミット済（992ff4f・qa skip のため per-task commit・ship で bump 込み amend 予定）・未 push（push=gh auth switch --user yuuya-miyagaki）。**教訓核**: (1) シェルで組む grep のドットは `\\.` でなく `[.]` で固定（ANSI-C クォートがバックスラッシュを剥がし bare-dot 化＝silent-green 穴・grill-plan 実 grep で捕捉）（conf8）。(2) コメント修正の孤立ハンクは B1 floor を満たせず commit→skip が sanctioned（conf7）。(3) gate ref は承認前に置くと pending→null-ref 不変条件違反で contract red＝record green→ref→承認を pytest 挟まず連続（conf8・全体レビュー 1-3 罠が実地顕在化）。"
+  - date: "2026-07-12"
+    mode: Dev
+    phase: "docs"
+    note: "iter65 / v1.26.0（S サイズ修復＝全体レビュー §4 Phase 1 項目 1-4・R2🔴）を全 dev ゲート approved まで完走（M＝deploy skip・push 手前で停止）。動機正本＝docs/full-review-2026-07-06-six-dimensions-evolution.md §R2/§4 表 1-4。実装（工程別 model tiering: 疑う=Fable 5／書く=Opus 4.8）: Fix 1 check-gate.sh を pure-bash size-aware 化（S→brainstorm gate/他・未設定・不正値→plan gate・approved OR n/a 許容・python 委譲は fail-open 退行で不採用・task_size は frontmatter スコープ読み）＋Fix 2 check_phase_transition の terminal 空リスト穴を明示 deny（Fix 3a 後 dormant・将来 size 追加への defense in depth）＋Fix 3a SIZE_ALLOWED_PHASES[S] に docs 追加（罠 q 根絶・terminal 統一・純加算）＋drift-guard（bash の size→gate 複製が python SoT から drift したら赤・iter53 parity 型）＋guidance 同期（state-machine.md/architecture-overview.md 姉妹表）。三者不整合（rule 文書○/python○/bash hook ✗）を bash 側へ揃えた。brainstorm→plan(grill-plan 致命2=Task2 monkeypatch が subprocess ハーネスと矛盾→in-process import 明記/リスク3 S降格迂回の受容 stance 確定＋要検討5 全反映)→implement(TDD RED-first・implementer=opus per-task commit)→grill-code(Critical0・fix-forward=docstring 同期)→review(1次4角度 finder=opus→親 verify=fable・盲検2次=fable 収束 approve_with_notes・Major3件 fix-forward=b9c95f7 本文spoof封鎖〔frontmatter スコープ読み〕/89264c7 else分岐 n/a許容ピン/ef1cd9b 姉妹表同期)→qa(B1 drill=skip〔per-task committed・iter64 conf7〕＋qa一次 fresh 変異 M1-M4 全kill＋full suite 1096 passed/2 skipped 緑記録)→security(1次 in-session＋盲検2次=fable・injection/secrets/data-exposure なし実測・SF-010 residual ack〔severity Major→Medium 較正〕・両者 approve_with_notes 収束)→ship(v1.25→1.26 MINOR・bump 3箇所〔check_framework_contract.py/STATUS/STATUS.template〕・TO-CLIENT)→docs(LEARNINGS: S編集不能/framework-M唯一クリーンを解消済へ更新＋新3件〔設計核/gate 昇格の parser・audit 穴/flaky 切り分け〕＋ref-window conf8→9)。実装コミット済（c17be50〜31c816d）・未 push（push=gh auth switch --user yuuya-miyagaki）。**残存**: SF-010（task_size empty-baseline raw-Edit×migration-grace 穴・Medium・OPEN）はユーザー承認で次反復 iter66 分離（F-1/F-2 パーサ drift 同梱）。既知 flaky=test_update_gate_lock（lock 待ちタイミング・diff 不接触＝回帰外）。**教訓核**: (1) gate 判定に OPTIONAL フィールドを昇格させるとパーサの緩さ＋監査カバレッジ穴が初めて gate-bypass に転化（読取厳格性と監査を機能追加と同時に検証）。(2) 実装層だけの三者不整合は緩い bash を厳しい python に意味で揃え parity guard をセットに。(3) record red は ref-window 一過性→flaky の順で切り分け（機構不接触なら回帰外）。"
 ---
 
 ## Summary
