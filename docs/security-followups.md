@@ -313,6 +313,24 @@ SF-001 系の網羅的閉鎖（rounds 5-11）で**実用的なシェル難読化
 - **by-design / not-a-vuln / forward-looking（コード変更なし）**: C4→SF-007（NOT-A-VULN）・G4→SF-008（by-design）・C1→SF-009（forward-looking・現状到達不能）。
 - 残る実コード修正タスクは**ゼロ**。今後 backlog 由来の着手は、上記 SF の「将来トリガ」が発火した時のみ。
 
+### SF-010: task_size の empty-baseline raw-Edit が migration-grace で tamper 検知を逃れる（**OPEN**・iter65 review 検出）
+
+- **発見**: iter65（S サイズ修復）review 1次 finder（gate 迂回）。親セッションで独立再現・CONFIRMED（旧実装 26de7f6 では両経路 deny＝この diff の回帰面）。
+- **種別**: **moat 回帰（文書化済み tamper-evidence 保証の違反）**。脅威モデル節「task_type/task_size も authorized writer 以外が書き換えると .gate-snapshot 比較で検知・block」に対する empty-baseline の穴。
+- **重大度**: **Major**（confidence 8）。ただし発火前提つき（下記）。
+- **経路**:
+  - `hooks/post-status-audit.sh:210` の tamper 判定 `[ "$OLD_TF" != "$NEW_TF" ] && [ -n "$OLD_TF" ]` は、snapshot 側 task_size（OLD_TF）が**空**だと block をスキップ（migration-grace）。
+  - task_size は OPTIONAL frontmatter キー＝**fresh scaffold / rollover 直後〜brainstorm Step D 前**は未設定（empty-baseline）が正規状態。この窓で `docs/STATUS.md`（docs/* ゆえ check-gate は raw-Edit を常時 allow）の frontmatter に `task_size: S` を raw-Edit で足すと、update-task.sh を通さず・tamper 検知されず S 化。
+  - 以降 check-gate は task_size=S を読み brainstorm gate へ切替＝**brainstorm 承認済みなら plan 儀式を bypass**してコード編集 allow。
+  - **この diff 以前は無害**（task_size 非参照）だったが、size-aware 化で task_size が gate 判定に昇格し初めて gate-bypass に転化。
+- **発火前提（severity 較正）**: task_size 設定済み（M/L 等）なら OLD_TF 非空で block されるため**到達不能**。empty-baseline 窓（早期タスク状態）＋意図的 frontmatter raw-Edit が必要。単一ユーザ dogfood では自傷経路（外部攻撃者面ではない）。
+- **本 iter で封鎖済みの姉妹経路（参考）**: 同 finding の本文 spoof 経路（frontmatter に task_size 無し・**本文**行頭 `task_size: S`＝`frontmatter_value` whole-file grep が拾う）は `b9c95f7` で check-gate の task_size 読取を frontmatter スコープ化して封鎖済み。
+- **修正方向（次反復・専用 brainstorm/plan 推奨）**:
+  - migration-grace を「真の旧フォーマット snapshot（task_type すら無い）」限定に絞る（task_type は必須キー＝現行 snapshot には常在。task_type 在で task_size 空→値 は raw-Edit＝block）。正規 update-task.sh 経路は snapshot 同期済みで tamper 判定に到達しないため無影響。migration ケース（真の旧 snapshot）は grace 温存。
+  - 併せて bash（check-gate/audit/snapshot の whole-file grep）と python（frontmatter-scope extract_frontmatter）の**パーサ二重実装 drift** を統一検討（gate_approvals 重複キーの先勝ち/後勝ち乖離＝同 finding 2(b) Minor も同根）。
+  - control-plane（post-status-audit.sh）変更＋migration 正当性の edge を含むため、review fix-forward で急がず専用反復で設計する（rushed な control-plane 変更は新規バグ源）。
+- **状態**: **OPEN**。iter65 security gate で residual として明示 ack 予定。次反復（iter66 候補）で対応。
+
 ## CLOSED
 
 （なし）
