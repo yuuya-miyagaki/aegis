@@ -317,7 +317,7 @@ SF-001 系の網羅的閉鎖（rounds 5-11）で**実用的なシェル難読化
 
 - **発見**: iter65（S サイズ修復）review 1次 finder（gate 迂回）。親セッションで独立再現・CONFIRMED（旧実装 26de7f6 では両経路 deny＝この diff の回帰面）。
 - **種別**: **moat 回帰（文書化済み tamper-evidence 保証の違反）**。脅威モデル節「task_type/task_size も authorized writer 以外が書き換えると .gate-snapshot 比較で検知・block」に対する empty-baseline の穴。
-- **重大度**: **Major**（confidence 8）。ただし発火前提つき（下記）。
+- **重大度**: **Medium**（iter65 security 盲検2次で Major→Medium に較正）。上げ止まり＝文書化済み tamper-evidence 保証に実在の例外を作る moat 回帰・empty-baseline は authorized フロー到達の正規状態。抑制＝**end-state（mislabel-S で plan skip）は authorized な RISK-3 経路（`update-task.sh --size S`）で既に到達可能かつ fail-visible 受容済みで、SF-010 の capability 増分は「update-task.sh の監査ログ行を省く」だけ＝新 capability を解錠しない**。加えて brainstorm ハードゲート必須・git/transcript/snapshot で完全可視・review/qa/security は下流で依然強制（skip は plan のみ）・脅威モデルは単一ユーザ dogfood の事故的自己バイパス（外部攻撃者面ではない）。発火前提つき（下記）。
 - **経路**:
   - `hooks/post-status-audit.sh:210` の tamper 判定 `[ "$OLD_TF" != "$NEW_TF" ] && [ -n "$OLD_TF" ]` は、snapshot 側 task_size（OLD_TF）が**空**だと block をスキップ（migration-grace）。
   - task_size は OPTIONAL frontmatter キー＝**fresh scaffold / rollover 直後〜brainstorm Step D 前**は未設定（empty-baseline）が正規状態。この窓で `docs/STATUS.md`（docs/* ゆえ check-gate は raw-Edit を常時 allow）の frontmatter に `task_size: S` を raw-Edit で足すと、update-task.sh を通さず・tamper 検知されず S 化。

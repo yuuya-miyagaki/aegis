@@ -3,7 +3,7 @@ framework: aegis
 framework_version: "1.25.0"
 project_name: "Aegis"
 mode: Dev
-phase: qa
+phase: security
 task_type: framework
 task_size: M
 task_size_rationale: "iteration 65（framework・全体レビュー §4 Phase 1 項目 1-4「S サイズ修復」＝R2🔴）M 確定（brainstorm Step D・update-task.sh 経由）。設計正本: docs/specs/2026-07-10-iter65-s-size-repair-design.md（Fix 1: check-gate.sh を pure-bash size-aware 化＝S→brainstorm gate/他→plan gate・python 委譲は fail-open 退行のため不採用／Fix 2: check_phase_transition 空リスト穴封鎖／Fix 3a: SIZE_ALLOWED_PHASES[S] に docs 追加＝罠 q 根絶／drift-guard テスト／state-machine.md 表同期）。footprint: hooks/check-gate.sh＋scripts/check_status.py＋tests＋.claude/rules/state-machine.md＝M（2-5）。control-plane（gate 強制ロジック）を触るため review+qa+security 必須・M のため deploy skip。"
@@ -16,7 +16,7 @@ gate_approvals:
   plan: approved
   review: approved
   qa: approved
-  security: pending
+  security: approved
   deploy: pending
   dev_ready_for_client: pending
 current_refs:
@@ -25,7 +25,7 @@ current_refs:
   spec: "docs/specs/2026-07-10-iter65-s-size-repair-design.md"
   review: "docs/qa-reports/iter65-review.md"
   qa: "docs/qa-reports/iter65-qa.md"
-  security: null
+  security: "docs/qa-reports/iter65-security.md"
   deploy: null
   translation: null
 external_evidence:
