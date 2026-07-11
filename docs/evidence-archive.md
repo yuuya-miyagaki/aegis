@@ -46,3 +46,11 @@ v151-security.md 記録の残余 5 系統を Task 1〜9 TDD で完走（461→47
 - **scope:** v0.12.2 実装後 4 ラウンドレビュー
 - **findings:** Round 6 (P1×2, P2×1: pre-compact exit 2 / minimal-project / test rc), Round 7 (P1×1, P3×1: git add 漏れ / テスト件数表記), Round 8 (P2×1, P3×1: stale last_updated / grep 自己マッチ), Round 9 (P3×2: コメント不整合)
 - **resolution:** 9件全反映。tier 1/2 PASS、134 tests PASS、本体と minimal-project 完全同期確認済み。STATUS external_evidence が 3 件上限のため iter48 rollover でアーカイブ（最古エントリ）。
+
+### session-history: 2026-04 期 v0.7.0〜v0.12.0（STATUS body から移設 2026-07-12・iter66 rollover）
+
+- 2026-04-15: v0.7.0-v0.7.2 実装。ネイティブ機能改善、scaffold自己完結性、信頼境界ハードニング。
+- 2026-04-17: v0.8.0 Client モード強化 実装完了+全ゲート通過+コミット+プッシュ。48ファイル変更。
+- 2026-04-18: v0.9.0-v0.10.0 integration-assist, browser-assist。全ゲート通過+コミット+プッシュ。
+- 2026-04-22: v0.11.0 Hair Salon Bloom 振り返り7施策実装+コミット+プッシュ。
+- 2026-04-22: v0.12.0 MCP gate + ref check + name lint + health check。48テスト全PASS。

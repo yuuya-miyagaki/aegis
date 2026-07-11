@@ -3,29 +3,29 @@ framework: aegis
 framework_version: "1.26.0"
 project_name: "Aegis"
 mode: Dev
-phase: docs
+phase: plan
 task_type: framework
 task_size: M
-task_size_rationale: "iteration 65（framework・全体レビュー §4 Phase 1 項目 1-4「S サイズ修復」＝R2🔴）M 確定（brainstorm Step D・update-task.sh 経由）。設計正本: docs/specs/2026-07-10-iter65-s-size-repair-design.md（Fix 1: check-gate.sh を pure-bash size-aware 化＝S→brainstorm gate/他→plan gate・python 委譲は fail-open 退行のため不採用／Fix 2: check_phase_transition 空リスト穴封鎖／Fix 3a: SIZE_ALLOWED_PHASES[S] に docs 追加＝罠 q 根絶／drift-guard テスト／state-machine.md 表同期）。footprint: hooks/check-gate.sh＋scripts/check_status.py＋tests＋.claude/rules/state-machine.md＝M（2-5）。control-plane（gate 強制ロジック）を触るため review+qa+security 必須・M のため deploy skip。"
-iteration: 65
+task_size_rationale: "iteration 66（framework・SF-010 封鎖＋frontmatter 読取意味論統一）M 確定（brainstorm Step D・update-task.sh 経由）。設計正本: docs/specs/2026-07-12-iter66-sf010-parser-unification-design.md（Fix ①: post-status-audit migration-grace を『snapshot に task_type 行なし＝真の旧フォーマット』限定に絞る／Fix ②: frontmatter_value を library 級スコープ化〔---あり→frontmatter 内 first-match・未終端→空 fail-closed・bare→whole-file 温存〕／Fix ③: snapshot 生成スコープ化＝baseline 毒込み封鎖／Fix ④: gate_value 本文 fallback を ---無しファイル限定〔F-2〕／Fix ⑤: python extract_scalar_value 行順 first-match 化〔F-1〕＋extract_approval_map 先勝ち化／parity drift-guard テスト）。footprint: hooks/lib/frontmatter.sh＋hooks/lib/snapshot.sh＋hooks/post-status-audit.sh＋scripts/check_status.py＋hooks/check-gate.sh(dedup)＋tests＝M（2-5）。control-plane（audit/gate 強制ロジック）を触るため review+qa+security 必須・M のため deploy skip。"
+iteration: 66
 ui_surface: false
-last_updated: "2026-07-12T06:00:00Z"
+last_updated: "2026-07-11T21:10:00Z"
 gate_approvals:
   client_ready_for_dev: n/a
   brainstorm: approved
-  plan: approved
-  review: approved
-  qa: approved
-  security: approved
+  plan: pending
+  review: pending
+  qa: pending
+  security: pending
   deploy: pending
-  dev_ready_for_client: approved
+  dev_ready_for_client: pending
 current_refs:
   requirements: []
-  plan: "docs/plans/2026-07-10-iter65-s-size-repair-implementation-plan.md"
-  spec: "docs/specs/2026-07-10-iter65-s-size-repair-design.md"
-  review: "docs/qa-reports/iter65-review.md"
-  qa: "docs/qa-reports/iter65-qa.md"
-  security: "docs/qa-reports/iter65-security.md"
+  plan: null
+  spec: "docs/specs/2026-07-12-iter66-sf010-parser-unification-design.md"
+  review: null
+  qa: null
+  security: null
   deploy: null
   translation: null
 external_evidence:
@@ -37,7 +37,7 @@ external_evidence:
     scope: "v0.13.0 計画 5 ラウンドレビュー"
     findings: "Round 1〜5 で計 25 件の指摘（hook 出力スキーマ陳腐化、TaskCreated/Completed 制御方式、Plan 条件付き許可、effort 配分、pre-compact.sh 同種破損、`if` 単一 rule 制約等）"
     resolution: "Rev.5 で全件反映、Phase 0a 即時実装着手 GO。hotfix/v0122-hook-schema ブランチで開始。"
-next_action: "**【iter65 完全クローズ・push 済】** origin/main=c230742・iter65/v1.26.0（S サイズ修復・R2🔴）全 dev ゲート approved＋dev_ready_for_client approved＋push 済。**次にやること＝iter66 rollover**（新テーマ着手時に brainstorm へリセット・dev ゲート pending 化・非 requirements refs=null・iteration++・requirements 保持）。**iter66 第一候補テーマ＝SF-010**（task_size empty-baseline raw-Edit×migration-grace 穴・Medium・OPEN＝post-status-audit の migration-grace を『真の旧フォーマット snapshot 限定』に絞る＋F-1/F-2 パーサ二重実装 drift 統一・正本 docs/security-followups.md SF-010）。◆別候補: full-review Phase 1 残り（1-1 済/1-4 済／1-2 judge skip-and-continue・1-3 update-gate approve --ref 原子化・1-5 drill 強化・1-6）。◆既知 flaky=test_update_gate_lock（回帰外・full-review R10 test#8）。◆環境注意: aegis 内で Claude Code 起動。push=active gh は yuuya-miyagaki（切替不要）。"
+next_action: "**【iter66 plan 着手】** brainstorm approved（設計正本=docs/specs/2026-07-12-iter66-sf010-parser-unification-design.md・RECORD 同日付）。テーマ=SF-010 封鎖＋frontmatter 読取意味論統一（Fix ①grace 絞り〔snapshot task_type 行有無で旧フォーマット判定〕②frontmatter_value library 級スコープ化③snapshot 生成スコープ化④gate_value 本文 fallback 厳格化〔F-2〕⑤python 行順 first-match＋先勝ち〔F-1〕＋parity drift-guard）。次=実装計画作成（docs/plans/2026-07-12-iter66-sf010-parser-unification-implementation-plan.md）→grill-plan→全指摘反映→plan gate 承認申請。工程別 model tiering: 書く=opus 委譲・疑う=fable。◆既知 flaky=test_update_gate_lock（回帰外・full-review R10 test#8）。◆環境注意: aegis 内で Claude Code 起動。push=active gh は yuuya-miyagaki（切替不要）。"
 blockers: []
 failure_tracking: null
 session_history:
@@ -77,11 +77,8 @@ Claude Code ネイティブの Aegis 運用フレームワーク。2026-06-05、
 
 ## Session History
 
-- 2026-04-15: v0.7.0-v0.7.2 実装。ネイティブ機能改善、scaffold自己完結性、信頼境界ハードニング。
-- 2026-04-17: v0.8.0 Client モード強化 実装完了+全ゲート通過+コミット+プッシュ。48ファイル変更。
-- 2026-04-18: v0.9.0-v0.10.0 integration-assist, browser-assist。全ゲート通過+コミット+プッシュ。
-- 2026-04-22: v0.11.0 Hair Salon Bloom 振り返り7施策実装+コミット+プッシュ。
-- 2026-04-22: v0.12.0 MCP gate + ref check + name lint + health check。48テスト全PASS。
+> 2026-04 期（v0.7.0〜v0.12.0）の 5 エントリは `docs/evidence-archive.md` に移設（2026-07-12・health 上限 ≤10 維持）。
+
 - 2026-06-05: future-proof 再アーキ着手。Phase 0b 確定 + Foundation（emit.sh 単一出力源 / patterns.sh / version owner）実装。Round 1/2 セカンドオピニオン反映。183 tests PASS、main マージ（未push）。
 - 2026-06-06: Phase R 再配分を連続 ship（routing 0.12.3／context 0.12.4／model-effort／name-hygiene／TDD 0.12.5／evidence 完了強制 0.12.6）。続けて Phase D（仕上げ）: migration guide(v0.12.2→v1.0.0)＋README リフレッシュ＋安定契約/SemVer 明文化＋version **1.0.0**。各タスクで brainstorm→2段グリル→実装→grill-code を完走。195 tests green・tier1/2 PASS。**再アーキ F→R→A→D 全完了＝v1.0.0「トレッドミルから降りる」看板を掲示。**
 - 2026-06-07: 機能整合性監査（charter 2026-06-07）。Layer 0-4 で 7 finding（P1×1/P2×4/P3×2）全修復。核心 F6（P1）＝setup.sh が hooks/lib を配布せず install 先で moat 全死→copy_hooks 修復＋scaffold smoke の hook 実発火で install 経路を契約化。v1.3.2 patch（298 tests・tag v1.3.2）。
