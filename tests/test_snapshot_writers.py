@@ -74,10 +74,27 @@ class TestSnapshotWriters(unittest.TestCase):
     def test_post_status_audit_regen_writes_task_fields(self):
         with _scratch() as tmp:
             p = Path(tmp)
-            # Pre-create a valid (phase/mode present) snapshot matching STATUS so
-            # the audit reaches the end-of-run regen (not first-edit allowance).
+            # Pre-create a valid baseline whose gate lines all MATCH STATUS so the
+            # audit finds no gate tamper and reaches the end-of-run regen. The
+            # baseline deliberately OMITS task_type/task_size (a true pre-iter43
+            # old-format snapshot) — migration grace still applies to task fields
+            # there, so no task block — which is exactly what lets this test prove
+            # the regen ADDS the task fields.
+            # iter66 / SF-010: gate lines must be complete-and-matching now; an
+            # empty→value gate delta on a snapshot that carries a gate_approvals
+            # section is itself blocked, so a gate-incomplete baseline would no
+            # longer reach regen.
             (p / ".claude" / ".gate-snapshot").write_text(
-                "gate_approvals:\n  brainstorm: pending\nphase: implement\nmode: Dev\n",
+                "gate_approvals:\n"
+                "  client_ready_for_dev: n/a\n"
+                "  brainstorm: pending\n"
+                "  plan: pending\n"
+                "  review: pending\n"
+                "  qa: pending\n"
+                "  security: pending\n"
+                "  deploy: pending\n"
+                "  dev_ready_for_client: pending\n"
+                "phase: implement\nmode: Dev\n",
                 encoding="utf-8",
             )
             payload = json.dumps({

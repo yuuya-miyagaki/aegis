@@ -173,6 +173,50 @@ class TestTaskTamper(unittest.TestCase):
             finally:
                 _unlock_tree(p)
 
+    def test_sf010_empty_baseline_size_injection_blocked(self):
+        # SF-010: snapshot は現行フォーマット（task_type あり）だが task_size 行なし
+        # → STATUS への raw-Edit task_size 追加は block（現行は grace で素通り＝RED）
+        with _scratch(_status(task_size="S"),
+                      _snapshot(task_type="framework", task_size=None)) as tmp:
+            p = Path(tmp)
+            try:
+                rc, out = _audit(p)
+                self.assertEqual(rc, 0)
+                self.assertTrue(_is_block(out),
+                                f"empty-baseline size injection must block: {out!r}")
+                self.assertIn("task-tamper", out)
+            finally:
+                _unlock_tree(p)
+
+    def test_task_type_removal_blocked_self_defense(self):
+        # grace を開ける前段（task_type 行の除去）自体が block される
+        status_no_type = _status().replace("task_type: framework\n", "")
+        with _scratch(status_no_type, _snapshot()) as tmp:
+            p = Path(tmp)
+            try:
+                rc, out = _audit(p)
+                self.assertEqual(rc, 0)
+                self.assertTrue(_is_block(out),
+                                f"task_type removal must block: {out!r}")
+            finally:
+                _unlock_tree(p)
+
+    def test_gate_line_missing_in_snapshot_injection_blocked(self):
+        # SF-010 (iii) empty-baseline class: snapshot の gate ブロックに deploy 行が
+        # 欠落 → STATUS raw-Edit で deploy: approved は block（現行は grace＝RED）
+        status = _status().replace("  deploy: pending\n", "  deploy: approved\n")
+        snapshot = _snapshot().replace("  deploy: pending\n", "")
+        with _scratch(status, snapshot) as tmp:
+            p = Path(tmp)
+            try:
+                rc, out = _audit(p)
+                self.assertEqual(rc, 0)
+                self.assertTrue(_is_block(out),
+                                f"gate empty-baseline injection must block: {out!r}")
+                self.assertIn("gate-tamper", out)
+            finally:
+                _unlock_tree(p)
+
     def test_unlock_tamper_keeps_moat_locked_in_session(self):
         """bugfix(locked)→framework の改竄編集は cp_apply 到達前に block＝
         当該セッションで hooks/ は解錠されない。"""

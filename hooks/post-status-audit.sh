@@ -143,15 +143,25 @@ fi
 
 # Check ALL gates for unauthorized value changes.
 # Detect ANY change (not just →approved) to prevent bypass via direct edit.
-# Authorized changes go through update-gate.sh which updates the snapshot atomically.
+# Authorized changes go through update-gate.sh which updates the snapshot
+# atomically. Empty-OLD grace is narrowed (iter66 / SF-010 (iii)): if the
+# snapshot carries a gate_approvals section at all (it always has, since the
+# format's inception), a gate line missing from it is a broken/hand-edited
+# baseline — blocking empty→value there is correct, not a migration case.
+SNAP_HAS_GATE_SECTION=false
+if grep -q "^gate_approvals:" "$SNAPSHOT_FILE" 2>/dev/null; then
+  SNAP_HAS_GATE_SECTION=true
+fi
 for gate in client_ready_for_dev brainstorm plan review qa security deploy dev_ready_for_client; do
   OLD=$(gate_value "$SNAPSHOT_FILE" "$gate")
   NEW=$(gate_value "$STATUS_FILE" "$gate")
 
-  if [ "$OLD" != "$NEW" ] && [ -n "$OLD" ]; then
-    REASON=$(printf '[gate-tamper] %s gate changed %s→%s without authorization. Use the /gate command to change gate values.' "$gate" "$OLD" "$NEW")
-    emit_block "$REASON"
-    exit 0
+  if [ "$OLD" != "$NEW" ]; then
+    if [ -n "$OLD" ] || [ "$SNAP_HAS_GATE_SECTION" = "true" ]; then
+      REASON=$(printf '[gate-tamper] %s gate changed %s→%s without authorization. Use the /gate command to change gate values.' "$gate" "${OLD:-<unset>}" "${NEW:-<unset>}")
+      emit_block "$REASON"
+      exit 0
+    fi
   fi
 done
 
@@ -196,21 +206,30 @@ if [ -n "$OLD_MODE" ] && [ -n "$NEW_MODE" ] && [ "$OLD_MODE" != "$NEW_MODE" ]; t
   fi
 fi
 
-# --- Task field tamper validation (iter43 / I3) ---
-# task_type controls gate requirements (STRICT_GATE_TASK_TYPES) AND the layer-2
-# moat lock; task_size controls which gates apply. Authorized changes go through
-# scripts/update-task.sh (which updates the snapshot atomically). A raw Edit that
-# changes either field is tamper — block (mirrors the gate loop). The `[ -n "$OLD" ]`
-# guard is a migration grace: an older snapshot without task fields is upgraded by
-# the regen below rather than blocking a legitimate edit.
+# --- Task field tamper validation (iter43 / I3, narrowed iter66 / SF-010) ---
+# task_type controls gate requirements AND the layer-2 moat lock; task_size
+# controls which gates apply (size-aware since iter65). Authorized changes go
+# through scripts/update-task.sh (snapshot updated atomically). A raw Edit that
+# changes either field is tamper — block. Migration grace is ONLY for a true
+# old-format snapshot (pre-iter43: no task_type line at all). A current-format
+# snapshot (task_type line present) blocks even empty→value transitions —
+# otherwise the OPTIONAL task_size could be injected during the empty-baseline
+# window (fresh scaffold / rollover before brainstorm Step D) to flip the
+# implement gate to brainstorm-only (SF-010).
 # NOTE: this MUST run before aegis_cp_apply below — see the moved-cp_apply note above.
+SNAP_IS_CURRENT_FORMAT=false
+if grep -q "^task_type:" "$SNAPSHOT_FILE" 2>/dev/null; then
+  SNAP_IS_CURRENT_FORMAT=true
+fi
 for tf in task_type task_size; do
   OLD_TF=$(frontmatter_value "$SNAPSHOT_FILE" "$tf")
   NEW_TF=$(frontmatter_value "$STATUS_FILE" "$tf")
-  if [ "$OLD_TF" != "$NEW_TF" ] && [ -n "$OLD_TF" ]; then
-    REASON=$(printf '[task-tamper] %s changed %s→%s without authorization. Use scripts/update-task.sh to change task_type/task_size.' "$tf" "$OLD_TF" "$NEW_TF")
-    emit_block "$REASON"
-    exit 0
+  if [ "$OLD_TF" != "$NEW_TF" ]; then
+    if [ -n "$OLD_TF" ] || [ "$SNAP_IS_CURRENT_FORMAT" = "true" ]; then
+      REASON=$(printf '[task-tamper] %s changed %s→%s without authorization. Use scripts/update-task.sh to change task_type/task_size.' "$tf" "${OLD_TF:-<unset>}" "${NEW_TF:-<unset>}")
+      emit_block "$REASON"
+      exit 0
+    fi
   fi
 done
 
