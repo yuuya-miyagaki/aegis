@@ -240,6 +240,25 @@ class TestGateValue(unittest.TestCase):
             rc, out = run_fn("gate_value", str(p), "plan")
             self.assertEqual(out, "approved\n")
 
+    def test_body_gate_block_not_adopted_when_frontmattered(self):
+        # F-2: frontmatter に節がなくても本文ブロックへ fallback しない
+        with tempfile.TemporaryDirectory() as d:
+            p = Path(d) / "STATUS.md"
+            p.write_text(
+                "---\nmode: Dev\n---\nbody\n"
+                "gate_approvals:\n  review: approved\n", encoding="utf-8")
+            rc, out = run_fn("gate_value", str(p), "review")
+            self.assertEqual(rc, 0)
+            self.assertEqual(out.strip(), "")
+
+    def test_bare_snapshot_gate_read_preserved(self):
+        with tempfile.TemporaryDirectory() as d:
+            p = Path(d) / ".gate-snapshot"
+            p.write_text("gate_approvals:\n  review: approved\nphase: qa\n",
+                         encoding="utf-8")
+            rc, out = run_fn("gate_value", str(p), "review")
+            self.assertEqual(out.strip(), "approved")
+
 
 class TestValueEquivalenceWithLegacyPipeline(unittest.TestCase):
     """新関数が旧3段パイプと全キーで一致することを実証（挙動不変）。"""

@@ -70,12 +70,18 @@ frontmatter_value() {
 
 # gate_value <file> <gate>
 #   stdout: the value of `<gate>:` under the gate_approvals section.
-#   frontmatter_section || raw_section: works on BOTH ---delimited STATUS.md
-#   AND bare .gate-snapshot (no ---), the same dual-file robustness as
-#   frontmatter_value. 2-space anchor prevents substring matches
-#   (e.g. `plan` vs `plan_extra`). Empty stdout + RC 0 when absent.
+#   Files starting with `---`: frontmatter_section ONLY (no body fallback —
+#   F-2: a body gate_approvals block must never drive gate decisions).
+#   Bare files (.gate-snapshot, no ---): raw_section as before. 2-space
+#   anchor prevents substring matches. Empty stdout + RC 0 when absent.
 gate_value() {
-  local file="$1" gate="$2"
-  { frontmatter_section "$file" gate_approvals 2>/dev/null || raw_section "$file" gate_approvals; } \
-    | grep -m1 "  ${gate}:" | sed "s/.*${gate}:[[:space:]]*//" | sed 's/^"//;s/"$//' || true
+  local file="$1" gate="$2" src=""
+  [ -f "$file" ] || return 0
+  if [ "$(head -n1 "$file" 2>/dev/null)" = "---" ]; then
+    src=$(frontmatter_section "$file" gate_approvals 2>/dev/null) || src=""
+  else
+    src=$(raw_section "$file" gate_approvals 2>/dev/null) || src=""
+  fi
+  printf '%s\n' "$src" | grep -m1 "  ${gate}:" \
+    | sed "s/.*${gate}:[[:space:]]*//" | sed 's/^"//;s/"$//' || true
 }
