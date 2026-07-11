@@ -1,5 +1,9 @@
 #!/usr/bin/env bash
-# PreToolUse hook for Edit/Write: blocks code edits when plan gate is not approved.
+# PreToolUse hook for Edit/Write: blocks code edits until the implement-gating
+# approval is in place. The gate is size-aware: task_size=S has no plan phase
+# (impl->review->ship->docs), so its pre-implement approval is the brainstorm
+# gate; every other size (M/L/unset/invalid) keeps the conservative plan-gate
+# check.
 # Also protects framework control files (hooks, scripts, .claude, CLAUDE.md)
 # from edits during non-framework project work.
 set -euo pipefail
@@ -234,21 +238,40 @@ if is_root_prose_md "$TARGET_FILE"; then
   exit 0
 fi
 
-# Extract mode and plan gate from STATUS.md frontmatter.
+# Extract mode from STATUS.md frontmatter.
 MODE=$(frontmatter_value "$STATUS_FILE" "mode")
-PLAN_GATE=$(gate_value "$STATUS_FILE" "plan")
 
-# Block code edits in Client mode.
+# Block code edits in Client mode (unchanged; runs before the gate check).
 if [ "$MODE" = "Client" ]; then
   emit_deny "[gate] Client mode: code edits are blocked. Complete Client phases and get client_ready_for_dev approval first."
   exit 0
 fi
 
-# Block code edits when plan gate is not approved.
-if [ "$PLAN_GATE" != "approved" ] && [ "$PLAN_GATE" != "n/a" ]; then
-  REASON=$(printf '[gate] Plan gate is %s. Complete brainstorm and plan phases before editing code.' "$PLAN_GATE")
-  emit_deny "$REASON"
-  exit 0
+# Size-aware implement gate. task_size=S has no plan phase in its flow
+# (impl->review->ship->docs), so gating on plan would make S code edits
+# structurally impossible (plan can never reach approved for S). For S the pre-implement
+# approval is the brainstorm gate; every other size (M/L/unset/invalid) keeps
+# the conservative plan-gate check — the gate is never loosened by an unknown
+# or malformed task_size. Pure bash: only frontmatter_value / gate_value.
+TASK_SIZE=$(frontmatter_value "$STATUS_FILE" "task_size")
+
+if [ "$TASK_SIZE" = "S" ]; then
+  BRAINSTORM_GATE=$(gate_value "$STATUS_FILE" "brainstorm")
+  # Block code edits when the brainstorm gate is not approved (fail-closed: an
+  # empty/missing value is not approved/n/a → deny).
+  if [ "$BRAINSTORM_GATE" != "approved" ] && [ "$BRAINSTORM_GATE" != "n/a" ]; then
+    REASON=$(printf '[gate] task_size=S skips the plan phase; the implement gate is brainstorm, which is %s. Complete the brainstorm phase before editing code.' "$BRAINSTORM_GATE")
+    emit_deny "$REASON"
+    exit 0
+  fi
+else
+  PLAN_GATE=$(gate_value "$STATUS_FILE" "plan")
+  # Block code edits when plan gate is not approved.
+  if [ "$PLAN_GATE" != "approved" ] && [ "$PLAN_GATE" != "n/a" ]; then
+    REASON=$(printf '[gate] Plan gate is %s. Complete brainstorm and plan phases before editing code.' "$PLAN_GATE")
+    emit_deny "$REASON"
+    exit 0
+  fi
 fi
 
 emit_allow
