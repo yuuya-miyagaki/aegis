@@ -59,7 +59,11 @@ raw_section() {
 frontmatter_value() {
   local file="$1" key="$2" src=""
   [ -f "$file" ] || return 0
-  if [ "$(head -n1 "$file" 2>/dev/null)" = "---" ]; then
+  # Match read_frontmatter's terminator tolerance: a leading `--- ` (trailing
+  # space) is a frontmatter-shaped file, not a bare one, so it takes the scoped
+  # path and fails closed (read_frontmatter's NR==1 strict `---` mismatch -> rc1
+  # -> empty) instead of leaking body lines via a whole-file read (iter66 Fix B).
+  if head -n1 "$file" 2>/dev/null | grep -qE '^---[[:space:]]*$'; then
     src=$(read_frontmatter "$file") || src=""
   else
     src=$(cat "$file" 2>/dev/null) || src=""
@@ -77,7 +81,9 @@ frontmatter_value() {
 gate_value() {
   local file="$1" gate="$2" src=""
   [ -f "$file" ] || return 0
-  if [ "$(head -n1 "$file" 2>/dev/null)" = "---" ]; then
+  # `--- ` (trailing space) -> scoped path (fail-closed), never the body
+  # gate_approvals block via raw whole-file read (iter66 Fix B; F-2 aligned).
+  if head -n1 "$file" 2>/dev/null | grep -qE '^---[[:space:]]*$'; then
     src=$(frontmatter_section "$file" gate_approvals 2>/dev/null) || src=""
   else
     src=$(raw_section "$file" gate_approvals 2>/dev/null) || src=""

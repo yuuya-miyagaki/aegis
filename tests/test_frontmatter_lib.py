@@ -190,6 +190,15 @@ class TestFrontmatterValue(unittest.TestCase):
             self.assertEqual(rc, 0)
             self.assertEqual(out.strip(), "")
 
+    def test_trailing_space_after_dashes_failclosed(self):
+        # 先頭行 "--- " は frontmatter 系ファイル扱い→未終端同様 空（whole-file に落ちない）
+        with tempfile.TemporaryDirectory() as d:
+            p = Path(d) / "STATUS.md"
+            p.write_text("--- \ntask_size: S\n---\nbody\n", encoding="utf-8")
+            rc, out = run_fn("frontmatter_value", str(p), "task_size")
+            self.assertEqual(rc, 0)
+            self.assertEqual(out.strip(), "")
+
     def test_bare_file_whole_file_read_preserved(self):
         # .gate-snapshot 形式（--- なし）は従来どおり
         with tempfile.TemporaryDirectory() as d:
@@ -247,6 +256,18 @@ class TestGateValue(unittest.TestCase):
             p.write_text(
                 "---\nmode: Dev\n---\nbody\n"
                 "gate_approvals:\n  review: approved\n", encoding="utf-8")
+            rc, out = run_fn("gate_value", str(p), "review")
+            self.assertEqual(rc, 0)
+            self.assertEqual(out.strip(), "")
+
+    def test_gate_trailing_space_after_dashes_failclosed(self):
+        # 先頭行 "--- " は frontmatter 扱い→scoped 経路→read_frontmatter が
+        # NR==1 厳格不一致で空→gate 空（whole-file の本文ブロックへ落ちない）
+        with tempfile.TemporaryDirectory() as d:
+            p = Path(d) / "STATUS.md"
+            p.write_text(
+                "--- \ngate_approvals:\n  review: approved\n---\nbody\n",
+                encoding="utf-8")
             rc, out = run_fn("gate_value", str(p), "review")
             self.assertEqual(rc, 0)
             self.assertEqual(out.strip(), "")

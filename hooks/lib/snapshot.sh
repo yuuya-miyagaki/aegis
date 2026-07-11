@@ -5,12 +5,6 @@
 # task_type + task_size. task_type/task_size were added in iter43 so that
 # raw Edits to them (which silently change gate requirements and the layer-2
 # moat lock) become tamper-evident, mirroring how gates already work.
-
-# snapshot.sh consumes read_frontmatter/_section_filter; source defensively
-# so a caller that loads snapshot.sh alone still works (bash 3.2 safe).
-if ! declare -F read_frontmatter >/dev/null 2>&1; then
-  . "$(dirname "${BASH_SOURCE[0]}")/frontmatter.sh"
-fi
 #
 # Single-function / multiple-fire-point design (iter37): session-start.sh,
 # update-gate.sh, update-task.sh, and post-status-audit.sh all call this helper
@@ -21,6 +15,12 @@ fi
 # with phase/mode missing (which the tamper detector's `[ -n "$OLD" ]` guard
 # would bypass). Non-destructive: if STATUS.md is absent or the staging write
 # fails, the existing snapshot is left untouched.
+
+# snapshot.sh consumes read_frontmatter/_section_filter; source defensively
+# so a caller that loads snapshot.sh alone still works (bash 3.2 safe).
+if ! declare -F read_frontmatter >/dev/null 2>&1; then
+  . "$(dirname "${BASH_SOURCE[0]}")/frontmatter.sh"
+fi
 
 # aegis_write_snapshot <root> — regenerate <root>/.claude/.gate-snapshot from
 # <root>/docs/STATUS.md. rc 0 on success; non-zero (without clobbering the
@@ -38,6 +38,11 @@ aegis_write_snapshot() {
   local fm
   fm=$(read_frontmatter "$status_file") || return 1
   [ -n "$fm" ] || return 1
+  # A STATUS without a gate_approvals section is broken (every format since
+  # inception carries it). Writing a gate-section-less snapshot would open a
+  # PERSISTENT empty-gate-baseline grace window (iter66 grill); keep the old
+  # snapshot instead (non-destructive, K-7).
+  printf '%s\n' "$fm" | grep -q "^gate_approvals:" || return 1
   mkdir -p "$snapshot_dir" 2>/dev/null || return 1
   local tmp="${snapshot_file}.tmp.$$"
   # `|| true` per key: an absent OPTIONAL key (task_size before brainstorm
@@ -66,10 +71,14 @@ aegis_write_snapshot() {
 # writers refresh the snapshot on every legitimate reset, so a normal rollover
 # never trips this.
 #
-# The current STATUS gate_approvals block is read ONCE with a single `sed`
-# (not one fork per snapshot line — that was O(lines) process spawns and hung
-# session-start for minutes on a bloated/corrupt snapshot; 2nd-review security
-# Major-2). No bash associative array: hooks target bash 3.2 (macOS default),
+# The current STATUS gate_approvals block is read ONCE with a single `awk`
+# (frontmatter_section — not one fork per snapshot line, which was O(lines)
+# process spawns and hung session-start for minutes on a bloated/corrupt
+# snapshot; 2nd-review security Major-2). Frontmatter-scoped (iter66 Fix A):
+# the old range `sed` re-triggered on a BODY `gate_approvals:` block, so body
+# lines could poison the current-block read and forge/mask a regression (census
+# blind spot: lowercase `$status_file` was invisible to the census regex).
+# No bash associative array: hooks target bash 3.2 (macOS default),
 # which lacks `declare -A`. The block string is newline-prefixed and each
 # earned gate is matched as a whole line via case. Gate names are restricted to
 # [a-z_] as defense in depth so a tampered snapshot line cannot become a glob.
@@ -82,7 +91,7 @@ aegis_snapshot_gate_regression() {
   [ -f "$snapshot_file" ] || return 1
   local nl cur_block line gate
   nl=$'\n'
-  cur_block=$(sed -n '/^gate_approvals:/,/^[a-z]/p' "$status_file" 2>/dev/null)
+  cur_block=$(frontmatter_section "$status_file" gate_approvals 2>/dev/null || true)
   cur_block="${nl}${cur_block}"   # newline-anchor the first line too
   while IFS= read -r line; do
     case "$line" in

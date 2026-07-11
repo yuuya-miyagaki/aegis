@@ -165,6 +165,87 @@ def test_malformed_frontmatter_keeps_existing_snapshot():
         assert after == before, "existing snapshot must be byte-identical"
 
 
+def test_gate_sectionless_status_keeps_old_snapshot():
+    """gate_approvals 節なし STATUS への書換 → rc≠0・snapshot 不変（Fix C）。
+
+    正常 STATUS で snapshot を作った後、frontmatter は valid だが
+    gate_approvals 節を欠く STATUS へ書換える。gate 節なし snapshot を書くと
+    PERSISTENT な empty-gate-baseline 猶予窓が開くため、旧 snapshot を温存し
+    rc≠0 を返さねばならない（非破壊・K-7）。
+    """
+    with _scratch() as tmp:
+        p = Path(tmp)
+        snap_file = p / ".claude" / ".gate-snapshot"
+        rc, err = _write_snapshot(p)
+        assert rc == 0, f"initial write failed: {err}"
+        before = snap_file.read_bytes()
+        # valid frontmatter but NO gate_approvals section
+        (p / "docs" / "STATUS.md").write_text(
+            "---\nmode: Dev\nphase: plan\ntask_type: framework\n"
+            "task_size: M\ncurrent_refs:\n  requirements: []\n---\nbody\n",
+            encoding="utf-8",
+        )
+        rc, err = _write_snapshot(p)
+        assert rc != 0, "gate-sectionless STATUS must fail-closed (rc!=0)"
+        after = snap_file.read_bytes()
+        assert after == before, "existing snapshot must be byte-identical"
+
+
+def _gate_regression(root: Path) -> int:
+    """Source snapshot.sh and call aegis_snapshot_gate_regression <root>."""
+    script = (
+        f'source "{SNAPSHOT_LIB}"; aegis_snapshot_gate_regression "{root}"'
+    )
+    r = subprocess.run(["bash", "-c", script], capture_output=True, text=True)
+    return r.returncode
+
+
+def test_gate_regression_ignores_body_gate_block():
+    """本文の gate_approvals ブロックは回帰判定に混入してはならない（Fix A）。
+
+    frontmatter の gate は snapshot と完全一致（review: approved・回帰なし）。
+    ただし本文に `gate_approvals:\n  review: pending` を置く。旧 sed 範囲読み
+    は反復して本文行を拾い rc0（回帰誤検出）になる。frontmatter_section へ
+    スコープ化すると本文は不可視 → rc1。
+    """
+    status = (
+        "---\nmode: Dev\nphase: implement\n"
+        "gate_approvals:\n  review: approved\n"
+        "current_refs:\n  requirements: []\n---\n"
+        "body text\ngate_approvals:\n  review: pending\nmore body\n"
+    )
+    with _scratch(status) as tmp:
+        p = Path(tmp)
+        snap = p / ".claude" / ".gate-snapshot"
+        snap.write_text(
+            "gate_approvals:\n  review: approved\nphase: implement\nmode: Dev\n",
+            encoding="utf-8",
+        )
+        rc = _gate_regression(p)
+        assert rc == 1, (
+            "body gate_approvals block leaked into current-block read "
+            f"(false regression); rc={rc}"
+        )
+
+
+def test_gate_regression_true_regression_still_detected():
+    """frontmatter 側で earned→pending の真の回帰は引き続き rc0 で検出。"""
+    status = (
+        "---\nmode: Dev\nphase: implement\n"
+        "gate_approvals:\n  review: pending\n"
+        "current_refs:\n  requirements: []\n---\nbody\n"
+    )
+    with _scratch(status) as tmp:
+        p = Path(tmp)
+        snap = p / ".claude" / ".gate-snapshot"
+        snap.write_text(
+            "gate_approvals:\n  review: approved\nphase: implement\nmode: Dev\n",
+            encoding="utf-8",
+        )
+        rc = _gate_regression(p)
+        assert rc == 0, f"true regression must be detected (rc0); rc={rc}"
+
+
 def test_normal_status_snapshot_shape_pinned():
     """正常系 STATUS の出力形状（行集合・順序）を従来と同一にピン。"""
     status = (
