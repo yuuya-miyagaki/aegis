@@ -222,7 +222,7 @@ CLAUDE.md はフレームワークの中核であり、常時コンテキスト�
 
 | タイプ | 必須ゲート | S（1ファイル） | M（2-5） | L（6+） |
 |--------|-----------|--------------|---------|--------|
-| feature/refactor/framework | review+qa+security+deploy | impl→review→ship | deploy 省略 | 全フェーズ |
+| feature/refactor/framework | review+qa+security+deploy | impl→review→ship→docs | deploy 省略 | 全フェーズ |
 | bugfix | review; brainstorm+plan=n/a | 同上 | 同上 | 同上 |
 | hotfix | review 推奨; brainstorm+plan=n/a | 同上 | 同上 | 同上 |
 

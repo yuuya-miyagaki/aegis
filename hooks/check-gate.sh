@@ -61,7 +61,7 @@ ROOT_REAL="$(cd "$ROOT" && pwd -P)"
 # probe (hooks/lib/safety.sh) says the FS folds case; on a case-sensitive FS
 # an uppercase HOOKS/ is a legitimately distinct user dir. The docs/* allowlist
 # above stays case-sensitive: not folding it only OVER-gates (a DOCS/ edit
-# falls through to the plan gate), never weakens protection.
+# falls through to the size-aware implement gate), never weakens protection.
 CASE_FOLD=0
 if aegis_fs_case_insensitive "$ROOT"; then
   CASE_FOLD=1
@@ -175,7 +175,8 @@ fi
 
 # --- ROOT-external absolute targets: not this project's code (C5, iter44) ---
 # Control files / templates / docs are handled above. The Client-mode lock and
-# the plan gate below both exist to stop edits to THIS project's code; a clearly
+# the size-aware implement gate below both exist to stop edits to THIS project's
+# code; a clearly
 # ROOT-external absolute path (e.g. global auto-memory at ~/.claude/.../memory/)
 # is not project code, so neither applies — short-circuit to allow. This is
 # intentional for both gates: auto-memory is mode-independent. Relative targets
