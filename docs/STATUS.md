@@ -3,7 +3,7 @@ framework: aegis
 framework_version: "1.26.0"
 project_name: "Aegis"
 mode: Dev
-phase: plan
+phase: implement
 task_type: framework
 task_size: M
 task_size_rationale: "iteration 66（framework・SF-010 封鎖＋frontmatter 読取意味論統一）M 確定（brainstorm Step D・update-task.sh 経由）。設計正本: docs/specs/2026-07-12-iter66-sf010-parser-unification-design.md（Fix ①: post-status-audit migration-grace を『snapshot に task_type 行なし＝真の旧フォーマット』限定に絞る／Fix ②: frontmatter_value を library 級スコープ化〔---あり→frontmatter 内 first-match・未終端→空 fail-closed・bare→whole-file 温存〕／Fix ③: snapshot 生成スコープ化＝baseline 毒込み封鎖／Fix ④: gate_value 本文 fallback を ---無しファイル限定〔F-2〕／Fix ⑤: python extract_scalar_value 行順 first-match 化〔F-1〕＋extract_approval_map 先勝ち化／parity drift-guard テスト）。footprint: hooks/lib/frontmatter.sh＋hooks/lib/snapshot.sh＋hooks/post-status-audit.sh＋scripts/check_status.py＋hooks/check-gate.sh(dedup)＋tests＝M（2-5）。control-plane（audit/gate 強制ロジック）を触るため review+qa+security 必須・M のため deploy skip。"
@@ -13,7 +13,7 @@ last_updated: "2026-07-11T21:10:00Z"
 gate_approvals:
   client_ready_for_dev: n/a
   brainstorm: approved
-  plan: pending
+  plan: approved
   review: pending
   qa: pending
   security: pending
@@ -21,7 +21,7 @@ gate_approvals:
   dev_ready_for_client: pending
 current_refs:
   requirements: []
-  plan: null
+  plan: "docs/plans/2026-07-12-iter66-sf010-parser-unification-implementation-plan.md"
   spec: "docs/specs/2026-07-12-iter66-sf010-parser-unification-design.md"
   review: null
   qa: null
@@ -37,7 +37,7 @@ external_evidence:
     scope: "v0.13.0 計画 5 ラウンドレビュー"
     findings: "Round 1〜5 で計 25 件の指摘（hook 出力スキーマ陳腐化、TaskCreated/Completed 制御方式、Plan 条件付き許可、effort 配分、pre-compact.sh 同種破損、`if` 単一 rule 制約等）"
     resolution: "Rev.5 で全件反映、Phase 0a 即時実装着手 GO。hotfix/v0122-hook-schema ブランチで開始。"
-next_action: "**【iter66 plan 着手】** brainstorm approved（設計正本=docs/specs/2026-07-12-iter66-sf010-parser-unification-design.md・RECORD 同日付）。テーマ=SF-010 封鎖＋frontmatter 読取意味論統一（Fix ①grace 絞り〔snapshot task_type 行有無で旧フォーマット判定〕②frontmatter_value library 級スコープ化③snapshot 生成スコープ化④gate_value 本文 fallback 厳格化〔F-2〕⑤python 行順 first-match＋先勝ち〔F-1〕＋parity drift-guard）。次=実装計画作成（docs/plans/2026-07-12-iter66-sf010-parser-unification-implementation-plan.md）→grill-plan→全指摘反映→plan gate 承認申請。工程別 model tiering: 書く=opus 委譲・疑う=fable。◆既知 flaky=test_update_gate_lock（回帰外・full-review R10 test#8）。◆環境注意: aegis 内で Claude Code 起動。push=active gh は yuuya-miyagaki（切替不要）。"
+next_action: "**【iter66 implement 着手】** plan approved（計画正本=docs/plans/2026-07-12-iter66-sf010-parser-unification-implementation-plan.md・grill-plan 致命2＝gate loop grace 未カバー/読点 census 欠如を反映済 a8620d1）。Task 0（census・親セッション）→Task 1-6（implementer=opus 委譲・TDD RED-first・per-task commit・親=fable が Stage1 仕様準拠を diff 検証）→Task 7（parity drift-guard）→grill-code→review へ。◆既知 flaky=test_update_gate_lock（回帰外・full-review R10 test#8）。◆環境注意: aegis 内で Claude Code 起動。push=active gh は yuuya-miyagaki（切替不要）。"
 blockers: []
 failure_tracking: null
 session_history:
