@@ -262,14 +262,12 @@ def has_top_level_key(frontmatter: str, key: str) -> bool:
 
 
 def extract_scalar_value(frontmatter: str, key: str) -> str | None:
-    match = re.search(rf'(?m)^{re.escape(key)}:\s*"(.*)"\s*$', frontmatter)
-    if match:
-        return match.group(1).strip()
-
-    match = re.search(rf"(?m)^{re.escape(key)}:\s*(.+)\s*$", frontmatter)
+    # First match in LINE ORDER (iter66 / F-1): the old quoted-form-priority
+    # two-pass let a later `key: "S"` override an earlier `key: M`, splitting
+    # python consumers from the bash `grep -m1` enforcement readers.
+    match = re.search(rf"(?m)^{re.escape(key)}:\s*(.+?)\s*$", frontmatter)
     if match:
         return match.group(1).strip().strip('"').strip("'")
-
     return None
 
 
@@ -290,7 +288,9 @@ def extract_approval_map(frontmatter: str) -> dict[str, str]:
             break
 
         match = re.match(r"^\s{2}([A-Za-z0-9_]+):\s*([A-Za-z0-9_\"'\-/]+)\s*$", line)
-        if match:
+        if match and match.group(1) not in approvals:
+            # first occurrence wins (iter66): mirrors the bash `grep -m1`
+            # readers so duplicate keys cannot split enforcement from checks
             approvals[match.group(1)] = match.group(2).strip("\"'")
 
     return approvals
