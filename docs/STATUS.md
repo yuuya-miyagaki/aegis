@@ -3,19 +3,19 @@ framework: aegis
 framework_version: "1.25.0"
 project_name: "Aegis"
 mode: Dev
-phase: review
+phase: qa
 task_type: framework
 task_size: M
 task_size_rationale: "iteration 65（framework・全体レビュー §4 Phase 1 項目 1-4「S サイズ修復」＝R2🔴）M 確定（brainstorm Step D・update-task.sh 経由）。設計正本: docs/specs/2026-07-10-iter65-s-size-repair-design.md（Fix 1: check-gate.sh を pure-bash size-aware 化＝S→brainstorm gate/他→plan gate・python 委譲は fail-open 退行のため不採用／Fix 2: check_phase_transition 空リスト穴封鎖／Fix 3a: SIZE_ALLOWED_PHASES[S] に docs 追加＝罠 q 根絶／drift-guard テスト／state-machine.md 表同期）。footprint: hooks/check-gate.sh＋scripts/check_status.py＋tests＋.claude/rules/state-machine.md＝M（2-5）。control-plane（gate 強制ロジック）を触るため review+qa+security 必須・M のため deploy skip。"
 iteration: 65
 ui_surface: false
-last_updated: "2026-07-12T02:31:00Z"
+last_updated: "2026-07-12T03:00:00Z"
 gate_approvals:
   client_ready_for_dev: n/a
   brainstorm: approved
   plan: approved
   review: approved
-  qa: pending
+  qa: approved
   security: pending
   deploy: pending
   dev_ready_for_client: pending
@@ -24,7 +24,7 @@ current_refs:
   plan: "docs/plans/2026-07-10-iter65-s-size-repair-implementation-plan.md"
   spec: "docs/specs/2026-07-10-iter65-s-size-repair-design.md"
   review: "docs/qa-reports/iter65-review.md"
-  qa: null
+  qa: "docs/qa-reports/iter65-qa.md"
   security: null
   deploy: null
   translation: null
@@ -37,7 +37,7 @@ external_evidence:
     scope: "v0.13.0 計画 5 ラウンドレビュー"
     findings: "Round 1〜5 で計 25 件の指摘（hook 出力スキーマ陳腐化、TaskCreated/Completed 制御方式、Plan 条件付き許可、effort 配分、pre-compact.sh 同種破損、`if` 単一 rule 制約等）"
     resolution: "Rev.5 で全件反映、Phase 0a 即時実装着手 GO。hotfix/v0122-hook-schema ブランチで開始。"
-next_action: "**【review approved・qa フェーズへ】** テーマ＝S サイズ修復（R2🔴・iter65）。review=approve_with_notes（1次4角度 finder=opus→親verify・盲検2次=fable 収束）。Major3件 fix-forward 済(b9c95f7 本文spoof封鎖/89264c7 ケースh n/a許容/ef1cd9b 姉妹表同期)。**SF-010（task_size empty-baseline raw-Edit×migration-grace 穴）はユーザー承認で次反復(iter66)分離・qa/security で residual ack 必須**（F-1/F-2 パーサ drift も SF-010 スコープ）。**次にやること＝qa（B1 drill・qa-verification skill・model=opus）→security（1次+盲検2次=fable・SF-010 を明示 ack）→ship→docs**。full suite 再記録中。◆ref-window 教訓(iter64 conf8)再現: ref→approve は pytest 挟まず連続。◆push 手前まで自走承認済。"
+next_action: "**【qa 完了→承認・security フェーズへ】** テーマ＝S サイズ修復（R2🔴・iter65）。qa=approve（機能対照表7件PASS・B1 drill skip〔per-task committed〕＋qa一次 fresh 変異4/4 kill〔M1-M4〕・full suite 1096 passed/2 skipped 緑記録）。**次にやること＝security（1次 in-session or 委譲＋盲検2次=fable・SF-010〔task_size empty-baseline raw-Edit×migration-grace 穴・F-1/F-2 パーサ drift〕を明示 residual ack〔ユーザー承認で次反復 iter66 分離〕）→ship→docs**。◆既知 flaky=test_update_gate_lock（lock 待ちタイミング・diff 不接触＝回帰外）。◆ref→approve は pytest 挟まず連続（iter64 conf8）。◆push 手前まで自走承認済。"
 blockers: []
 failure_tracking: null
 session_history:
