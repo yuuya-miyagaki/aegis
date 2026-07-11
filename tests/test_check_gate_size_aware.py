@@ -175,6 +175,22 @@ class TestCheckGateSizeAware(unittest.TestCase):
         self.assertTrue(_denied(out),
                         f"invalid task_size XL + plan pending must deny, got: {out!r}")
 
+    def test_h_bugfix_size_m_plan_na_allows(self):
+        """(h) bugfix・M・plan=n/a → allow（else 分岐の n/a 許容ピン）。
+
+        bugfix/hotfix は brainstorm+plan=n/a（bug-diagnosis）であり、task_size は
+        S に限らない（M/L の bugfix は実運用パス）。else 分岐（S 以外）の
+        `plan=n/a` 受理が削除されると正当な bugfix-M 編集が誤 deny される
+        （false-deny 回帰）。review 1次 finder（テスト強度）の変異生存分析で
+        このセルの無テストが検出されたため追加（iter65）。"""
+        txt = STATUS_TMPL.format(mode="Dev", phase="implement", task_type="bugfix",
+                                 task_size="M", brainstorm="n/a", plan="n/a")
+        with _scratch_root(txt) as name:
+            root = Path(name)
+            out = _hook(root, _src(root))
+        self.assertTrue(_allowed(out),
+                        f"bugfix M+plan n/a must allow ({{}}), got: {out!r}")
+
     def test_g_size_s_missing_brainstorm_key_plan_approved_denies(self):
         """(g) S・gate_approvals に brainstorm キーなし・plan=approved → deny。
         fail-closed の明示ピン: S は brainstorm を見るので、キー欠落は空値
