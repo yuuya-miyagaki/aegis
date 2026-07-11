@@ -22,7 +22,7 @@
 
 - 分割方針: 読取 library（意味論の単一ソース）→ 生成系（snapshot）→ 判定系（audit）→ python 検査系 → parity guard の 5 ユニット。各 Fix は独立にテスト可能・独立にコミット可能。
 - 各ユニットの責務:
-  - **Fix ① audit grace 絞り込み**（hooks/post-status-audit.sh・SF-010 本丸）: task field tamper 判定を「`OLD_TF != NEW_TF` かつ（`OLD_TF` 非空 **または** snapshot に `task_type:` 行が存在）なら block」へ。grace は「旧値空 かつ snapshot に task_type 行なし」＝真の旧フォーマット（pre-iter43）のみ。
+  - **Fix ① audit grace 絞り込み**（hooks/post-status-audit.sh・SF-010 本丸）: task field tamper 判定を「`OLD_TF != NEW_TF` かつ（`OLD_TF` 非空 **または** snapshot に `task_type:` 行が存在）なら block」へ。grace は「旧値空 かつ snapshot に task_type 行なし」＝真の旧フォーマット（pre-iter43）のみ。**gate loop にも同型の絞り込みを適用**（grill-plan 指摘①・2026-07-12）: gate tamper 判定（:152）の `[ -n "$OLD" ]` grace は、snapshot に `gate_approvals:` 行が存在すれば無効化＝gate 行欠落 snapshot への empty→value 注入（SF-010 (iii) の empty-baseline class）を block。K-7 integrity check は phase/mode しか検査しないため、この絞り込みが gate 行欠落の穴を塞ぐ唯一の防御。
   - **Fix ② frontmatter_value スコープ化**（hooks/lib/frontmatter.sh）: 先頭行 `---` → `read_frontmatter` 出力内 first-match のみ。`---` 開始だが未終端 → 空（fail-closed）。`---` 非開始（bare `.gate-snapshot`）→ 従来の whole-file。契約（absent→空+rc0・クォート剥がし）は不変。
   - **Fix ③ snapshot 生成スコープ化**（hooks/lib/snapshot.sh）: phase/mode/task_type/task_size の whole-file `grep -m1` 4 行と gate_approvals ブロックの whole-file `sed` を frontmatter スコープ読み（②＋`frontmatter_section`）へ置換。監査 baseline 側の本文毒込みを封鎖。
   - **Fix ④ gate_value fallback 厳格化**（hooks/lib/frontmatter.sh・F-2）: `raw_section` fallback を「`---` frontmatter を持たないファイル」限定に。`---` ありで gate_approvals 節なし → 空＝下流 not-approved（fail-closed）。
@@ -63,6 +63,8 @@
   - T2 grace 温存: snapshot に task_type 行なし（真の旧フォーマット）→ 同編集が grace（block されない）。
   - T3 正規経路無影響: update-task.sh 経由の変更（snapshot 原子更新込み）が block されない。
   - T4 自己防衛: task_type を raw-Edit で除去 → 既存判定（OLD 非空・値相違)で block（grace を開けられない）。
+  - T5 gate loop 絞り込み（grill-plan 指摘①）: snapshot の gate ブロックから deploy 行を欠落させ STATUS raw-Edit で `deploy: approved` → **block**（現行は grace＝RED から開始）。
+  - 読点全数調査（census）: STATUS.md を直接読む箇所を機械列挙し enforcement／advisory／authorized-writer に分類した台帳を残す（enforcement 全件が本設計の Fix に写像されることの実証・grill-plan 指摘②）。
 - 結合: 既存 full suite（1096 passed / 2 skipped 基準）＋scaffold smoke。既知 flaky `test_update_gate_lock` は回帰判定から除外（full-review R10 test#8）。
 - エッジケース（parity drift-guard・iter53/65 型）: 敵対 fixture 表 —（a）frontmatter 内重複キー（b）引用形+非引用形混在（F-1 再現）（c）本文 spoof 行（d）gate_approvals 節欠落（F-2 再現）（e）bare snapshot（f）未終端 frontmatter — 各 fixture について bash 読点（bash -c ハーネス）と python 読点の返値一致をアサート。将来どちらかが drift したら赤。
 - 手動確認: なし（全て自動化・ドリル対象は qa フェーズで B1 判断）。
