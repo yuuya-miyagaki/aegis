@@ -338,6 +338,45 @@ class TestCheckPhaseTransition(unittest.TestCase):
             rc, out = run_check(root, "--check-phase-transition", "review", "implement")
             self.assertEqual(rc, 0, f"Expected allow (backward), got: {out}")
 
+    def test_ship_to_docs_S_adjacent_allows(self):
+        """review→ship→docs terminal for S size — ship→docs is a legitimate
+        adjacent forward transition (Fix 3a: docs added to SIZE_ALLOWED_PHASES[S]).
+
+        Regression pin for 罠 q: before Fix 3a this passed only via the empty-list
+        hole in check_phase_transition (docs was NOT in the S set, so no phase after
+        ship was 'allowed' → adjacency check bypassed) while the static check FAILed
+        the same STATUS ('割れ'). After Fix 3a it passes as a genuine adjacency,
+        consistent with the static check. Either way this MUST stay rc 0.
+        gate_approvals: brainstorm/review approved (S skips qa/security/deploy)."""
+        content = make_status_md(
+            phase="docs", task_size="S",
+            approvals={"brainstorm": "approved", "review": "approved"},
+        )
+        with TempProject(content) as root:
+            rc, out = run_check(root, "--check-phase-transition", "ship", "docs")
+            self.assertEqual(rc, 0, f"Expected allow (S ship→docs adjacent), got: {out}")
+
+
+class TestSizeAllowedPhasesStatic(unittest.TestCase):
+    """Fix 3a: docs is a valid terminal phase for task_size 'S' (unifies S with
+    M/L terminals). The static validator (default invocation, no --check flag)
+    must NOT emit the 'phase … is not allowed for task_size' FAIL for S/docs.
+
+    make_status_md fixtures are not otherwise validate-clean, so the specific
+    'not allowed for task_size' substring is the isolating RED/GREEN signal
+    (rc alone is not specific), mirroring TestTaskSizeRationaleEnforcement."""
+
+    def test_S_docs_phase_is_allowed_by_static_check(self):
+        """feature/S/docs must not trigger the phase-allowed FAIL (RED before 3a)."""
+        content = make_status_md(task_type="feature", task_size="S", phase="docs")
+        with TempProject(content) as root:
+            rc, out = run_check(root)
+            self.assertNotIn(
+                "not allowed for task_size",
+                out,
+                f"S/docs must be an allowed phase after Fix 3a: {out}",
+            )
+
 
 # =============================================================================
 # Hook-level integration tests (shell scripts → deny JSON)

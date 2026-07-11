@@ -207,9 +207,12 @@ EXPECTED_CURRENT_REF_KEYS = {"requirements", "plan", "spec", "review", "qa", "se
 ALLOWED_TASK_TYPES = {"feature", "refactor", "bugfix", "hotfix", "framework"}
 ALLOWED_TASK_SIZES = {"S", "M", "L"}
 # Phase flow constraints by task size.
-# S: minimal flow (1-file fixes). M: skip deploy. L: all phases.
+# S: minimal flow (1-file fixes) — skips plan/qa/security/deploy but keeps the
+#    ship→docs terminal (docs is unenforced, so its inclusion is purely additive
+#    and unifies S with the M/L terminal, closing the 罠 q static/transition split).
+# M: skip deploy. L: all phases.
 SIZE_ALLOWED_PHASES = {
-    "S": {"brainstorm", "implement", "review", "ship"},
+    "S": {"brainstorm", "implement", "review", "ship", "docs"},
     "M": {"brainstorm", "plan", "implement", "review", "qa", "security", "ship", "docs"},
     "L": {"brainstorm", "plan", "implement", "review", "qa", "security", "deploy", "ship", "docs"},
 }
