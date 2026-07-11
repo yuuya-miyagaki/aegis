@@ -37,7 +37,7 @@ external_evidence:
     scope: "v0.13.0 計画 5 ラウンドレビュー"
     findings: "Round 1〜5 で計 25 件の指摘（hook 出力スキーマ陳腐化、TaskCreated/Completed 制御方式、Plan 条件付き許可、effort 配分、pre-compact.sh 同種破損、`if` 単一 rule 制約等）"
     resolution: "Rev.5 で全件反映、Phase 0a 即時実装着手 GO。hotfix/v0122-hook-schema ブランチで開始。"
-next_action: "**【docs 完了・dev_ready_for_client 申請待ち＝push 手前】** iter65 / v1.26.0（S サイズ修復・R2🔴）は全 dev ゲート approved（brainstorm/plan/review/qa/security・M で deploy skip）＋ship（bump 3箇所・TO-CLIENT）＋docs（LEARNINGS 更新・session_history に iter65・iter62 剪定）まで完了。実装コミット c17be50〜（docs コミットは本 next_action 反映後）。**次にやること＝ユーザーに (1) dev_ready_for_client 承認 と (2) push（`gh auth switch --user yuuya-miyagaki` 後）の可否を確認**。承認後 `bash scripts/update-gate.sh dev_ready_for_client approve`→iteration rollover（iter66）。◆**残存 SF-010**（task_size empty-baseline raw-Edit×migration-grace・Medium・OPEN）＋F-1/F-2 パーサ drift は iter66 の第一候補テーマ（ユーザー承認で分離済）。◆既知 flaky=test_update_gate_lock（回帰外）。"
+next_action: "**【iter65 完全クローズ・push 済】** origin/main=c230742・iter65/v1.26.0（S サイズ修復・R2🔴）全 dev ゲート approved＋dev_ready_for_client approved＋push 済。**次にやること＝iter66 rollover**（新テーマ着手時に brainstorm へリセット・dev ゲート pending 化・非 requirements refs=null・iteration++・requirements 保持）。**iter66 第一候補テーマ＝SF-010**（task_size empty-baseline raw-Edit×migration-grace 穴・Medium・OPEN＝post-status-audit の migration-grace を『真の旧フォーマット snapshot 限定』に絞る＋F-1/F-2 パーサ二重実装 drift 統一・正本 docs/security-followups.md SF-010）。◆別候補: full-review Phase 1 残り（1-1 済/1-4 済／1-2 judge skip-and-continue・1-3 update-gate approve --ref 原子化・1-5 drill 強化・1-6）。◆既知 flaky=test_update_gate_lock（回帰外・full-review R10 test#8）。◆環境注意: aegis 内で Claude Code 起動。push=active gh は yuuya-miyagaki（切替不要）。"
 blockers: []
 failure_tracking: null
 session_history:
