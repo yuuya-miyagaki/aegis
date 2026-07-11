@@ -18,6 +18,7 @@ brainstorm・plan 両キーを持つ。
 """
 from __future__ import annotations
 
+import importlib.util
 import json
 import shutil
 import subprocess
@@ -26,6 +27,19 @@ import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+
+
+def _load_check_status():
+    """check_status.py を in-process import（読み取り専用・差し替え禁止）。
+
+    module-level 定数（SIZE_ALLOWED_PHASES / PHASE_REQUIRES_GATES）を SoT として
+    直接参照するためだけに import する。main() は __name__ ガード下なので副作用なし。
+    """
+    path = ROOT / "scripts" / "check_status.py"
+    spec = importlib.util.spec_from_file_location("check_status_sot", path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
 
 # 拡張テンプレ: task_size を持ち、gate_approvals に brainstorm・plan 双方を持つ。
 STATUS_TMPL = (
@@ -172,6 +186,74 @@ class TestCheckGateSizeAware(unittest.TestCase):
             out = _hook(root, _src(root))
         self.assertTrue(_denied(out),
                         f"S + missing brainstorm key must deny (fail-closed), got: {out!r}")
+
+
+class TestSizeGateDriftGuard(unittest.TestCase):
+    """check-gate.sh の size→gate ハードコードが python SoT から drift したら赤く落ちる guard。
+
+    背景: b796f95 で hooks/check-gate.sh は size-aware 化され、size→ゲートの対応を
+    pure-bash でハードコードした（task_size=S → brainstorm gate を検査／それ以外
+    〔M/L/未設定/不正値〕 → plan gate を検査）。この bash 側前提は python SoT
+    ――scripts/check_status.py の SIZE_ALLOWED_PHASES / PHASE_REQUIRES_GATES――の
+    「複製」であり、将来 size 追加や集合変更で bash が陳腐化すると gate が静かに
+    緩む/壊れる。本 guard は SoT を in-process import して bash 前提を機械照合し、
+    drift した瞬間に赤く落ちて保守者を hooks/check-gate.sh の size-aware 分岐へ誘導する。
+
+    参照:
+      - hooks/check-gate.sh: task_size=S 分岐（brainstorm gate 検査）と else 分岐
+        （plan gate 検査）が本 guard の照合対象。
+      - iter53 の REGEX↔WARN parity ドリフトガードと同パターン
+        （tests/test_destructive_warning_language.py）: SoT を単一化できない複製に
+        機械的 parity テストで歯を付ける手法。
+    """
+
+    def setUp(self):
+        self.mod = _load_check_status()
+
+    def test_only_S_skips_plan(self):
+        """plan フェーズを持たない（＝plan gate を skip する）size は S のみ。
+
+        M/L に plan が復活したり別 size が plan を落としたら、check-gate.sh の
+        「S だけ brainstorm gate・他は plan gate」ハードコードが陳腐化する。
+        """
+        sap = self.mod.SIZE_ALLOWED_PHASES
+        skip_plan = {s for s, phases in sap.items() if "plan" not in phases}
+        self.assertEqual(
+            skip_plan, {"S"},
+            "check-gate.sh の size→gate ハードコードとの同期が壊れた: plan を skip "
+            f"する size が {{'S'}} でなく {skip_plan} になった。"
+            "hooks/check-gate.sh の size-aware 分岐（S→brainstorm gate／他→plan gate）"
+            "を更新せよ。")
+
+    def test_S_implement_prior_gate_is_brainstorm_only(self):
+        """S の implement 直前ゲート列は [brainstorm]（check-gate.sh の S 分岐と一致）。
+
+        PHASE_REQUIRES_GATES['implement'] を S の許可フェーズ集合で絞ると
+        brainstorm だけが残る＝bash の「S は brainstorm gate を検査」に対応。
+        """
+        prior = [g for g in self.mod.PHASE_REQUIRES_GATES["implement"]
+                 if g in self.mod.SIZE_ALLOWED_PHASES["S"]]
+        self.assertEqual(
+            prior, ["brainstorm"],
+            "check-gate.sh の size→gate ハードコードとの同期が壊れた: S の implement "
+            f"直前ゲート列が ['brainstorm'] でなく {prior} になった。"
+            "hooks/check-gate.sh の size-aware 分岐（S→brainstorm gate）を更新せよ。")
+
+    def test_M_and_L_implement_prior_gate_is_brainstorm_then_plan(self):
+        """M・L の implement 直前ゲート列は [brainstorm, plan]（check-gate.sh の else 分岐と一致）。
+
+        両 size とも brainstorm/plan を許可フェーズに持つので絞り込みで両方残る＝
+        bash の「S 以外は plan gate を検査」に対応。
+        """
+        for size in ("M", "L"):
+            prior = [g for g in self.mod.PHASE_REQUIRES_GATES["implement"]
+                     if g in self.mod.SIZE_ALLOWED_PHASES[size]]
+            self.assertEqual(
+                prior, ["brainstorm", "plan"],
+                "check-gate.sh の size→gate ハードコードとの同期が壊れた: "
+                f"size={size} の implement 直前ゲート列が ['brainstorm', 'plan'] "
+                f"でなく {prior} になった。"
+                "hooks/check-gate.sh の size-aware 分岐（他→plan gate）を更新せよ。")
 
 
 if __name__ == "__main__":
