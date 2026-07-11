@@ -2,7 +2,8 @@
 """Fix 1 (本丸): check-gate.sh の最終ゲート判定を size-aware にする。
 
 背景: 現行 check-gate.sh はコード編集を無条件で plan gate 承認要求していたが、
-S サイズの phase 集合に plan フェーズは存在せず（impl->review->ship）、
+S サイズの phase 集合に plan フェーズは存在せず（impl->review->ship->docs・
+docs は Fix 3a で追加）、
 feature/refactor/framework は plan を n/a 化もできない → S でコード編集が
 構造的に不能だった。本修正は task_size を読み、S は implement 直前の承認
 ゲート（brainstorm）を検査、それ以外（M/L/未設定/不正値）は従来どおり
