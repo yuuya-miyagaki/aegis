@@ -109,3 +109,75 @@ def test_snapshot_failure_preserves_existing():
         # existing snapshot must remain (not truncated to empty)
         assert snap_file.exists()
         assert "old" in snap_file.read_text(encoding="utf-8")
+
+
+# --- iter66 Task 3 (Fix ③): snapshot 生成を frontmatter スコープ化 -----------
+
+def test_body_spoof_lines_excluded_from_snapshot():
+    """本文の task_size/gate_approvals 行が snapshot に混入しない。"""
+    status = (
+        "---\nmode: Dev\nphase: plan\ntask_type: framework\n"
+        "gate_approvals:\n  review: pending\n---\n"
+        "body\ntask_size: S\ngate_approvals:\n  review: approved\n"
+    )
+    with _scratch(status) as tmp:
+        p = Path(tmp)
+        rc, err = _write_snapshot(p)
+        assert rc == 0, f"helper failed: {err}"
+        snap = (p / ".claude" / ".gate-snapshot").read_text(encoding="utf-8")
+        assert "task_size: S" not in snap, f"body task_size leaked: {snap!r}"
+        assert "review: approved" not in snap, f"body gate leaked: {snap!r}"
+        assert "task_type: framework" in snap, f"missing task_type: {snap!r}"
+
+
+def test_absent_task_size_still_regenerates():
+    """潜在バグ修復: task_size 行なしでも regen は成功し task_type は記録される。"""
+    status = (
+        "---\nmode: Dev\nphase: brainstorm\ntask_type: framework\n"
+        "gate_approvals:\n  review: pending\n---\nbody\n"
+    )
+    with _scratch(status) as tmp:
+        p = Path(tmp)
+        rc, err = _write_snapshot(p)
+        assert rc == 0, f"regen must succeed without task_size: {err}"
+        snap = (p / ".claude" / ".gate-snapshot").read_text(encoding="utf-8")
+        assert "task_type: framework" in snap, f"missing task_type: {snap!r}"
+        assert "task_size:" not in snap, f"unexpected task_size line: {snap!r}"
+
+
+def test_malformed_frontmatter_keeps_existing_snapshot():
+    """未終端 frontmatter へ破壊 → rc≠0・既存 snapshot は byte 同一で温存。"""
+    with _scratch() as tmp:
+        p = Path(tmp)
+        snap_file = p / ".claude" / ".gate-snapshot"
+        # 1) normal STATUS -> build a valid snapshot
+        rc, err = _write_snapshot(p)
+        assert rc == 0, f"initial write failed: {err}"
+        before = snap_file.read_bytes()
+        # 2) corrupt STATUS: unterminated frontmatter (no closing ---)
+        (p / "docs" / "STATUS.md").write_text(
+            "---\nmode: Dev\nphase: plan\ntask_type: framework\n",
+            encoding="utf-8",
+        )
+        rc, err = _write_snapshot(p)
+        assert rc != 0, "malformed frontmatter must fail-closed (rc!=0)"
+        after = snap_file.read_bytes()
+        assert after == before, "existing snapshot must be byte-identical"
+
+
+def test_normal_status_snapshot_shape_pinned():
+    """正常系 STATUS の出力形状（行集合・順序）を従来と同一にピン。"""
+    status = (
+        "---\nmode: Dev\nphase: plan\ntask_type: framework\n"
+        "task_size: M\ngate_approvals:\n  brainstorm: approved\n"
+        "  plan: pending\n---\nbody\n"
+    )
+    with _scratch(status) as tmp:
+        p = Path(tmp)
+        rc, err = _write_snapshot(p)
+        assert rc == 0, f"helper failed: {err}"
+        snap = (p / ".claude" / ".gate-snapshot").read_text(encoding="utf-8")
+        assert snap == (
+            "gate_approvals:\n  brainstorm: approved\n  plan: pending\n"
+            "phase: plan\nmode: Dev\ntask_type: framework\ntask_size: M\n"
+        ), f"shape drift: {snap!r}"

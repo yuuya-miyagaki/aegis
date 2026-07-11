@@ -5,6 +5,12 @@
 # task_type + task_size. task_type/task_size were added in iter43 so that
 # raw Edits to them (which silently change gate requirements and the layer-2
 # moat lock) become tamper-evident, mirroring how gates already work.
+
+# snapshot.sh consumes read_frontmatter/_section_filter; source defensively
+# so a caller that loads snapshot.sh alone still works (bash 3.2 safe).
+if ! declare -F read_frontmatter >/dev/null 2>&1; then
+  . "$(dirname "${BASH_SOURCE[0]}")/frontmatter.sh"
+fi
 #
 # Single-function / multiple-fire-point design (iter37): session-start.sh,
 # update-gate.sh, update-task.sh, and post-status-audit.sh all call this helper
@@ -26,14 +32,24 @@ aegis_write_snapshot() {
   local snapshot_dir="${root}/.claude"
   local snapshot_file="${snapshot_dir}/.gate-snapshot"
   [ -f "$status_file" ] || return 1
+  # Frontmatter-scoped source (iter66 Fix③): body lines can never poison the
+  # tamper baseline. Malformed/unterminated frontmatter -> keep the existing
+  # snapshot untouched (non-destructive, K-7) and report failure.
+  local fm
+  fm=$(read_frontmatter "$status_file") || return 1
+  [ -n "$fm" ] || return 1
   mkdir -p "$snapshot_dir" 2>/dev/null || return 1
   local tmp="${snapshot_file}.tmp.$$"
+  # `|| true` per key: an absent OPTIONAL key (task_size before brainstorm
+  # Step D) must not abort the regen — the old whole-file version silently
+  # failed here, leaving a stale snapshot (one enabler of the SF-010
+  # empty-baseline window).
   {
-    sed -n '/^gate_approvals:/,/^[a-z]/{ /^gate_approvals:/p; /^  /p; }' "$status_file" 2>/dev/null
-    grep -m1 "^phase:" "$status_file" 2>/dev/null
-    grep -m1 "^mode:" "$status_file" 2>/dev/null
-    grep -m1 "^task_type:" "$status_file" 2>/dev/null
-    grep -m1 "^task_size:" "$status_file" 2>/dev/null
+    printf '%s\n' "$fm" | _section_filter gate_approvals
+    printf '%s\n' "$fm" | grep -m1 "^phase:" || true
+    printf '%s\n' "$fm" | grep -m1 "^mode:" || true
+    printf '%s\n' "$fm" | grep -m1 "^task_type:" || true
+    printf '%s\n' "$fm" | grep -m1 "^task_size:" || true
   } > "$tmp" 2>/dev/null && mv "$tmp" "$snapshot_file" 2>/dev/null || {
     rm -f "$tmp" 2>/dev/null || true
     return 1
