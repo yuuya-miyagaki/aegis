@@ -3,29 +3,29 @@ framework: aegis
 framework_version: "1.25.0"
 project_name: "Aegis"
 mode: Dev
-phase: docs
+phase: review
 task_type: framework
 task_size: M
-task_size_rationale: "iteration 64（framework・全体レビュー §4 Phase 1 項目 1-1: fingerprint を HEAD sha 束縛から非 docs/.claude tree-hash 化＝R6 根1〔罠 r,b,c,d〕。併せて iter63 OR marker LOW-1〔setup.sh selfheal 帰属判定 leg(b) の OR〕を authoritative stamp 単独要求へ厳格化）= M。footprint 見込み: hooks/lib/fingerprint.sh＋tests/test_fingerprint_lib.py＋bin/setup.sh＋tests/test_setup_locked_target_upgrade.py の 2-5 コア/テストファイル＝M（2-5）。evidence moat 中核（fingerprint.sh は E1 単一所有者）かつ distribution（setup.sh）隣接のため review+qa+security 必須・M のため deploy skip。S は R2 罠（check-gate.sh が plan gate を無条件要求・S に plan フェーズ無し・本 iter未修正）で構造的に不能のため M を採用（LEARNINGS: framework-M が唯一クリーン）。"
-iteration: 64
+task_size_rationale: "iteration 65（framework・全体レビュー §4 Phase 1 項目 1-4「S サイズ修復」＝R2🔴）M 確定（brainstorm Step D・update-task.sh 経由）。設計正本: docs/specs/2026-07-10-iter65-s-size-repair-design.md（Fix 1: check-gate.sh を pure-bash size-aware 化＝S→brainstorm gate/他→plan gate・python 委譲は fail-open 退行のため不採用／Fix 2: check_phase_transition 空リスト穴封鎖／Fix 3a: SIZE_ALLOWED_PHASES[S] に docs 追加＝罠 q 根絶／drift-guard テスト／state-machine.md 表同期）。footprint: hooks/check-gate.sh＋scripts/check_status.py＋tests＋.claude/rules/state-machine.md＝M（2-5）。control-plane（gate 強制ロジック）を触るため review+qa+security 必須・M のため deploy skip。"
+iteration: 65
 ui_surface: false
-last_updated: "2026-07-08T12:50:00Z"
+last_updated: "2026-07-12T02:31:00Z"
 gate_approvals:
   client_ready_for_dev: n/a
   brainstorm: approved
   plan: approved
   review: approved
-  qa: approved
-  security: approved
+  qa: pending
+  security: pending
   deploy: pending
-  dev_ready_for_client: approved
+  dev_ready_for_client: pending
 current_refs:
   requirements: []
-  plan: docs/plans/2026-07-08-iter64-fingerprint-tree-hash-plan.md
-  spec: docs/specs/2026-07-08-iter64-fingerprint-tree-hash-design.md
-  review: docs/qa-reports/iter64-review.md
-  qa: docs/qa-reports/iter64-qa.md
-  security: docs/qa-reports/iter64-security.md
+  plan: "docs/plans/2026-07-10-iter65-s-size-repair-implementation-plan.md"
+  spec: "docs/specs/2026-07-10-iter65-s-size-repair-design.md"
+  review: "docs/qa-reports/iter65-review.md"
+  qa: null
+  security: null
   deploy: null
   translation: null
 external_evidence:
@@ -37,7 +37,7 @@ external_evidence:
     scope: "v0.13.0 計画 5 ラウンドレビュー"
     findings: "Round 1〜5 で計 25 件の指摘（hook 出力スキーマ陳腐化、TaskCreated/Completed 制御方式、Plan 条件付き許可、effort 配分、pre-compact.sh 同種破損、`if` 単一 rule 制約等）"
     resolution: "Rev.5 で全件反映、Phase 0a 即時実装着手 GO。hotfix/v0122-hook-schema ブランチで開始。"
-next_action: "**【iter64 完全クローズ・push 済 origin/main=3a69f2d】** iter64 / v1.25.0（fingerprint tree-hash 化＝R6 根1／setup OR marker 厳格化＝iter63 LOW-1 解消）を全 dev ゲート approved まで完走し push 済（詳細は session_history 末尾＋git show 3a69f2d）。**次にやること＝iter65 の rollover**（新テーマ着手時に `brainstorm` へリセット・dev ゲート pending 化・iteration→65・requirements 以外の refs=null・state-machine.md「Iteration」節に従う）。◆候補テーマ＝full-review §4 Phase 1 残り: judge read_test_result skip-and-continue（1-2・R6 根2＝罠 e,m）／update-gate approve --ref 原子化＋SIGPIPE（1-3・iter64 で実地遭遇）／S サイズ修復（1-4）／drill コメントラン floor 除外（1-5・iter64 で skip を採らせた限界）／record 引数事前検証（1-6）。◆環境注意: aegis 内で Claude Code を起動（親 repo セッションでは hooks 無効）。"
+next_action: "**【review approved・qa フェーズへ】** テーマ＝S サイズ修復（R2🔴・iter65）。review=approve_with_notes（1次4角度 finder=opus→親verify・盲検2次=fable 収束）。Major3件 fix-forward 済(b9c95f7 本文spoof封鎖/89264c7 ケースh n/a許容/ef1cd9b 姉妹表同期)。**SF-010（task_size empty-baseline raw-Edit×migration-grace 穴）はユーザー承認で次反復(iter66)分離・qa/security で residual ack 必須**（F-1/F-2 パーサ drift も SF-010 スコープ）。**次にやること＝qa（B1 drill・qa-verification skill・model=opus）→security（1次+盲検2次=fable・SF-010 を明示 ack）→ship→docs**。full suite 再記録中。◆ref-window 教訓(iter64 conf8)再現: ref→approve は pytest 挟まず連続。◆push 手前まで自走承認済。"
 blockers: []
 failure_tracking: null
 session_history:

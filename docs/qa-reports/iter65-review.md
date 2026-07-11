@@ -3,7 +3,8 @@
 - 対象: `git diff 26de7f6..HEAD`（S サイズ修復 Fix 1/2/3a＋テスト＋guidance 同期）
 - 仕様正本: `docs/specs/2026-07-10-iter65-s-size-repair-design.md` ／ 計画 `docs/plans/2026-07-10-iter65-s-size-repair-implementation-plan.md`
 - 手法: 1次＝4角度 finder 並列（bash 堅牢性=opus / gate 迂回=opus / テスト強度=opus / 仕様準拠=opus）→ 親（fable）verify・fix-forward。全 finder は read-only 6拘束下・fixture は mktemp のみ・repo tree 非破壊。
-- full suite: 1094 passed / 2 skipped（環境条件つき既知 skip）。review 時点の関連テスト 145+ passed。
+- full suite: **1096 passed / 2 skipped**（環境条件つき既知 skip・review fix-forward 反映後の bh2jsw80d 緑実行 exit=0）。
+- **flaky 観測（透明性）**: `tests/test_update_gate_lock.py::test_lock_held_blocks_noop_approve` が full-suite 負荷下の1実行で1回 fail→別 full 実行(bh2jsw80d)で pass・単独3/3 pass・ファイル17/17 pass。full-review R10 test#8 で既知のハードコード lock 待ちタイミング脆弱性。本 diff は update-gate.sh/lock/snapshot 不接触（`git diff --name-only 26de7f6..HEAD` で確認）＝回帰ではない。qa/security に申し送り（env 化での安定化は別バックログ）。
 
 ## 対照表（plan タスク × 実装）
 
