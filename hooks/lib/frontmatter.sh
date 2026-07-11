@@ -51,13 +51,21 @@ raw_section() {
 
 # frontmatter_value <file> <key>
 #   stdout: top-level scalar value (surrounding double-quotes stripped).
-#   Whole-file `^key:` match so bare frontmatter files (.gate-snapshot, no `---`)
-#   work identically. Empty stdout + RC 0 when the file or key is absent
-#   (callers test -n/-z; matches the prior `... || true` inline behavior).
+#   Files starting with `---` are read WITHIN the frontmatter scope only
+#   (first match; body lines are invisible — SF-010). `---` present but
+#   unterminated -> empty (fail-closed). Bare frontmatter files
+#   (.gate-snapshot, no ---) keep the whole-file read. Empty stdout + RC 0
+#   when the file or key is absent (callers test -n/-z; unchanged contract).
 frontmatter_value() {
-  local file="$1" key="$2"
+  local file="$1" key="$2" src=""
   [ -f "$file" ] || return 0
-  grep -m1 "^${key}:" "$file" | sed "s/^${key}:[[:space:]]*//" | sed 's/^"//;s/"$//' || true
+  if [ "$(head -n1 "$file" 2>/dev/null)" = "---" ]; then
+    src=$(read_frontmatter "$file") || src=""
+  else
+    src=$(cat "$file" 2>/dev/null) || src=""
+  fi
+  printf '%s\n' "$src" | grep -m1 "^${key}:" \
+    | sed "s/^${key}:[[:space:]]*//" | sed 's/^"//;s/"$//' || true
 }
 
 # gate_value <file> <gate>

@@ -164,6 +164,41 @@ class TestFrontmatterValue(unittest.TestCase):
         self.assertEqual(rc, 0)
         self.assertEqual(out, "")
 
+    def test_body_spoof_line_invisible_in_frontmattered_file(self):
+        # SF-010 class: --- ファイルでは本文の key: 行は読まれない
+        with tempfile.TemporaryDirectory() as d:
+            p = Path(d) / "STATUS.md"
+            p.write_text("---\nmode: Dev\n---\nbody\ntask_size: S\n",
+                         encoding="utf-8")
+            rc, out = run_fn("frontmatter_value", str(p), "task_size")
+            self.assertEqual(rc, 0)
+            self.assertEqual(out.strip(), "")
+
+    def test_frontmatter_first_match_wins_over_body(self):
+        with tempfile.TemporaryDirectory() as d:
+            p = Path(d) / "STATUS.md"
+            p.write_text("---\ntask_size: M\n---\nbody\ntask_size: S\n",
+                         encoding="utf-8")
+            rc, out = run_fn("frontmatter_value", str(p), "task_size")
+            self.assertEqual(out.strip(), "M")
+
+    def test_unterminated_frontmatter_value_empty_failclosed(self):
+        with tempfile.TemporaryDirectory() as d:
+            p = Path(d) / "STATUS.md"
+            p.write_text("---\ntask_size: S\nno close\n", encoding="utf-8")
+            rc, out = run_fn("frontmatter_value", str(p), "task_size")
+            self.assertEqual(rc, 0)
+            self.assertEqual(out.strip(), "")
+
+    def test_bare_file_whole_file_read_preserved(self):
+        # .gate-snapshot 形式（--- なし）は従来どおり
+        with tempfile.TemporaryDirectory() as d:
+            p = Path(d) / ".gate-snapshot"
+            p.write_text("phase: implement\ntask_type: framework\n",
+                         encoding="utf-8")
+            rc, out = run_fn("frontmatter_value", str(p), "task_type")
+            self.assertEqual(out.strip(), "framework")
+
 
 class TestGateValue(unittest.TestCase):
     def _write(self, tmp: Path, text: str) -> Path:
