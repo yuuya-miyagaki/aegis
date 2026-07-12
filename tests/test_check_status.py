@@ -779,6 +779,26 @@ class TestPreApproveGateRefCheck(unittest.TestCase):
             # 🟡 (ack-able), never 🔴 (1): missing evidence must not hard-block.
             self.assertEqual(rc, 2, f"Migration must be ack-able 🟡, not blocked: {out}")
 
+    def test_pending_ref_env_suppresses_advisory(self):
+        """update-gate.sh approve --ref 経由（AEGIS_PENDING_REF セット）では
+        「ref が空」ADVISORY を出さない（--ref が原子的に設定するため）。"""
+        content = make_status_md(
+            phase="plan", task_size="L",
+            approvals={"brainstorm": "approved"},
+            refs={"plan": "null"},
+        )
+        with TempProject(content) as root:
+            result = subprocess.run(
+                ["python3", str(CHECK_STATUS), "--root", root,
+                 "--pre-approve-gate", "plan"],
+                capture_output=True, text=True,
+                env={**os.environ, "AEGIS_PENDING_REF": "docs/plans/plan.md"},
+            )
+            out = (result.stdout + result.stderr).strip()
+            self.assertEqual(result.returncode, 0, out)
+            self.assertNotIn("ADVISORY", out,
+                             f"--ref 経由では空ref ADVISORY を出さない: {out}")
+
 
 # =============================================================================
 # --check-status-health tests
@@ -2169,16 +2189,49 @@ class TestCheckCompletionEvidence(unittest.TestCase):
                 rc, 1,
                 f"missing-file violation must exit non-zero (A9/B3), got rc={rc}")
 
-    def test_pending_gate_with_ref_is_stale_violation(self):
-        # reuse semantics: a ref present under a pending gate is a stale-ref violation
+    def test_pending_gate_with_ref_is_advisory_not_violation(self):
+        # iter68 (1-3): pending gate + present ref は WARNING（advisory）に降格。
+        # writer が reset/na で null 化・approve --ref で原子設定するため、
+        # 残置 ref は運用衛生であって evidence 偽装ではない。
         content = make_status_md(approvals=dict(ALL_PENDING),
                                  refs={"qa": "docs/qa-reports/qa1.md"})
         with TempProject(content) as root:
             (Path(root) / "docs" / "qa-reports").mkdir(parents=True)
             (Path(root) / "docs" / "qa-reports" / "qa1.md").write_text("ok")
             rc, out = run_check(root, "--check-completion-evidence")
-            self.assertIn("EVIDENCE:", out, "pending gate + present ref must be stale violation")
+            self.assertEqual(rc, 0, f"pending+ref must not fail: {out}")
+            self.assertNotIn("EVIDENCE:", out)
+            self.assertIn("WARNING", out, "advisory WARNING must still surface")
             self.assertIn("stale", out)
+
+    def test_na_gate_with_ref_is_advisory_not_violation(self):
+        content = make_status_md(approvals={**ALL_PENDING, "qa": "n/a"},
+                                 refs={"qa": "docs/qa-reports/qa1.md"})
+        with TempProject(content) as root:
+            (Path(root) / "docs" / "qa-reports").mkdir(parents=True)
+            (Path(root) / "docs" / "qa-reports" / "qa1.md").write_text("ok")
+            rc, out = run_check(root, "--check-completion-evidence")
+            self.assertEqual(rc, 0, f"n/a+ref must not fail: {out}")
+            self.assertNotIn("EVIDENCE:", out)
+            self.assertIn("WARNING", out)
+
+    def test_completion_advisory_goes_to_stderr_not_stdout(self):
+        """【grill-plan 致命1】check-task-completed.sh は stdout 非空を violation
+        扱いするため、advisory WARNING は stderr に出る（stdout は空・rc 0）。
+        これが崩れると TaskCompleted hook が pending+ref で完了を再ブロックする。"""
+        content = make_status_md(approvals=dict(ALL_PENDING),
+                                 refs={"qa": "docs/qa-reports/qa1.md"})
+        with TempProject(content) as root:
+            (Path(root) / "docs" / "qa-reports").mkdir(parents=True)
+            (Path(root) / "docs" / "qa-reports" / "qa1.md").write_text("ok")
+            result = subprocess.run(
+                ["python3", str(CHECK_STATUS), "--root", root,
+                 "--check-completion-evidence"],
+                capture_output=True, text=True)
+            self.assertEqual(result.returncode, 0)
+            self.assertEqual(result.stdout.strip(), "",
+                             "stdout は violation 専用チャネル（hook 契約）")
+            self.assertIn("WARNING", result.stderr)
 
     def test_requirements_missing_file_violates(self):
         # extract_current_refs only parses a multi-line YAML list (4-space "- item")
