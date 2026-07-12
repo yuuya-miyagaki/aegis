@@ -480,5 +480,218 @@ class TestPostBashObserveMarkerField(unittest.TestCase):
                 f"verify: {entry}")
 
 
+# ---------------------------------------------------------------------------
+# D. trust-scan (iter67): undecidable-ok エントリ〔observed かつ
+# marker_verified≠true かつ status=ok〕は情報ゼロ＝透明として skip し、
+# 走査は最新の decidable エントリ〔src='manual'、または observed かつ
+# marker_verified=true〕まで遡って判定を下す。
+#   - undecidable-fail〔status=fail〕は従来どおり終端 unverified。
+#   - decidable の fp 不一致も従来どおり終端 unverified。
+#   - undecidable-ok の透明化は fp 検査より前（stale な undecidable-ok も透明）。
+# 現行 read_test_result は undecidable-ok で終端 unverified を返すため、
+# 「透明化して古い decidable が勝つ」を期待する系列は RED になる。
+# ---------------------------------------------------------------------------
+
+
+class TestReadTestResultTrustScan(unittest.TestCase):
+    """undecidable-ok 透明化の目標意味論を系列で固定する（実装は iter67 Task 2）。"""
+
+    STALE = "a" * 64
+
+    @classmethod
+    def setUpClass(cls):
+        import importlib.util
+        spec = importlib.util.spec_from_file_location(
+            "build_judge_card", str(ROOT / "scripts" / "build-judge-card.py"))
+        cls.mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(cls.mod)
+
+    def _scratch_repo(self) -> tempfile.TemporaryDirectory:
+        tmp = tempfile.TemporaryDirectory()
+        p = Path(tmp.name)
+        subprocess.run(["git", "init", "-q"], cwd=p, check=True)
+        subprocess.run(["git", "config", "user.email", "x@y.z"],
+                       cwd=p, check=True)
+        subprocess.run(["git", "config", "user.name", "t"],
+                       cwd=p, check=True)
+        (p / "f.txt").write_text("seed", encoding="utf-8")
+        subprocess.run(["git", "add", "-A"], cwd=p, check=True)
+        subprocess.run(["git", "commit", "-q", "-m", "init"],
+                       cwd=p, check=True)
+        ev = p / ".claude"
+        ev.mkdir()
+        hooks_dir = p / "hooks"
+        hooks_dir.mkdir()
+        lib_dir = hooks_dir / "lib"
+        lib_dir.mkdir()
+        for lib in ("patterns.sh", "fingerprint.sh"):
+            (lib_dir / lib).symlink_to(ROOT / "hooks" / "lib" / lib)
+        return tmp
+
+    def _fp(self, root: Path) -> str:
+        return self.mod.current_fingerprint(root)
+
+    def _entry(self, src: str, status: str, fp: str,
+               marker_verified="__absent__", cmd: str = "pytest tests/") -> dict:
+        """基本形の evidence エントリを1件生成。marker_verified に
+        '__absent__' を渡すとキー自体を持たない（v1.6.0 スキーマ相当）。"""
+        d = {
+            "v": 1, "ts": "2026-07-12T00:00:00Z",
+            "src": src, "cmd": cmd, "status": status,
+            "payload_sha": "x" * 64, "fp": fp,
+        }
+        if marker_verified != "__absent__":
+            d["marker_verified"] = marker_verified
+        return d
+
+    def _write_entries(self, root: Path, entries: list, rotated_split=None):
+        """entries は古→新。rotated_split=None なら全件を current ログへ。
+        rotated_split=N なら先頭 N 件を .1（rotated）へ、残りを current へ。
+        read 側は .1 → current の順で古→新として読む。"""
+        cur = root / ".claude" / "evidence-log.jsonl"
+        rot = root / ".claude" / "evidence-log.jsonl.1"
+        if rotated_split is None:
+            cur.write_text(
+                "".join(json.dumps(e) + "\n" for e in entries),
+                encoding="utf-8")
+            return
+        old, new = entries[:rotated_split], entries[rotated_split:]
+        rot.write_text(
+            "".join(json.dumps(e) + "\n" for e in old), encoding="utf-8")
+        cur.write_text(
+            "".join(json.dumps(e) + "\n" for e in new), encoding="utf-8")
+
+    def test_trusted_green_survives_noise_ok_entry(self):
+        """manual green の後ろに no-run な observed/ok/mv=False が積まれても、
+        後者は透明で古い manual green が勝つ。"""
+        with self._scratch_repo() as _:
+            r = Path(_)
+            fp = self._fp(r)
+            self._write_entries(r, [
+                self._entry("manual", "ok", fp),
+                self._entry("observed", "ok", fp, marker_verified=False,
+                            cmd="pytest --collect-only -q"),
+            ])
+            self.assertEqual(
+                self.mod.read_test_result(r), "green",
+                "undecidable-ok ノイズが未実装（終端 unverified）＝RED")
+
+    def test_marker_verified_green_survives_noise_ok_entry(self):
+        """marker_verified=true の green も後続 no-run ノイズを透過して勝つ。"""
+        with self._scratch_repo() as _:
+            r = Path(_)
+            fp = self._fp(r)
+            self._write_entries(r, [
+                self._entry("observed", "ok", fp, marker_verified=True),
+                self._entry("observed", "ok", fp, marker_verified=False),
+            ])
+            self.assertEqual(
+                self.mod.read_test_result(r), "green",
+                "undecidable-ok ノイズが未実装（終端 unverified）＝RED")
+
+    def test_decidable_red_cannot_be_laundered_by_noise_ok_entry(self):
+        """decidable red は後続の no-run ノイズで 🟡 に洗浄できない
+        （red 洗浄経路の封鎖）。"""
+        with self._scratch_repo() as _:
+            r = Path(_)
+            fp = self._fp(r)
+            self._write_entries(r, [
+                self._entry("observed", "fail", fp, marker_verified=True),
+                self._entry("observed", "ok", fp, marker_verified=False),
+            ])
+            self.assertEqual(
+                self.mod.read_test_result(r), "red",
+                "透明化が未実装だと red が noise ok で unverified に洗浄＝RED")
+
+    def test_undecidable_fail_stays_terminal_unverified(self):
+        """undecidable-fail〔observed/fail/mv≠true〕は透明化せず終端 unverified
+        （fail 側の fail-closed は不変）。"""
+        with self._scratch_repo() as _:
+            r = Path(_)
+            fp = self._fp(r)
+            self._write_entries(r, [
+                self._entry("manual", "ok", fp),
+                self._entry("observed", "fail", fp, marker_verified=False),
+            ])
+            self.assertEqual(self.mod.read_test_result(r), "unverified")
+
+    def test_transparency_does_not_resurrect_stale_green(self):
+        """透明化は古い decidable を"復活"させるが、その decidable 自身が
+        stale なら fp 不一致で終端 unverified（stale green を蘇生しない）。"""
+        with self._scratch_repo() as _:
+            r = Path(_)
+            fp = self._fp(r)
+            self._write_entries(r, [
+                self._entry("manual", "ok", self.STALE),
+                self._entry("observed", "ok", fp, marker_verified=False),
+            ])
+            self.assertEqual(self.mod.read_test_result(r), "unverified")
+
+    def test_v160_ok_entry_is_transparent_in_sequence(self):
+        """marker_verified キー自体を持たない v1.6.0 の observed/ok も
+        undecidable-ok として透明（古い manual green が勝つ）。"""
+        with self._scratch_repo() as _:
+            r = Path(_)
+            fp = self._fp(r)
+            self._write_entries(r, [
+                self._entry("manual", "ok", fp),
+                self._entry("observed", "ok", fp),  # marker_verified 欠如
+            ])
+            self.assertEqual(
+                self.mod.read_test_result(r), "green",
+                "キー欠如の undecidable-ok が終端扱い＝RED")
+
+    def test_newest_decidable_red_still_wins(self):
+        """最新が decidable red なら（透明化と無関係に）従来どおり red。"""
+        with self._scratch_repo() as _:
+            r = Path(_)
+            fp = self._fp(r)
+            self._write_entries(r, [
+                self._entry("manual", "ok", fp),
+                self._entry("observed", "fail", fp, marker_verified=True),
+            ])
+            self.assertEqual(self.mod.read_test_result(r), "red")
+
+    def test_noise_only_log_stays_unverified(self):
+        """undecidable-ok だけのログは decidable ゼロ＝unverified
+        （透明化で全件消えても silent-green にしない）。"""
+        with self._scratch_repo() as _:
+            r = Path(_)
+            fp = self._fp(r)
+            self._write_entries(r, [
+                self._entry("observed", "ok", fp, marker_verified=False),
+                self._entry("observed", "ok", fp, marker_verified=False),
+            ])
+            self.assertEqual(self.mod.read_test_result(r), "unverified")
+
+    def test_transparency_spans_rotated_log(self):
+        """透明化は rotated (.1) 境界をまたぐ：.1 側の古い manual green を
+        current 側の undecidable-ok を透過して拾う。"""
+        with self._scratch_repo() as _:
+            r = Path(_)
+            fp = self._fp(r)
+            self._write_entries(r, [
+                self._entry("manual", "ok", fp),                       # -> .1
+                self._entry("observed", "ok", fp, marker_verified=False),  # current
+            ], rotated_split=1)
+            self.assertEqual(
+                self.mod.read_test_result(r), "green",
+                "rotated 境界を越えた透明化が未実装＝RED")
+
+    def test_transparency_precedes_fp_check(self):
+        """undecidable-ok の透明化は fp 検査より前：最新 observed/ok が
+        stale fp でも undecidable-ok として透明化され、古い manual green が勝つ。"""
+        with self._scratch_repo() as _:
+            r = Path(_)
+            fp = self._fp(r)
+            self._write_entries(r, [
+                self._entry("manual", "ok", fp),
+                self._entry("observed", "ok", self.STALE, marker_verified=False),
+            ])
+            self.assertEqual(
+                self.mod.read_test_result(r), "green",
+                "stale な undecidable-ok が fp 検査で終端＝RED")
+
+
 if __name__ == "__main__":
     unittest.main()
