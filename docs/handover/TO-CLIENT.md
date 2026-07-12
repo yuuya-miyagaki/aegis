@@ -1,4 +1,4 @@
-# 納品サマリー — iteration 66（v1.26.1）
+# 納品サマリー — iteration 67（v1.26.2）
 
 <!-- 正本: ship-and-docs skill -->
 <!-- exit-check: TO-CLIENT 完成・証拠参照済み・既知ギャップ記載済み → docs へ -->
@@ -7,56 +7,52 @@
 
 ## 納品サマリー
 
-- リリース / ビルド: aegis v1.26.1（iter66・**PATCH**＝既存 moat の穴を塞ぐ security fix＋内部パーサ統一・公開契約不変・後方互換）
+- リリース / ビルド: aegis v1.26.2（iter67・**PATCH**＝judge の gate 判定 fix・公開契約不変・後方互換）
 - 日付: 2026-07-12
 - 担当者: aegis dev フロー（工程別モデル tiering: 疑う=Fable 5／書く=Opus 4.8。実装=implementer opus・review/qa/security 一次=opus・親verify/盲検2次/判定=fable）
-- 操作マニュアル: 不要（保守者操作に新規ステップなし。挙動変化＝下記「運用上の注意」に記載）
+- 操作マニュアル: 不要（保守者操作に新規ステップなし。むしろ従来必要だった手順規律が1つ不要化＝下記「運用上の注意」）
 - 運用 RUNBOOK: 不要（新規運用手順なし）
 - UAT 結果: 不要（ACCEPTANCE 未定義の framework イテレーション）
 
-## 実装範囲（SF-010 封鎖＋frontmatter 読取意味論統一）
+## 実装範囲（judge test-fact 判定堅牢化＝trust-scan）
 
-**背景**: iter65 で検出された SF-010＝`task_size` の empty-baseline 窓（未設定＝fresh scaffold / rollover 直後〜brainstorm Step D 前が正規状態）で `docs/STATUS.md` frontmatter を raw-Edit し `task_size: S` を注入すると、`post-status-audit.sh` の migration-grace（`[ -n "$OLD" ]`）が tamper 検知をスキップし plan 儀式を bypass できた。size-aware 化（iter65）で `task_size` が gate 判定に昇格して初めて gate-bypass に転化した moat 回帰。併せて bash（whole-file grep）と python（frontmatter-scope）のパーサ二重実装 drift（F-1/F-2＋(i)(iii)）を統一。
+**背景**: gate 承認時に走る judge の tier-1 test-fact（`scripts/build-judge-card.py::read_test_result`）は evidence-log を新しい順に走査し、**最初の** test-runner マッチエントリで green/red/unverified を確定していた。そのエントリが「observed かつ marker 未検証（＝観測者が本物のテストサマリを確認できなかった）」で status=ok だと、直下に fp 一致の trusted green があっても `unverified`（🟡）を返した。結果、record green の後に件数確認の生 `pytest --collect-only` や `pytest | tail` を1回走らせるだけで gate が 🟡 降格し、ack 儀式または再 record が必要になった（iter64/65/66 で3回顕在化＝LEARNINGS conf9 line137）。
 
-- **Fix ①（本丸）: migration-grace を「真の旧フォーマット snapshot」限定に絞る**（`post-status-audit.sh`）。task field loop は snapshot に `task_type` 行があれば（現行フォーマット）空→値も block、gate loop は snapshot に `gate_approvals:` 節があれば gate 行欠落への空→値も block。grace が残るのは pre-iter43 の真の旧フォーマット（task_type 行なし／gate_approvals 節なし）のみ。正規経路（update-task.sh/update-gate.sh）は snapshot を原子更新するため無影響。
-- **Fix ②: `frontmatter_value` を library 級スコープ化**（`hooks/lib/frontmatter.sh`）。`---` ありファイルは frontmatter 内 first-match のみ（本文行の spoof が不可視）・未終端 frontmatter は空 fail-closed・bare ファイル（`.gate-snapshot`）は whole-file 読みを温存。consumer 契約（absent→空+rc0）不変。
-- **Fix ③: snapshot 生成を frontmatter スコープ化**（`hooks/lib/snapshot.sh`）＝baseline 毒込み封鎖＋`task_size` 欠落時に最終 grep rc1 で regen が silent fail していた潜在バグを修復＋`gate_approvals:` 必須ガード（gate 節なし baseline の永続 grace 窓を防止）。
-- **Fix ④: `gate_value` の本文 fallback を `---` 無しファイル限定に**（F-2）。frontmatter を持つ STATUS では本文の `gate_approvals` ブロックが gate 判定を駆動しない。
-- **Fix ⑤: python パーサを bash に意味論同期**（`scripts/check_status.py`）。`extract_scalar_value` を行順 first-match 化（F-1・引用形優先で `key: "S"` が先行 `key: M` を上書きする audit-evading な python=S/bash=M 割れを消去）＋`extract_approval_map` を先勝ち化（重複キーの後勝ち→先勝ち・bash `grep -m1` に一致）。
-- **dedup**: `check-gate.sh` の `task_size` 読みを iter65 のインライン scoped 読みから Fix ② の `frontmatter_value` へ集約（読取意味論の単一ソース化・挙動不変）。
-- **parity drift-guard**: bash↔python パーサの意味論が drift したら赤く落ちる新規テスト（fixture a-k）。
+- **trust-scan（本丸）**: 走査中、undecidable（observed かつ `marker_verified≠true`）かつ status=ok のエントリを「green も red も証明できない＝情報ゼロ」として**透明**（skip して走査継続）にし、最新の decidable エントリ（`src="manual"`、または observed で `marker_verified=true`）が判定を下す。`build-judge-card.py::read_test_result` の走査ループに1分岐を挿入（fp 検査の直前）＋docstring を trust-scan 意味論に同期。
+- **不変（C-2/K-1/fp backstop 無緩和）**: undecidable-fail（status=fail）は従来どおり終端 `unverified`（runner 形の失敗信号を保持）・decidable の fp 不一致は終端 `unverified`（stale green を蘇生しない）・decidable エントリゼロは `unverified`（silent-green の下限）。
+- **副産物＝厳格化**: decidable red を後続の no-run コマンドで red→🟡 に「洗浄」する経路が閉じた（透明化で red が保持される）。
 
 ## 変更ファイル
 
-- `hooks/lib/frontmatter.sh`（frontmatter_value スコープ化・gate_value 本文 fallback 厳格化・値正規化 _strip_scalar・gate_value 行頭 2-space アンカー）
-- `hooks/lib/snapshot.sh`（生成スコープ化・regen バグ修復・gate 節ガード）
-- `hooks/post-status-audit.sh`（migration-grace 絞り込み＝task fields＋gate loop）
-- `scripts/check_status.py`（extract_scalar_value first-match・extract_approval_map 先勝ち）
-- `hooks/check-gate.sh`（task_size 読みを frontmatter_value へ dedup）
-- `tests/`（test_frontmatter_lib.py・test_snapshot_helper.py・test_snapshot_writers.py・test_post_status_audit_task_tamper.py・test_check_status_parsers.py〔新規〕・test_parser_parity_driftguard.py〔新規〕）
-- version bump: `check_framework_contract.py`／`docs/STATUS.md`／`templates/STATUS.template.md`（1.26.0→1.26.1）
+- `scripts/build-judge-card.py`（`read_test_result` に undecidable-ok 透明化1分岐＋docstring 同期）
+- `tests/test_test_runner_realness.py`（`TestReadTestResultTrustScan` 系列テスト11件〔計画10＋fix-forward の3段系列〕新規）
+- `tests/test_judge_card.py`（既存ピン `test_newest_stale_does_not_fall_back_to_older_fresh` の理由コメントに decidable 限定子を追記・アサーション不変）
+- `docs/architecture-overview.md`（judge 記述を trust-scan 意味論に同期・1文）
+- version bump: `check_framework_contract.py`／`docs/STATUS.md`／`templates/STATUS.template.md`（1.26.1→1.26.2）
 
 ## 証拠
 
-- 設計: `docs/specs/2026-07-12-iter66-sf010-parser-unification-design.md`／計画: `docs/plans/2026-07-12-iter66-sf010-parser-unification-implementation-plan.md`
-- review: `docs/qa-reports/iter66-review.md`（1次4角度 finder=opus→親verify=fable・盲検2次=fable approve 収束・Major×4 fix-forward 6148a60）
-- qa: `docs/qa-reports/iter66-qa.md`（機能対照表 12件PASS・fresh変異 M1-M5 全kill〔計14テスト〕・SF-010 閉塞 4ケース hook 直接発火再実測・**full suite 1138 passed/2 skipped**）
-- security: `docs/qa-reports/iter66-security.md`（1次 opus＋盲検2次 fable 収束 approve・新規脆弱性0・SF-010 消化実測・SF-011 起票）
+- 設計: `docs/specs/2026-07-12-iter67-judge-test-fact-robustness-design.md`（＋brainstorm-record）／計画: `docs/plans/2026-07-12-iter67-judge-test-fact-robustness-implementation-plan.md`
+- review: `docs/qa-reports/iter67-review.md`（1次4角度〔仕様/敵対/テスト強度/保守性〕finder=opus→親verify=fable・盲検2次=fable・approve 系収束・fix-forward 2件 70ace79/0739a79）
+- qa: `docs/qa-reports/iter67-qa.md`（機能対照表 8件PASS・fresh変異 M1-M5 全kill＋grill 変異2種・**実環境 E2E 差分＝同一 evidence-log で OLD(d2c4dd6)=unverified／NEW=green**・scoped 99 passed）
+- security: `docs/qa-reports/iter67-security.md`（1次 opus＋盲検2次 fable 収束 approve・新規脆弱性0・gate-bypass 4攻撃面 differential 実走・SF-012 起票）
 
 ## テスト・QA・セキュリティ要約
 
-- **テスト**: full suite 1138 passed / 2 skipped（環境条件つき既知 skip＝case-insensitive FS・shellcheck 不在）。contract PASS。B1 drill は per-task コミット済みで skip（sanctioned 縁ケース・iter64 conf7）＋qa 一次 fresh 変異 M1-M5 全 kill（計14テスト・scratch clone 内）＋SF-010 閉塞を pytest 非経由の hook 直接発火で 4 ケース独立再実測。
-- **review**: Major×4（bash 値正規化を python に一致／gate_value 行頭 2-space アンカー／parity fixture g-k 追加）を fix-forward `6148a60`。
-- **security**: 新規 injection/secrets/data-exposure/緩め bypass なし（1次 opus＋盲検2次 fable が実フック実測）。全変更 fail-closed 方向。SF-010 の (i)(ii)(iii) を消化。
+- **テスト**: 対象2ファイル 99 passed・full suite green（record-test-result・v1.26.2 tree で実証）・contract PASS。B1 drill は per-task コミット済みで sanctioned skip（iter64 conf7）＋fresh 変異 M1-M5 全 kill（独立 scratch clone・scoped 99 テスト）。
+- **review**: Minor を fix-forward 2件（3段系列ピン追加・docstring の Decidable 定義を実挙動に正確化＋LEARNINGS 導線＋guidance に undecidable-fail 終端補記）。
+- **security**: 新規 injection/secrets/data-exposure/gate-bypass なし（differential harness で baseline vs HEAD 実走）。red 可視性はむしろ厳格化。検出2件はいずれも pre-existing（差分実走で OLD=NEW 確定）＝SF-012 起票。
 
 ## 残留リスク・既知の制限事項
 
-- **SF-010（Medium・iter66 で封鎖・docs で CLOSED 化予定）**: 本反復で本丸（Fix ①）＋(i) 重複キー先勝ち乖離（Fix ⑤）＋(ii) 引用形優先（Fix ⑤ first-match）＋(iii) gate_value 本文 fallback（Fix ④）を消化。canonical size 注入・gate 行欠落注入とも BLOCK、真の旧フォーマット grace 温存、正規経路無影響を hook 直接発火で実測。
-- **SF-011（Low・OPEN・新規起票）**: bash `read_frontmatter`（終端 `^---[[:space:]]*$`・末尾スペース許容）と python `extract_frontmatter`（strict `\A---\n...\n---\n`）の終端デリミタ許容差。frontmatter 途中に `--- ` を挿入し後続に `task_size: S` を隠すと python `check_phase_transition` だけが読み phase-skip を数字上許容し得る。**pre-existing**（baseline deb4a8a=HEAD で同挙動・この diff の回帰ではない）かつ **3層 contained**（check-gate は bash empty→plan gate→deny／gate 承認は update-gate.sh 必須／`--strict`/contract の PyYAML cross-check が reject＝"done" 洗浄不能）で実害到達なし。次反復 hardening（read_frontmatter 終端 strict 化 or parity fixture 追加）。詳細 `docs/security-followups.md` SF-011。
-- **flaky（回帰外）**: `test_update_gate_lock.py::test_lock_held_blocks_noop_approve`（lock 待ちタイミング・full-review R10 test#8 既知）。本 diff は update-gate/lock/snapshot 不接触。
+- **SF-012（Low・OPEN・pre-existing・新規起票）**: evidence 信頼判定の hardening 2件 — (a) washed-green（`pytest; true` の exit 洗浄＋pass-marker regex が `1 failed, 2 passed` にもマッチ→decidable green）、(b) unknown-src decidable-by-default（src 欠如/異値が decidable 扱い）。いずれも 1次/2次が differential 実走で **baseline d2c4dd6 と同挙動＝本 iter の回帰でない**を確定。実 writer は observed/manual のみ発行・任意 log 書込みは脅威モデル外・(a) の発火には明示的 exit 洗浄（自己欺瞞）が必要＝contained。iter68 hardening 候補（writer 側の marker/status 整合軸＋reader 側 src allowlist）。詳細 `docs/security-followups.md` SF-012。
+- **SF-011（Low・OPEN・pre-existing）**: frontmatter 終端デリミタ差（iter66 起票・未着手）。
+- **flaky（回帰外）**: `test_update_gate_lock`（lock 待ちタイミング・full-review R10 test#8 既知）。本 iter の全 run で顕在化せず・本 diff は update-gate/lock 不接触。
+- deps: N/A（外部依存パッケージなし・pip/npm マニフェスト不在＝judge の deps は unverified🟡 で ack）。
+- 公開契約: **不変**（`read_test_result` の戻り値集合〔green/red/unverified〕・呼出側〔collect_facts〕・observer 契約〔evidence.sh〕・token 契約・skill boot-path 全て変更なし）。SemVer PATCH 妥当。
 
-## 運用上の注意
+## 運用上の注意（挙動変化）
 
-- **tamper-evidence の穴が塞がった**: `task_size` empty-baseline 窓での raw-Edit 注入が tamper audit で block されるようになった（fail-closed 方向のみ・正規 `update-task.sh`/`update-gate.sh` 経路は無影響）。
-- **frontmatter 読取が本文 spoof に強くなった**: STATUS の本文に `task_size:`/`gate_approvals:` 行を書いても gate/audit 判定は frontmatter のみを見る。bash と python のパーサが同じ値を読むよう統一（duplicate キーは先勝ち・引用形は行順優先）。
+- **gate 承認時の judge が「件数確認の生 pytest ノイズ」で 🟡 降格しなくなった**。record green（`record-test-result.py`）の後に `pytest --collect-only` 等を走らせても、直近の trusted green が判定を保つ。従来必要だった「件数確認は record の前に・締めは必ず record-test-result」という手順規律（LEARNINGS conf9 line137 の test-fact 軸）は、この fix で機構的に不要化された。ただし **record→ref→承認の間に生 pytest を挟まない運用自体は ref-window の contract 不変条件（別軸・未解決）のため引き続き推奨**。
+- **decidable red は no-run コマンドで隠せなくなった**（厳格化）。テストが実際に赤い状態で承認しようとすると、その後に collect-only 等を走らせても judge は red を保持する。
 - **未 push**: 実装コミット済み・**push 手前で停止**（push は `gh auth switch --user yuuya-miyagaki`）。
