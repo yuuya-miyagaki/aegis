@@ -3,7 +3,7 @@ framework: aegis
 framework_version: "1.26.1"
 project_name: "Aegis"
 mode: Dev
-phase: qa
+phase: security
 task_type: framework
 task_size: M
 task_size_rationale: "iteration 67（framework・judge test-fact 判定堅牢化）M 確定（brainstorm Step D・update-task.sh 経由）。設計正本: docs/specs/2026-07-12-iter67-judge-test-fact-robustness-design.md（trust-scan＝read_test_result の走査で undecidable〔observed かつ marker_verified≠true〕かつ status=ok のエントリを情報ゼロ＝透明として skip・判定は最新 decidable〔manual／observed+marker=true〕が下す。undecidable-fail 終端 unverified・fp 不一致終端・decidable ゼロ→unverified は不変＝C-2/K-1/fp backstop 無緩和。red 洗浄経路〔decidable red 後の no-run コマンドで red→🟡〕も封鎖＝厳格化）。footprint: scripts/build-judge-card.py＋tests/test_test_runner_realness.py＝M（2-5）。control-plane（gate 判定ロジック）を触るため review+qa+security 必須・M のため deploy skip。候補#2 ref-window 原子化は iter68 第一候補へ繰越・#3 は独立 maintenance へ。"
@@ -15,7 +15,7 @@ gate_approvals:
   brainstorm: approved
   plan: approved
   review: approved
-  qa: pending
+  qa: approved
   security: pending
   deploy: pending
   dev_ready_for_client: pending
@@ -24,7 +24,7 @@ current_refs:
   plan: "docs/plans/2026-07-12-iter67-judge-test-fact-robustness-implementation-plan.md"
   spec: "docs/specs/2026-07-12-iter67-judge-test-fact-robustness-design.md"
   review: "docs/qa-reports/iter67-review.md"
-  qa: null
+  qa: "docs/qa-reports/iter67-qa.md"
   security: null
   deploy: null
   translation: null
@@ -37,7 +37,7 @@ external_evidence:
     scope: "v0.13.0 計画 5 ラウンドレビュー"
     findings: "Round 1〜5 で計 25 件の指摘（hook 出力スキーマ陳腐化、TaskCreated/Completed 制御方式、Plan 条件付き許可、effort 配分、pre-compact.sh 同種破損、`if` 単一 rule 制約等）"
     resolution: "Rev.5 で全件反映、Phase 0a 即時実装着手 GO。hotfix/v0122-hook-schema ブランチで開始。"
-next_action: "**【iter67 qa 着手（自走）】** review approved（judge 🟢・正本=docs/qa-reports/iter67-review.md）: 1次4角度（A 仕様=approve/B 敵対=approve〔FB-1 washed-green は baseline 差分で pre-existing 実証・Low・SF-012 起票予定〕/C テスト強度=a_w_n→3段系列ピン fix-forward 70ace79/D 保守性=a_w_n→D-1 fix-forward）＋盲検2次=fable a_w_n（F1 docstring 定義乖離/F3 guidance 省略→fix-forward 0739a79・divergence なし）。次=qa gate: B1 drill 判断（per-task committed＝diff 空なら conf7 の sanctioned skip＋代替実証〔fresh 変異・grill 変異2種は実証済み〕）→judge preview の実地確認（trust-scan 発火＝本 iter の manual green が noise を透過するか）→full record green→qa ref→承認。◆既知 flaky=test_update_gate_lock（回帰外）。◆push=ユーザー指示待ち。"
+next_action: "**【iter67 security 着手（自走）】** qa approved（judge 🟢・正本=docs/qa-reports/iter67-qa.md）: B1=sanctioned skip＋代替実証〔fresh 変異 M1-M5 全kill・grill 変異2種・実環境 E2E 差分=同一状態で OLD(d2c4dd6)=unverified／NEW=green・scoped 99 passed・full record green〕。注記: qa agent は plan mode 制約で非 readonly 実行不能→親が同一手順を直接実施。次=security gate: 1次（security agent=opus max・injection/secrets/data-exposure/gate-bypass 実挙動）→盲検2次（fable fresh・1次非開示）→SF-012 起票（washed-green marker/status 整合＋unknown-src allowlist・pre-existing 実証済み・Low）→record green→security ref→承認。◆push=ユーザー指示待ち。"
 blockers: []
 failure_tracking: null
 session_history:
