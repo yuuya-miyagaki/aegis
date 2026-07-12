@@ -99,7 +99,7 @@ mapping.md はクライアント用語 → 機能仕様 → 実装ヒントの 3
 - `scope` で `docs/requirements/SCOPE.md` と `docs/requirements/NFR.md` を作成したら追加する。
 - `acceptance` で `docs/requirements/ACCEPTANCE.md` を作成したら追加する。
 - `handover` では requirements refs を維持し、`next_action` を handover 完了に合わせて更新する。
-- `handover` で `docs/translation/mapping.md` を作成する。`current_refs.translation` への設定はゲート承認の直前（Translation Artifact 節のタイミング規定に従う）。
+- `handover` で `docs/translation/mapping.md` を作成する。`current_refs.translation` はゲート承認と同時に `approve --ref` で設定する（Translation Artifact 節の原子承認規定に従う）。
 
 ### モード遷移ゲート
 

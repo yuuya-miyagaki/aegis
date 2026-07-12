@@ -16,8 +16,10 @@ set -euo pipefail
 # しうるが、書込み前の出力は fail-closed（exit≠0・状態不変）、書込み後は
 # best-effort（|| true）で exit 0 を保つ。
 # 監査済み（iter68）: 本スクリプト内で「下流の早期終了」に依存するパイプは
-# CURRENT 読取の `grep -m1`（`|| true` 済み）と print_report 内（guard 済み）
-# のみ — trap を外す場合はこの2点の EPIPE 化を再監査すること。
+# CURRENT 読取の `grep -m1`（`|| true` 済み）・print_report 内（guard 済み）・
+# pre-write sanity の `grep -q`（frontmatter_section が単一 printf のバッファ
+# 出力なので producer は grep の match/exit より先に write を完了＝EPIPE 競合
+# なし）の3点 — trap を外す/frontmatter_section を逐次出力に変える場合は再監査すること。
 trap '' PIPE
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"

@@ -3,8 +3,10 @@
 test_destructive_warning_language.py と同型の token pin）＋テンプレ対応表 parity。
 
 ドッグフード ゲート戦闘3: client-workflow の「作成したら translation ref を設定」指示が
-stale-ref 検査（pending gate + ref = FAIL）と正面衝突。正しい運用（承認の直前に設定→
-承認を連続実行）を skill 本文に明文化し、旧文言の再発を token で封鎖する。
+stale-ref 検査と正面衝突（当時 pending gate + ref = FAIL）。iter68 で承認は
+`approve --ref` の原子1書込みになり stale-ref は advisory WARNING に降格したが、
+「作成時に ref を設定する」旧文言の再発は引き続き token で封鎖する（現行の正文言＝
+「承認の直前に別途 set せず approve --ref で承認と同時に設定」）。
 テンプレ対応表は scripts/_artifact_template_map.py（single owner）との parity で縛る。
 """
 from __future__ import annotations
@@ -42,9 +44,10 @@ CLIENT_ARTIFACTS = [p for p, _ in check_status.CLIENT_GATE_ARTIFACTS] + [
 class TestTranslationRefTiming(unittest.TestCase):
     def test_timing_token_present(self):
         self.assertIn("承認の直前", CW,
-                      "translation ref のタイミング規定（承認の直前）が消えている")
+                      "translation ref のタイミング規定（承認の直前に別途 set せず"
+                      " approve --ref で同時設定）が消えている")
         self.assertIn("stale-ref", CW,
-                      "stale-ref 違反への言及（なぜ直前なのか）が消えている")
+                      "stale-ref への言及（advisory WARNING 降格の説明）が消えている")
 
     def test_old_contradicting_wording_gone(self):
         self.assertNotIn(
