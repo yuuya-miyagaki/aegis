@@ -49,6 +49,18 @@ raw_section() {
   printf '%s\n' "$out"
 }
 
+# _strip_scalar (stdin -> stdout) — normalize a raw scalar to match python's
+# check_status.py `.strip().strip('"').strip("'")`: trim surrounding
+# whitespace, then ONE layer of surrounding double-quotes, then one layer of
+# single-quotes. Keeps the bash readers byte-identical to the python readers
+# for the realistic value space (iter66 review 1st finding). Residual: nested
+# multi-quote like `""S""` is not fully unwrapped (python .strip removes all);
+# such values cannot come from authorized writers and are tamper-blocked
+# (bash-vs-bash audit), so they stay out of the parity contract.
+_strip_scalar() {
+  sed 's/^[[:space:]]*//; s/[[:space:]]*$//' | sed 's/^"//; s/"$//' | sed "s/^'//; s/'\$//"
+}
+
 # frontmatter_value <file> <key>
 #   stdout: top-level scalar value (surrounding double-quotes stripped).
 #   Files starting with `---` are read WITHIN the frontmatter scope only
@@ -69,15 +81,19 @@ frontmatter_value() {
     src=$(cat "$file" 2>/dev/null) || src=""
   fi
   printf '%s\n' "$src" | grep -m1 "^${key}:" \
-    | sed "s/^${key}:[[:space:]]*//" | sed 's/^"//;s/"$//' || true
+    | sed "s/^${key}:[[:space:]]*//" | _strip_scalar || true
 }
 
 # gate_value <file> <gate>
 #   stdout: the value of `<gate>:` under the gate_approvals section.
 #   Files starting with `---`: frontmatter_section ONLY (no body fallback —
 #   F-2: a body gate_approvals block must never drive gate decisions).
-#   Bare files (.gate-snapshot, no ---): raw_section as before. 2-space
-#   anchor prevents substring matches. Empty stdout + RC 0 when absent.
+#   Bare files (.gate-snapshot, no ---): raw_section as before. The leading
+#   2-space anchor is strict (`^  ${gate}:`): it matches only a gate line at
+#   the canonical 2-space indent and does NOT pick up a 4-space-indented line
+#   via substring — python's extract_approval_map ignores such deeper-indented
+#   lines, so the strict anchor keeps bash fail-closed and at parity (iter66
+#   review 1st finding). Empty stdout + RC 0 when absent.
 gate_value() {
   local file="$1" gate="$2" src=""
   [ -f "$file" ] || return 0
@@ -88,6 +104,6 @@ gate_value() {
   else
     src=$(raw_section "$file" gate_approvals 2>/dev/null) || src=""
   fi
-  printf '%s\n' "$src" | grep -m1 "  ${gate}:" \
-    | sed "s/.*${gate}:[[:space:]]*//" | sed 's/^"//;s/"$//' || true
+  printf '%s\n' "$src" | grep -m1 "^  ${gate}:" \
+    | sed "s/.*${gate}:[[:space:]]*//" | _strip_scalar || true
 }

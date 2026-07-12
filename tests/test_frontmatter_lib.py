@@ -208,6 +208,27 @@ class TestFrontmatterValue(unittest.TestCase):
             rc, out = run_fn("frontmatter_value", str(p), "task_type")
             self.assertEqual(out.strip(), "framework")
 
+    def test_single_quoted_value_stripped_matches_python(self):
+        with tempfile.TemporaryDirectory() as d:
+            p = Path(d) / "STATUS.md"
+            p.write_text("---\ntask_size: 'S'\n---\nbody\n", encoding="utf-8")
+            rc, out = run_fn("frontmatter_value", str(p), "task_size")
+            self.assertEqual(out.strip(), "S")
+
+    def test_trailing_whitespace_value_trimmed(self):
+        with tempfile.TemporaryDirectory() as d:
+            p = Path(d) / "STATUS.md"
+            p.write_text("---\ntask_size: S  \n---\nbody\n", encoding="utf-8")
+            rc, out = run_fn("frontmatter_value", str(p), "task_size")
+            self.assertEqual(out, "S\n")  # 末尾空白除去（grep 出力の改行のみ）
+
+    def test_double_quoted_value_still_stripped(self):
+        with tempfile.TemporaryDirectory() as d:
+            p = Path(d) / "STATUS.md"
+            p.write_text('---\ntask_size: "M"\n---\nbody\n', encoding="utf-8")
+            rc, out = run_fn("frontmatter_value", str(p), "task_size")
+            self.assertEqual(out.strip(), "M")
+
 
 class TestGateValue(unittest.TestCase):
     def _write(self, tmp: Path, text: str) -> Path:
@@ -276,6 +297,31 @@ class TestGateValue(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             p = Path(d) / ".gate-snapshot"
             p.write_text("gate_approvals:\n  review: approved\nphase: qa\n",
+                         encoding="utf-8")
+            rc, out = run_fn("gate_value", str(p), "review")
+            self.assertEqual(out.strip(), "approved")
+
+    def test_four_space_indent_gate_not_matched(self):
+        # 4-space インデント gate 行は行頭 2-space アンカーで拾わない（fail-closed）
+        with tempfile.TemporaryDirectory() as d:
+            p = Path(d) / "STATUS.md"
+            p.write_text("---\ngate_approvals:\n    review: approved\n---\nbody\n",
+                         encoding="utf-8")
+            rc, out = run_fn("gate_value", str(p), "review")
+            self.assertEqual(out.strip(), "")
+
+    def test_two_space_indent_gate_still_read(self):
+        with tempfile.TemporaryDirectory() as d:
+            p = Path(d) / "STATUS.md"
+            p.write_text("---\ngate_approvals:\n  review: approved\n---\nbody\n",
+                         encoding="utf-8")
+            rc, out = run_fn("gate_value", str(p), "review")
+            self.assertEqual(out.strip(), "approved")
+
+    def test_single_quoted_gate_value_stripped(self):
+        with tempfile.TemporaryDirectory() as d:
+            p = Path(d) / "STATUS.md"
+            p.write_text("---\ngate_approvals:\n  review: 'approved'\n---\nbody\n",
                          encoding="utf-8")
             rc, out = run_fn("gate_value", str(p), "review")
             self.assertEqual(out.strip(), "approved")

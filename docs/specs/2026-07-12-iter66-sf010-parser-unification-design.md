@@ -66,7 +66,8 @@
   - T5 gate loop 絞り込み（grill-plan 指摘①）: snapshot の gate ブロックから deploy 行を欠落させ STATUS raw-Edit で `deploy: approved` → **block**（現行は grace＝RED から開始）。
   - 読点全数調査（census）: STATUS.md を直接読む箇所を機械列挙し enforcement／advisory／authorized-writer に分類した台帳を残す（enforcement 全件が本設計の Fix に写像されることの実証・grill-plan 指摘②）。
 - 結合: 既存 full suite（1096 passed / 2 skipped 基準）＋scaffold smoke。既知 flaky `test_update_gate_lock` は回帰判定から除外（full-review R10 test#8）。
-- エッジケース（parity drift-guard・iter53/65 型）: 敵対 fixture 表 —（a）frontmatter 内重複キー（b）引用形+非引用形混在（F-1 再現）（c）本文 spoof 行（d）gate_approvals 節欠落（F-2 再現）（e）bare snapshot（f）未終端 frontmatter — 各 fixture について bash 読点（bash -c ハーネス）と python 読点の返値一致をアサート。将来どちらかが drift したら赤。
+- エッジケース（parity drift-guard・iter53/65 型）: 敵対 fixture 表 —（a）frontmatter 内重複キー（b）引用形+非引用形混在（F-1 再現）（c）本文 spoof 行（d）gate_approvals 節欠落（F-2 再現）（e）bare snapshot（f）未終端 frontmatter（g）single-quote スカラー（h）末尾空白スカラー（i）4-space インデント gate（j）single-quote gate 値（k）double-quote スカラー — 各 fixture について bash 読点（bash -c ハーネス）と python 読点の返値一致をアサート。将来どちらかが drift したら赤。（g）-（k）は iter66 review 1次で確定した bash↔python 値正規化ドリフト（single-quote 剥がし・末尾空白 trim・gate 行頭 2-space アンカー）を機械保証する追加の歯。
+- parity 契約の範囲と残余の限界（「限界主張は実証」原則）: parity 契約は「authorized writer が生成しうる**現実的な値空間**」— クォート無し／single-quote／double-quote・値前後の空白・2-space インデント gate — に対して bash==python を機械保証する（bash 側の正規化 `_strip_scalar` を python の `.strip().strip('"').strip("'")` に一致させる）。多重ネストクォート（例 `""S""`）など**病理的入力**は authorized writer（update-task.sh／update-gate.sh 等）が生成せず、生 Edit で持ち込めば bash-vs-bash snapshot audit（tamper 検知）で block されるため、parity 契約の対象外とする。従って `_strip_scalar` が single/double-quote を各 1 層しか剥がさない残余は fail-closed 方向であり、契約の穴ではない。
 - 手動確認: なし（全て自動化・ドリル対象は qa フェーズで B1 判断）。
 
 ## 次のステップ

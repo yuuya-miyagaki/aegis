@@ -107,6 +107,29 @@ class TestParserParity(unittest.TestCase):
             self.assertEqual(bash_value(p, "task_size"), "")
             self.assertEqual(py_value(text, "task_size"), "")
 
+    def test_g_single_quoted_scalar(self):
+        self.assert_parity(
+            "---\ntask_size: 'S'\n---\nbody\n", "task_size", "S")
+
+    def test_h_trailing_space_scalar(self):
+        self.assert_parity(
+            "---\ntask_size: S  \n---\nbody\n", "task_size", "S")
+
+    def test_i_four_space_indent_gate(self):
+        # bash も python も 4-space gate を採用しない（fail-closed 一致）
+        self.assert_gate_parity(
+            "---\ngate_approvals:\n    review: approved\n---\nbody\n",
+            "review", "")
+
+    def test_j_single_quoted_gate_value(self):
+        self.assert_gate_parity(
+            "---\ngate_approvals:\n  review: 'approved'\n---\nbody\n",
+            "review", "approved")
+
+    def test_k_double_quoted_scalar(self):
+        self.assert_parity(
+            '---\ntask_size: "M"\n---\nbody\n', "task_size", "M")
+
 
 if __name__ == "__main__":
     unittest.main()
