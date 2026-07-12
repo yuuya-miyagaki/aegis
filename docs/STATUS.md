@@ -9,7 +9,7 @@ task_size: M
 task_size_rationale: "iteration 66（framework・SF-010 封鎖＋frontmatter 読取意味論統一）M 確定（brainstorm Step D・update-task.sh 経由）。設計正本: docs/specs/2026-07-12-iter66-sf010-parser-unification-design.md（Fix ①: post-status-audit migration-grace を『snapshot に task_type 行なし＝真の旧フォーマット』限定に絞る／Fix ②: frontmatter_value を library 級スコープ化〔---あり→frontmatter 内 first-match・未終端→空 fail-closed・bare→whole-file 温存〕／Fix ③: snapshot 生成スコープ化＝baseline 毒込み封鎖／Fix ④: gate_value 本文 fallback を ---無しファイル限定〔F-2〕／Fix ⑤: python extract_scalar_value 行順 first-match 化〔F-1〕＋extract_approval_map 先勝ち化／parity drift-guard テスト）。footprint: hooks/lib/frontmatter.sh＋hooks/lib/snapshot.sh＋hooks/post-status-audit.sh＋scripts/check_status.py＋hooks/check-gate.sh(dedup)＋tests＝M（2-5）。control-plane（audit/gate 強制ロジック）を触るため review+qa+security 必須・M のため deploy skip。"
 iteration: 66
 ui_surface: false
-last_updated: "2026-07-12T06:30:00Z"
+last_updated: "2026-07-12T06:46:00Z"
 gate_approvals:
   client_ready_for_dev: n/a
   brainstorm: approved
@@ -37,7 +37,7 @@ external_evidence:
     scope: "v0.13.0 計画 5 ラウンドレビュー"
     findings: "Round 1〜5 で計 25 件の指摘（hook 出力スキーマ陳腐化、TaskCreated/Completed 制御方式、Plan 条件付き許可、effort 配分、pre-compact.sh 同種破損、`if` 単一 rule 制約等）"
     resolution: "Rev.5 で全件反映、Phase 0a 即時実装着手 GO。hotfix/v0122-hook-schema ブランチで開始。"
-next_action: "**【iter66 docs 完了・dev_ready_for_client 申請】** ship 完了（v1.26.0→1.26.1 PATCH・bump 3箇所・TO-CLIENT 更新・commit dace3b7）。docs 完了: SF-010 を CLOSED 化（plan 完了条件・(i)(ii)(iii) 消化＋対応コミット明記）＋LEARNINGS 3件更新（line139 conf8→9 SF-010 封鎖／line137 ref-window に judge test-fact 最新マッチ軸追加／新 conf8 盲検2次 pre-existing 乖離の扱い＝SF-011）＋docs-sync 整合性チェック drift なし（CHANGELOG 無・README policy 不変・MANUAL/RUNBOOK/UAT は framework 内部改修で N/A）。次=dev_ready_for_client ゲート承認申請（ユーザー承認 → update-gate.sh dev_ready_for_client approve）。◆push=active gh は yuuya-miyagaki（切替不要・push はユーザー指示待ち）。"
+next_action: "**【iter66 完全クローズ済 → 次は iter67 rollover＋brainstorm】** iter66（v1.26.1・SF-010 封鎖＋frontmatter 読取意味論統一）は全 dev ゲート approved＋dev_ready_for_client approved で完全クローズ（commit abf6d04〜5ae8634・**未 push**＝ユーザー指示でローカル確定）。**次タスク＝iter67**: retro で合意した改善 #1『judge の test-fact 判定堅牢化』。狙い＝`build-judge-card.py::read_test_result` が『evidence-log の最新 test-runner マッチ』を採るため record green 後にクォート外の生 pytest を1回走らせるだけで observed-unverified（marker_verified=False）が manual green を上書きし unverified 降格する罠（iter64/65/66 で3回顕在化＝conf9 line137）を機構で根切り（例: fp 一致の manual/marker_verified=True green があれば後続 observed-unverified で上書きしない）。**手順**: (1) rollover＝dev ゲート全 reset〔update-gate.sh reset〕・iteration 66→67・non-requirements refs=null・phase=brainstorm・external_evidence ≤3 維持。(2) brainstorm 前に STATUS 再読・objective/blockers/next 再述（CLAUDE.md 必須）。(3) aegis-brainstorm skill で #1 を設計対話（関連候補 #2 ref-window 原子化・#3 session_history 自動アーカイブ＋doctor 誤検出偏り は brainstorm で scope 判断）。◆push=active gh は yuuya-miyagaki（切替不要・push はユーザー指示待ち）。"
 blockers: []
 failure_tracking: null
 session_history:
