@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import subprocess
+import sys
 from pathlib import Path
 
 
@@ -553,7 +555,10 @@ def evidence_integrity_violations(
 ) -> list[str]:
     """Gate/ref consistency + ref-file existence. Returns bare violation
     messages WITHOUT a path prefix, so validate_status_file can prepend the
-    path and --check-completion-evidence can use them directly. Never raises."""
+    path and --check-completion-evidence can use them directly. Never raises.
+
+    Gate/ref consistency: a pending/n/a gate with a lingering ref is a stderr
+    WARNING (advisory, non-violation); stdout is the violation-only channel."""
     violations: list[str] = []
     try:
         for gate_key, ref_key in GATE_REF_MAPPING.items():
@@ -565,9 +570,19 @@ def evidence_integrity_violations(
                     f"gate '{gate_key}' is approved but current_refs.{ref_key} is empty"
                 )
             if gate_value in {"pending", "n/a"} and not ref_is_empty:
-                violations.append(
-                    f"gate '{gate_key}' is '{gate_value}' but current_refs.{ref_key} "
-                    f"still has a value (stale ref: {ref_value})"
+                # iter68 (full-review 1-3): advisory, not a violation. The
+                # authorized writer nulls refs on reset/na and sets them
+                # atomically at `approve --ref`, so a lingering ref under a
+                # pending/n/a gate is operator hygiene, not an evidence
+                # breach. Enforced invariants stay: approved ⇒ ref exists.
+                # MUST go to stderr: check-task-completed.sh treats non-empty
+                # STDOUT of --check-completion-evidence as a violation (and
+                # drops stderr), so a stdout WARNING would re-block completion.
+                print(
+                    f"WARNING: gate '{gate_key}' is '{gate_value}' but "
+                    f"current_refs.{ref_key} still has a value "
+                    f"(stale ref: {ref_value}) — advisory only",
+                    file=sys.stderr,
                 )
 
         for key in ("plan", "spec", "review", "qa", "security", "deploy", "translation"):
@@ -1115,14 +1130,15 @@ def pre_approve_gate(gate_name: str, root: Path) -> int:
         ref_key = GATE_REF_MAPPING[gate_name]
         ref_value = refs.get(ref_key)
         ref_is_empty = ref_value is None or ref_value == "null" or ref_value == []
-        if ref_is_empty:
+        if ref_is_empty and not os.environ.get("AEGIS_PENDING_REF"):
             print(
                 f"ADVISORY: Approving '{gate_name}' but "
                 f"current_refs.{ref_key} is empty."
             )
             print(
-                f"         Set current_refs.{ref_key} to the evidence file path; "
-                f"it is enforced at completion by the TaskCompleted hook."
+                f"         Prefer atomic: bash scripts/update-gate.sh "
+                f"{gate_name} approve --ref <evidence-path>; the ref is "
+                f"enforced at completion by the TaskCompleted hook."
             )
 
     # --- Deterministic prerequisite gating (mode/phase/prereq/strict) ---
