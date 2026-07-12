@@ -3,29 +3,29 @@ framework: aegis
 framework_version: "1.26.1"
 project_name: "Aegis"
 mode: Dev
-phase: docs
+phase: plan
 task_type: framework
 task_size: M
-task_size_rationale: "iteration 66（framework・SF-010 封鎖＋frontmatter 読取意味論統一）M 確定（brainstorm Step D・update-task.sh 経由）。設計正本: docs/specs/2026-07-12-iter66-sf010-parser-unification-design.md（Fix ①: post-status-audit migration-grace を『snapshot に task_type 行なし＝真の旧フォーマット』限定に絞る／Fix ②: frontmatter_value を library 級スコープ化〔---あり→frontmatter 内 first-match・未終端→空 fail-closed・bare→whole-file 温存〕／Fix ③: snapshot 生成スコープ化＝baseline 毒込み封鎖／Fix ④: gate_value 本文 fallback を ---無しファイル限定〔F-2〕／Fix ⑤: python extract_scalar_value 行順 first-match 化〔F-1〕＋extract_approval_map 先勝ち化／parity drift-guard テスト）。footprint: hooks/lib/frontmatter.sh＋hooks/lib/snapshot.sh＋hooks/post-status-audit.sh＋scripts/check_status.py＋hooks/check-gate.sh(dedup)＋tests＝M（2-5）。control-plane（audit/gate 強制ロジック）を触るため review+qa+security 必須・M のため deploy skip。"
-iteration: 66
+task_size_rationale: "iteration 67（framework・judge test-fact 判定堅牢化）M 確定（brainstorm Step D・update-task.sh 経由）。設計正本: docs/specs/2026-07-12-iter67-judge-test-fact-robustness-design.md（trust-scan＝read_test_result の走査で undecidable〔observed かつ marker_verified≠true〕かつ status=ok のエントリを情報ゼロ＝透明として skip・判定は最新 decidable〔manual／observed+marker=true〕が下す。undecidable-fail 終端 unverified・fp 不一致終端・decidable ゼロ→unverified は不変＝C-2/K-1/fp backstop 無緩和。red 洗浄経路〔decidable red 後の no-run コマンドで red→🟡〕も封鎖＝厳格化）。footprint: scripts/build-judge-card.py＋tests/test_test_runner_realness.py＝M（2-5）。control-plane（gate 判定ロジック）を触るため review+qa+security 必須・M のため deploy skip。候補#2 ref-window 原子化は iter68 第一候補へ繰越・#3 は独立 maintenance へ。"
+iteration: 67
 ui_surface: false
-last_updated: "2026-07-12T06:46:00Z"
+last_updated: "2026-07-12T07:10:00Z"
 gate_approvals:
   client_ready_for_dev: n/a
   brainstorm: approved
-  plan: approved
-  review: approved
-  qa: approved
-  security: approved
+  plan: pending
+  review: pending
+  qa: pending
+  security: pending
   deploy: pending
-  dev_ready_for_client: approved
+  dev_ready_for_client: pending
 current_refs:
   requirements: []
-  plan: "docs/plans/2026-07-12-iter66-sf010-parser-unification-implementation-plan.md"
-  spec: "docs/specs/2026-07-12-iter66-sf010-parser-unification-design.md"
-  review: "docs/qa-reports/iter66-review.md"
-  qa: "docs/qa-reports/iter66-qa.md"
-  security: "docs/qa-reports/iter66-security.md"
+  plan: null
+  spec: "docs/specs/2026-07-12-iter67-judge-test-fact-robustness-design.md"
+  review: null
+  qa: null
+  security: null
   deploy: null
   translation: null
 external_evidence:
@@ -37,7 +37,7 @@ external_evidence:
     scope: "v0.13.0 計画 5 ラウンドレビュー"
     findings: "Round 1〜5 で計 25 件の指摘（hook 出力スキーマ陳腐化、TaskCreated/Completed 制御方式、Plan 条件付き許可、effort 配分、pre-compact.sh 同種破損、`if` 単一 rule 制約等）"
     resolution: "Rev.5 で全件反映、Phase 0a 即時実装着手 GO。hotfix/v0122-hook-schema ブランチで開始。"
-next_action: "**【iter66 完全クローズ済 → 次は iter67 rollover＋brainstorm】** iter66（v1.26.1・SF-010 封鎖＋frontmatter 読取意味論統一）は全 dev ゲート approved＋dev_ready_for_client approved で完全クローズ（commit abf6d04〜5ae8634・**未 push**＝ユーザー指示でローカル確定）。**次タスク＝iter67**: retro で合意した改善 #1『judge の test-fact 判定堅牢化』。狙い＝`build-judge-card.py::read_test_result` が『evidence-log の最新 test-runner マッチ』を採るため record green 後にクォート外の生 pytest を1回走らせるだけで observed-unverified（marker_verified=False）が manual green を上書きし unverified 降格する罠（iter64/65/66 で3回顕在化＝conf9 line137）を機構で根切り（例: fp 一致の manual/marker_verified=True green があれば後続 observed-unverified で上書きしない）。**手順**: (1) rollover＝dev ゲート全 reset〔update-gate.sh reset〕・iteration 66→67・non-requirements refs=null・phase=brainstorm・external_evidence ≤3 維持。(2) brainstorm 前に STATUS 再読・objective/blockers/next 再述（CLAUDE.md 必須）。(3) aegis-brainstorm skill で #1 を設計対話（関連候補 #2 ref-window 原子化・#3 session_history 自動アーカイブ＋doctor 誤検出偏り は brainstorm で scope 判断）。◆push=active gh は yuuya-miyagaki（切替不要・push はユーザー指示待ち）。"
+next_action: "**【iter67 plan 着手（ユーザー指示＝自走）】** brainstorm approved（設計正本=docs/specs/2026-07-12-iter67-judge-test-fact-robustness-design.md・RECORD 同日付・自走のため設計採否は推奨ベースで確定＝retro 合意例と同方向の案 A）。テーマ＝judge test-fact 判定堅牢化（trust-scan: undecidable-ok エントリを走査透明化・最新 decidable が判定・undecidable-fail／fp 不一致／decidable ゼロの unverified は不変・red 洗浄経路も封鎖）。scope 判断: #2 ref-window 原子化→iter68 第一候補・#3→独立 maintenance。次=実装計画作成（docs/plans/2026-07-12-iter67-judge-test-fact-robustness-implementation-plan.md）→grill-plan→全指摘反映→plan gate 承認。工程別 model tiering: 書く=opus 委譲・疑う=fable。◆既知 flaky=test_update_gate_lock（回帰外）。◆push=active gh は yuuya-miyagaki（切替不要・push はユーザー指示待ち）。"
 blockers: []
 failure_tracking: null
 session_history:
