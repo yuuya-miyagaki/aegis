@@ -19,6 +19,7 @@
 - `scripts/update-gate.sh` の現行 approve 経路: 検証（check_status --pre-approve-gate）→ **judge カード全文 cat（241-252行）→ `[gate-approve]` echo（304行）→ sed 書込み（320行）** → snapshot → 結果表示。書込み前に大量 stdout があるため pipe 早期クローズで SIGPIPE 死＝状態未変更（罠 a）。
 - `reset` は既に「gate 値＋ref null 化」を**単一 sed パス**（SED_ARGS 配列に -e 2本・1回の TMP+mv）で書く（306-320行）。`approve --ref` はこの型の対称形。
 - `evidence_integrity_violations`（scripts/check_status.py:549-600）は validate_status_file（=check_framework_contract 経由で full suite の contract テスト）と `--check-completion-evidence`（=TaskCompleted hook）の**2箇所から共有**される。ここを1点変更すれば両方に波及する。
+- **【grill-plan 致命1・実測】`hooks/check-task-completed.sh:139` は `--check-completion-evidence` の stdout 非空を violation と扱う**（`if [ -n "$EVIDENCE" ]`・rc は python3 死活のみ・stderr は `2>/dev/null` で破棄）。よって降格 WARNING は **stderr に print** しないと完了ブロックが残る。stdout は violation 専用チャネルという既存契約。
 - `pre_approve_gate`（check_status.py:1084-）は ref 空のとき ADVISORY を print する（1111-1126行）。`--ref` 併用時はこの ADVISORY が誤誘導になるので env `AEGIS_PENDING_REF` で抑止する。
 - 成功時の `check_gate_prerequisites` は**無出力**（client_ready_for_dev の [spec-delta] 1行を除く）。plan gate は JUDGE_GATES（review/qa/security/deploy）にも qa drill にも該当しない → fixture は plan gate が最も静かで決定的。
 - 既存テスト: `tests/test_update_gate_lock.py` の `_scaffold`（scripts copy＋check_status.py symlink＋hooks/lib）を踏襲。`tests/test_check_status.py::TestCheckCompletionEvidence::test_pending_gate_with_ref_is_stale_violation`（2172行）が旧挙動（FAIL）をピン。`tests/test_check_status.py:693-765` の ADVISORY テスト群は env 無しの挙動として存続可能。`tests/test_judge_card_push.py` は出力順序をピンしていない（内容 assertIn のみ）→ 並べ替えの影響なし。
@@ -231,6 +232,17 @@ class TestUpdateGateRefAtomic(unittest.TestCase):
             self.assertNotIn("docs/plans/plan.md", status,
                              "na は current_refs.plan を null 化する")
 
+    # --- 部分失敗の封鎖（grill-plan 致命2） ---
+
+    def test_ref_key_line_missing_rejected_before_write(self):
+        """current_refs に対象 key 行が無い破損 STATUS では、sed が静かに
+        素通りして gate だけ approved になる部分失敗を書込み前に拒否する。"""
+        with tempfile.TemporaryDirectory() as d:
+            broken = STATUS_PLAN_PHASE.replace("  plan: null\n", "", 1)
+            root = self._scaffold(Path(d), broken)
+            self._assert_rejected_no_write(
+                root, "plan", "approve", "--ref", "docs/plans/plan.md")
+
     # --- SIGPIPE 耐性（罠 a） ---
 
     def test_closed_stdout_pipe_still_approves(self):
@@ -254,6 +266,42 @@ class TestUpdateGateRefAtomic(unittest.TestCase):
             status = self._status(root)
             self.assertIn("  plan: approved", status)
             self.assertIn('  plan: "docs/plans/plan.md"', status)
+
+    # --- --ref × --ack 併用（judge gate 合流点・grill-plan 要検討3） ---
+
+    def test_ref_with_ack_on_judge_gate(self):
+        """review（JUDGE_GATES）で git なし→🟡 degrade→--ack 承認と --ref を
+        併用: flag parser・ACK 後置追記・card push 移設が全部乗る経路。"""
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            docs = root / "docs"
+            (docs / "qa-reports").mkdir(parents=True)
+            status = STATUS_PLAN_PHASE.replace(
+                "phase: plan", "phase: review").replace(
+                "  plan: pending", "  plan: approved", 1)
+            (docs / "STATUS.md").write_text(status, encoding="utf-8")
+            (docs / "qa-reports" / "review.md").write_text("# review\n",
+                                                           encoding="utf-8")
+            scripts = root / "scripts"
+            scripts.mkdir()
+            shutil.copy2(ROOT / "scripts" / "update-gate.sh",
+                         scripts / "update-gate.sh")
+            for name in ("check_status.py", "build-judge-card.py",
+                         "run-test-strength-drill.py", "record-test-result.py"):
+                (scripts / name).symlink_to(ROOT / "scripts" / name)
+            shutil.copytree(ROOT / "hooks" / "lib", root / "hooks" / "lib")
+            r = subprocess.run(
+                ["bash", str(scripts / "update-gate.sh"), "review", "approve",
+                 "--ref", "docs/qa-reports/review.md", "--ack", "テスト確認済み"],
+                capture_output=True, text=True, check=False, timeout=120)
+            self.assertEqual(r.returncode, 0, f"{r.stdout}\n{r.stderr}")
+            status_after = (docs / "STATUS.md").read_text(encoding="utf-8")
+            self.assertIn("  review: approved", status_after)
+            self.assertIn('  review: "docs/qa-reports/review.md"', status_after)
+            card = docs / "qa-reports" / "judge-review.md"
+            self.assertTrue(card.is_file())
+            self.assertIn("## ACK", card.read_text(encoding="utf-8"),
+                          "ACK は書込み成立後にカードへ追記される")
 
     # --- 構造ピン（順序退行の静的ガード） ---
 
@@ -303,7 +351,27 @@ if __name__ == "__main__":
             self.assertEqual(rc, 0, f"n/a+ref must not fail: {out}")
             self.assertNotIn("EVIDENCE:", out)
             self.assertIn("WARNING", out)
+
+    def test_completion_advisory_goes_to_stderr_not_stdout(self):
+        """【grill-plan 致命1】check-task-completed.sh は stdout 非空を violation
+        扱いするため、advisory WARNING は stderr に出る（stdout は空・rc 0）。
+        これが崩れると TaskCompleted hook が pending+ref で完了を再ブロックする。"""
+        content = make_status_md(approvals=dict(ALL_PENDING),
+                                 refs={"qa": "docs/qa-reports/qa1.md"})
+        with TempProject(content) as root:
+            (Path(root) / "docs" / "qa-reports").mkdir(parents=True)
+            (Path(root) / "docs" / "qa-reports" / "qa1.md").write_text("ok")
+            result = subprocess.run(
+                ["python3", str(CHECK_STATUS), "--root", root,
+                 "--check-completion-evidence"],
+                capture_output=True, text=True)
+            self.assertEqual(result.returncode, 0)
+            self.assertEqual(result.stdout.strip(), "",
+                             "stdout は violation 専用チャネル（hook 契約）")
+            self.assertIn("WARNING", result.stderr)
 ```
+
+（`run_check` は stdout+stderr を結合するため上2本の `assertIn("WARNING", out)` はそのまま成立する。）
 
 `TestPreApproveGateRefCheck`（692行のクラス）に追加。`run_check` は env 非対応なので直接 subprocess で呼ぶ（CHECK_STATUS はファイル冒頭の既存定数）:
 
@@ -361,14 +429,18 @@ git commit -m "test(iter68): RED — approve --ref 原子化・SIGPIPE 耐性・
                 # atomically at `approve --ref`, so a lingering ref under a
                 # pending/n/a gate is operator hygiene, not an evidence
                 # breach. Enforced invariants stay: approved ⇒ ref exists.
+                # MUST go to stderr: check-task-completed.sh treats non-empty
+                # STDOUT of --check-completion-evidence as a violation (and
+                # drops stderr), so a stdout WARNING would re-block completion.
                 print(
                     f"WARNING: gate '{gate_key}' is '{gate_value}' but "
                     f"current_refs.{ref_key} still has a value "
-                    f"(stale ref: {ref_value}) — advisory only"
+                    f"(stale ref: {ref_value}) — advisory only",
+                    file=sys.stderr,
                 )
 ```
 
-関数 docstring の「Gate/ref consistency」節に「pending/n/a+ref は WARNING print（非 violation）」の1文を追記。
+関数 docstring の「Gate/ref consistency」節に「pending/n/a+ref は stderr WARNING（非 violation・stdout は violation 専用チャネル）」の1文を追記。`import sys` が check_status.py 冒頭に無ければ追加。
 
 - [ ] **Step 2-2: pre_approve_gate の ADVISORY を AEGIS_PENDING_REF で抑止＋文言を --ref 推奨へ**
 
@@ -419,6 +491,9 @@ git commit -m "feat(iter68): pending/n/a+ref を advisory WARNING に降格＋ap
 # 状態書込み前にスクリプトを殺せないようにする。以降の出力は EPIPE で失敗
 # しうるが、書込み前の出力は fail-closed（exit≠0・状態不変）、書込み後は
 # best-effort（|| true）で exit 0 を保つ。
+# 監査済み（iter68）: 本スクリプト内で「下流の早期終了」に依存するパイプは
+# CURRENT 読取の `grep -m1`（`|| true` 済み）と print_report 内（guard 済み）
+# のみ — trap を外す場合はこの2点の EPIPE 化を再監査すること。
 trap '' PIPE
 ```
 
@@ -502,6 +577,16 @@ approve case（196-255行）を以下に:
 302-323行を置換:
 
 ```bash
+# --- Pre-write sanity (grill-plan 致命2): --ref の対象 key 行が current_refs に
+# 実在することを lock 内で検証。無ければ sed が静かに素通りし「gate だけ
+# approved・ref 未設定・exit 0」の部分失敗になるため、書込み前に fail-closed。
+if [ "$ACTION" = "approve" ] && [ -n "$REF_PATH" ]; then
+  if ! frontmatter_section "$STATUS_FILE" current_refs | grep -q "^  ${GATE_REF_KEY}:"; then
+    echo "ERROR: current_refs.${GATE_REF_KEY} line not found in STATUS.md — cannot set --ref atomically."
+    exit 1
+  fi
+fi
+
 # --- Update STATUS.md (STATE FIRST — before any success output; 罠a) ---
 TMP="${STATUS_FILE}.tmp.$$"
 SED_ARGS=(-e "/^gate_approvals:/,/^[a-z]/ s|\(  ${GATE_NAME_SED}:\).*|\1 ${TARGET_VALUE}|")
@@ -618,6 +703,11 @@ bash scripts/update-gate.sh <gate-name> approve --ref <evidence-path>
 
 各ファイルで `grep -n "update-gate.sh" <file>` し、gate approve 行を evidence ref 付きの正順に更新（例: `bash scripts/update-gate.sh review approve --ref docs/qa-reports/iterNN-review.md`）。「ref を先に set してから approve」「approve 後に ref を set」を指示する記述があれば「approve --ref で同時に」へ書き換え。ref を持たない gate（brainstorm/dev_ready_for_client）の行は変更しない。
 
+- [ ] **Step 4-3b: 残り guidance の stale-ref 主張を掃く（grill-plan 要検討4）**
+
+Run: `grep -rn "stale" README.md docs/architecture-overview.md .claude/rules/ 2>/dev/null` と `grep -rn "pending.*ref\|ref.*pending" README.md docs/architecture-overview.md`
+「pending gate の ref は FAIL/violation」と主張する記述があれば advisory（WARNING）へ書き換え。ヒットなしならスキップ理由として記録。
+
 - [ ] **Step 4-4: full suite＋record**
 
 Run: `python3 -m pytest tests/ -q 2>&1 | tail -3`
@@ -639,10 +729,19 @@ git commit -m "docs(iter68): approve --ref 正順を guidance へ同期（/gate�
 
 1. `approve --ref` で gate 値と ref が**1書込み**で立ち、直後の `--check-completion-evidence` が rc 0（窓なし）。
 2. stdout が閉じた pipe でも approve が完遂し rc 0（罠 a 根治）・状態書込みが承認主張出力に先行（構造ピン）。
-3. pending/n/a+ref は contract/完了検査とも rc 0＋WARNING（罠 b/c の FAIL 根治）。approved+空 ref・ref 不在は FAIL 維持（無緩和）。
-4. --ref の不正入力（不在/絶対/../allowlist 外/対象外 gate/approve 以外）は全て exit 1・状態不変。
+3. pending/n/a+ref は contract/完了検査とも rc 0＋**stderr** WARNING（罠 b/c の FAIL 根治・stdout は violation 専用＝TaskCompleted hook 契約を維持）。approved+空 ref・ref 不在は FAIL 維持（無緩和）。
+4. --ref の不正入力（不在/絶対/../allowlist 外/対象外 gate/approve 以外/**current_refs に key 行なし**）は全て exit 1・状態不変。
 5. 既存挙動の非退行: reset の ref null 化・lock プロトコル・--ack 経路・B2 card push 内容・ADVISORY（env 無し時）。
 6. full suite green・contract PASS・guidance 同期済み。
+
+## grill-plan 反映記録（2026-07-12）
+
+- 致命1: TaskCompleted hook は stdout 非空を violation 扱い（実測）→ advisory は stderr へ＋ストリーム分離ピンテスト追加。
+- 致命2: sed 無マッチ素通り（gate だけ approved の部分失敗）→ lock 内 pre-write で current_refs key 行の実在検証＋破損 fixture テスト追加。
+- 要検討2: flag parser の厳格化（旧 $3 黙殺→エラー）は意図的変更として受容。
+- 要検討3: --ref×--ack 併用テスト追加（judge gate 合流点）。
+- 要検討4: README/architecture-overview の stale-ref 主張 grep ステップ追加（Step 4-3b）。
+- 要検討5: already-approved＋--ref は exit 0＋NOTE（既存 already-approved 挙動と整合・ref 差し替えはスコープ外）＝判断確定。
 
 ## 残課題・ship 判断メモ
 
