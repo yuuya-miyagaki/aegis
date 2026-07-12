@@ -348,6 +348,20 @@ SF-001 系の網羅的閉鎖（rounds 5-11）で**実用的なシェル難読化
 - **修正方向（次反復・hardening）**: `read_frontmatter` の終端を strict `^---$` に締めて python に一致させる、または parity drift-guard（`tests/test_parser_parity_driftguard.py`）に `--- ` mid-delimiter fixture を追加。iter66 の `frontmatter_value` scoped 化は fail-closed 方向で本乖離を悪化させていない（whole-file→scoped は strictly ≤ permissive）。
 - **状態**: **OPEN**。iter66 security gate で residual として ack。緊急性低（pre-existing・contained）・次反復候補。
 
+### SF-012: evidence 信頼判定の hardening 2件 — washed-green（exit 洗浄×marker regex）＋unknown-src decidable-by-default（**OPEN**・iter67 review 角度B/security 1次 検出・両方 pre-existing）
+
+- **発見**: iter67（judge test-fact trust-scan 化）review 1次 角度B（敵対 finder・opus）が (a) を、security 1次（opus）F-1 が (b) を検出。いずれも **differential battery（baseline d2c4dd6 vs HEAD の実走）で pre-existing を実証**（OLD=NEW＝iter67 の回帰ではない）。review 盲検2次も (a) を独立に観察（周辺観察として一致）。
+- **種別**: evidence writer/reader の信頼判定 hardening（marker/status 整合＋src allowlist）。moat 回帰ではない（文書化済み保証の違反なし）。
+- **重大度**: **Low**（pre-existing・実 writer 集合と脅威モデルで contained・発火に明示的な自己欺瞞行為または脅威モデル外 capability が必要）。
+- **経路**:
+  - (a) **washed-green**: `python3 -m pytest -q; true`（テスト失敗だが `; true` で exit 0）を Bash 実行 → observer の status は exit code 由来で `ok`、出力の `=== 1 failed, 2 passed in …` が `AEGIS_TEST_PASS_MARKER_REGEX`（`={3,} [0-9]+ (passed|failed)`）にマッチして `marker_verified=true` → **decidable green**（1 failed でも judge が green）。iter67 trust-scan の影響は到達性のみ（washed-green の上に noise-ok がある場合、旧は 🟡 に隠れ新は表面化＝W2）＝**green の新規製造なし**（透明化は fp 一致の decidable green の実在が前提）。
+  - (b) **unknown-src decidable-by-default**: `src` キー欠如/異値（`"forged"` 等）のエントリは `undecidable = (src=="observed" and …)` の述語に落ちず decidable 扱い＝status どおり green/red 化。実 writer（`hooks/lib/evidence.sh`＝observed 固定・`scripts/record-test-result.py`＝manual 固定）は他の src を発行せず、evidence-log への任意書込みは脅威モデル外（それが可能なら src:"manual" green を直接偽造できるため capability 増分なし）。
+- **発火前提（severity 較正）**: (a) は `; true` 等の明示的 exit 洗浄＝自己欺瞞行為が必要（事故で書く形ではない・通常の失敗は exit≠0 → status=fail → 終端 🟡/red）。(b) は log への任意 JSON 書込み＝脅威モデル外。
+- **修正方向（iter68 hardening 候補）**:
+  - (a) writer 側（evidence.sh `_check_test_marker`）: pass-marker ヒット時に同一 summary へ fail トークン（`[0-9]+ failed`）が同居し **かつ exit=0** なら marker 無効化（zero-run gate と同型の整合軸追加）。または reader 側で `status=ok` × summary-failed の矛盾検出。
+  - (b) reader 側（read_test_result）: src allowlist（`src in ("manual","observed")` 以外は undecidable-fail 扱い＝終端 🟡）。docstring は iter67 で実挙動を明記済み（0739a79）。
+- **状態**: **OPEN**。iter67 security gate は approve（新規リスクなし・両件 pre-existing 実証済み）。
+
 ## CLOSED
 
 - **SF-010**（Medium・iter65 review 検出→iter66 v1.26.1 で封鎖）: task_size empty-baseline raw-Edit × migration-grace の tamper 逃れ。Fix ①（`feff60c` migration-grace を真の旧フォーマット限定に絞り込み・task fields＋gate loop）＋(i)(ii) Fix ⑤（`6229fd5` python first-match/先勝ち）＋(iii) Fix ④（`c5f5fd2` gate_value 本文 fallback を ---無し限定）。hook 直接発火 4 ケース＋fresh 変異 M1-M5＋1次/盲検2次 approve で裏取り。詳細は上記 SF-010 節。

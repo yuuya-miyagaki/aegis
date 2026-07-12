@@ -16,7 +16,7 @@ gate_approvals:
   plan: approved
   review: approved
   qa: approved
-  security: pending
+  security: approved
   deploy: pending
   dev_ready_for_client: pending
 current_refs:
@@ -25,7 +25,7 @@ current_refs:
   spec: "docs/specs/2026-07-12-iter67-judge-test-fact-robustness-design.md"
   review: "docs/qa-reports/iter67-review.md"
   qa: "docs/qa-reports/iter67-qa.md"
-  security: null
+  security: "docs/qa-reports/iter67-security.md"
   deploy: null
   translation: null
 external_evidence:
