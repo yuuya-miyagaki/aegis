@@ -333,6 +333,20 @@ SF-001 系の網羅的閉鎖（rounds 5-11）で**実用的なシェル難読化
     - (iii) **`gate_value` の `raw_section` 本文フォールバック**（盲検2次 F-2・Minor conf9・pre-existing）: frontmatter に gate_approvals 節が無い STATUS では本文の gate_approvals ブロックが gate 判定に採用され allow になり得る（旧版でも同様＝この diff の回帰ではない）。empty-baseline class では audit を逃れ得るため SF-010 修正時に gate_approvals 側も対象化。
   - control-plane（post-status-audit.sh）変更＋migration 正当性の edge を含むため、review fix-forward で急がず専用反復で設計する（rushed な control-plane 変更は新規バグ源）。
 - **状態**: **OPEN**。iter65 security gate で residual として明示 ack 予定。次反復（iter66 候補）で対応。
+- **iter66 対応（本反復で封鎖・docs で CLOSED 化予定）**: Fix ①（`feff60c`）で migration-grace を task fields＋gate loop とも「真の旧フォーマット snapshot」限定に絞り、(i) 重複キー先勝ち乖離・(ii) `extract_scalar_value` 引用形優先を Fix ⑤（`6229fd5` first-match/先勝ち）で、(iii) `gate_value` 本文 fallback を Fix ④（`c5f5fd2` ---無しファイル限定）で消化。qa で hook 直接発火 4 ケース（canonical size 注入 BLOCK・gate 行欠落注入 BLOCK・真の旧フォーマット grace 温存・正規 update-task.sh 無影響）＋fresh 変異 M1-M5 全 kill、security 1次＋盲検2次とも approve で機械裏取り。
+
+### SF-011: bash `read_frontmatter` と python `extract_frontmatter` の終端デリミタ許容差（**OPEN**・iter66 security 盲検2次検出・pre-existing）
+
+- **発見**: iter66 security 盲検2次（fable・独立・1次結論非開示）。differential battery（`deb4a8a` baseline vs HEAD の実 hook 発火）で **pre-existing** を実証（この diff の回帰ではない＝両 rev で同挙動）。
+- **種別**: パーサ二重実装 drift（frontmatter 終端デリミタの許容差）。bash `hooks/lib/frontmatter.sh` の `read_frontmatter` は `^---[[:space:]]*$`（末尾スペース許容）で終端判定するが、python `scripts/check_status.py:254` の `extract_frontmatter` は `\A---\n(?P<body>.*?)\n---\n`（strict・末尾スペース不可）。両者とも iter66 で変更なし（baseline=HEAD）。
+- **重大度**: **Low**（pre-existing かつ 3 層で contained・実害到達なし・単一ユーザ dogfood の事故的自己バイパス面）。
+- **経路**: STATUS frontmatter の途中に `--- `（末尾スペース）を raw-Edit で挿入し、その後続に `task_size: S` を隠す。bash はそこで frontmatter 終了と判断し `task_size` を本文扱い（scoped 読み→空）、python `check_phase_transition` は frontmatter 継続と見なし `task_size: S` を読む＝S-flow 隣接判定で phase-skip（brainstorm→implement や review→ship）を**数字上**許容し得る。
+- **contained（3 層・iter66 で実証済み）**:
+  - (1) `check-gate.sh` はコード編集ゲート＝bash が空を読む→plan gate→**deny**（コード編集は unlock されない・qa 変異 M2 で実測）。
+  - (2) gate 承認は `update-gate.sh` 必須＝raw-Edit で gate 値を approved にできず tamper audit が block（本 iter の (iii) gate loop 絞り込みでさらに堅牢化）。
+  - (3) `check_status.py:842 validate_with_pyyaml`（`--strict`/contract）が `extract_frontmatter`＋`yaml.safe_load` の regex↔PyYAML cross-check で mode/phase/gate 不一致を検出→contract FAIL＝malformed frontmatter を "done" に洗浄できない。
+- **修正方向（次反復・hardening）**: `read_frontmatter` の終端を strict `^---$` に締めて python に一致させる、または parity drift-guard（`tests/test_parser_parity_driftguard.py`）に `--- ` mid-delimiter fixture を追加。iter66 の `frontmatter_value` scoped 化は fail-closed 方向で本乖離を悪化させていない（whole-file→scoped は strictly ≤ permissive）。
+- **状態**: **OPEN**。iter66 security gate で residual として ack。緊急性低（pre-existing・contained）・次反復候補。
 
 ## CLOSED
 
