@@ -313,7 +313,7 @@ SF-001 系の網羅的閉鎖（rounds 5-11）で**実用的なシェル難読化
 - **by-design / not-a-vuln / forward-looking（コード変更なし）**: C4→SF-007（NOT-A-VULN）・G4→SF-008（by-design）・C1→SF-009（forward-looking・現状到達不能）。
 - 残る実コード修正タスクは**ゼロ**。今後 backlog 由来の着手は、上記 SF の「将来トリガ」が発火した時のみ。
 
-### SF-010: task_size の empty-baseline raw-Edit が migration-grace で tamper 検知を逃れる（**OPEN**・iter65 review 検出）
+### SF-010: task_size の empty-baseline raw-Edit が migration-grace で tamper 検知を逃れる（**CLOSED**・iter66 v1.26.1 で封鎖・iter65 review 検出）
 
 - **発見**: iter65（S サイズ修復）review 1次 finder（gate 迂回）。親セッションで独立再現・CONFIRMED（旧実装 26de7f6 では両経路 deny＝この diff の回帰面）。
 - **種別**: **moat 回帰（文書化済み tamper-evidence 保証の違反）**。脅威モデル節「task_type/task_size も authorized writer 以外が書き換えると .gate-snapshot 比較で検知・block」に対する empty-baseline の穴。
@@ -332,8 +332,8 @@ SF-001 系の網羅的閉鎖（rounds 5-11）で**実用的なシェル難読化
     - (ii) **`extract_scalar_value`（check_status.py:264-273）の引用形優先**（盲検2次 F-1・Minor conf8）: `task_size: M` の後に `task_size: "S"` を raw 追記すると、audit 比較（bash 先勝ち）は M→M で tamper 非検知のまま、python 消費側（`check_phase_transition` の S 隣接判定・`task_size != "S"` strict-gate 免除）だけが S を読む＝audit-evading な enforcement 緩和（python=S/bash=M の割れ・実測）。check-gate 自体は騙されない（コード編集ゲートは緩まない）。
     - (iii) **`gate_value` の `raw_section` 本文フォールバック**（盲検2次 F-2・Minor conf9・pre-existing）: frontmatter に gate_approvals 節が無い STATUS では本文の gate_approvals ブロックが gate 判定に採用され allow になり得る（旧版でも同様＝この diff の回帰ではない）。empty-baseline class では audit を逃れ得るため SF-010 修正時に gate_approvals 側も対象化。
   - control-plane（post-status-audit.sh）変更＋migration 正当性の edge を含むため、review fix-forward で急がず専用反復で設計する（rushed な control-plane 変更は新規バグ源）。
-- **状態**: **OPEN**。iter65 security gate で residual として明示 ack 予定。次反復（iter66 候補）で対応。
-- **iter66 対応（本反復で封鎖・docs で CLOSED 化予定）**: Fix ①（`feff60c`）で migration-grace を task fields＋gate loop とも「真の旧フォーマット snapshot」限定に絞り、(i) 重複キー先勝ち乖離・(ii) `extract_scalar_value` 引用形優先を Fix ⑤（`6229fd5` first-match/先勝ち）で、(iii) `gate_value` 本文 fallback を Fix ④（`c5f5fd2` ---無しファイル限定）で消化。qa で hook 直接発火 4 ケース（canonical size 注入 BLOCK・gate 行欠落注入 BLOCK・真の旧フォーマット grace 温存・正規 update-task.sh 無影響）＋fresh 変異 M1-M5 全 kill、security 1次＋盲検2次とも approve で機械裏取り。
+- **状態**: **CLOSED**（iter66 v1.26.1・ship コミット `dace3b7`）。(i)(ii)(iii) 全消化・機械裏取り済み（下記 iter66 対応）。
+- **iter66 対応（本反復で封鎖・v1.26.1）**: Fix ①（`feff60c`）で migration-grace を task fields＋gate loop とも「真の旧フォーマット snapshot」限定に絞り、(i) 重複キー先勝ち乖離・(ii) `extract_scalar_value` 引用形優先を Fix ⑤（`6229fd5` first-match/先勝ち）で、(iii) `gate_value` 本文 fallback を Fix ④（`c5f5fd2` ---無しファイル限定）で消化。qa で hook 直接発火 4 ケース（canonical size 注入 BLOCK・gate 行欠落注入 BLOCK・真の旧フォーマット grace 温存・正規 update-task.sh 無影響）＋fresh 変異 M1-M5 全 kill、security 1次 opus＋盲検2次 fable とも approve で機械裏取り。**新 capability を解錠せず既存 moat 保証の穴のみを fail-closed 方向で封鎖**（正規 update-task.sh/update-gate.sh 経路は snapshot 原子同期で無影響）。残余の終端デリミタ差は SF-011 へ分離。
 
 ### SF-011: bash `read_frontmatter` と python `extract_frontmatter` の終端デリミタ許容差（**OPEN**・iter66 security 盲検2次検出・pre-existing）
 
@@ -350,4 +350,4 @@ SF-001 系の網羅的閉鎖（rounds 5-11）で**実用的なシェル難読化
 
 ## CLOSED
 
-（なし）
+- **SF-010**（Medium・iter65 review 検出→iter66 v1.26.1 で封鎖）: task_size empty-baseline raw-Edit × migration-grace の tamper 逃れ。Fix ①（`feff60c` migration-grace を真の旧フォーマット限定に絞り込み・task fields＋gate loop）＋(i)(ii) Fix ⑤（`6229fd5` python first-match/先勝ち）＋(iii) Fix ④（`c5f5fd2` gate_value 本文 fallback を ---無し限定）。hook 直接発火 4 ケース＋fresh 変異 M1-M5＋1次/盲検2次 approve で裏取り。詳細は上記 SF-010 節。
