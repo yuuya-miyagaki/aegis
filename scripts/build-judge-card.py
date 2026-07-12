@@ -200,9 +200,12 @@ def read_test_result(root: Path) -> str:
     no decidable entry, stale/oversize/nogit fingerprint, unreadable
     patterns — is 'unverified' (🟡 ack-able), never silent-green.
 
-    Decidable = src='manual' OR marker_verified:true. An undecidable entry
-    (src='observed' with marker_verified NOT true) certifies nothing, so
-    the trust-scan (iter67) treats it by status:
+    Undecidable = src:'observed' with marker_verified NOT true; every other
+    entry is decidable (src:'manual' from the trusted runner, observed with
+    marker_verified:true — the real writers emit only those two src values;
+    an unknown/missing src falling to decidable is pre-existing, whitelist
+    hardening tracked as a follow-up). An undecidable entry certifies
+    nothing, so the trust-scan (iter67) treats it by status:
       - undecidable-ok  → TRANSPARENT: pure no-run noise (--collect-only
         counts, piped/truncated output), skipped so the scan continues to
         the newest decidable entry. It cannot demote a trusted green nor
