@@ -212,8 +212,10 @@ CLAUDE.md はフレームワークの中核であり、常時コンテキスト�
 <gate> approve --ack "理由"` で承認可、理由はカードに記録）。テスト判定は
 **evidence-log（hook 観測・E1）由来**: PostToolUse/PostToolUseFailure(Bash) が
 全 Bash 実行のメタ（コマンド・成否・worktree fingerprint）を
-`.claude/evidence-log.jsonl` に記録し、judge が現コードと一致する最新のテスト
-実行を照合する。Claude Code 外でテストした場合のみ
+`.claude/evidence-log.jsonl` に記録し、judge が現コードと一致する最新の**検証可能
+な**テスト実行（manual または marker 検証済み observed。marker 未検証の
+observed-ok はノイズとして透明＝iter67 trust-scan）を照合する。Claude Code 外で
+テストした場合のみ
 `python3 scripts/record-test-result.py --root . "<test command>"` で手動記録する
 （同一スキーマ・`src:"manual"`・スクリプト自身がコマンドを実行するため自己申告
 ではない）。`/judge` で同じカードを読み取り専用でプレビューできる。
