@@ -206,7 +206,8 @@ def read_test_result(root: Path) -> str:
       - undecidable-ok  → TRANSPARENT: pure no-run noise (--collect-only
         counts, piped/truncated output), skipped so the scan continues to
         the newest decidable entry. It cannot demote a trusted green nor
-        launder a decidable red into a 🟡.
+        launder a decidable red into a 🟡 (this demotion bit three gate
+        approvals in iter64-66 — see docs/LEARNINGS.md, judge test-fact).
       - undecidable-fail → TERMINAL 'unverified': something runner-shaped
         failed, keep the re-record signal (fail-closed unchanged).
     The transparency skip precedes the fp check, so a stale undecidable-ok

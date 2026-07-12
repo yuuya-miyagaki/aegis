@@ -692,6 +692,20 @@ class TestReadTestResultTrustScan(unittest.TestCase):
                 self.mod.read_test_result(r), "green",
                 "stale な undecidable-ok が fp 検査で終端＝RED")
 
+    def test_transparency_does_not_skip_undecidable_fail(self):
+        """3段系列（green ← undecidable-fail ← undecidable-ok）: 透明化は
+        undecidable-fail を飛び越えない＝noise-ok を skip した先の
+        undecidable-fail が終端 unverified（review 1次 角度C の未ピン指摘を固定）。"""
+        with self._scratch_repo() as _:
+            r = Path(_)
+            fp = self._fp(r)
+            self._write_entries(r, [
+                self._entry("manual", "ok", fp),
+                self._entry("observed", "fail", fp, marker_verified=False),
+                self._entry("observed", "ok", fp, marker_verified=False),
+            ])
+            self.assertEqual(self.mod.read_test_result(r), "unverified")
+
 
 if __name__ == "__main__":
     unittest.main()
