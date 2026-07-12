@@ -3,7 +3,7 @@ framework: aegis
 framework_version: "1.26.1"
 project_name: "Aegis"
 mode: Dev
-phase: plan
+phase: implement
 task_type: framework
 task_size: M
 task_size_rationale: "iteration 67（framework・judge test-fact 判定堅牢化）M 確定（brainstorm Step D・update-task.sh 経由）。設計正本: docs/specs/2026-07-12-iter67-judge-test-fact-robustness-design.md（trust-scan＝read_test_result の走査で undecidable〔observed かつ marker_verified≠true〕かつ status=ok のエントリを情報ゼロ＝透明として skip・判定は最新 decidable〔manual／observed+marker=true〕が下す。undecidable-fail 終端 unverified・fp 不一致終端・decidable ゼロ→unverified は不変＝C-2/K-1/fp backstop 無緩和。red 洗浄経路〔decidable red 後の no-run コマンドで red→🟡〕も封鎖＝厳格化）。footprint: scripts/build-judge-card.py＋tests/test_test_runner_realness.py＝M（2-5）。control-plane（gate 判定ロジック）を触るため review+qa+security 必須・M のため deploy skip。候補#2 ref-window 原子化は iter68 第一候補へ繰越・#3 は独立 maintenance へ。"
@@ -13,7 +13,7 @@ last_updated: "2026-07-12T07:10:00Z"
 gate_approvals:
   client_ready_for_dev: n/a
   brainstorm: approved
-  plan: pending
+  plan: approved
   review: pending
   qa: pending
   security: pending
@@ -21,7 +21,7 @@ gate_approvals:
   dev_ready_for_client: pending
 current_refs:
   requirements: []
-  plan: null
+  plan: "docs/plans/2026-07-12-iter67-judge-test-fact-robustness-implementation-plan.md"
   spec: "docs/specs/2026-07-12-iter67-judge-test-fact-robustness-design.md"
   review: null
   qa: null
@@ -37,7 +37,7 @@ external_evidence:
     scope: "v0.13.0 計画 5 ラウンドレビュー"
     findings: "Round 1〜5 で計 25 件の指摘（hook 出力スキーマ陳腐化、TaskCreated/Completed 制御方式、Plan 条件付き許可、effort 配分、pre-compact.sh 同種破損、`if` 単一 rule 制約等）"
     resolution: "Rev.5 で全件反映、Phase 0a 即時実装着手 GO。hotfix/v0122-hook-schema ブランチで開始。"
-next_action: "**【iter67 plan 着手（ユーザー指示＝自走）】** brainstorm approved（設計正本=docs/specs/2026-07-12-iter67-judge-test-fact-robustness-design.md・RECORD 同日付・自走のため設計採否は推奨ベースで確定＝retro 合意例と同方向の案 A）。テーマ＝judge test-fact 判定堅牢化（trust-scan: undecidable-ok エントリを走査透明化・最新 decidable が判定・undecidable-fail／fp 不一致／decidable ゼロの unverified は不変・red 洗浄経路も封鎖）。scope 判断: #2 ref-window 原子化→iter68 第一候補・#3→独立 maintenance。次=実装計画作成（docs/plans/2026-07-12-iter67-judge-test-fact-robustness-implementation-plan.md）→grill-plan→全指摘反映→plan gate 承認。工程別 model tiering: 書く=opus 委譲・疑う=fable。◆既知 flaky=test_update_gate_lock（回帰外）。◆push=active gh は yuuya-miyagaki（切替不要・push はユーザー指示待ち）。"
+next_action: "**【iter67 implement 着手（自走）】** plan approved（正本=docs/plans/2026-07-12-iter67-judge-test-fact-robustness-implementation-plan.md）。grill-plan 済: 致命1（既存系列ピン test_judge_card.py::test_newest_stale_does_not_fall_back_to_older_fresh の存在を計画に組込・decidable-stale 終端は不変で共存）＋要検討2（実測証跡の固定・既存ピンコメント限定子）全反映。判定マトリクスは現行/パッチ後とも 10/10 実測一致済。次=Task 1（系列テスト RED・implementer=opus）→Task 2（trust-scan 実装＋docstring）→Task 3（architecture-overview 1文同期）→grill-code→review。◆既知 flaky=test_update_gate_lock（回帰外）。◆push=ユーザー指示待ち。"
 blockers: []
 failure_tracking: null
 session_history:
