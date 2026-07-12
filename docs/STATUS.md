@@ -18,7 +18,7 @@ gate_approvals:
   qa: approved
   security: approved
   deploy: pending
-  dev_ready_for_client: pending
+  dev_ready_for_client: approved
 current_refs:
   requirements: []
   plan: "docs/plans/2026-07-12-iter67-judge-test-fact-robustness-implementation-plan.md"
