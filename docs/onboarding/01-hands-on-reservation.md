@@ -92,8 +92,10 @@ Claude（`client-workflow` スキル）が背景・利用者（社員／受付�
 `/gate` で状況を確認し、Client の関所を承認する：
 
 ```bash
-bash scripts/update-gate.sh client_ready_for_dev approve
+bash scripts/update-gate.sh client_ready_for_dev approve --ref docs/translation/mapping.md
 ```
+
+`--ref` は承認と同時に evidence ref（`current_refs`）を1書込みで設定する正順（ref を持つ gate 共通）。
 
 `/status` を見ると **`mode: Dev` / `phase: brainstorm`** に切り替わっている。
 
@@ -116,7 +118,7 @@ bash scripts/update-gate.sh brainstorm approve
 時間帯が重なれば `True`、そうでなければ `False`」。承認：
 
 ```bash
-bash scripts/update-gate.sh plan approve
+bash scripts/update-gate.sh plan approve --ref docs/plans/<計画ファイル>.md
 ```
 
 > **体験ポイント③**：plan を承認するまで、コードを書こうとすると `check-gate` が **拒否** する。
@@ -136,19 +138,19 @@ bash scripts/update-gate.sh plan approve
 `aegis-review-gate` ＋ reviewer エージェントでフレッシュな目で確認し、承認：
 
 ```bash
-bash scripts/update-gate.sh review approve
+bash scripts/update-gate.sh review approve --ref docs/qa-reports/<レビューレポート>.md
 ```
 
 > **体験ポイント⑤**：承認の瞬間に `build-judge-card.py` が**自動で走り**、judge カード
 > （`docs/qa-reports/judge-review.md`）が出る。🟢ならそのまま承認、🟡（要確認）なら理由を添えて：
-> `bash scripts/update-gate.sh review approve --ack "確認した理由"`。🔴 は機械事実と矛盾＝ブロック。
+> `bash scripts/update-gate.sh review approve --ref <レビューレポート> --ack "確認した理由"`（--ref は初回と同じもの）。🔴 は機械事実と矛盾＝ブロック。
 
 ### qa — 検証（テスト強度ドリル）
 `qa-verification` スキルが、`docs/qa-reports/test-strength.drill`（mutant 入りの仕様）を**作ってくれる**。
 あなたは中身を確認するだけでよい（手書きは不要）。承認：
 
 ```bash
-bash scripts/update-gate.sh qa approve
+bash scripts/update-gate.sh qa approve --ref docs/qa-reports/<QAレポート>.md
 ```
 
 > **体験ポイント⑥**：承認の瞬間に **テスト強度ドリル**（`run-test-strength-drill.py`）が**自動で走る**。
@@ -159,7 +161,7 @@ bash scripts/update-gate.sh qa approve
 `aegis-security-gate` で確認し、承認：
 
 ```bash
-bash scripts/update-gate.sh security approve
+bash scripts/update-gate.sh security approve --ref docs/qa-reports/<セキュリティレポート>.md
 ```
 
 ### deploy / ship — 仕上げ

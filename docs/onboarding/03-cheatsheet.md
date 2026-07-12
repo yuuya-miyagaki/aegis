@@ -55,10 +55,11 @@ Dev（品質を守りながら作る）
 ### ゲート操作（`scripts/update-gate.sh`）
 
 ```bash
-bash scripts/update-gate.sh <gate> approve      # 承認
-bash scripts/update-gate.sh <gate> na           # 対象外にする（qa は不可）
-bash scripts/update-gate.sh <gate> reset        # pending に戻す
-bash scripts/update-gate.sh <gate> approve --ack "理由"   # 🟡（要確認）を理由つきで承認
+bash scripts/update-gate.sh <gate> approve --ref <証拠ファイル>   # 承認（ref を持つ gate は evidence ref を同時設定）
+bash scripts/update-gate.sh <gate> approve      # 承認（ref を持たない brainstorm / dev_ready_for_client）
+bash scripts/update-gate.sh <gate> na           # 対象外にする（qa は不可・ref は null 化）
+bash scripts/update-gate.sh <gate> reset        # pending に戻す（ref は null 化）
+bash scripts/update-gate.sh <gate> approve --ref <証拠ファイル> --ack "理由"   # 🟡（要確認）を理由つきで承認
 ```
 
 承認時の signal: **🟢=そのまま承認可／🟡=要確認（--ack で承認）／🔴=機械事実と矛盾＝ブロック**。

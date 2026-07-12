@@ -19,14 +19,14 @@ Usage: `/gate`, `/gate approve <gate>`, `/gate na <gate>`, `/gate reset <gate>`
 
 1. Read `docs/STATUS.md`
 2. Parse the gate name from arguments
-3. **Pre-validation check**: For gates with ref mappings (plan, review, qa, security, deploy), verify `current_refs.<gate>` is set. If empty, display the ref status and warn the user before proceeding.
+3. **Pre-validation check**: For gates with ref mappings (plan, review, qa, security, deploy, client_ready_for_dev→translation), the ref is set atomically at approval via `--ref` — `current_refs` being empty before approval is normal. Confirm the evidence file to pass as `--ref` exists.
 4. **Judge preview (review/qa/security/deploy のみ)**: 承認を求める**前に**カードを提示する:
    - Run: `python3 scripts/build-judge-card.py --gate <gate-name> --root .`
    - Read `docs/qa-reports/judge-<gate-name>.md` and present it to the user in plain Japanese, filling the「次のアクション」section from context. The user decides by looking at the card — never summarize it away.
 5. Confirm with the user: "Approve {gate} gate? This advances the workflow."
 6. On confirmation, run:
 
-```markdown
+```bash
 # 推奨（原子承認: gate 値と evidence ref を1書込みで設定・stale-ref 窓なし）
 bash scripts/update-gate.sh <gate-name> approve --ref <evidence-path>
 ```
@@ -36,10 +36,10 @@ bash scripts/update-gate.sh <gate-name> approve --ref <evidence-path>
 If the result is 🟡, relay the card's 🟡 items and ask the user for an explicit reason, then run:
 
 ```bash
-bash scripts/update-gate.sh <gate-name> approve --ack "<user-stated reason>"
+bash scripts/update-gate.sh <gate-name> approve --ref <evidence-path> --ack "<user-stated reason>"
 ```
 
-The reason must come from the user's reply — never invent one.
+Keep the same `--ref` as the first attempt (omitting it approves the gate without its evidence ref). The reason must come from the user's reply — never invent one.
 
 ## N/A mode (`$ARGUMENTS` contains "na")
 
