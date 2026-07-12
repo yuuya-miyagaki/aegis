@@ -3,13 +3,13 @@ framework: aegis
 framework_version: "1.26.2"
 project_name: "Aegis"
 mode: Dev
-phase: security
+phase: ship
 task_type: framework
 task_size: M
 task_size_rationale: "iteration 67（framework・judge test-fact 判定堅牢化）M 確定（brainstorm Step D・update-task.sh 経由）。設計正本: docs/specs/2026-07-12-iter67-judge-test-fact-robustness-design.md（trust-scan＝read_test_result の走査で undecidable〔observed かつ marker_verified≠true〕かつ status=ok のエントリを情報ゼロ＝透明として skip・判定は最新 decidable〔manual／observed+marker=true〕が下す。undecidable-fail 終端 unverified・fp 不一致終端・decidable ゼロ→unverified は不変＝C-2/K-1/fp backstop 無緩和。red 洗浄経路〔decidable red 後の no-run コマンドで red→🟡〕も封鎖＝厳格化）。footprint: scripts/build-judge-card.py＋tests/test_test_runner_realness.py＝M（2-5）。control-plane（gate 判定ロジック）を触るため review+qa+security 必須・M のため deploy skip。候補#2 ref-window 原子化は iter68 第一候補へ繰越・#3 は独立 maintenance へ。"
 iteration: 67
 ui_surface: false
-last_updated: "2026-07-12T07:10:00Z"
+last_updated: "2026-07-12T10:30:00Z"
 gate_approvals:
   client_ready_for_dev: n/a
   brainstorm: approved
