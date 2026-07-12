@@ -32,7 +32,7 @@
 - 公開 API（CLI・後方互換は加算のみ）:
   - `bash scripts/update-gate.sh <gate> approve [--ref <repo相対path>] [--ack "<reason>"]`
     - `--ref` は approve 専用。対象 gate が ref key を持たない（brainstorm/dev_ready_for_client）→ usage エラー・状態不変。
-    - path は repo 相対必須（先頭 `/` 拒否）・`$ROOT/<path>` が通常ファイルとして実在しなければエラー・状態不変。
+    - path は repo 相対必須（先頭 `/` 拒否）・`..` 拒否・文字 allowlist `[A-Za-z0-9._/-]`・`$ROOT/<path>` が通常ファイルとして実在しなければエラー・状態不変。
     - 既に approved の gate へ --ref → 現行どおり「No change needed」で exit 0＋「ref は変更していない」旨を明示（ref 差し替えはスコープ外）。
   - `na` / `reset` に `--ref` → usage エラー。
   - `na` は reset と同様に対応 ref を null 化（同一 sed 単一パス）。
@@ -82,7 +82,7 @@
   - 既存ピン `test_pending_gate_with_ref_is_stale_violation`（tests/test_check_status.py:2172）→ 「violation ではなく WARNING・rc 0」へ書き換え。
   - approved+空 ref FAIL・ref 不在 FAIL の非退行ピン。n/a+ref も WARNING（対称）。
   - --check-completion-evidence 経由でも pending+ref が rc 0＋WARNING（TaskCompleted hook 波及の直接証明）。
-- エッジケース: path に sed 特殊文字（`&`・`|`）を含む場合のエスケープ／client_ready_for_dev→translation の --ref 経路／lock 競合下の --ref（既存 lock テストの非退行）。
+- エッジケース: path の文字 allowlist（`[A-Za-z0-9._/-]` のみ許可＝sed 特殊文字・YAML 破壊文字・`..` traversal を入口で拒否。「エスケープして通す」より狭く安全）／client_ready_for_dev→translation の --ref 経路／lock 競合下の --ref（既存 lock テストの非退行）。
 - 手動確認: 実フローで `record green → approve --ref docs/qa-reports/iter68-review.md` の2手が contract 赤ゼロで通ること（qa フェーズの実環境 E2E で記録）。
 
 ## 次のステップ
