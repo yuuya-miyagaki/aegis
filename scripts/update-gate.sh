@@ -3,12 +3,22 @@
 # Called by /gate command via Bash tool. Updates STATUS.md and .gate-snapshot atomically.
 # Because this runs via Bash (not Edit/Write), it naturally bypasses post-status-audit.sh.
 #
-# Usage: bash scripts/update-gate.sh <gate-name> [approve|na|reset] [--ack "reason"]
+# Usage: bash scripts/update-gate.sh <gate-name> [approve|na|reset] [--ref <path>] [--ack "reason"]
 #   approve (default): pending → approved
 #   na:                pending → n/a (only brainstorm/plan)
 #   reset:             approved/n/a → pending
+#   --ref <path>:      approve と同時に current_refs.<gate> を原子的に設定（repo 相対・実在ファイルのみ）
 #   --ack "reason":    acknowledge a 🟡 (tri-state) judge result when approving
 set -euo pipefail
+
+# 罠a (full-review R6): SIGPIPE を無視し、pipe 早期クローズ（| head 等）が
+# 状態書込み前にスクリプトを殺せないようにする。以降の出力は EPIPE で失敗
+# しうるが、書込み前の出力は fail-closed（exit≠0・状態不変）、書込み後は
+# best-effort（|| true）で exit 0 を保つ。
+# 監査済み（iter68）: 本スクリプト内で「下流の早期終了」に依存するパイプは
+# CURRENT 読取の `grep -m1`（`|| true` 済み）と print_report 内（guard 済み）
+# のみ — trap を外す場合はこの2点の EPIPE 化を再監査すること。
+trap '' PIPE
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
@@ -20,8 +30,25 @@ source "${ROOT}/hooks/lib/frontmatter.sh"
 
 GATE_NAME="${1:-}"
 ACTION="${2:-approve}"
-ACK_FLAG="${3:-}"
-ACK_REASON="${4:-}"
+
+ACK_SET=false
+ACK_REASON=""
+REF_PATH=""
+if [ "$#" -ge 2 ]; then shift 2; else shift "$#"; fi
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --ack)
+      [ "$#" -ge 2 ] || { echo "ERROR: --ack requires a reason"; exit 1; }
+      ACK_SET=true; ACK_REASON="$2"; shift 2 ;;
+    --ref)
+      [ "$#" -ge 2 ] || { echo "ERROR: --ref requires a path"; exit 1; }
+      REF_PATH="$2"; shift 2 ;;
+    *)
+      echo "ERROR: unknown argument '$1'"
+      echo "Usage: bash scripts/update-gate.sh <gate-name> [approve|na|reset] [--ref <path>] [--ack \"reason\"]"
+      exit 1 ;;
+  esac
+done
 
 VALID_GATES="client_ready_for_dev brainstorm plan review qa security deploy dev_ready_for_client"
 VALID_ACTIONS="approve na reset"
@@ -29,10 +56,11 @@ VALID_ACTIONS="approve na reset"
 # --- Argument validation ---
 
 if [ -z "$GATE_NAME" ]; then
-  echo "Usage: bash scripts/update-gate.sh <gate-name> [approve|na|reset]"
+  echo "Usage: bash scripts/update-gate.sh <gate-name> [approve|na|reset] [--ref <path>] [--ack \"reason\"]"
   echo ""
   echo "Valid gates: $VALID_GATES"
   echo "Actions: approve (default), na, reset"
+  echo "--ref <path>: approve と同時に current_refs.<gate> を原子的に設定（repo 相対・実在ファイルのみ）"
   echo ""
   # Show current gate status if STATUS.md exists.
   if [ -f "$STATUS_FILE" ]; then
@@ -54,6 +82,43 @@ if [ "$VALID" = "false" ]; then
   echo "ERROR: Invalid gate name '$GATE_NAME'"
   echo "Valid gates: $VALID_GATES"
   exit 1
+fi
+
+# --- Gate → ref mapping (mirrors check_status.py gate_ref_mapping) ---
+get_ref_key() {
+  case "$1" in
+    plan) echo "plan" ;;
+    review) echo "review" ;;
+    qa) echo "qa" ;;
+    security) echo "security" ;;
+    deploy) echo "deploy" ;;
+    client_ready_for_dev) echo "translation" ;;
+    *) echo "" ;;
+  esac
+}
+
+GATE_REF_KEY=$(get_ref_key "$GATE_NAME")
+
+if [ -n "$REF_PATH" ]; then
+  if [ "$ACTION" != "approve" ]; then
+    echo "ERROR: --ref is only valid with the 'approve' action."
+    exit 1
+  fi
+  if [ -z "$GATE_REF_KEY" ]; then
+    echo "ERROR: gate '$GATE_NAME' has no current_refs key; --ref is not applicable."
+    exit 1
+  fi
+  case "$REF_PATH" in
+    /*) echo "ERROR: --ref path must be repo-relative: $REF_PATH"; exit 1 ;;
+    *..*) echo "ERROR: --ref path must not contain '..': $REF_PATH"; exit 1 ;;
+    *[!A-Za-z0-9._/-]*)
+      # allowlist: YAML 引用と sed 置換の双方を追加エスケープなしで安全にする
+      echo "ERROR: --ref path contains unsupported characters: $REF_PATH"; exit 1 ;;
+  esac
+  if [ ! -f "${ROOT}/${REF_PATH}" ]; then
+    echo "ERROR: --ref file not found: ${REF_PATH}"
+    exit 1
+  fi
 fi
 
 VALID_ACTION=false
@@ -191,11 +256,15 @@ fi
 
 TARGET_VALUE=""
 ACTION_TAG=""
+ACK_RECORD=false
 
 case "$ACTION" in
   approve)
     if [ "$CURRENT" = "approved" ]; then
       echo "Gate '$GATE_NAME' is already approved. No change needed."
+      if [ -n "$REF_PATH" ]; then
+        echo "NOTE: --ref は未適用（既 approved の ref 差し替えはスコープ外）" || true
+      fi
       exit 0
     fi
     if [ "$CURRENT" = "n/a" ]; then
@@ -204,6 +273,9 @@ case "$ACTION" in
       exit 1
     fi
     # Context validation: delegate to check_status.py (tri-state 0/1/2).
+    # --ref を伴う場合、check_status.py の「空 ref ADVISORY」は誤誘導になるため
+    # AEGIS_PENDING_REF で抑止する（if 形式で set -e 安全に）。
+    if [ -n "$REF_PATH" ]; then export AEGIS_PENDING_REF="$REF_PATH"; fi
     # set +e: python returning non-zero is expected (deny/ack) — must not abort
     # before echoing.
     set +e
@@ -211,45 +283,24 @@ case "$ACTION" in
     GATE_CHECK_RC=$?
     set -e
     if [ -n "$GATE_CHECK" ]; then
-      echo "$GATE_CHECK"
+      echo "$GATE_CHECK" || true
     fi
     if [ "$GATE_CHECK_RC" -eq 0 ]; then
       : # 🟢 approvable — fall through
     elif [ "$GATE_CHECK_RC" -eq 2 ]; then
       # 🟡 needs ack: approve only when an explicit reason is supplied.
-      if [ "$ACK_FLAG" != "--ack" ] || [ -z "$ACK_REASON" ]; then
-        echo ""
-        echo "🟡 要確認の項目があります（上記）。承認するには理由を添えてください:"
-        echo "  bash scripts/update-gate.sh $GATE_NAME approve --ack \"確認した理由\""
+      if [ "$ACK_SET" != "true" ] || [ -z "$ACK_REASON" ]; then
+        echo "" || true
+        echo "🟡 要確認の項目があります（上記）。承認するには理由を添えてください:" || true
+        echo "  bash scripts/update-gate.sh $GATE_NAME approve --ack \"確認した理由\"" || true
         exit 1
       fi
-      CARD="${ROOT}/docs/qa-reports/judge-${GATE_NAME}.md"
-      if [ -f "$CARD" ]; then
-        printf '\n## ACK\n- %s （%s）\n' "$ACK_REASON" "$(date '+%Y-%m-%d %H:%M')" >> "$CARD"
-      fi
-      # Brace-delimit ${CARD}: bash 3.2 (macOS default) mis-parses a bare $CARD
-      # immediately followed by a multibyte char like ）, yielding "unbound var".
-      echo "[gate-ack] ${GATE_NAME}: 🟡 を ack で承認（理由記録: ${CARD}）"
+      # ACK 追記とその echo は書込み成立後（Step 3-6）へ移設。ここではフラグのみ。
+      ACK_RECORD=true
     else
       # 🔴 (1) or any unexpected code: hard block.
       exit 1
     fi
-    # B2 judge-card push (P1-C2, OBS-019): print the full card into the
-    # transcript so the LLM relays it to the client. Pull-only cards (/judge)
-    # never reached non-engineer clients in the behavioral review.
-    # Gate list duplicates check_status.py JUDGE_GATES (bash cannot import it).
-    case "$GATE_NAME" in
-      review|qa|security|deploy)
-        CARD_FILE="${ROOT}/docs/qa-reports/judge-${GATE_NAME}.md"
-        if [ -f "$CARD_FILE" ]; then
-          echo ""
-          echo "===== JUDGE CARD (${GATE_NAME}) ====="
-          cat "$CARD_FILE"
-          echo "===== END JUDGE CARD ====="
-          echo "[judge-card] 上のカードを平易な日本語で依頼者に提示してください（「次のアクション」欄は文脈に合わせて補完）。"
-        fi
-        ;;
-    esac
     TARGET_VALUE="approved"
     ACTION_TAG="gate-approve"
     ;;
@@ -286,43 +337,38 @@ case "$ACTION" in
     ;;
 esac
 
-# --- Gate → ref mapping (mirrors check_status.py gate_ref_mapping) ---
-get_ref_key() {
-  case "$1" in
-    plan) echo "plan" ;;
-    review) echo "review" ;;
-    qa) echo "qa" ;;
-    security) echo "security" ;;
-    deploy) echo "deploy" ;;
-    client_ready_for_dev) echo "translation" ;;
-    *) echo "" ;;
-  esac
-}
-
-# --- Update STATUS.md ---
-
-echo "[${ACTION_TAG}] $GATE_NAME: $CURRENT → $TARGET_VALUE"
-
-TMP="${STATUS_FILE}.tmp.$$"
-# Scope sed to gate_approvals section only — prevents matching same key names
-# in other sections (e.g., current_refs also has review, qa, security, deploy).
-# Use | delimiter in substitution to avoid conflict with n/a value containing /.
-# Single pass: gate value and (for reset) ref null-ing land in one write so a
-# concurrent reader never observes the intermediate state.
-SED_ARGS=(-e "/^gate_approvals:/,/^[a-z]/ s|\(  ${GATE_NAME_SED}:\).*|\1 ${TARGET_VALUE}|")
-if [ "$ACTION" = "reset" ]; then
-  REF_KEY=$(get_ref_key "$GATE_NAME")
-  if [ -n "$REF_KEY" ]; then
-    REF_KEY_SED=$(printf '%s\n' "$REF_KEY" | sed 's/[.[\/*^$&]/\\&/g')
-    SED_ARGS+=(-e "/^current_refs:/,/^[a-z]/ s|\(  ${REF_KEY_SED}:\).*|\1 null|")
+# --- Pre-write sanity (grill-plan 致命2): --ref の対象 key 行が current_refs に
+# 実在することを lock 内で検証。無ければ sed が静かに素通りし「gate だけ
+# approved・ref 未設定・exit 0」の部分失敗になるため、書込み前に fail-closed。
+if [ "$ACTION" = "approve" ] && [ -n "$REF_PATH" ]; then
+  if ! frontmatter_section "$STATUS_FILE" current_refs | grep -q "^  ${GATE_REF_KEY}:"; then
+    echo "ERROR: current_refs.${GATE_REF_KEY} line not found in STATUS.md — cannot set --ref atomically."
+    exit 1
   fi
 fi
+
+# --- Update STATUS.md (STATE FIRST — before any success output; 罠a) ---
+TMP="${STATUS_FILE}.tmp.$$"
+SED_ARGS=(-e "/^gate_approvals:/,/^[a-z]/ s|\(  ${GATE_NAME_SED}:\).*|\1 ${TARGET_VALUE}|")
+if { [ "$ACTION" = "reset" ] || [ "$ACTION" = "na" ]; } && [ -n "$GATE_REF_KEY" ]; then
+  REF_KEY_SED=$(printf '%s\n' "$GATE_REF_KEY" | sed 's/[.[\/*^$&]/\\&/g')
+  SED_ARGS+=(-e "/^current_refs:/,/^[a-z]/ s|\(  ${REF_KEY_SED}:\).*|\1 null|")
+elif [ "$ACTION" = "approve" ] && [ -n "$REF_PATH" ]; then
+  REF_KEY_SED=$(printf '%s\n' "$GATE_REF_KEY" | sed 's/[.[\/*^$&]/\\&/g')
+  # REF_PATH は allowlist 検証済み（\ & | " を含み得ない）→ 置換部そのまま安全
+  SED_ARGS+=(-e "/^current_refs:/,/^[a-z]/ s|\(  ${REF_KEY_SED}:\).*|\1 \"${REF_PATH}\"|")
+fi
 sed "${SED_ARGS[@]}" "$STATUS_FILE" > "$TMP" && mv "$TMP" "$STATUS_FILE"
-if [ "$ACTION" = "reset" ] && [ -n "${REF_KEY:-}" ]; then
-  echo "[${ACTION_TAG}] current_refs.${REF_KEY} → null"
+
+# --- Post-write file mutations (stdout 非依存・書込み成立後のみ記録) ---
+if [ "$ACK_RECORD" = "true" ]; then
+  CARD="${ROOT}/docs/qa-reports/judge-${GATE_NAME}.md"
+  if [ -f "$CARD" ]; then
+    printf '\n## ACK\n- %s （%s）\n' "$ACK_REASON" "$(date '+%Y-%m-%d %H:%M')" >> "$CARD"
+  fi
 fi
 
-# --- Update snapshot atomically ---
+# --- Update snapshot atomically（既存コメントごと維持） ---
 # iter43: single-source via aegis_write_snapshot (captures gate/phase/mode +
 # task_type/task_size). The lib lives under hooks/lib (already sourced:
 # frontmatter.sh). Fall back to a no-op if unavailable — the gate value is
@@ -333,10 +379,37 @@ if command -v aegis_write_snapshot >/dev/null 2>&1; then
   aegis_write_snapshot "$ROOT" || true
 fi
 
-echo "[${ACTION_TAG}] STATUS.md and .gate-snapshot updated."
-
-# --- Show result ---
-
-echo ""
-echo "Current gate status:"
-frontmatter_section "$STATUS_FILE" gate_approvals | grep "^  " | sed 's/^  /  /' || true
+# --- Best-effort report: 状態は永続化済み。出力失敗（EPIPE 等）は無害化 ---
+print_report() {
+  echo "[${ACTION_TAG}] ${GATE_NAME}: ${CURRENT} → ${TARGET_VALUE}"
+  if { [ "$ACTION" = "reset" ] || [ "$ACTION" = "na" ]; } && [ -n "$GATE_REF_KEY" ]; then
+    echo "[${ACTION_TAG}] current_refs.${GATE_REF_KEY} → null"
+  fi
+  if [ "$ACTION" = "approve" ] && [ -n "$REF_PATH" ]; then
+    echo "[${ACTION_TAG}] current_refs.${GATE_REF_KEY} → \"${REF_PATH}\""
+  fi
+  if [ "$ACK_RECORD" = "true" ]; then
+    # Brace-delimit ${GATE_NAME}: bash 3.2 は多バイト文字直前の bare 変数を誤解析
+    echo "[gate-ack] ${GATE_NAME}: 🟡 を ack で承認（理由記録: ${ROOT}/docs/qa-reports/judge-${GATE_NAME}.md）"
+  fi
+  if [ "$ACTION" = "approve" ]; then
+    # B2 judge-card push (P1-C2, OBS-019)（既存コメントごと移設）
+    case "$GATE_NAME" in
+      review|qa|security|deploy)
+        CARD_FILE="${ROOT}/docs/qa-reports/judge-${GATE_NAME}.md"
+        if [ -f "$CARD_FILE" ]; then
+          echo ""
+          echo "===== JUDGE CARD (${GATE_NAME}) ====="
+          cat "$CARD_FILE"
+          echo "===== END JUDGE CARD ====="
+          echo "[judge-card] 上のカードを平易な日本語で依頼者に提示してください（「次のアクション」欄は文脈に合わせて補完）。"
+        fi
+        ;;
+    esac
+  fi
+  echo "[${ACTION_TAG}] STATUS.md and .gate-snapshot updated."
+  echo ""
+  echo "Current gate status:"
+  frontmatter_section "$STATUS_FILE" gate_approvals | grep "^  " | sed 's/^  /  /'
+}
+print_report 2>/dev/null || true
