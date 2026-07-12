@@ -3,29 +3,29 @@ framework: aegis
 framework_version: "1.26.2"
 project_name: "Aegis"
 mode: Dev
-phase: docs
+phase: brainstorm
 task_type: framework
 task_size: M
 task_size_rationale: "iteration 67（framework・judge test-fact 判定堅牢化）M 確定（brainstorm Step D・update-task.sh 経由）。設計正本: docs/specs/2026-07-12-iter67-judge-test-fact-robustness-design.md（trust-scan＝read_test_result の走査で undecidable〔observed かつ marker_verified≠true〕かつ status=ok のエントリを情報ゼロ＝透明として skip・判定は最新 decidable〔manual／observed+marker=true〕が下す。undecidable-fail 終端 unverified・fp 不一致終端・decidable ゼロ→unverified は不変＝C-2/K-1/fp backstop 無緩和。red 洗浄経路〔decidable red 後の no-run コマンドで red→🟡〕も封鎖＝厳格化）。footprint: scripts/build-judge-card.py＋tests/test_test_runner_realness.py＝M（2-5）。control-plane（gate 判定ロジック）を触るため review+qa+security 必須・M のため deploy skip。候補#2 ref-window 原子化は iter68 第一候補へ繰越・#3 は独立 maintenance へ。"
-iteration: 67
+iteration: 68
 ui_surface: false
-last_updated: "2026-07-12T10:30:00Z"
+last_updated: "2026-07-12T19:30:00Z"
 gate_approvals:
   client_ready_for_dev: n/a
-  brainstorm: approved
-  plan: approved
-  review: approved
-  qa: approved
-  security: approved
+  brainstorm: pending
+  plan: pending
+  review: pending
+  qa: pending
+  security: pending
   deploy: pending
-  dev_ready_for_client: approved
+  dev_ready_for_client: pending
 current_refs:
   requirements: []
-  plan: "docs/plans/2026-07-12-iter67-judge-test-fact-robustness-implementation-plan.md"
-  spec: "docs/specs/2026-07-12-iter67-judge-test-fact-robustness-design.md"
-  review: "docs/qa-reports/iter67-review.md"
-  qa: "docs/qa-reports/iter67-qa.md"
-  security: "docs/qa-reports/iter67-security.md"
+  plan: null
+  spec: null
+  review: null
+  qa: null
+  security: null
   deploy: null
   translation: null
 external_evidence:
@@ -37,7 +37,7 @@ external_evidence:
     scope: "v0.13.0 計画 5 ラウンドレビュー"
     findings: "Round 1〜5 で計 25 件の指摘（hook 出力スキーマ陳腐化、TaskCreated/Completed 制御方式、Plan 条件付き許可、effort 配分、pre-compact.sh 同種破損、`if` 単一 rule 制約等）"
     resolution: "Rev.5 で全件反映、Phase 0a 即時実装着手 GO。hotfix/v0122-hook-schema ブランチで開始。"
-next_action: "**【iter67 完全クローズ・push 済 → Phase 1 スイープ着手】** origin/main=404743a（iter67 全16コミット push 済）。iter67/v1.26.2（judge test-fact trust-scan・PATCH）は全 dev ゲート approved＋dev_ready_for_client approved で完全クローズ。**ユーザー方針＝docs/full-review-2026-07-06-six-dimensions-evolution.md §4 Phase 1 の残り3項目を一気に片付ける（1反復1項目・立て続け・各反復の境目で `/clear`→`/recover` でコンテキスト衛生）**。Phase 1 消化: 1-1✅iter64／1-2✅iter67〔trust-scan がこれ〕／1-4✅iter65。**残り＝スイープ対象（この順で実施）**: 【iter68=1-3】update-gate の `approve --ref` 原子化＋状態変更を出力より先に（SIGPIPE 耐性）＋pending+ref を advisory 降格（R6 罠 a,b,c・LEARNINGS line137 前段軸＝pending gate に ref を置くと `check_framework_contract` が red 化する運用負債の機構的根治）。→【iter69=1-5】drill 強化: NO_RUN 拒否＋mutant parse 検証＋コメントラン floor 除外〔起票済〕＋`--since` モード（R4/R6 罠 l,f）。→【iter70=1-6】record-test-result 引数事前検証／deps 無 manifest を info 降格／judge カードに tests スコープ表示（R6 罠 n・F6・test#3）。**各 iter 手順**: rollover（dev ゲート pending 化〔update-gate.sh reset〕・iteration++・非 requirements refs=null・requirements 保持・session_history 新エントリ追加時は最古を evidence-archive.md へ移設し frontmatter ≤3 維持〔今 iter65/66/67＝iter68 docs で iter65 archive〕）→brainstorm→plan→grill-plan→implement(TDD RED-first・書く=opus)→grill-code→review(1次4角度→親verify=fable・盲検2次=fable)→qa→security→ship(bump)→docs(LEARNINGS)→dev_ready_for_client→push→`/clear`→`/recover`。**次アクション＝iter68 rollover して 1-3 の brainstorm**。◆別トラック（Phase 1 完遂後 or 1-3 に相乗り可）: SF-011（frontmatter 終端デリミタ差・Low・pre-existing・contained）／SF-012（washed-green＋unknown-src・Low・pre-existing・contained）／#3 session_history 自動アーカイブ＋doctor 誤検出偏り。◆push=`gh auth switch --user yuuya-miyagaki` 必須（active が tigereye だと 403）。"
+next_action: "**【iter68 着手＝Phase 1 スイープ 1-3】** rollover 完了（dev ゲート全 pending・iteration=68・非 requirements refs=null・requirements 保持）。今回タスク＝docs/full-review-2026-07-06-six-dimensions-evolution.md §4 の 1-3: update-gate の `approve --ref` 原子化＋状態変更を出力より先に（SIGPIPE 耐性）＋pending+ref を advisory 降格（R6 罠 a,b,c・LEARNINGS ref-window 軸＝pending gate に ref を置くと `check_framework_contract` が red 化する運用負債の機構的根治）。**次アクション＝aegis-brainstorm skill を読み brainstorm 実施（→Step D で update-task.sh・その後 plan→grill-plan→implement〔TDD RED-first・書く=opus〕→grill-code→review〔1次4角度→親verify=fable・盲検2次=fable〕→qa→security→ship〔bump〕→docs〔LEARNINGS・session_history 追加時 iter65 を evidence-archive へ〕→dev_ready_for_client→push→/clear→/recover）**。スイープ残: 【iter69=1-5】drill 強化: NO_RUN 拒否＋mutant parse 検証＋コメントラン floor 除外〔起票済〕＋`--since`（R4/R6 罠 l,f）→【iter70=1-6】record-test-result 引数事前検証／deps 無 manifest info 降格／judge カード tests スコープ表示（R6 罠 n・F6・test#3）。◆別トラック: SF-011（frontmatter 終端デリミタ差・Low・pre-existing・contained）／SF-012（washed-green＋unknown-src・Low・pre-existing・contained）＝1-3 に相乗り検討可／#3 session_history 自動アーカイブ＋doctor 誤検出偏り。◆push=`gh auth switch --user yuuya-miyagaki` 必須（active が tigereye だと 403）。"
 blockers: []
 failure_tracking: null
 session_history:
