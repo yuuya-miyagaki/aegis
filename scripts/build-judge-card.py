@@ -195,21 +195,36 @@ def _evidence_entries(root: Path) -> list:
 def read_test_result(root: Path) -> str:
     """'green' / 'red' / 'unverified' from the OBSERVED evidence log (E1).
 
-    The newest test-runner entry decides; its fp must equal the CURRENT
-    worktree fingerprint (both 64-hex). Anything else — no log, no matching
-    entry, stale/oversize/nogit fingerprint, unreadable patterns — is
-    'unverified' (🟡 ack-able), never silent-green.
+    The newest **decidable** test-runner entry decides; its fp must equal
+    the CURRENT worktree fingerprint (both 64-hex). Anything else — no log,
+    no decidable entry, stale/oversize/nogit fingerprint, unreadable
+    patterns — is 'unverified' (🟡 ack-able), never silent-green.
+
+    Decidable = src='manual' OR marker_verified:true. An undecidable entry
+    (src='observed' with marker_verified NOT true) certifies nothing, so
+    the trust-scan (iter67) treats it by status:
+      - undecidable-ok  → TRANSPARENT: pure no-run noise (--collect-only
+        counts, piped/truncated output), skipped so the scan continues to
+        the newest decidable entry. It cannot demote a trusted green nor
+        launder a decidable red into a 🟡.
+      - undecidable-fail → TERMINAL 'unverified': something runner-shaped
+        failed, keep the re-record signal (fail-closed unchanged).
+    The transparency skip precedes the fp check, so a stale undecidable-ok
+    is skipped too (it is decidable-nothing; fp is irrelevant to noise).
 
     C-2 (v1.6.1): runner-name match alone is insufficient. An entry from an
     OBSERVED source (post-bash-observe.sh) is treated as 'green' / 'red'
     ONLY when it carries marker_verified:true (meaning the observer saw an
     actual final-summary line in tool_response.output — `== N passed in`,
-    `Tests: N passed`, etc.). Without marker_verified:true the entry
-    degrades to 'unverified' (fail-closed). Manual entries (src='manual',
-    via record-test-result.py with the trusted-runner contract) keep the
-    old behavior — they bypass marker_verified because the human attested.
-    Schema: entries written by v1.6.0 lack the field, so they all degrade
-    to 'unverified' on first load — re-run the test to upgrade the log.
+    `Tests: N passed`, etc.). Without marker_verified:true an OBSERVED entry
+    is undecidable: with status 'ok' it is transparent (skipped), with
+    status 'fail' it is terminal 'unverified' (fail-closed). Manual entries
+    (src='manual', via record-test-result.py with the trusted-runner
+    contract) keep the old behavior — they bypass marker_verified because
+    the human attested.
+    Schema: entries written by v1.6.0 lack the field, so an OBSERVED v1.6.0
+    'ok' entry is transparent (skipped) in the sequence and a v1.6.0 'fail'
+    entry is terminal 'unverified' — re-run the test to upgrade the log.
     """
     pats = _test_runner_patterns(root)
     if not pats:
@@ -231,10 +246,23 @@ def read_test_result(root: Path) -> str:
             cmd = sp.sub("Q", cmd)
         if not any(p.search(cmd) for p in pats):
             continue
+        # trust-scan (iter67): an observed entry whose marker was NOT
+        # verified can certify neither green nor red (C-2) — with status
+        # "ok" it is pure noise (--collect-only counts, piped/truncated
+        # output), so it is TRANSPARENT: skip it and keep scanning for the
+        # newest decidable entry. A fail-status undecidable stays terminal
+        # (something runner-shaped failed — keep the 🟡 re-record signal).
+        # Without this, one noise entry after a trusted green demotes the
+        # gate to unverified (iter64/65/66), and one --collect-only after a
+        # decidable red launders red into an ack-able 🟡.
+        undecidable = (d.get("src") == "observed"
+                       and d.get("marker_verified") is not True)
+        if undecidable and d.get("status") == "ok":
+            continue
         if (d.get("fp") or "") != current:
             return "unverified"
         # C-2: marker_verified gate for observed entries.
-        if d.get("src") == "observed" and d.get("marker_verified") is not True:
+        if undecidable:
             return "unverified"
         return "green" if d.get("status") == "ok" else "red"
     return "unverified"
