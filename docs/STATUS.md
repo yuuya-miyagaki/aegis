@@ -3,18 +3,18 @@ framework: aegis
 framework_version: "1.26.0"
 project_name: "Aegis"
 mode: Dev
-phase: review
+phase: qa
 task_type: framework
 task_size: M
 task_size_rationale: "iteration 66（framework・SF-010 封鎖＋frontmatter 読取意味論統一）M 確定（brainstorm Step D・update-task.sh 経由）。設計正本: docs/specs/2026-07-12-iter66-sf010-parser-unification-design.md（Fix ①: post-status-audit migration-grace を『snapshot に task_type 行なし＝真の旧フォーマット』限定に絞る／Fix ②: frontmatter_value を library 級スコープ化〔---あり→frontmatter 内 first-match・未終端→空 fail-closed・bare→whole-file 温存〕／Fix ③: snapshot 生成スコープ化＝baseline 毒込み封鎖／Fix ④: gate_value 本文 fallback を ---無しファイル限定〔F-2〕／Fix ⑤: python extract_scalar_value 行順 first-match 化〔F-1〕＋extract_approval_map 先勝ち化／parity drift-guard テスト）。footprint: hooks/lib/frontmatter.sh＋hooks/lib/snapshot.sh＋hooks/post-status-audit.sh＋scripts/check_status.py＋hooks/check-gate.sh(dedup)＋tests＝M（2-5）。control-plane（audit/gate 強制ロジック）を触るため review+qa+security 必須・M のため deploy skip。"
 iteration: 66
 ui_surface: false
-last_updated: "2026-07-11T21:10:00Z"
+last_updated: "2026-07-12T04:07:00Z"
 gate_approvals:
   client_ready_for_dev: n/a
   brainstorm: approved
   plan: approved
-  review: pending
+  review: approved
   qa: pending
   security: pending
   deploy: pending
@@ -23,7 +23,7 @@ current_refs:
   requirements: []
   plan: "docs/plans/2026-07-12-iter66-sf010-parser-unification-implementation-plan.md"
   spec: "docs/specs/2026-07-12-iter66-sf010-parser-unification-design.md"
-  review: null
+  review: "docs/qa-reports/iter66-review.md"
   qa: null
   security: null
   deploy: null
@@ -37,7 +37,7 @@ external_evidence:
     scope: "v0.13.0 計画 5 ラウンドレビュー"
     findings: "Round 1〜5 で計 25 件の指摘（hook 出力スキーマ陳腐化、TaskCreated/Completed 制御方式、Plan 条件付き許可、effort 配分、pre-compact.sh 同種破損、`if` 単一 rule 制約等）"
     resolution: "Rev.5 で全件反映、Phase 0a 即時実装着手 GO。hotfix/v0122-hook-schema ブランチで開始。"
-next_action: "**【iter66 review 着手】** implement 完了（Task 0-7 全完・per-task commit abf6d04〜fba9b08・全 Stage1 PASS）＋grill-code 完了（Critical0・🟡3＋🟢1 を fix-forward 1934c98＝regression 関数読点スコープ化〔census 盲点・小文字 $status_file〕/---判定終端許容整合/snapshot gate 節ガード）。full 1127 passed/2 skipped・contract PASS。次=review 1次（finder=opus 4角度: gate迂回/正規フロー回帰/パーサ整合/テスト強度・read-only 6拘束）→親 verify=fable→盲検2次=fable→record green→ref→review gate 承認申請。◆既知 flaky=test_update_gate_lock（回帰外）。◆環境注意: push=active gh は yuuya-miyagaki（切替不要）。"
+next_action: "**【iter66 qa 着手】** review gate approved（1次4角度 finder=opus＋親 verify=fable＋盲検2次=fable が approve 収束・Major×4 は fix-forward 6148a60 で解消・full 1138 passed/2 skipped・contract PASS・ref=docs/qa-reports/iter66-review.md）。次=qa: B1 drill は per-task committed のため skip 見込み（iter64/65 conf7 前例・代替実証=fresh 変異 kill＋RED-first 実証＋SF-010 閉塞再実測）→ full suite record green → qa ref → qa gate 承認申請。◆既知 flaky=test_update_gate_lock（回帰外）。◆環境注意: push=active gh は yuuya-miyagaki（切替不要）。"
 blockers: []
 failure_tracking: null
 session_history:
