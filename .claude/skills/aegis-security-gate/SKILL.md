@@ -49,7 +49,7 @@ Skill(skill="security-review")
 - 全 finding に severity 付与済み
 - `docs/qa-reports/` にセキュリティレポートが存在する
 - deploy blocker があれば STATUS.md に記録済み
-- security gate 承認：`bash scripts/update-gate.sh security approve`
+- security gate 承認：`bash scripts/update-gate.sh security approve --ref docs/qa-reports/iterNN-security.md`（gate 値と ref を1書込みで設定）
 
 ## 禁止事項（aegis 固有）
 

@@ -46,9 +46,9 @@ mapping.md はクライアント用語 → 機能仕様 → 実装ヒントの 3
 - 支援 Agent: `translation-specialist`（mapping 作成・更新を委任可能）
 - 支援 Skill: `translation-mapping`（手順ガイド）
 - Gate 契約: `client_ready_for_dev` 承認時に mapping.md の存在がチェックされる
-- **ref 設定のタイミング**: `current_refs.translation` は**承認の直前**に設定し、
-  設定→承認（update-gate.sh）を連続実行する。pending のまま ref を置いて完了検査を
-  挟むと stale-ref 違反で拒否される。
+- **ref 設定のタイミング**: `current_refs.translation` は**承認の直前**に別途 set せず、
+  `update-gate.sh client_ready_for_dev approve --ref <mapping.md>` で承認と同時に
+  1書込み設定する（原子承認＝窓なし）。pending+ref の stale-ref は FAIL でなくWARNING。
 
 ## Spec Delta（反復2回目以降）
 

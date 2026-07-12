@@ -103,7 +103,7 @@ deploy フェーズ完了時に `DEPLOY-CHECKLIST.template.md` をベースに�
 チェックリストを `docs/qa-reports/` に保存し、deploy ゲートを承認する:
 
 ```bash
-bash scripts/update-gate.sh deploy approve
+bash scripts/update-gate.sh deploy approve --ref docs/qa-reports/iterNN-deploy.md
 ```
 
 STATUS.md の直接編集は禁止（`update-gate.sh` が gate snapshot を含めて原子的に更新する唯一の経路）。

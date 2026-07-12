@@ -58,7 +58,7 @@ Skill(skill="review")
 - PASS/FAIL 判定を明記（理由付き）
 - `docs/qa-reports/` にレビューレポートが存在する
 - confidence < 7 の finding には注意書きを付与済み
-- review gate 承認：`bash scripts/update-gate.sh review approve`
+- review gate 承認：`bash scripts/update-gate.sh review approve --ref docs/qa-reports/iterNN-review.md`（gate 値と ref を1書込みで設定）
 
 ## 禁止事項（aegis 固有）
 

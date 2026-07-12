@@ -26,9 +26,12 @@ Usage: `/gate`, `/gate approve <gate>`, `/gate na <gate>`, `/gate reset <gate>`
 5. Confirm with the user: "Approve {gate} gate? This advances the workflow."
 6. On confirmation, run:
 
-```bash
-bash scripts/update-gate.sh <gate-name> approve
+```markdown
+# 推奨（原子承認: gate 値と evidence ref を1書込みで設定・stale-ref 窓なし）
+bash scripts/update-gate.sh <gate-name> approve --ref <evidence-path>
 ```
+
+`na`/`reset` は当該 gate の `current_refs` を null 化する。pending gate に ref が残っていても FAIL ではなく WARNING（advisory）扱い。
 
 If the result is 🟡, relay the card's 🟡 items and ask the user for an explicit reason, then run:
 

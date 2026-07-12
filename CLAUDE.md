@@ -88,4 +88,4 @@ A task is only complete when:
 - `docs/STATUS.md` points to the active refs
 - blockers and residual risks are recorded
 - the completion summary is evidence-based
-- approved `review`/`qa`/`security`/`deploy`/`plan` gates declare their `current_refs` entry (and `pending`/`n/a` gates leave it null); every declared ref points to an existing file. Enforced at completion by the TaskCompleted hook (same invariant as `check_framework_contract`).
+- approved `review`/`qa`/`security`/`deploy`/`plan` gates declare their `current_refs` entry (set atomically via `approve --ref`); every declared ref points to an existing file. `pending`/`n/a` gates keep refs null — deviations are advisory WARNINGs. Enforced at completion by the TaskCompleted hook (same invariant as `check_framework_contract`).

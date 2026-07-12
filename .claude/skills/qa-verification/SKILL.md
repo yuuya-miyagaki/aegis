@@ -130,8 +130,8 @@ mutant を作れないタスク（ドキュメント・設定・文言のみの�
 
 > **skip スペックは手順4のプレビューを実行しない**: standalone runner は
 > `test_command` 必須で skip を解釈できず `verdict: FAIL` になる。skip 解釈は
-> 承認時の `check_status.py::run_qa_drill` のみ（`verdict: SKIP`）。`.drill` を置いたら
-> プレビューせず `update-gate.sh qa approve` に委ねる。
+> 承認時の `check_status.py::run_qa_drill` のみ（`verdict: SKIP`）。`.drill`設置後は
+> プレビューせず `update-gate.sh qa approve --ref <QAレポート>`へ。
 
 理由はユーザーが見る証拠に残る。安易なスキップは避け、コードがあるなら必ずドリルする。
 ただし **framework 改修などコードを per-task でコミット済みのタスク**は、qa 承認時の
