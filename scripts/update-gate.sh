@@ -15,11 +15,14 @@ set -euo pipefail
 # 状態書込み前にスクリプトを殺せないようにする。以降の出力は EPIPE で失敗
 # しうるが、書込み前の出力は fail-closed（exit≠0・状態不変）、書込み後は
 # best-effort（|| true）で exit 0 を保つ。
-# 監査済み（iter68）: 本スクリプト内で「下流の早期終了」に依存するパイプは
-# CURRENT 読取の `grep -m1`（`|| true` 済み）・print_report 内（guard 済み）・
-# pre-write sanity の `grep -q`（frontmatter_section が単一 printf のバッファ
-# 出力なので producer は grep の match/exit より先に write を完了＝EPIPE 競合
-# なし）の3点 — trap を外す/frontmatter_section を逐次出力に変える場合は再監査すること。
+# 監査（iter68 review F-1・実測で確定）: 早期終了する pipe 消費者（grep -q /
+# grep -m1）を frontmatter_section の下流に置くと、producer の printf の
+# write() と読み手の exit が交差して EPIPE になる真性レースがある（単離再現
+# 58/3000。trap '' PIPE は silent kill を write エラーに変え pipefail 越しの
+# 誤判定へ増幅する）。よって本スクリプトは frontmatter_section の下流に
+# 早期終了消費者を置かない（CURRENT 読取は全量読み・pre-write sanity は
+# 変数キャプチャ＋case のインメモリ判定）。パイプを足すときは全量 drain
+# するか、変数に取ってから判定すること（構造ピンテストが再導入を検知する）。
 trap '' PIPE
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -43,7 +46,7 @@ while [ "$#" -gt 0 ]; do
       [ "$#" -ge 2 ] || { echo "ERROR: --ack requires a reason"; exit 1; }
       ACK_SET=true; ACK_REASON="$2"; shift 2 ;;
     --ref)
-      [ "$#" -ge 2 ] || { echo "ERROR: --ref requires a path"; exit 1; }
+      { [ "$#" -ge 2 ] && [ -n "$2" ]; } || { echo "ERROR: --ref requires a non-empty path"; exit 1; }
       REF_PATH="$2"; shift 2 ;;
     *)
       echo "ERROR: unknown argument '$1'"
@@ -247,7 +250,8 @@ fi
 # are all [a-z_] but this guards against future additions).
 GATE_NAME_SED=$(printf '%s\n' "$GATE_NAME" | sed 's/[.[\/*^$&]/\\&/g')
 
-CURRENT=$(frontmatter_section "$STATUS_FILE" gate_approvals | grep -m1 "  ${GATE_NAME}:" | sed "s/.*${GATE_NAME_SED}:[[:space:]]*//" | sed 's/^"//;s/"$//' || true)
+# F-1: 早期終了する grep -m1 は EPIPE レース源 — 全量読みし先頭一致だけ整形する。
+CURRENT=$(frontmatter_section "$STATUS_FILE" gate_approvals | grep "  ${GATE_NAME}:" | sed -n "1s/.*${GATE_NAME_SED}:[[:space:]]*//p" | sed 's/^"//;s/"$//' || true)
 
 if [ -z "$CURRENT" ]; then
   echo "ERROR: Gate '$GATE_NAME' not found in STATUS.md gate_approvals"
@@ -343,20 +347,28 @@ esac
 # 実在することを lock 内で検証。無ければ sed が静かに素通りし「gate だけ
 # approved・ref 未設定・exit 0」の部分失敗になるため、書込み前に fail-closed。
 if [ "$ACTION" = "approve" ] && [ -n "$REF_PATH" ]; then
-  if ! frontmatter_section "$STATUS_FILE" current_refs | grep -q "^  ${GATE_REF_KEY}:"; then
-    echo "ERROR: current_refs.${GATE_REF_KEY} line not found in STATUS.md — cannot set --ref atomically."
-    exit 1
-  fi
+  # F-1: pipe 下流の grep -q は EPIPE レースで偽拒否する（実測 58/3000）—
+  # 変数に取り case のインメモリ行頭一致で判定（レースゼロ・実測 0/3000）。
+  REFS_SECTION=$(frontmatter_section "$STATUS_FILE" current_refs || true)
+  NL=$'\n'
+  case "$REFS_SECTION" in
+    "  ${GATE_REF_KEY}:"*|*"${NL}  ${GATE_REF_KEY}:"*) : ;;
+    *)
+      echo "ERROR: current_refs.${GATE_REF_KEY} line not found in STATUS.md — cannot set --ref atomically."
+      exit 1 ;;
+  esac
 fi
 
 # --- Update STATUS.md (STATE FIRST — before any success output; 罠a) ---
 TMP="${STATUS_FILE}.tmp.$$"
+REF_KEY_SED=""
+if [ -n "$GATE_REF_KEY" ]; then
+  REF_KEY_SED=$(printf '%s\n' "$GATE_REF_KEY" | sed 's/[.[\/*^$&]/\\&/g')
+fi
 SED_ARGS=(-e "/^gate_approvals:/,/^[a-z]/ s|\(  ${GATE_NAME_SED}:\).*|\1 ${TARGET_VALUE}|")
 if { [ "$ACTION" = "reset" ] || [ "$ACTION" = "na" ]; } && [ -n "$GATE_REF_KEY" ]; then
-  REF_KEY_SED=$(printf '%s\n' "$GATE_REF_KEY" | sed 's/[.[\/*^$&]/\\&/g')
   SED_ARGS+=(-e "/^current_refs:/,/^[a-z]/ s|\(  ${REF_KEY_SED}:\).*|\1 null|")
 elif [ "$ACTION" = "approve" ] && [ -n "$REF_PATH" ]; then
-  REF_KEY_SED=$(printf '%s\n' "$GATE_REF_KEY" | sed 's/[.[\/*^$&]/\\&/g')
   # REF_PATH は allowlist 検証済み（\ & | " を含み得ない）→ 置換部そのまま安全
   SED_ARGS+=(-e "/^current_refs:/,/^[a-z]/ s|\(  ${REF_KEY_SED}:\).*|\1 \"${REF_PATH}\"|")
 fi

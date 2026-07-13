@@ -25,7 +25,7 @@ user-invocable: false
 | 3 | **requirements** | `docs/requirements/PRD.md` | PRD の全セクションが埋まり、機能要件が列挙され、ユーザーが内容を承認 | PRD 承認後 `scope` へ |
 | 4 | **scope** | `docs/requirements/SCOPE.md`, `docs/requirements/NFR.md` | スコープ境界が明確で、NFR が定義され、ユーザーが承認 | SCOPE + NFR 承認後 `acceptance` へ |
 | 5 | **acceptance** | `docs/requirements/ACCEPTANCE.md` | 受入条件が機能要件・非機能要件と紐付き、判定基準が明確で、ユーザーが承認 | ACCEPTANCE 承認後 `handover` へ |
-| 6 | **handover** | `docs/handover/TO-DEV.md`, `docs/translation/mapping.md`（反復2回目以降は `docs/handover/CHANGES.md` も） | 引き渡し文書が正本ドキュメントを参照し、優先順位・リスク・未解決事項が記載され、ユーザーが承認。translation mapping が作成済みであること（ref 設定は承認直前 — 下記参照） | HANDOVER 承認後、`client_ready_for_dev` ゲートを申請 |
+| 6 | **handover** | `docs/handover/TO-DEV.md`, `docs/translation/mapping.md`（反復2回目以降は `docs/handover/CHANGES.md` も） | 引き渡し文書が正本ドキュメントを参照し、優先順位・リスク・未解決事項が記載され、ユーザーが承認。translation mapping が作成済みであること（ref は承認と同時設定 — 下記参照） | HANDOVER 承認後、`client_ready_for_dev` ゲートを申請 |
 
 ## テンプレート対応表（正本: `_artifact_template_map.py`・テンプレ名は非自明）
 
@@ -99,7 +99,7 @@ mapping.md はクライアント用語 → 機能仕様 → 実装ヒントの 3
 - `scope` で `docs/requirements/SCOPE.md` と `docs/requirements/NFR.md` を作成したら追加する。
 - `acceptance` で `docs/requirements/ACCEPTANCE.md` を作成したら追加する。
 - `handover` では requirements refs を維持し、`next_action` を handover 完了に合わせて更新する。
-- `handover` で `docs/translation/mapping.md` を作成する。`current_refs.translation` はゲート承認と同時に `approve --ref` で設定する（Translation Artifact 節の原子承認規定に従う）。
+- `handover` で `docs/translation/mapping.md` を作成する。`current_refs.translation` は承認と同時に設定（Translation Artifact 節参照）。
 
 ### モード遷移ゲート
 

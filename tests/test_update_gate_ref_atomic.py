@@ -47,6 +47,7 @@ current_refs:
   security: null
   deploy: null
   translation: null
+next_action: "fixture body (sed range closes at this top-level key, like production)"
 ---
 """
 
@@ -162,6 +163,14 @@ class TestUpdateGateRefAtomic(unittest.TestCase):
             self._assert_rejected_no_write(
                 root, "plan", "approve", "--bogus")
 
+    def test_ref_empty_string_rejected(self):
+        """--ref "" は「--ref 未指定」に化けさせず明示エラー（review テスト強度
+        指摘: allowlist は空文字に非マッチで素通りし、approved+空 ref の遅延
+        FAIL に化ける）。"""
+        with tempfile.TemporaryDirectory() as d:
+            root = self._scaffold(Path(d))
+            self._assert_rejected_no_write(root, "plan", "approve", "--ref", "")
+
     def test_already_approved_ref_untouched(self):
         with tempfile.TemporaryDirectory() as d:
             status = STATUS_PLAN_PHASE.replace("  plan: pending",
@@ -267,6 +276,27 @@ class TestUpdateGateRefAtomic(unittest.TestCase):
                         "judge card push must come after the state write")
         self.assertLess(write_idx, text.index('[${ACTION_TAG}] ${GATE_NAME}:'),
                         "success report must come after the state write")
+
+    def test_no_early_exit_pipe_consumers_structure(self):
+        """F-1 回帰ピン: 早期終了する pipe 消費者（grep -q / grep -m1）は
+        frontmatter_section の producer printf と EPIPE レースし、trap '' PIPE
+        下で pipefail 誤判定＝正当な approve の偽拒否になる（実測 58/3000）。
+        全量 drain か変数キャプチャ＋case 判定を使うこと。"""
+        text = (ROOT / "scripts" / "update-gate.sh").read_text(encoding="utf-8")
+        self.assertNotIn("| grep -q", text,
+                         "早期終了 grep -q の再導入は F-1 レースの回帰")
+        self.assertNotIn("| grep -m1", text,
+                         "早期終了 grep -m1 の再導入は F-1 レースの回帰")
+
+    def test_single_write_structure(self):
+        """変異(a) 静的ピン: 書込みは単一 sed 呼び出し＋単一 mv。2回の別書込みに
+        分割すると並行 reader が中間状態（gate だけ approved）を観測できる —
+        動的テストでは検出不能なクラスのため構造でピンする。"""
+        text = (ROOT / "scripts" / "update-gate.sh").read_text(encoding="utf-8")
+        self.assertEqual(text.count('sed "${SED_ARGS[@]}"'), 1,
+                         "STATUS 書込みは単一の sed 呼び出しであること")
+        self.assertEqual(text.count('mv "$TMP" "$STATUS_FILE"'), 1,
+                         "STATUS 書込みは単一の mv であること")
 
 
 if __name__ == "__main__":

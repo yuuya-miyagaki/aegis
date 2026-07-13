@@ -127,6 +127,10 @@ fi
 # Evidence integrity: reuse validate_status_file's gate/ref + existence checks
 # at completion time. python3 absent -> 差し戻し (exit 2): completion evidence
 # cannot be verified, so do not certify the completion (P3-1, policy: moat).
+# Channel contract (iter68): --check-completion-evidence prints violations to
+# STDOUT only; advisories (pending/n/a stale-ref WARNING) go to stderr, which
+# the 2>/dev/null below intentionally drops. Non-empty stdout == violation.
+# Counterpart comment lives in check_status.py evidence_integrity_violations.
 set +e
 EVIDENCE=$(python3 "${DEFAULT_ROOT}/scripts/check_status.py" --root "$ROOT" --check-completion-evidence 2>/dev/null)
 EV_RC=$?
