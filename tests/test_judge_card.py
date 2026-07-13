@@ -4,6 +4,7 @@ import shutil
 import subprocess as sp
 import tempfile
 import unittest
+import unittest.mock
 from pathlib import Path
 
 ROOT_DIR = Path(__file__).resolve().parent.parent
@@ -397,6 +398,32 @@ class TestResolveReport(unittest.TestCase):
             root = Path(d)
             self._status(root, "null")
             self.assertIsNone(judge.resolve_gate_report(root, "review"))
+
+    def test_pending_ref_env_overrides_null_ref(self):
+        """iter68 原子承認: `approve --ref` は pre-approve judge の実行前に
+        AEGIS_PENDING_REF（実在検証済み・同一書込みで current_refs に確定する
+        path）を export する。judge はこれを claims 源として尊重する — さもないと
+        原子フローの judge gate が常に「ref 空＝claims 無し」の 🟡 に落ち、
+        ack が常態化して evidence 規律を汚す。tier-1 facts（fp/tests）は不接触。"""
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            self._status(root, "null")
+            with unittest.mock.patch.dict(
+                    "os.environ",
+                    {"AEGIS_PENDING_REF": "docs/qa-reports/review.md"}):
+                self.assertEqual(judge.resolve_gate_report(root, "review"),
+                                 root / "docs/qa-reports/review.md")
+
+    def test_pending_ref_env_ignored_for_refless_gate(self):
+        """ref key を持たない gate は env があっても None（--ref 自体が
+        update-gate 側で拒否される経路との整合）。"""
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            self._status(root, "null")
+            with unittest.mock.patch.dict(
+                    "os.environ",
+                    {"AEGIS_PENDING_REF": "docs/qa-reports/review.md"}):
+                self.assertIsNone(judge.resolve_gate_report(root, "brainstorm"))
 
 
 class TestVerdict(unittest.TestCase):

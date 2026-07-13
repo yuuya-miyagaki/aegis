@@ -75,11 +75,18 @@
 
 ```claims
 second_opinion:
-  verdict: reject
-  divergence_points: ["4-A: sed&&mv の errexit 免除による書込み失敗 fail-open（1次未検出・Major・修正済）", "3-1: trap 構造ピンのコメント欺瞞（修正済）", "4-B: symlink 越境（Minor・繰延）"]
-resolution: "reject 指摘 2 件（4-A/3-1）を review 内で fix-forward し、盲検2次自身の「この2点を潰せば approve 相当」基準を充足。同一エージェントによる修正再検証で収束確認。"
+  verdict: approve_with_notes
+  divergence_points: ["4-A: sed&&mv の errexit 免除による書込み失敗 fail-open（1次未検出・Major・初回 verdict=reject の根拠・fix-forward c42af84 後に同一エージェント再検証で根治実測＝rc1/STATUS不変/偽出力ゼロ・回帰テストの RED 検証まで確認）", "3-1: trap 構造ピンのコメント欺瞞（行アンカー化で修正・mutation 再実行で検知確認）", "4-B: --ref symlink 越境（Minor conf6・両者合意で iter69+ 繰延）"]
+resolution: "初回 reject（4-A 根拠）→ fix-forward c42af84 → 同一エージェント再検証 approve_with_notes に収束（183 passed・contract PASS 実測）。"
 ```
+
+## 追補: ドッグフード発見ギャップ（judge × 原子承認）
+
+review gate を本 iter の成果物 `approve --ref` で承認しようとした時点で発覚: judge（build-judge-card）は claims を `current_refs.<gate>` からのみ読むため、原子フローでは pre-approve 時 ref=null → **judge gate の黄金経路が常に「claims 無し 🟡」＋ack** になり、ack が常態化して evidence 規律を汚す。
+
+- 処置（review 内 fix-forward・TDD RED→GREEN）: `resolve_gate_report` が `AEGIS_PENDING_REF`（update-gate が実在検証済みで export し同一書込みで確定する path）を claims 源として尊重する 1 分岐を追加。tier-1 facts（fp/tests）は不接触＝信頼モデル無変更（claims はもともと self-attested）。ref key を持たない gate は env があっても None（update-gate 側の --ref 拒否と整合・テストでピン）。
+- テスト: `test_pending_ref_env_overrides_null_ref`／`test_pending_ref_env_ignored_for_refless_gate`（tests/test_judge_card.py）。
 
 ## 最終判定（fix-forward 後）: **PASS（approve）**
 
-4-A/3-1 修正後: 対象テスト 37 passed・full suite green（下記 QA で fresh 記録）。Critical 0・Major 4件（F-1/T-1/T-2/4-A）全て本フェーズ内で実測検証付き修正済み。
+4-A/3-1＋judge ギャップ修正後: full suite **1173 passed / 2 skipped**・contract PASS。Critical 0・Major 4件（F-1/T-1/T-2/4-A）全て本フェーズ内で実測検証付き修正済み。

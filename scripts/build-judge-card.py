@@ -9,6 +9,7 @@ Never dispatches an LLM (the second opinion is recorded by the LLM beforehand).
 from __future__ import annotations
 
 import json
+import os
 import re
 import subprocess
 import sys
@@ -333,10 +334,20 @@ GATE_REF_KEY = {"review": "review", "qa": "qa", "security": "security",
 
 def resolve_gate_report(root: Path, gate: str) -> Path | None:
     """Read current_refs.<ref_key> from STATUS.md; return the report path or
-    None when the ref is null/absent (=> 🟡 evidence-not-submitted upstream)."""
+    None when the ref is null/absent (=> 🟡 evidence-not-submitted upstream).
+
+    iter68 atomic approve: `update-gate.sh <gate> approve --ref <path>` exports
+    AEGIS_PENDING_REF (existence-validated) BEFORE this pre-approve judge runs
+    and commits it to current_refs in the same single write as the approval.
+    Honor it as the claims source so the atomic golden path stays judgeable —
+    otherwise every judge gate would land a routine 🟡 (claims-absent) and ack
+    would stop signalling real deviations. Tier-1 facts (fp/tests) untouched."""
     ref_key = GATE_REF_KEY.get(gate)
     if not ref_key:
         return None
+    pending = os.environ.get("AEGIS_PENDING_REF")
+    if pending:
+        return root / pending
     status = root / "docs" / "STATUS.md"
     if not status.is_file():
         return None
