@@ -74,10 +74,13 @@
 1次との相違点: 1次（敵対バグ角度）は書込み**成功後**の出力経路と EPIPE レースに深く、**失敗経路**の errexit 免除は未検出。盲検2次が独立に掘った（盲検の分担価値が実証された形）。逆に 1次の F-1（EPIPE レース）は2次は「再導入なし」を確認したのみ＝相互補完。
 
 ```claims
+tests_pass: true
+no_stubs: true
+verdict: approve_with_notes
 second_opinion:
   verdict: approve_with_notes
   divergence_points: ["4-A: sed&&mv の errexit 免除による書込み失敗 fail-open（1次未検出・Major・初回 verdict=reject の根拠・fix-forward c42af84 後に同一エージェント再検証で根治実測＝rc1/STATUS不変/偽出力ゼロ・回帰テストの RED 検証まで確認）", "3-1: trap 構造ピンのコメント欺瞞（行アンカー化で修正・mutation 再実行で検知確認）", "4-B: --ref symlink 越境（Minor conf6・両者合意で iter69+ 繰延）"]
-resolution: "初回 reject（4-A 根拠）→ fix-forward c42af84 → 同一エージェント再検証 approve_with_notes に収束（183 passed・contract PASS 実測）。"
+  evidence: "盲検2次=fresh fable・qa-reports 読取禁止・正常系/検証系/特殊gate/SIGPIPE 400+200回/guidance を独立実測。初回 reject（4-A 実証）→ fix c42af84 → 同一エージェント再検証で approve_with_notes 収束（183 passed・contract PASS・回帰テスト RED 検証込み）。1次=4角度（仕様準拠/敵対/テスト強度/保守性）全て approve_with_notes・親 verify で F-1 を 58/3000 独立再現→修正 0/3000。"
 ```
 
 ## 追補: ドッグフード発見ギャップ（judge × 原子承認）
