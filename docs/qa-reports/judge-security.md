@@ -9,16 +9,13 @@
 - 依存監査: unverified
 
 ## ティア2: 🔍 第2意見（self-attested・自己申告・低信頼）
-- あり: approve_with_notes
+- あり: approve
 
 ## 🟡 要確認
 - 依存監査が未検証
-
-## 💬 情報（非ブロッキング）
-- approve_with_notes — notes の解消状況を確認
 
 ## あなたが取るアクション
 （LLM が平易日本語で記述）
 
 ## ACK
-- 盲検2次 approve_with_notes（notes=SF-012 pre-existing Low hardening・divergence 0）。1次 approve と収束・新規脆弱性0。 （2026-07-12 18:56）
+- 新規依存ゼロ（pure bash＋python 標準ライブラリのみ・1次/盲検2次とも deps_clean 実測・変更ファイルに依存マニフェスト不含）。依存監査 unverified は N/A。 （2026-07-13 18:27）

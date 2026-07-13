@@ -1,9 +1,9 @@
 ---
 framework: aegis
-framework_version: "1.26.2"
+framework_version: "1.27.0"
 project_name: "Aegis"
 mode: Dev
-phase: security
+phase: ship
 task_type: framework
 task_size: M
 task_size_rationale: "iteration 68（framework・update-gate approve --ref 原子化＝Phase 1 項目 1-3）M 確定（brainstorm Step D・update-task.sh 経由）。設計正本: docs/specs/2026-07-12-iter68-update-gate-ref-atomic-design.md（(1) approve --ref: gate 値と current_refs を単一 sed パス〔TMP+mv〕で原子書込み＝pending+ref／approved+空の赤窓を消滅・(2) approve 経路を検証→書込み→ACK→snapshot→best-effort 出力に並べ替え＋trap '' PIPE＝SIGPIPE fail-safe 不変条件・(3) evidence_integrity_violations の pending/n/a+ref を FAIL→WARNING 降格〔approved+空・ref 不在・client artifact は FAIL 維持〕・na も ref null 化）。footprint: scripts/update-gate.sh＋scripts/check_status.py＋tests（test_check_status.py 既存ピン更新＋update-gate 新規テスト）＝M（2-5）。control-plane（gate writer＋contract 判定）を触るため review+qa+security 必須・M のため deploy skip。SF-011/SF-012 は相乗りせず backlog 維持（テーマ純度）。"
@@ -16,7 +16,7 @@ gate_approvals:
   plan: approved
   review: approved
   qa: approved
-  security: pending
+  security: approved
   deploy: pending
   dev_ready_for_client: pending
 current_refs:
@@ -25,7 +25,7 @@ current_refs:
   spec: "docs/specs/2026-07-12-iter68-update-gate-ref-atomic-design.md"
   review: "docs/qa-reports/iter68-review.md"
   qa: "docs/qa-reports/iter68-qa.md"
-  security: null
+  security: "docs/qa-reports/iter68-security.md"
   deploy: null
   translation: null
 external_evidence:

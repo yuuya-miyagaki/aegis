@@ -1,4 +1,4 @@
-# 納品サマリー — iteration 67（v1.26.2）
+# 納品サマリー — iteration 68（v1.27.0）
 
 <!-- 正本: ship-and-docs skill -->
 <!-- exit-check: TO-CLIENT 完成・証拠参照済み・既知ギャップ記載済み → docs へ -->
@@ -7,52 +7,56 @@
 
 ## 納品サマリー
 
-- リリース / ビルド: aegis v1.26.2（iter67・**PATCH**＝judge の gate 判定 fix・公開契約不変・後方互換）
-- 日付: 2026-07-12
-- 担当者: aegis dev フロー（工程別モデル tiering: 疑う=Fable 5／書く=Opus 4.8。実装=implementer opus・review/qa/security 一次=opus・親verify/盲検2次/判定=fable）
-- 操作マニュアル: 不要（保守者操作に新規ステップなし。むしろ従来必要だった手順規律が1つ不要化＝下記「運用上の注意」）
+- リリース / ビルド: aegis v1.27.0（iter68・**MINOR**＝`approve --ref` 後方互換 CLI 追加＋pending/n/a+ref を FAIL→advisory 緩和。公開契約は後方互換〔既存 `approve` 不変・緩和方向〕）
+- 日付: 2026-07-13
+- 担当者: aegis dev フロー（工程別モデル tiering: 疑う=Fable 5／書く=Opus 4.8。実装=implementer opus・review/qa 一次=opus・security 1次=親 in-session fable・親verify/盲検2次=fable）
+- 操作マニュアル: 不要（むしろ従来必要だった「record→ref→承認を中断なく連続」規律が1コマンドに畳まれ**不要化**＝下記「運用上の注意」）
 - 運用 RUNBOOK: 不要（新規運用手順なし）
 - UAT 結果: 不要（ACCEPTANCE 未定義の framework イテレーション）
 
-## 実装範囲（judge test-fact 判定堅牢化＝trust-scan）
+## 実装範囲（update-gate `approve --ref` 原子化＝全体レビュー §4 Phase 1 項目 1-3）
 
-**背景**: gate 承認時に走る judge の tier-1 test-fact（`scripts/build-judge-card.py::read_test_result`）は evidence-log を新しい順に走査し、**最初の** test-runner マッチエントリで green/red/unverified を確定していた。そのエントリが「observed かつ marker 未検証（＝観測者が本物のテストサマリを確認できなかった）」で status=ok だと、直下に fp 一致の trusted green があっても `unverified`（🟡）を返した。結果、record green の後に件数確認の生 `pytest --collect-only` や `pytest | tail` を1回走らせるだけで gate が 🟡 降格し、ack 儀式または再 record が必要になった（iter64/65/66 で3回顕在化＝LEARNINGS conf9 line137）。
+**背景**: ゲート承認値（`gate_approvals.<gate>`）と evidence ref（`current_refs.<gate>`）は別ステップでしか書けず、どちらの順でも `check_framework_contract` が赤くなる窓が開いた（ref 先置き→pending+ref=stale FAIL／approve 先→approved+空=FAIL）。加えて approve 時に judge カード全文を**状態書込みより前に** stdout へ流すため、`| head` 等の pipe 早期クローズで SIGPIPE 死＝gate 未承認のまま出力だけ欠ける罠があった（全体レビュー R6 罠 a,b,c・LEARNINGS ref-window 軸＝iter35/43/64/65 で被弾）。
 
-- **trust-scan（本丸）**: 走査中、undecidable（observed かつ `marker_verified≠true`）かつ status=ok のエントリを「green も red も証明できない＝情報ゼロ」として**透明**（skip して走査継続）にし、最新の decidable エントリ（`src="manual"`、または observed で `marker_verified=true`）が判定を下す。`build-judge-card.py::read_test_result` の走査ループに1分岐を挿入（fp 検査の直前）＋docstring を trust-scan 意味論に同期。
-- **不変（C-2/K-1/fp backstop 無緩和）**: undecidable-fail（status=fail）は従来どおり終端 `unverified`（runner 形の失敗信号を保持）・decidable の fp 不一致は終端 `unverified`（stale green を蘇生しない）・decidable エントリゼロは `unverified`（silent-green の下限）。
-- **副産物＝厳格化**: decidable red を後続の no-run コマンドで red→🟡 に「洗浄」する経路が閉じた（透明化で red が保持される）。
+- **(1) `approve --ref <path>` 原子書込み**: ゲート値と ref を**単一 sed パス（TMP+mv）**で同時確定＝赤窓が構造的に消滅。`--ref` は repo 相対・`..` 拒否・文字 allowlist `[A-Za-z0-9._/-]`・空文字拒否・実在ファイル必須で検証（不正入力は状態変更前に exit 1）。既存の `approve`（ref なし）は不変。
+- **(2) SIGPIPE fail-safe**: `trap` PIPE 無視＋approve 経路を「検証→**状態書込み**→ACK 追記→snapshot→best-effort 出力」に並べ替え。承認を主張する出力は必ず状態永続化の後。書込みは明示 `if ! sed` / `if ! mv` で fail-closed（`&&` リストの set -e 免除による偽成功を封鎖）。
+- **(3) pending/n/a+ref を advisory 降格**: `evidence_integrity_violations` の「pending/n/a gate に ref 残置」を FAIL→**stderr WARNING**（stdout は violation 専用チャネル＝TaskCompleted hook の契約を維持）。approved+空 ref・ref 実在検査・client artifact 検査は**FAIL 維持**（無緩和）。na も reset 同様に ref を null 化。
+- **(4) judge 統合**: judge（`build-judge-card`）が `AEGIS_PENDING_REF`（update-gate が実在検証済みで同一書込みに確定する path）を claims 源として尊重＝原子 approve の judge gate が常時 🟡+ack に落ちるのを回避。tier-1 facts（fp/tests/secrets/stubs）は不接触。
 
 ## 変更ファイル
 
-- `scripts/build-judge-card.py`（`read_test_result` に undecidable-ok 透明化1分岐＋docstring 同期）
-- `tests/test_test_runner_realness.py`（`TestReadTestResultTrustScan` 系列テスト11件〔計画10＋fix-forward の3段系列〕新規）
-- `tests/test_judge_card.py`（既存ピン `test_newest_stale_does_not_fall_back_to_older_fresh` の理由コメントに decidable 限定子を追記・アサーション不変）
-- `docs/architecture-overview.md`（judge 記述を trust-scan 意味論に同期・1文）
-- version bump: `check_framework_contract.py`／`docs/STATUS.md`／`templates/STATUS.template.md`（1.26.1→1.26.2）
+- `scripts/update-gate.sh`（flag parser・--ref 検証・単一 sed 三態・trap・書込み先行・fail-closed・print_report）
+- `scripts/check_status.py`（pending/n/a+ref を stderr advisory 降格・`AEGIS_PENDING_REF` で空 ref ADVISORY 抑止）
+- `scripts/build-judge-card.py`（`AEGIS_PENDING_REF` を claims 源として尊重・1分岐）
+- `hooks/check-task-completed.sh`（stdout=violation / stderr=advisory のチャネル契約コメント）
+- `tests/`: `test_update_gate_ref_atomic.py`（新規20本）・`test_check_status.py`（advisory 降格へ書換＋追加）・`test_judge_card.py`（env override 2本）・`test_skill_guidance_tokens.py`（意味論更新）
+- guidance: `.claude/commands/gate.md`・`CLAUDE.md`（完了規則1文）・skill 6枚・onboarding 2枚（approve --ref 正順へ同期）
+- version bump: `check_framework_contract.py`／`docs/STATUS.md`／`templates/STATUS.template.md`（1.26.2→1.27.0）
 
 ## 証拠
 
-- 設計: `docs/specs/2026-07-12-iter67-judge-test-fact-robustness-design.md`（＋brainstorm-record）／計画: `docs/plans/2026-07-12-iter67-judge-test-fact-robustness-implementation-plan.md`
-- review: `docs/qa-reports/iter67-review.md`（1次4角度〔仕様/敵対/テスト強度/保守性〕finder=opus→親verify=fable・盲検2次=fable・approve 系収束・fix-forward 2件 70ace79/0739a79）
-- qa: `docs/qa-reports/iter67-qa.md`（機能対照表 8件PASS・fresh変異 M1-M5 全kill＋grill 変異2種・**実環境 E2E 差分＝同一 evidence-log で OLD(d2c4dd6)=unverified／NEW=green**・scoped 99 passed）
-- security: `docs/qa-reports/iter67-security.md`（1次 opus＋盲検2次 fable 収束 approve・新規脆弱性0・gate-bypass 4攻撃面 differential 実走・SF-012 起票）
+- 設計: `docs/specs/2026-07-12-iter68-update-gate-ref-atomic-design.md`（＋brainstorm-record）／計画: `docs/plans/2026-07-12-iter68-update-gate-ref-atomic-implementation-plan.md`（grill-plan 反映記録付き）
+- レビュー: `docs/qa-reports/iter68-review.md`（1次4角度＋盲検2次・PASS。Major 4件〔F-1 EPIPE レース／T-1 変異穴／T-2 fixture 代表性／盲検2次 4-A fail-open〕全て fix-forward 済み・実測検証付き）
+- QA: `docs/qa-reports/iter68-qa.md`（fresh 変異 M1-M6 全 KILLED〔独立 clone〕・full suite 1173 passed/2 skipped・実環境 E2E＝本 iter 機能で review gate を原子承認）
+- セキュリティ: `docs/qa-reports/iter68-security.md`（1次 in-session＋盲検2次 物理隔離 clone とも approve・新規脆弱性0・env/--ref は tier-1 不接触・injection 全拒否・fail-open 4-A 修正確認）
 
-## テスト・QA・セキュリティ要約
+## テスト・QA・セキュリティ結果の要約
 
-- **テスト**: 対象2ファイル 99 passed・full suite green（record-test-result・v1.26.2 tree で実証）・contract PASS。B1 drill は per-task コミット済みで sanctioned skip（iter64 conf7）＋fresh 変異 M1-M5 全 kill（独立 scratch clone・scoped 99 テスト）。
-- **review**: Minor を fix-forward 2件（3段系列ピン追加・docstring の Decidable 定義を実挙動に正確化＋LEARNINGS 導線＋guidance に undecidable-fail 終端補記）。
-- **security**: 新規 injection/secrets/data-exposure/gate-bypass なし（differential harness で baseline vs HEAD 実走）。red 可視性はむしろ厳格化。検出2件はいずれも pre-existing（差分実走で OLD=NEW 確定）＝SF-012 起票。
+- full suite: **1173 passed / 2 skipped**（record green・以降 docs のみ＝fp 不変）／`check_framework_contract` PASS
+- 変異検証: qa の fresh 変異 M1-M6 全 KILLED＋review テスト強度の (a)-(i) 9種＝原子性・順序・fail-closed・advisory 降格・judge env を多層でピン
+- 敵対検証: F-1（trap PIPE 無視下の grep 早期終了 × frontmatter_section printf の EPIPE レース）を親が単離再現 **58/3000**→修正後 **0/3000**（早期終了消費者を全量読み/変数キャプチャ+case に置換）
 
 ## 残留リスク・既知の制限事項
 
-- **SF-012（Low・OPEN・pre-existing・新規起票）**: evidence 信頼判定の hardening 2件 — (a) washed-green（`pytest; true` の exit 洗浄＋pass-marker regex が `1 failed, 2 passed` にもマッチ→decidable green）、(b) unknown-src decidable-by-default（src 欠如/異値が decidable 扱い）。いずれも 1次/2次が differential 実走で **baseline d2c4dd6 と同挙動＝本 iter の回帰でない**を確定。実 writer は observed/manual のみ発行・任意 log 書込みは脅威モデル外・(a) の発火には明示的 exit 洗浄（自己欺瞞）が必要＝contained。iter68 hardening 候補（writer 側の marker/status 整合軸＋reader 側 src allowlist）。詳細 `docs/security-followups.md` SF-012。
-- **SF-011（Low・OPEN・pre-existing）**: frontmatter 終端デリミタ差（iter66 起票・未着手）。
-- **flaky（回帰外）**: `test_update_gate_lock`（lock 待ちタイミング・full-review R10 test#8 既知）。本 iter の全 run で顕在化せず・本 diff は update-gate/lock 不接触。
-- deps: N/A（外部依存パッケージなし・pip/npm マニフェスト不在＝judge の deps は unverified🟡 で ack）。
-- 公開契約: **不変**（`read_test_result` の戻り値集合〔green/red/unverified〕・呼出側〔collect_facts〕・observer 契約〔evidence.sh〕・token 契約・skill boot-path 全て変更なし）。SemVer PATCH 妥当。
+- **SF-013**（OPEN・Low・pre-existing・contained・iter69+ hardening）: (a) update-gate の sed 範囲終端 `/^[a-z]/` が `---` で閉じない（canonical STATUS では到達不能）／(b) `--ref` の `-f` が symlink を辿る（ref は非実行の証跡・tamper writer 前提で capability 増分なし）。いずれも baseline 8ab52ed=HEAD の差分実走で pre-existing 実証済み。
+- 繰延（iter69/70 スイープ）: client_ready_for_dev の `--ref` 実行経路テスト（重量 fixture）・SF-011/SF-012（既存 backlog）。
+- 既知 flaky: `test_update_gate_lock`（lock 待ちタイミング・本 diff 不接触＝回帰外・本 run 全 green）。
 
-## 運用上の注意（挙動変化）
+## 運用上の注意点
 
-- **gate 承認時の judge が「件数確認の生 pytest ノイズ」で 🟡 降格しなくなった**。record green（`record-test-result.py`）の後に `pytest --collect-only` 等を走らせても、直近の trusted green が判定を保つ。従来必要だった「件数確認は record の前に・締めは必ず record-test-result」という手順規律（LEARNINGS conf9 line137 の test-fact 軸）は、この fix で機構的に不要化された。ただし **record→ref→承認の間に生 pytest を挟まない運用自体は ref-window の contract 不変条件（別軸・未解決）のため引き続き推奨**。
-- **decidable red は no-run コマンドで隠せなくなった**（厳格化）。テストが実際に赤い状態で承認しようとすると、その後に collect-only 等を走らせても judge は red を保持する。
-- **未 push**: 実装コミット済み・**push 手前で停止**（push は `gh auth switch --user yuuya-miyagaki`）。
+- **ゲート承認の推奨形が変わった**: `bash scripts/update-gate.sh <gate> approve --ref <evidence-path>` で承認と evidence ref 設定を1コマンドに。従来の「record green→ref を raw-Edit→中断なく approve」の暗記規律は不要（原子化で赤窓が消えたため）。既存の `approve`（ref なし）も引き続き動作。
+- pending/n/a gate に ref が残っていても contract は赤くならず advisory WARNING（stderr）になった。ただし approved gate の ref 欠落・ref 先ファイル不在は従来どおり完了時に FAIL。
+
+## 手続き上の注記（プロセス透明性）
+
+security 1次に最初ディスパッチしたサブエージェントが read-only 拘束に違反し本体 tree を汚した（オートフォーマッタ由来の空白整形・意味変更なし＋ドリル成果物上書き）。両ファイルは committed 状態へ復元し、当該 run は破棄、1次は親が独立 clone 上で全項目再実測した（詳細は iter68-security.md 手続き注記）。教訓は検証委譲の物理隔離 clone 標準化として LEARNINGS へ記録。
