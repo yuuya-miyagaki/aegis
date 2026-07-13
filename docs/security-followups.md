@@ -362,6 +362,15 @@ SF-001 系の網羅的閉鎖（rounds 5-11）で**実用的なシェル難読化
   - (b) reader 側（read_test_result）: src allowlist（`src in ("manual","observed")` 以外は undecidable-fail 扱い＝終端 🟡）。docstring は iter67 で実挙動を明記済み（0739a79）。
 - **状態**: **OPEN**。iter67 security gate は approve（新規リスクなし・両件 pre-existing 実証済み）。
 
+### SF-013: update-gate sed 範囲終端の無限界（`/^[a-z]/` が `---` で閉じない）＋--ref symlink 越境（**OPEN**・iter68 review 敵対1次/盲検2次 検出・いずれも pre-existing/Minor）
+
+- **発見**: (a) iter68 review 敵対1次（opus・F-2 Low conf8）。scratch で「current_refs が frontmatter 末尾 key ＋ body に `  <key>:` 形の行」の合成 STATUS に対し body 行の書換えを再現。**baseline 8ab52ed の reset null 化 sed に同一範囲パターンが既存＝pre-existing**（iter68 の --ref 書込みはそれを踏襲したのみ）。(b) 同 review 盲検2次（fable・4-B Minor conf6）: `--ref` の `-f` 判定は symlink を辿るため、repo 内に置いた「repo 外実ファイルへの symlink」が存在チェックを通過し得る（path 検証自体は絶対/../allowlist で拒否済み・書かれる値は repo 相対リンク名）。
+- **種別**: (a) sed 範囲アドレスの防御的堅牢化（canonical STATUS では到達不能）・(b) evidence ref の指し先検証の厳密化。いずれも moat 回帰ではない。
+- **重大度**: **Low**（(a) canonical STATUS は current_refs の後に必ず top-level key〔external_evidence/next_action〕が続き範囲が正しく閉じる＝到達には手書きの異常 frontmatter 構造が必要。(b) single-user・ref は非実行の証跡ポインタ・tamper-evident writer 前提で capability 増分なし）。
+- **contained**: (a) iter68 qa の fixture 本番同型化（next_action 追加）で正常経路の範囲終端はテスト済み。pre-write sanity が key 行実在を検証するため「素通りで gate だけ approved」の複合は封鎖済み（1956ac1）。(b) approved+ref のファイル不在は完了検査 FAIL 維持。
+- **修正方向（iter69+ hardening）**: (a) sed 範囲終端を `/^[a-z-]/`＋`/^---$/` の複合（または awk 化）で frontmatter 境界に閉じる＋異常構造 fixture のテスト。(b) `--ref` 検証に realpath の repo 包含チェックを追加（YAGNI 評価と併せて判断）。
+- **状態**: **OPEN**。iter68 security gate で residual として評価（1次/盲検2次とも非ブロッキング判定・pre-existing 実証済み）。
+
 ## CLOSED
 
 - **SF-010**（Medium・iter65 review 検出→iter66 v1.26.1 で封鎖）: task_size empty-baseline raw-Edit × migration-grace の tamper 逃れ。Fix ①（`feff60c` migration-grace を真の旧フォーマット限定に絞り込み・task fields＋gate loop）＋(i)(ii) Fix ⑤（`6229fd5` python first-match/先勝ち）＋(iii) Fix ④（`c5f5fd2` gate_value 本文 fallback を ---無し限定）。hook 直接発火 4 ケース＋fresh 変異 M1-M5＋1次/盲検2次 approve で裏取り。詳細は上記 SF-010 節。
