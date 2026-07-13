@@ -64,7 +64,7 @@
 
 - 想定失敗と対応:
   - --ref パス不在／絶対パス／ref key 無し gate／approve 以外への --ref → usage エラー exit 1・**状態不変**（lock 取得前に検証できるものは前で）。
-  - sed/mv 失敗 → set -e で abort・TMP 残置なし（既存 `${STATUS_FILE}.tmp.$$` 方式踏襲）・gate/ref とも旧値のまま（部分書込みなし）。
+  - sed/mv 失敗 → **明示 if 判定で fail-closed**（当初案の「set -e で abort」は誤り＝`A && B` 形は bash の AND-OR リスト errexit 免除で abort せず偽の成功出力に化けることを盲検2次が実証〔4-A〕・review で修正）・TMP は失敗時に削除・gate/ref とも旧値のまま（部分書込みなし）・偽の承認主張出力を出さない。
   - 書込み後の出力失敗（EPIPE 等）→ `|| true` で握り exit 0（状態は既に整合）。ACK 追記は stdout でなくファイル追記なので EPIPE 非該当・書込み直後（report より前）に置き「承認されたのに ACK 未記録」を防ぐ。
 - エラー伝播の方針: 状態変更前の失敗は非ゼロ exit で伝播（fail-closed）。状態変更後は出力系のみ best-effort（fail-open だが状態に不影響）。
 

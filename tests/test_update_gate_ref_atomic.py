@@ -10,6 +10,7 @@ contract（pending+ref / approved+空）が赤くなる窓が開く。
 from __future__ import annotations
 
 import os
+import re
 import shutil
 import subprocess
 import tempfile
@@ -204,6 +205,28 @@ class TestUpdateGateRefAtomic(unittest.TestCase):
             self._assert_rejected_no_write(
                 root, "plan", "approve", "--ref", "docs/plans/plan.md")
 
+    # --- 書込み失敗の fail-closed（盲検2次 4-A） ---
+
+    def test_write_failure_fails_closed_no_false_success(self):
+        """`sed > TMP && mv` は bash set -e の AND-OR リスト免除により書込み失敗
+        でも abort せず、偽の「approved」出力＋exit 0 に化ける（盲検2次が実証）。
+        書込み失敗＝非ゼロ exit・STATUS 不変・承認主張出力ゼロを契約として固定。"""
+        with tempfile.TemporaryDirectory() as d:
+            root = self._scaffold(Path(d))
+            docs = root / "docs"
+            os.chmod(docs, 0o555)  # TMP(docs/STATUS.md.tmp.*) の作成を失敗させる
+            try:
+                r = self._run(root, "plan", "approve",
+                              "--ref", "docs/plans/plan.md")
+            finally:
+                os.chmod(docs, 0o755)
+            self.assertNotEqual(r.returncode, 0,
+                                f"書込み失敗は fail-closed: {r.stdout}\n{r.stderr}")
+            self.assertIn("  plan: pending", self._status(root),
+                          "STATUS は旧値のまま")
+            self.assertNotIn("[gate-approve]", r.stdout,
+                             "偽の承認主張出力を出さない")
+
     # --- SIGPIPE 耐性（罠 a） ---
 
     def test_closed_stdout_pipe_still_approves(self):
@@ -270,7 +293,11 @@ class TestUpdateGateRefAtomic(unittest.TestCase):
         """状態書込み（mv）が承認主張出力（[${ACTION_TAG}] 行・JUDGE CARD push）
         より前にあること。SIGPIPE trap の存在もピンする。"""
         text = (ROOT / "scripts" / "update-gate.sh").read_text(encoding="utf-8")
-        self.assertIn("trap '' PIPE", text)
+        # 盲検2次 3-1: assertIn だとコメント中の言及で欺瞞できる（実コマンド行を
+        # 削除しても pass）— 行アンカーで「行がコマンドそのもの」であることを要求。
+        self.assertTrue(
+            re.search(r"(?m)^\s*trap '' PIPE\s*$", text),
+            "trap '' PIPE の実コマンド行が消えている（コメント言及では不可）")
         write_idx = text.index('mv "$TMP" "$STATUS_FILE"')
         self.assertLess(write_idx, text.index("JUDGE CARD"),
                         "judge card push must come after the state write")

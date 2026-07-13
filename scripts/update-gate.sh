@@ -372,7 +372,18 @@ elif [ "$ACTION" = "approve" ] && [ -n "$REF_PATH" ]; then
   # REF_PATH は allowlist 検証済み（\ & | " を含み得ない）→ 置換部そのまま安全
   SED_ARGS+=(-e "/^current_refs:/,/^[a-z]/ s|\(  ${REF_KEY_SED}:\).*|\1 \"${REF_PATH}\"|")
 fi
-sed "${SED_ARGS[@]}" "$STATUS_FILE" > "$TMP" && mv "$TMP" "$STATUS_FILE"
+# 盲検2次 4-A: `A && B` 形は set -e の AND-OR リスト免除で書込み失敗でも
+# 続行し、偽の成功出力＋exit 0 に化ける（実証済み）。明示 if で fail-closed 化。
+if ! sed "${SED_ARGS[@]}" "$STATUS_FILE" > "$TMP"; then
+  rm -f "$TMP" 2>/dev/null || true
+  echo "ERROR: failed to write ${TMP} (STATUS.md unchanged)"
+  exit 1
+fi
+if ! mv "$TMP" "$STATUS_FILE"; then
+  rm -f "$TMP" 2>/dev/null || true
+  echo "ERROR: failed to replace STATUS.md (STATUS.md unchanged)"
+  exit 1
+fi
 
 # --- Post-write file mutations (stdout 非依存・書込み成立後のみ記録) ---
 if [ "$ACK_RECORD" = "true" ]; then
