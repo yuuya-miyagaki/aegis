@@ -44,6 +44,50 @@ def _drill_excluded(rel: str) -> bool:
 EMPTY_TREE = "4b825dc642cb6eb9a060e54bf8d69288fbee4904"
 BASELINE_OUTPUT_TAIL = 20  # lines of failing baseline output to surface
 
+# R4 (full-review 2026-07-06): evidence.sh は no-run コマンド（--collect-only /
+# --dry-run 等）を AEGIS_TEST_NO_RUN_FLAG_REGEX で拒否するが、drill 側が未消費
+# だった — collect-only ＋構文破壊 mutant で「1件もテストを実行しない DRILL
+# PASS」が成立していた。同じ regex を同じエンジン（bash grep -E）で消費する:
+# regex は [[:space:]] POSIX クラスを含み、python re に直接食わせると文字集合
+# として誤解釈され silent mis-match になる。
+# patterns.sh は --root でなく本スクリプト位置相対で解決する: --root は
+# patterns.sh を持たない scratch clone / temp repo を指しうる（root 相対だと
+# 全 drill block か fail-open の二択になる）。framework install では scripts/
+# と hooks/ が兄弟（update-task.sh の ROOT 解決と同型）。
+FRAMEWORK_ROOT = Path(__file__).resolve().parent.parent
+PATTERNS_LIB = FRAMEWORK_ROOT / "hooks" / "lib" / "patterns.sh"
+
+
+def check_no_run_command(cmd: str, patterns_lib: Path | None = None) -> None:
+    """Reject a test_command matching AEGIS_TEST_NO_RUN_FLAG_REGEX (single
+    source: patterns.sh). Any condition that prevents the check — missing
+    patterns.sh, unset regex, grep/subprocess failure — is fail-closed."""
+    lib = Path(patterns_lib) if patterns_lib is not None else PATTERNS_LIB
+    if not lib.is_file():
+        raise DrillError(
+            f"patterns.sh not found: {lib} — NO_RUN 検査を実行できないため "
+            f"fail-closed（framework install が壊れています）")
+    # grep -e: dash 始まり regex がオプションと誤解釈される余地を機構的に排除
+    # （マッチ意味論は evidence.sh:128 の grep -qE と同一）
+    script = ('source "$1" >/dev/null 2>&1 || exit 3; '
+              '[ -n "${AEGIS_TEST_NO_RUN_FLAG_REGEX:-}" ] || exit 3; '
+              'printf %s "$2" | grep -qE -e "$AEGIS_TEST_NO_RUN_FLAG_REGEX"')
+    try:
+        proc = subprocess.run(
+            ["bash", "-c", script, "_", str(lib), cmd],
+            capture_output=True, timeout=10)
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        raise DrillError(f"NO_RUN 検査の実行に失敗（fail-closed）: {exc}")
+    if proc.returncode == 0:
+        raise DrillError(
+            "test_command が no-run フラグ（--collect-only / --dry-run / "
+            "--version 等）を含みます — テストを1件も実行しないコマンドは"
+            "テスト強度を証明しません")
+    if proc.returncode != 1:
+        raise DrillError(
+            f"NO_RUN regex を patterns.sh から読み込めません "
+            f"(rc={proc.returncode}) — fail-closed")
+
 
 class DrillError(Exception):
     """Any condition that makes the drill inconclusive => fail-closed."""
@@ -422,6 +466,7 @@ def run_drill(root: Path, spec_path: Path, report_path: Path) -> int:
         spec = parse_spec(spec_path)
         cmd = spec["test_command"]
         timeout = int(spec["timeout_seconds"])
+        check_no_run_command(cmd)
         # transparency: surface what will actually be executed at approval time
         print(f"test command (executed at approval): {cmd}")
 
