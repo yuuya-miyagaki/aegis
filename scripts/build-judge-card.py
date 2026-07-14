@@ -167,6 +167,34 @@ def _tr_strip_patterns(root: Path) -> list:
     return pats
 
 
+def _norm_cmd_match(cmd: str, pats: list, strips: list) -> bool:
+    """Normalize a cmd (newlines→';', quoted spans masked to the inert token
+    Q via `strips`) then test it against the runner patterns `pats`. This is
+    the single-source normalize+match used by BOTH read_test_result's scan and
+    record-test-result.py's pre-validation — so the checker (record) and the
+    consumer (judge) can never drift in how they normalize a command."""
+    cmd = (cmd or "").replace("\n", ";")
+    for sp in strips:
+        cmd = sp.sub("Q", cmd)
+    return any(p.search(cmd) for p in pats)
+
+
+def runner_cmd_matches(root: Path, cmd: str) -> bool | None:
+    """Is `cmd` a recognized test-runner command, per the SAME normalization
+    and patterns the judge uses to scan the evidence log? Returns None when the
+    check cannot run (patterns.sh unreadable → no runner patterns, or the strip
+    patterns are not exactly two) — a fail-closed 'cannot verify' distinct from
+    a definite False. record-test-result.py consumes this so a command the
+    judge could never recognize is never recorded (checker == consumer)."""
+    pats = _test_runner_patterns(root)
+    if not pats:
+        return None
+    strips = _tr_strip_patterns(root)
+    if len(strips) != 2:
+        return None
+    return _norm_cmd_match(cmd, pats, strips)
+
+
 def _evidence_entries(root: Path) -> list:
     """Parse evidence-log (rotated .1 first, then current = oldest->newest).
     Broken lines are skipped — the judge must degrade to 'unverified', never
@@ -245,11 +273,10 @@ def read_test_result(root: Path) -> str:
             continue
         # Newlines normalized to ';' and quoted spans masked to the inert token
         # Q before matching — the same pipeline as the grep consumer
-        # (T1 v1.5.1 + v1.5.2, tests/test_patterns_parity.py).
-        cmd = (d.get("cmd") or "").replace("\n", ";")
-        for sp in strips:
-            cmd = sp.sub("Q", cmd)
-        if not any(p.search(cmd) for p in pats):
+        # (T1 v1.5.1 + v1.5.2, tests/test_patterns_parity.py). Single-sourced
+        # via _norm_cmd_match so record-test-result.py's pre-validation cannot
+        # drift from this scan's normalization.
+        if not _norm_cmd_match(d.get("cmd"), pats, strips):
             continue
         # trust-scan (iter67): an observed entry whose marker was NOT
         # verified can certify neither green nor red (C-2) — with status
