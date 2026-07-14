@@ -338,7 +338,14 @@ def scan_secrets(root: Path) -> list[str]:
 UNAUDITABLE_MANIFESTS = (
     "pyproject.toml", "setup.py", "setup.cfg", "Pipfile", "Pipfile.lock",
     "poetry.lock", "uv.lock", "go.mod", "Cargo.toml", "Gemfile",
-    "Gemfile.lock", "composer.json")
+    "Gemfile.lock", "composer.json",
+    # grill-code F-2: JVM / BEAM / Flutter / Swift ecosystems declare real
+    # dependencies too — presenting them as 'no-manifest' (zero-dependency)
+    # would be a false fact on the security card. Best-effort list: an unknown
+    # ecosystem still degrades only to the advisory info tier, and the card
+    # shows the raw state either way (fail-visible).
+    "pom.xml", "build.gradle", "build.gradle.kts", "mix.exs",
+    "pubspec.yaml", "Package.swift")
 
 
 def audit_deps(root: Path) -> str:
@@ -483,10 +490,10 @@ def compute_verdict(gate: str, claims: dict | None, facts: dict,
         # positives, so a vuln advises (🟡) but never hard-blocks (🔴) — even if
         # a claim says deps_clean. Blocking on a flaky signal would let a network
         # hiccup veto a release.
-        # no-manifest is an info demotion that removes the meaningless per-
-        # iteration ack (treadmill) for zero-dependency repos — full-review F6.
         yellow.append("依存監査で脆弱性の可能性（要確認・ack で承認可）")
     elif facts["deps"] == "no-manifest":
+        # no-manifest is an info demotion that removes the meaningless per-
+        # iteration ack (treadmill) for zero-dependency repos — full-review F6.
         info.append("依存 manifest なし（依存ゼロ repo）— 監査対象なし")
     # At the qa GATE the B1 drill runs first and already blocks on FAIL, so this
     # is usually redundant there; it still matters for the read-only /judge
@@ -563,8 +570,14 @@ def _sanitize_card_field(s, limit: int = 120) -> str:
     stray code spans), and a leading markdown '#' run to fullwidth '＃' so the
     field can never reproduce the genuine '## 総合' header substring (design
     line 77: '## 見出し注入不能'); over-limit is truncated to limit-1 + '…'."""
-    out = (str(s).replace("\r", ";").replace("\n", ";")
-           .replace("`", "'").replace("#", "＃"))
+    out = str(s).replace("\r", ";").replace("\n", ";")
+    # grill-code F-1: CR/LF alone is a denylist — Unicode line separators
+    # (U+2028/U+2029/NEL/\v/\f) survive it and str.splitlines()/some renderers
+    # break on them, so a hostile cmd could spoof a second card line. Collapse
+    # ALL remaining whitespace positively via str.split() (which splits on
+    # every Unicode whitespace) instead of enumerating break characters.
+    out = " ".join(out.split())
+    out = out.replace("`", "'").replace("#", "＃")
     if len(out) > limit:
         out = out[:limit - 1] + "…"
     return out

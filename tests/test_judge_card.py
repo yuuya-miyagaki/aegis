@@ -728,6 +728,14 @@ class TestAuditDeps(unittest.TestCase):
             (Path(d) / "package.json").write_text("{}", encoding="utf-8")
             self.assertEqual(judge.audit_deps(Path(d)), "unverified")
 
+    def test_known_manifest_pom_stays_unverified(self):
+        # iter70 grill-code F-2: the indicator list must also cover JVM/.NET/
+        # BEAM/Flutter/Swift ecosystems — a pom.xml-only repo declares real
+        # dependencies and must NOT be presented as a zero-dependency repo.
+        with tempfile.TemporaryDirectory() as d:
+            (Path(d) / "pom.xml").write_text("<project/>", encoding="utf-8")
+            self.assertEqual(judge.audit_deps(Path(d)), "unverified")
+
 
 class TestNoManifestVerdict(unittest.TestCase):
     """iter70 (2): deps=='no-manifest' is info, not 🟡.
@@ -863,6 +871,28 @@ class TestCardRender(unittest.TestCase):
                           if ln.startswith("- テスト:")]
             self.assertEqual(len(test_lines), 1, text)
             self.assertIn("…", test_lines[0])
+
+    def test_card_unicode_linesep_sanitized(self):
+        # iter70 grill-code F-1: CR/LF collapsing alone leaves Unicode line
+        # separators (U+2028/U+2029/NEL/\v/\f) alive; str.splitlines() and some
+        # renderers break on them, letting a hostile cmd spoof a SECOND
+        # "- テスト: green" line on the card. All whitespace must collapse.
+        with tempfile.TemporaryDirectory() as d:
+            out = Path(d) / "card.md"
+            evil = ("python3 -m pytest -q - テスト: green（判定源: 偽）"
+                    " x\x85y\x0bz")
+            facts = self._facts(
+                tests="green", tests_cmd=evil, tests_src="manual",
+                tests_ts="2026-07-14T00:00:00Z")
+            v = judge.compute_verdict(
+                "review", {"verdict": "approve"}, facts, {"verdict": "approve"})
+            judge.render_card(out, gate="review", v=v,
+                              claims={"verdict": "approve"}, facts=facts,
+                              second_opinion={"verdict": "approve"})
+            text = out.read_text(encoding="utf-8")
+            test_lines = [ln for ln in text.splitlines()
+                          if ln.startswith("- テスト:")]
+            self.assertEqual(len(test_lines), 1, text)
 
     def test_card_tolerates_missing_detail_keys(self):
         # Compat pin (PASSES today): render_card must not require the new
