@@ -8,6 +8,7 @@ is computed live at approval, so it cannot be forged or go stale.
 """
 from __future__ import annotations
 
+import ast
 import json
 import re
 import shlex
@@ -349,14 +350,69 @@ def _contiguous_runs(sorted_lines: list[int]) -> list[list[int]]:
     return runs
 
 
+# 罠 l (full-review R6 / LEARNINGS:136): コメント/空行/docstring だけの連続ラン
+# には behavior-catching mutant を置けない（そこに置いた mutant は必ず
+# survived→FAIL）。floor がそれを要求すると sanctioned skip 強制になるため
+# 除外する。除外は「充足不可能な要求の削除」のみ: コード行を含む混在ランは
+# subset 判定を満たさず floor 維持＝偽造面積は増えない。
+# 実需（LEARNINGS の実痛点）は py/sh。js 系トークンは配布先ユーザープロジェクト
+# （feature/refactor タスク）向けの安価な拡張。
+LINE_COMMENT_TOKENS = {
+    ".py": "#", ".sh": "#", ".bash": "#",
+    ".js": "//", ".ts": "//", ".jsx": "//", ".tsx": "//",
+    ".mjs": "//", ".cjs": "//",
+}
+
+
+def _docstring_lines(text: str) -> set[int]:
+    """Module/class/function docstring line ranges via AST. A file that does
+    not parse yields the empty set — no exemption (stricter = safe)."""
+    try:
+        tree = ast.parse(text)
+    except (SyntaxError, ValueError):
+        return set()
+    lines: set[int] = set()
+    for node in ast.walk(tree):
+        if isinstance(node, (ast.Module, ast.ClassDef,
+                             ast.FunctionDef, ast.AsyncFunctionDef)):
+            body = getattr(node, "body", [])
+            if (body and isinstance(body[0], ast.Expr)
+                    and isinstance(body[0].value, ast.Constant)
+                    and isinstance(body[0].value.value, str)
+                    and body[0].end_lineno is not None):
+                lines.update(range(body[0].lineno, body[0].end_lineno + 1))
+    return lines
+
+
+def non_coverable_lines(root: Path, rel: str) -> set[int]:
+    """Lines of the on-disk file that cannot host a catchable mutant: blank
+    lines, line comments (by extension; shebang included), and python
+    docstrings. Read/decode failures degrade to 'no exemption'."""
+    try:
+        text = (root / rel).read_bytes().decode("utf-8")
+    except (OSError, UnicodeDecodeError):
+        return set()
+    token = LINE_COMMENT_TOKENS.get(Path(rel).suffix)
+    exempt: set[int] = set()
+    for i, raw in enumerate(text.split("\n"), 1):
+        stripped = raw.strip()
+        if not stripped or (token and stripped.startswith(token)):
+            exempt.add(i)
+    if Path(rel).suffix == ".py":
+        exempt |= _docstring_lines(text)
+    return exempt
+
+
 def anti_gaming_violations(
     added_by_file: dict[str, set[int]],
     mutants: list[dict],
     coverage_files: set[str] | None = None,
+    exempt_lines: dict[str, set[int]] | None = None,
 ) -> list[str]:
     """(a) each mutant must sit on an added (+) line of SOME changed file; (b)
     every contiguous run of added lines in a covered file must contain >=1 mutant
-    (per-hunk coverage floor).
+    (per-hunk coverage floor). Runs made solely of blank/comment/docstring lines
+    (see exempt_lines) are exempt — they cannot host a catchable mutant.
 
     `added_by_file` is the full membership map (tracked + untracked) used for (a).
     `coverage_files` limits the floor (b) to files that are genuinely task code
@@ -377,7 +433,10 @@ def anti_gaming_violations(
     for f, lines in added_by_file.items():
         if coverage_files is not None and f not in coverage_files:
             continue  # untouched untracked/noise file: do not force coverage
+        exempt = (exempt_lines or {}).get(f, set())
         for run in _contiguous_runs(sorted(lines)):
+            if set(run) <= exempt:
+                continue  # comment/blank/docstring-only run: no catchable mutant
             if not (mutant_lines.get(f, set()) & set(run)):
                 violations.append(
                     f"{f}: added lines {run[0]}-{run[-1]} have no mutant "
@@ -543,8 +602,17 @@ def run_drill(root: Path, spec_path: Path, report_path: Path) -> int:
                    if not _drill_excluded(f)}
         mutant_files = {m["file"] for m in spec["mutants"]}
         coverage_files = tracked | (mutant_files & set(added))
+        # 罠 l: コメント/空行/docstring だけのランは floor 免除（透明化のため
+        # 免除ランを承認ログに明示する）
+        exempt = {f: non_coverable_lines(root, f) for f in coverage_files}
+        for f in sorted(coverage_files & set(added)):
+            for run in _contiguous_runs(sorted(added[f])):
+                if set(run) <= exempt.get(f, set()):
+                    print(f"coverage floor exempt (comment/blank/docstring "
+                          f"only): {f}:{run[0]}-{run[-1]}")
         ag = anti_gaming_violations(added, spec["mutants"],
-                                    coverage_files=coverage_files)
+                                    coverage_files=coverage_files,
+                                    exempt_lines=exempt)
         if ag:
             print("DRILL BLOCKED (anti-gaming):")
             for v in ag:
