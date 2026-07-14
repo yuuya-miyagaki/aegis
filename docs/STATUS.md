@@ -3,16 +3,16 @@ framework: aegis
 framework_version: "1.27.0"
 project_name: "Aegis"
 mode: Dev
-phase: brainstorm
+phase: plan
 task_type: framework
 task_size: M
-task_size_rationale: "iteration 68（framework・update-gate approve --ref 原子化＝Phase 1 項目 1-3）M 確定（brainstorm Step D・update-task.sh 経由）。設計正本: docs/specs/2026-07-12-iter68-update-gate-ref-atomic-design.md（(1) approve --ref: gate 値と current_refs を単一 sed パス〔TMP+mv〕で原子書込み＝pending+ref／approved+空の赤窓を消滅・(2) approve 経路を検証→書込み→ACK→snapshot→best-effort 出力に並べ替え＋trap '' PIPE＝SIGPIPE fail-safe 不変条件・(3) evidence_integrity_violations の pending/n/a+ref を FAIL→WARNING 降格〔approved+空・ref 不在・client artifact は FAIL 維持〕・na も ref null 化）。footprint: scripts/update-gate.sh＋scripts/check_status.py＋tests（test_check_status.py 既存ピン更新＋update-gate 新規テスト）＝M（2-5）。control-plane（gate writer＋contract 判定）を触るため review+qa+security 必須・M のため deploy skip。SF-011/SF-012 は相乗りせず backlog 維持（テーマ純度）。"
+task_size_rationale: "iteration 69（framework・B1 drill 強化＝Phase 1 項目 1-5）M 確定（brainstorm Step D・update-task.sh 経由）。設計正本: docs/specs/2026-07-14-iter69-drill-hardening-design.md（(1) NO_RUN 拒否＝patterns.sh の AEGIS_TEST_NO_RUN_FLAG_REGEX を bash+grep subprocess で single-source 消費〔evidence.sh と同一エンジン＝意味論ドリフトゼロ〕・R4 フォージ穴閉塞 (2) mutant 構文検証＝適用前 pre-pass で .py→py_compile／.sh→bash -n・構文破壊 mutant を spec エラー化〔元ファイル parse 不能は帰責不能 skip〕 (3) coverage floor からコメント/空行/py docstring のみの連続ランを除外〔緩和は不可能要求の削除のみ・混在ラン維持・AST parse 失敗は厳格側劣化〕＝罠 l (4) .drill spec optional key since で diff baseline ref 指定〔ancestor 検証＋report since: 行で透明化・CLI flag は承認時固定 argv で不達のため spec key〕＝罠 f）。footprint: scripts/run-test-strength-drill.py＋tests/test_test_strength_drill.py＋qa-verification SKILL.md＝M（2-5）。control-plane（qa gate 証拠機構）を触るため review+qa+security 必須・M のため deploy skip。SF-011/012/013 は相乗りせず backlog 維持（テーマ純度・iter68 前例）。"
 iteration: 69
 ui_surface: false
 last_updated: "2026-07-14T00:00:00Z"
 gate_approvals:
   client_ready_for_dev: n/a
-  brainstorm: pending
+  brainstorm: approved
   plan: pending
   review: pending
   qa: pending
@@ -22,7 +22,7 @@ gate_approvals:
 current_refs:
   requirements: []
   plan: null
-  spec: null
+  spec: "docs/specs/2026-07-14-iter69-drill-hardening-design.md"
   review: null
   qa: null
   security: null
@@ -37,7 +37,7 @@ external_evidence:
     scope: "v0.13.0 計画 5 ラウンドレビュー"
     findings: "Round 1〜5 で計 25 件の指摘（hook 出力スキーマ陳腐化、TaskCreated/Completed 制御方式、Plan 条件付き許可、effort 配分、pre-compact.sh 同種破損、`if` 単一 rule 制約等）"
     resolution: "Rev.5 で全件反映、Phase 0a 即時実装着手 GO。hotfix/v0122-hook-schema ブランチで開始。"
-next_action: "**【iter69 着手＝Phase 1 スイープ 1-5】** rollover 完了（dev ゲート全 pending・iteration=69・非 requirements refs=null・requirements 保持）。今回タスク＝docs/full-review-2026-07-06-six-dimensions-evolution.md §4 の 1-5: drill 強化 — NO_RUN 拒否＋mutant parse 検証＋コメントラン floor 除外〔起票済〕＋`--since` モード（R4/R6 罠 l,f）。**次アクション＝aegis-brainstorm skill を読み brainstorm 実施（→Step D で update-task.sh・その後 plan→grill-plan→implement〔TDD RED-first・書く=opus〕→grill-code→review〔1次4角度→親verify=fable・盲検2次=fable〕→qa→security→ship〔bump〕→docs〔LEARNINGS・session_history 追加時 iter66 を evidence-archive へ＝≤3 維持〕→dev_ready_for_client→push→/clear→/recover）**。スイープ残: 【iter70=1-6】record-test-result 引数事前検証／deps 無 manifest info 降格／judge カード tests スコープ表示（R6 罠 n・F6・test#3）＝Phase 1 完遂。Phase 1 消化: 1-1✅iter64／1-2✅iter67／1-3✅iter68／1-4✅iter65／残=1-5〔本反復〕,1-6。◆別トラック: SF-011（frontmatter 終端デリミタ差）／SF-012（washed-green＋unknown-src）／SF-013（sed 範囲終端＋symlink）＝いずれも Low・pre-existing・contained・hardening 候補（1-5 は drill 触るので SF 相乗りは brainstorm で判断）／#3 session_history 自動アーカイブ＋doctor 誤検出偏り。◆push=`gh auth switch --user yuuya-miyagaki` 必須（active が tigereye だと 403）。"
+next_action: "**【iter69 plan フェーズ＝Phase 1 スイープ 1-5】** brainstorm approved（自走・記録=docs/specs/2026-07-14-iter69-drill-hardening-brainstorm-record.md・設計正本=docs/specs/2026-07-14-iter69-drill-hardening-design.md）。タスク＝B1 drill 強化 4点: (1) NO_RUN 拒否〔bash+grep single-source 消費〕(2) mutant 構文検証〔py_compile/bash -n〕(3) コメント/docstring ラン floor 除外 (4) spec key `since`〔CLI flag は承認時 run_qa_drill 固定 argv で不達〕。**次アクション＝writing-plans skill で実装計画作成→grill-plan→plan approve --ref→implement（TDD RED-first・書く=opus per-task commit）→grill-code→review（1次4角度 finder=opus→親verify=fable・盲検2次=fable）→qa（実 diff で drill 実走＝新機能の実環境 E2E）→security→ship（bump MINOR 想定 v1.27.0→v1.28.0）→docs（LEARNINGS・session_history 追加時 iter66 を evidence-archive へ＝≤3 維持）→dev_ready_for_client→push→/clear→/recover**。スイープ残: 【iter70=1-6】record-test-result 引数事前検証／deps 無 manifest info 降格／judge カード tests スコープ表示（R6 罠 n・F6・test#3）＝Phase 1 完遂。Phase 1 消化: 1-1✅iter64／1-2✅iter67／1-3✅iter68／1-4✅iter65／残=1-5〔本反復〕,1-6。◆別トラック: SF-011／SF-012／SF-013＝いずれも Low・pre-existing・contained・hardening 候補（brainstorm で相乗りせず確定・テーマ純度）／#3 session_history 自動アーカイブ＋doctor 誤検出偏り。◆push=`gh auth switch --user yuuya-miyagaki` 必須（active が tigereye だと 403）。"
 blockers: []
 failure_tracking: null
 session_history:
