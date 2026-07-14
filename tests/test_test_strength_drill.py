@@ -93,6 +93,21 @@ class TestParseSpec(unittest.TestCase):
             with self.assertRaises(drill.DrillError):
                 drill.parse_spec(self._write(d, test_command="   "))
 
+    def test_since_optional_and_validated(self):
+        with tempfile.TemporaryDirectory() as d:
+            spec = drill.parse_spec(self._write(d, since="abc123"))
+            self.assertEqual(spec["since"], "abc123")
+
+    def test_since_empty_string_raises(self):
+        with tempfile.TemporaryDirectory() as d:
+            with self.assertRaises(drill.DrillError):
+                drill.parse_spec(self._write(d, since="   "))
+
+    def test_since_non_string_raises(self):
+        with tempfile.TemporaryDirectory() as d:
+            with self.assertRaises(drill.DrillError):
+                drill.parse_spec(self._write(d, since=123))
+
 
 class TestAddedLines(unittest.TestCase):
     def test_tracked_added_lines(self):
@@ -287,11 +302,12 @@ class TestReport(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             out = Path(d) / "r.md"
             drill.write_report(out, verdict="PASS", total=2, caught=2,
-                               baseline="green", survived=[])
+                               baseline="green", survived=[], since="HEAD")
             text = out.read_text()
             self.assertIn("verdict: PASS", text)
             self.assertIn("mutants_total: 2", text)
             self.assertIn("survived: []", text)
+            self.assertIn("since: HEAD", text)
 
     def test_fail_report_lists_survivors(self):
         with tempfile.TemporaryDirectory() as d:
@@ -301,6 +317,7 @@ class TestReport(unittest.TestCase):
             text = out.read_text()
             self.assertIn("verdict: FAIL", text)
             self.assertIn("src/a.py:3", text)
+            self.assertIn("since: n/a", text)  # 省略時デフォルト
 
 
 class TestMainEndToEnd(unittest.TestCase):
@@ -443,6 +460,109 @@ class TestMainEndToEnd(unittest.TestCase):
             self.assertEqual(res.returncode, 1)
             self.assertIn("git", res.stdout + res.stderr)
 
+    def test_collect_only_command_blocked_e2e(self):
+        # R4 フォージ再現: no-run コマンドは実 patterns.sh 消費で BLOCKED
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            _git_init(root)
+            self._commit_seed(root)
+            (root / "src" / "m.py").write_text("a = 1\nb = 2\n", encoding="utf-8")
+            spec = root / "s.drill"
+            spec.write_text(json.dumps({
+                "test_command": "pytest --collect-only -q",
+                "timeout_seconds": 10,
+                "mutants": [{"file": "src/m.py", "line": 2,
+                             "original": "b = 2", "mutated": "b = 3"}],
+            }), encoding="utf-8")
+            report = root / "r.md"
+            res = self._run(root, spec, report)
+            self.assertEqual(res.returncode, 1)
+            self.assertIn("DRILL BLOCKED", res.stdout)
+            # 経路特定: baseline red/inconclusive でも rc=1+BLOCKED には到達する
+            # ため、NO_RUN 拒否のメッセージ自体を要求する（RED の証明力を担保。
+            # 実装前は pytest 不在環境でも inconclusive 経由で偶然 PASS しうる）
+            self.assertIn("no-run フラグ", res.stdout)
+            self.assertIn("verdict: FAIL", report.read_text())
+
+    def test_since_mode_committed_change_pass(self):
+        # 罠 f: per-task コミット済みで diff HEAD 空でも、since=反復基点で drill 成立
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            _git_init(root)
+            self._commit_seed(root)
+            base = sp.run(["git", "-C", str(root), "rev-parse", "HEAD"],
+                          capture_output=True, text=True, check=True).stdout.strip()
+            (root / "src" / "m.py").write_text("a = 1\nb = 2\n", encoding="utf-8")
+            _git(root, "add", "-A")
+            _git(root, "commit", "-qm", "task work")
+            spec = root / "s.drill"
+            spec.write_text(json.dumps({
+                "test_command": "grep -q 'b = 2' src/m.py",
+                "timeout_seconds": 10,
+                "since": base,
+                "mutants": [{"file": "src/m.py", "line": 2,
+                             "original": "b = 2", "mutated": "b = 3"}],
+            }), encoding="utf-8")
+            report = root / "r.md"
+            res = self._run(root, spec, report)
+            self.assertEqual(res.returncode, 0, res.stdout + res.stderr)
+            text = report.read_text()
+            self.assertIn("verdict: PASS", text)
+            self.assertIn(f"since: {base}", text)
+
+    def test_since_non_ancestor_blocked(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            _git_init(root)
+            self._commit_seed(root)
+            _git(root, "checkout", "-q", "-b", "side")
+            (root / "side.txt").write_text("s\n", encoding="utf-8")
+            _git(root, "add", "-A")
+            _git(root, "commit", "-qm", "side")
+            side = sp.run(["git", "-C", str(root), "rev-parse", "HEAD"],
+                          capture_output=True, text=True, check=True).stdout.strip()
+            _git(root, "checkout", "-q", "-")
+            (root / "src" / "m.py").write_text("a = 1\nb = 2\n", encoding="utf-8")
+            spec = root / "s.drill"
+            spec.write_text(json.dumps({
+                "test_command": "grep -q 'b = 2' src/m.py",
+                "timeout_seconds": 10,
+                "since": side,
+                "mutants": [{"file": "src/m.py", "line": 2,
+                             "original": "b = 2", "mutated": "b = 3"}],
+            }), encoding="utf-8")
+            report = root / "r.md"
+            res = self._run(root, spec, report)
+            self.assertEqual(res.returncode, 1)
+            self.assertIn("DRILL BLOCKED", res.stdout)
+
+    def test_comment_only_hunk_no_mutant_required_e2e(self):
+        # 罠 l: 純コメントの孤立ハンクは floor を要求されない
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            _git_init(root)
+            (root / "src").mkdir()
+            (root / "src" / "m.py").write_text("a = 1\nmid = 0\nz = 9\n",
+                                               encoding="utf-8")
+            _git(root, "add", "-A")
+            _git(root, "commit", "-qm", "i")
+            (root / "src" / "m.py").write_text(
+                "a = 1\n# isolated note\nmid = 0\nz = 9\nb = 2\n",
+                encoding="utf-8")
+            spec = root / "s.drill"
+            spec.write_text(json.dumps({
+                "test_command": "grep -q 'b = 2' src/m.py",
+                "timeout_seconds": 10,
+                "mutants": [{"file": "src/m.py", "line": 5,
+                             "original": "b = 2", "mutated": "b = 3"}],
+            }), encoding="utf-8")
+            report = root / "r.md"
+            res = self._run(root, spec, report)
+            self.assertEqual(res.returncode, 0,
+                             f"comment-only hunk must not demand a mutant: "
+                             f"{res.stdout}{res.stderr}")
+            self.assertIn("verdict: PASS", report.read_text())
+
 
 class TestVendorExclusion(unittest.TestCase):
     def test_vendor_excluded_segments(self):
@@ -485,6 +605,219 @@ class TestVendorExclusion(unittest.TestCase):
             _git(root, "add", "-A")
             added = drill.added_lines_by_file(root, drill.EMPTY_TREE)  # 例外なく返る
             self.assertIn("src/app.py", added)
+
+
+class TestNoRunCommand(unittest.TestCase):
+    """R4: no-run コマンド（--collect-only 等）の拒否。single source は
+    patterns.sh（スクリプト位置相対）。patterns_lib 引数は fixture 注入口。
+    実装は `grep -qE -e "$REGEX"`（`-e` で dash 始まり regex のオプション
+    誤解釈を機構的に排除・マッチ意味論は evidence.sh:128 と同一）。"""
+
+    def _lib(self, d, content):
+        p = Path(d) / "patterns.sh"
+        p.write_text(content, encoding="utf-8")
+        return p
+
+    def test_collect_only_rejected(self):
+        with tempfile.TemporaryDirectory() as d:
+            lib = self._lib(d, "AEGIS_TEST_NO_RUN_FLAG_REGEX='collect-only'\n")
+            with self.assertRaises(drill.DrillError):
+                drill.check_no_run_command("pytest --collect-only -q",
+                                           patterns_lib=lib)
+
+    def test_clean_command_passes(self):
+        with tempfile.TemporaryDirectory() as d:
+            lib = self._lib(d, "AEGIS_TEST_NO_RUN_FLAG_REGEX='collect-only'\n")
+            drill.check_no_run_command("pytest tests/ -q", patterns_lib=lib)
+
+    def test_missing_lib_fail_closed(self):
+        with self.assertRaises(drill.DrillError):
+            drill.check_no_run_command(
+                "pytest -q", patterns_lib=Path("/nonexistent/patterns.sh"))
+
+    def test_unset_regex_fail_closed(self):
+        with tempfile.TemporaryDirectory() as d:
+            lib = self._lib(d, "# regex not defined here\n")
+            with self.assertRaises(drill.DrillError):
+                drill.check_no_run_command("pytest -q", patterns_lib=lib)
+
+    def test_real_patterns_rejects_collect_only(self):
+        # single-source 消費の実証: 実 patterns.sh で R4 のフォージコマンドを拒否
+        with self.assertRaises(drill.DrillError):
+            drill.check_no_run_command("pytest --collect-only -q")
+
+    def test_real_patterns_accepts_normal_pytest(self):
+        drill.check_no_run_command("python3 -m pytest tests/test_x.py -q")
+
+
+class TestSinceRef(unittest.TestCase):
+    def _two_commits(self, root):
+        _git_init(root)
+        (root / "a.txt").write_text("1\n", encoding="utf-8")
+        _git(root, "add", "-A")
+        _git(root, "commit", "-qm", "c1")
+        first = sp.run(["git", "-C", str(root), "rev-parse", "HEAD"],
+                       capture_output=True, text=True, check=True).stdout.strip()
+        (root / "a.txt").write_text("1\n2\n", encoding="utf-8")
+        _git(root, "add", "-A")
+        _git(root, "commit", "-qm", "c2")
+        return first
+
+    def test_valid_ancestor_resolves_to_full_sha(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            first = self._two_commits(root)
+            self.assertEqual(drill.resolve_since_ref(root, first), first)
+
+    def test_unknown_ref_raises(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            self._two_commits(root)
+            with self.assertRaises(drill.DrillError):
+                drill.resolve_since_ref(root, "no-such-ref-xyz")
+
+    def test_non_ancestor_raises(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            first = self._two_commits(root)
+            _git(root, "checkout", "-q", "-b", "side", first)
+            (root / "b.txt").write_text("side\n", encoding="utf-8")
+            _git(root, "add", "-A")
+            _git(root, "commit", "-qm", "side-commit")
+            side = sp.run(["git", "-C", str(root), "rev-parse", "HEAD"],
+                          capture_output=True, text=True, check=True).stdout.strip()
+            _git(root, "checkout", "-q", "-")
+            with self.assertRaises(drill.DrillError):
+                drill.resolve_since_ref(root, side)
+
+
+class TestSyntaxCheckMutants(unittest.TestCase):
+    def _mut(self, file, line, original, mutated):
+        return {"file": file, "line": line,
+                "original": original, "mutated": mutated}
+
+    def test_python_syntax_broken_mutant_blocked(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            (root / "a.py").write_text("def f():\n    return 1\n",
+                                       encoding="utf-8")
+            with self.assertRaises(drill.DrillError):
+                drill.syntax_check_mutants(
+                    root, [self._mut("a.py", 2, "    return 1", "    return (")])
+
+    def test_python_semantic_mutant_passes(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            (root / "a.py").write_text("def f():\n    return 1\n",
+                                       encoding="utf-8")
+            drill.syntax_check_mutants(
+                root, [self._mut("a.py", 2, "    return 1", "    return 2")])
+
+    def test_bash_syntax_broken_mutant_blocked(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            (root / "x.sh").write_text("if true; then\n  echo hi\nfi\n",
+                                       encoding="utf-8")
+            with self.assertRaises(drill.DrillError):
+                drill.syntax_check_mutants(
+                    root, [self._mut("x.sh", 3, "fi", "f (")])
+
+    def test_unknown_extension_skipped(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            (root / "n.txt").write_text("hello\n", encoding="utf-8")
+            drill.syntax_check_mutants(
+                root, [self._mut("n.txt", 1, "hello", "((broken((")])
+
+    def test_unparseable_original_skipped(self):
+        # 元ファイルが parse 不能 → 帰責不能として skip（baseline red が受ける）
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            (root / "bad.py").write_text("def (\n", encoding="utf-8")
+            drill.syntax_check_mutants(
+                root, [self._mut("bad.py", 1, "def (", "also broken (")])
+
+
+class TestNonCoverableLines(unittest.TestCase):
+    def test_blank_and_hash_comment_lines(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            (root / "a.py").write_text("x = 1\n\n# note\n  # indented\n",
+                                       encoding="utf-8")
+            got = drill.non_coverable_lines(root, "a.py")
+            self.assertNotIn(1, got)
+            self.assertTrue({2, 3, 4}.issubset(got))
+
+    def test_js_line_comments(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            (root / "a.js").write_text("// c\nlet x = 1\n", encoding="utf-8")
+            got = drill.non_coverable_lines(root, "a.js")
+            self.assertIn(1, got)
+            self.assertNotIn(2, got)
+
+    def test_python_docstring_lines(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            (root / "m.py").write_text(
+                '"""module doc\nsecond line\n"""\nx = 1\n', encoding="utf-8")
+            got = drill.non_coverable_lines(root, "m.py")
+            self.assertTrue({1, 2, 3}.issubset(got))
+            self.assertNotIn(4, got)
+
+    def test_parse_failure_no_docstring_exemption(self):
+        # AST parse 失敗 → docstring 除外なし（厳格側劣化）。# 行は除外のまま。
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            (root / "b.py").write_text('def (\n"""not a docstring"""\n# c\n',
+                                       encoding="utf-8")
+            got = drill.non_coverable_lines(root, "b.py")
+            self.assertNotIn(2, got)
+            self.assertIn(3, got)
+
+    def test_unreadable_returns_empty(self):
+        with tempfile.TemporaryDirectory() as d:
+            self.assertEqual(
+                drill.non_coverable_lines(Path(d), "missing.py"), set())
+
+    def test_shebang_counts_as_comment(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            (root / "s.sh").write_text("#!/bin/bash\necho hi\n",
+                                       encoding="utf-8")
+            got = drill.non_coverable_lines(root, "s.sh")
+            self.assertIn(1, got)
+            self.assertNotIn(2, got)
+
+    def test_crlf_lines_handled(self):
+        # CRLF: strip() が \r を除去するため判定は LF と同一
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            (root / "w.py").write_text("x = 1\r\n\r\n# note\r\n",
+                                       encoding="utf-8")
+            got = drill.non_coverable_lines(root, "w.py")
+            self.assertNotIn(1, got)
+            self.assertTrue({2, 3}.issubset(got))
+
+
+class TestFloorExemption(unittest.TestCase):
+    def test_comment_only_run_exempted(self):
+        added = {"src/a.py": {2, 3}}
+        got = drill.anti_gaming_violations(
+            added, [], exempt_lines={"src/a.py": {2, 3}})
+        self.assertEqual(got, [])
+
+    def test_mixed_run_keeps_floor(self):
+        added = {"src/a.py": {2, 3}}
+        got = drill.anti_gaming_violations(
+            added, [], exempt_lines={"src/a.py": {2}})
+        self.assertEqual(len(got), 1)
+        self.assertIn("coverage floor", got[0])
+
+    def test_none_exempt_is_previous_behavior(self):
+        added = {"src/a.py": {2, 3}}
+        got = drill.anti_gaming_violations(added, [], exempt_lines=None)
+        self.assertEqual(len(got), 1)
 
 
 if __name__ == "__main__":
