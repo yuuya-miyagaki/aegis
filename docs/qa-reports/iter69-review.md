@@ -97,6 +97,6 @@ tests_pass: true
 no_stubs: true
 verdict: approve_with_notes
 second_opinion:
-  verdict: reject_resolved
-  divergence_points: ["盲検2次が F-1[Critical: shlex quoting で NO_RUN 迂回]＋F-2[Major: fixtures-per-test 漏れ]を E2E 実証し reject。1次(opus)と初回 verify は見落とし＝独立性が Critical を捕捉。親 verify で裏取り→fix-forward(800948b)→独立敵対再検証で閉塞確認、verdict は approve_with_notes に収束。残 divergence は非フラグ no-run フォージ(SF-014)の扱いのみ＝pre-existing/非ブロッキングで全員一致"]
+  verdict: approve_with_notes
+  divergence_points: ["盲検2次(reviewer-maintainability・fable)は当初 diff に対し reject＝F-1[Critical: shlex quoting で NO_RUN 迂回・偽PASS を E2E 実証]＋F-2[Major: fixtures-per-test 漏れ]を検出。1次(opus)と初回 verify は見落とし＝独立性が Critical を捕捉。親 verify で裏取り→fix-forward(800948b)→独立敵対再検証(reviewer・fable)が閉塞確認し approve_with_notes（この verdict はゲート対象＝修正後コードに対する第2意見）。残 divergence は非フラグ no-run フォージ(SF-014)の扱いのみ＝pre-existing/非ブロッキングで全員一致"]
 ```
