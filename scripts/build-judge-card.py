@@ -321,9 +321,15 @@ def scan_secrets(root: Path) -> list[str]:
     return hits
 
 
+UNAUDITABLE_MANIFESTS = (
+    "pyproject.toml", "setup.py", "setup.cfg", "Pipfile", "Pipfile.lock",
+    "poetry.lock", "uv.lock", "go.mod", "Cargo.toml", "Gemfile",
+    "Gemfile.lock", "composer.json")
+
+
 def audit_deps(root: Path) -> str:
     """Audit the PROJECT's declared dependencies. Returns 'clean'/'vuln'/
-    'unverified'.
+    'unverified'/'no-manifest'.
 
     Two failure modes the naive version got wrong:
     - `pip-audit` with no args audits the *ambient* interpreter env, not the
@@ -331,8 +337,14 @@ def audit_deps(root: Path) -> str:
       exists.
     - `npm audit` with no lockfile errors out (non-zero), which must NOT be read
       as 'vuln'. npm runs only when a lockfile is present.
-    When no matching manifest exists, or the tool is absent/times out, the result
-    is 'unverified' (advisory 🟡) — never a fabricated 'vuln'."""
+    When an auditable manifest exists but the tool is absent/times out, the
+    result is 'unverified' (advisory 🟡) — never a fabricated 'vuln'.
+
+    'no-manifest' is the proof of a zero-dependency repo (nothing to audit), not
+    an exemption for the un-auditable: if even one known dependency manifest
+    exists (package.json without a lockfile, or any UNAUDITABLE_MANIFESTS entry)
+    we fall to 'unverified' — dependencies are present but the audit path is not
+    wired, so we fail-visible rather than claim no manifest."""
     for req in ("requirements.txt", "requirements.lock"):
         if (root / req).is_file():
             try:
@@ -352,7 +364,15 @@ def audit_deps(root: Path) -> str:
         except (OSError, subprocess.TimeoutExpired):
             return "unverified"
         return "clean" if proc.returncode == 0 else "vuln"
-    return "unverified"
+    # package.json without a lockfile: a real manifest we could not audit.
+    if (root / "package.json").is_file():
+        return "unverified"
+    # A known dependency manifest exists but no audit path is wired for it —
+    # dependencies are present (not zero), so fail-visible as 'unverified'.
+    if any((root / m).is_file() for m in UNAUDITABLE_MANIFESTS):
+        return "unverified"
+    # No dependency manifest of any kind → proof of a zero-dependency repo.
+    return "no-manifest"
 
 
 GATE_REF_KEY = {"review": "review", "qa": "qa", "security": "security",
@@ -449,7 +469,11 @@ def compute_verdict(gate: str, claims: dict | None, facts: dict,
         # positives, so a vuln advises (🟡) but never hard-blocks (🔴) — even if
         # a claim says deps_clean. Blocking on a flaky signal would let a network
         # hiccup veto a release.
+        # no-manifest is an info demotion that removes the meaningless per-
+        # iteration ack (treadmill) for zero-dependency repos — full-review F6.
         yellow.append("依存監査で脆弱性の可能性（要確認・ack で承認可）")
+    elif facts["deps"] == "no-manifest":
+        info.append("依存 manifest なし（依存ゼロ repo）— 監査対象なし")
     # At the qa GATE the B1 drill runs first and already blocks on FAIL, so this
     # is usually redundant there; it still matters for the read-only /judge
     # PREVIEW (which does not run the drill) reading a recorded FAIL verdict.
