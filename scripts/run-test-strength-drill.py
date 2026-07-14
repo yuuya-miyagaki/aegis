@@ -62,32 +62,49 @@ PATTERNS_LIB = FRAMEWORK_ROOT / "hooks" / "lib" / "patterns.sh"
 def check_no_run_command(cmd: str, patterns_lib: Path | None = None) -> None:
     """Reject a test_command matching AEGIS_TEST_NO_RUN_FLAG_REGEX (single
     source: patterns.sh). Any condition that prevents the check — missing
-    patterns.sh, unset regex, grep/subprocess failure — is fail-closed."""
+    patterns.sh, unset regex, grep/subprocess failure, unparseable quoting —
+    is fail-closed."""
     lib = Path(patterns_lib) if patterns_lib is not None else PATTERNS_LIB
     if not lib.is_file():
         raise DrillError(
             f"patterns.sh not found: {lib} — NO_RUN 検査を実行できないため "
             f"fail-closed（framework install が壊れています）")
+    # iter69 blind-2nd (2026-07-14): the executor runs shlex.split(cmd), so a
+    # QUOTED flag — pytest "--collect-only" — is clean against the whitespace-
+    # anchored regex in raw form (the char before `--` is `"`, not a space) but
+    # becomes a bare --collect-only argv token at run time. Forge reproduced:
+    # fake DRILL PASS with zero tests. Check the SAME normalization the executor
+    # uses: shlex.split then re-join so every flag token is space-bounded and
+    # cannot be smuggled past the gate by quoting. Unparseable quoting is
+    # fail-closed (the executor's shlex.split would also error on it).
+    try:
+        argv = shlex.split(cmd)
+    except ValueError as exc:
+        raise DrillError(
+            f"test_command を解析できません（クォート不整合）— fail-closed: {exc}")
     # grep -e: dash 始まり regex がオプションと誤解釈される余地を機構的に排除
     # （マッチ意味論は evidence.sh:128 の grep -qE と同一）
     script = ('source "$1" >/dev/null 2>&1 || exit 3; '
               '[ -n "${AEGIS_TEST_NO_RUN_FLAG_REGEX:-}" ] || exit 3; '
               'printf %s "$2" | grep -qE -e "$AEGIS_TEST_NO_RUN_FLAG_REGEX"')
-    try:
-        proc = subprocess.run(
-            ["bash", "-c", script, "_", str(lib), cmd],
-            capture_output=True, timeout=10)
-    except (OSError, subprocess.TimeoutExpired) as exc:
-        raise DrillError(f"NO_RUN 検査の実行に失敗（fail-closed）: {exc}")
-    if proc.returncode == 0:
-        raise DrillError(
-            "test_command が no-run フラグ（--collect-only / --dry-run / "
-            "--version 等）を含みます — テストを1件も実行しないコマンドは"
-            "テスト強度を証明しません")
-    if proc.returncode != 1:
-        raise DrillError(
-            f"NO_RUN regex を patterns.sh から読み込めません "
-            f"(rc={proc.returncode}) — fail-closed")
+    # Probe the argv-normalized form (authoritative: what actually runs) AND the
+    # raw string (defense-in-depth). A match on either blocks.
+    for probe in (" ".join(argv), cmd):
+        try:
+            proc = subprocess.run(
+                ["bash", "-c", script, "_", str(lib), probe],
+                capture_output=True, timeout=10)
+        except (OSError, subprocess.TimeoutExpired) as exc:
+            raise DrillError(f"NO_RUN 検査の実行に失敗（fail-closed）: {exc}")
+        if proc.returncode == 0:
+            raise DrillError(
+                "test_command が no-run フラグ（--collect-only / --dry-run / "
+                "--version 等）を含みます — テストを1件も実行しないコマンドは"
+                "テスト強度を証明しません")
+        if proc.returncode != 1:
+            raise DrillError(
+                f"NO_RUN regex を patterns.sh から読み込めません "
+                f"(rc={proc.returncode}) — fail-closed")
 
 
 _SYNTAX_CHECKED_SUFFIXES = (".py", ".sh", ".bash")

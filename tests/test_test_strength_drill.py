@@ -527,6 +527,29 @@ class TestMainEndToEnd(unittest.TestCase):
             self.assertEqual(res.returncode, 1)
             self.assertIn("no-run フラグ", res.stdout)
 
+    def test_quoted_collectonly_forge_blocked_e2e(self):
+        # blind-2nd F-1 [Critical]: the R4 forge reconstructed by QUOTING the
+        # no-run flag (`"--collect-only"`), which is clean against the raw-string
+        # regex but becomes a bare flag at shlex-exec time. The drill now
+        # shlex-normalizes before the NO_RUN check, so it must still block.
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            _git_init(root)
+            self._commit_seed(root)
+            (root / "src" / "m.py").write_text("a = 1\n_ = 1\n", encoding="utf-8")
+            spec = root / "s.drill"
+            spec.write_text(json.dumps({
+                "test_command": 'python3 -m pytest "--collect-only" -q',
+                "timeout_seconds": 10,
+                "mutants": [{"file": "src/m.py", "line": 2,
+                             "original": "_ = 1", "mutated": "raise Exception()"}],
+            }), encoding="utf-8")
+            report = root / "r.md"
+            res = self._run(root, spec, report)
+            self.assertEqual(res.returncode, 1)
+            self.assertIn("no-run フラグ", res.stdout)
+            self.assertIn("verdict: FAIL", report.read_text())
+
     def test_since_mode_committed_change_pass(self):
         # 罠 f: per-task コミット済みで diff HEAD 空でも、since=反復基点で drill 成立
         with tempfile.TemporaryDirectory() as d:
@@ -691,6 +714,30 @@ class TestNoRunCommand(unittest.TestCase):
 
     def test_real_patterns_accepts_normal_pytest(self):
         drill.check_no_run_command("python3 -m pytest tests/test_x.py -q")
+
+    def test_quoted_flag_rejected_via_shlex_norm(self):
+        # blind-2nd (2026-07-14): 生文字列では境界不成立で通り抜ける引用済み
+        # フラグ（"--collect-only"）を、実行系と同じ shlex 正規化で拒否する。
+        with tempfile.TemporaryDirectory() as d:
+            lib = self._lib(d, "AEGIS_TEST_NO_RUN_FLAG_REGEX='collect-only'\n")
+            for cmd in ('pytest "--collect-only" -q', "pytest '--collect-only' -q"):
+                with self.assertRaises(drill.DrillError, msg=cmd):
+                    drill.check_no_run_command(cmd, patterns_lib=lib)
+
+    def test_real_patterns_rejects_quoted_collect_only(self):
+        with self.assertRaises(drill.DrillError):
+            drill.check_no_run_command('python3 -m pytest "--collect-only" -q')
+
+    def test_real_patterns_rejects_fixtures_per_test(self):
+        # blind-2nd F-2: --fixtures-per-test はテスト本体を走らせない no-run
+        with self.assertRaises(drill.DrillError):
+            drill.check_no_run_command("python3 -m pytest --fixtures-per-test -q")
+
+    def test_unparseable_quoting_fail_closed(self):
+        with tempfile.TemporaryDirectory() as d:
+            lib = self._lib(d, "AEGIS_TEST_NO_RUN_FLAG_REGEX='collect-only'\n")
+            with self.assertRaises(drill.DrillError):
+                drill.check_no_run_command('pytest "unterminated', patterns_lib=lib)
 
 
 class TestSinceRef(unittest.TestCase):
