@@ -223,6 +223,18 @@ def _evidence_entries(root: Path) -> list:
 
 def read_test_result(root: Path) -> str:
     """'green' / 'red' / 'unverified' from the OBSERVED evidence log (E1).
+    Compat wrapper — for the deciding entry's cmd/src/ts see
+    read_test_result_detail."""
+    return read_test_result_detail(root)["tests"]
+
+
+def read_test_result_detail(root: Path) -> dict:
+    """Deciding test-runner entry as a dict: {"tests": <'green'|'red'|
+    'unverified'>, "cmd": <str|None>, "src": <str|None>, "ts": <str|None>}.
+    Judgment and card display share this single scan so they can never drift
+    on WHICH entry decided. cmd/src/ts are the raw values from the deciding
+    entry (green/red); sanitization is the display layer's responsibility.
+    Every 'unverified' terminus returns cmd/src/ts all None.
 
     The newest **decidable** test-runner entry decides; its fp must equal
     the CURRENT worktree fingerprint (both 64-hex). Anything else — no log,
@@ -259,15 +271,16 @@ def read_test_result(root: Path) -> str:
     'ok' entry is transparent (skipped) in the sequence and a v1.6.0 'fail'
     entry is terminal 'unverified' — re-run the test to upgrade the log.
     """
+    unverified = {"tests": "unverified", "cmd": None, "src": None, "ts": None}
     pats = _test_runner_patterns(root)
     if not pats:
-        return "unverified"
+        return unverified
     strips = _tr_strip_patterns(root)
     if len(strips) != 2:
-        return "unverified"
+        return unverified
     current = current_fingerprint(root)
     if not _HEX64.match(current):
-        return "unverified"
+        return unverified
     for d in reversed(_evidence_entries(root)):
         if d.get("status") not in ("ok", "fail"):
             continue
@@ -292,12 +305,13 @@ def read_test_result(root: Path) -> str:
         if undecidable and d.get("status") == "ok":
             continue
         if (d.get("fp") or "") != current:
-            return "unverified"
+            return unverified
         # C-2: marker_verified gate for observed entries.
         if undecidable:
-            return "unverified"
-        return "green" if d.get("status") == "ok" else "red"
-    return "unverified"
+            return unverified
+        return {"tests": "green" if d.get("status") == "ok" else "red",
+                "cmd": d.get("cmd"), "src": d.get("src"), "ts": d.get("ts")}
+    return unverified
 
 
 SECRET_PATTERN = re.compile(
@@ -529,8 +543,12 @@ def collect_facts(root: Path, gate: str) -> dict:
             b1 = m.group(1) if m else None
     secrets = scan_secrets(root) if gate == "security" else []
     deps = audit_deps(root) if gate == "security" else "clean"
+    tr = read_test_result_detail(root)
     return {
-        "tests": read_test_result(root),
+        "tests": tr["tests"],
+        "tests_cmd": tr["cmd"],
+        "tests_src": tr["src"],
+        "tests_ts": tr["ts"],
         "stubs": scan_stubs(root),
         "secrets": secrets,
         "b1_verdict": b1,
@@ -538,13 +556,40 @@ def collect_facts(root: Path, gate: str) -> dict:
     }
 
 
+def _sanitize_card_field(s, limit: int = 120) -> str:
+    """Neutralize a raw evidence field for single-line card display: CR/LF are
+    collapsed to ';' (a forged header cannot land on its own line to inject a
+    second card section or a second '- テスト:' line), backticks to "'" (no
+    stray code spans), and a leading markdown '#' run to fullwidth '＃' so the
+    field can never reproduce the genuine '## 総合' header substring (design
+    line 77: '## 見出し注入不能'); over-limit is truncated to limit-1 + '…'."""
+    out = (str(s).replace("\r", ";").replace("\n", ";")
+           .replace("`", "'").replace("#", "＃"))
+    if len(out) > limit:
+        out = out[:limit - 1] + "…"
+    return out
+
+
 def render_card(report_out: Path, *, gate: str, v: Verdict, claims: dict | None,
                 facts: dict, second_opinion: dict | None) -> None:
     sym = {0: "🟢 承認可", 1: "🔴 ブロック", 2: "🟡 要確認"}[v.overall]
+    # tests line: when the deciding entry's cmd is known, name the judgment
+    # source (src/cmd/ts) so a reader can trace the verdict; all three fields go
+    # through _sanitize_card_field so a hostile recorded cmd cannot inject card
+    # structure. build()'s except path passes facts without the new keys, so
+    # .get keeps missing keys benign (compat pin test_card_tolerates_missing).
+    if facts.get("tests_cmd"):
+        _src = _sanitize_card_field(facts.get("tests_src") or "?")
+        _cmd = _sanitize_card_field(facts["tests_cmd"])
+        _ts = _sanitize_card_field(facts.get("tests_ts") or "?")
+        tests_line = (f"- テスト: {facts['tests']}"
+                      f"（判定源: src={_src} / cmd={_cmd} / ts={_ts}）")
+    else:
+        tests_line = f"- テスト: {facts['tests']}"
     lines = [f"# Judge カード: {gate} ゲート（機械生成）", "",
              f"## 総合: {sym}", "",
              "## ティア1: 機械事実（✅検証済・高信頼）",
-             f"- テスト: {facts['tests']}",
+             tests_line,
              f"- 未完成マーカー(変更行): {facts['stubs'] or 'なし'}"]
     if gate == "security":
         lines.append(f"- シークレット: {facts['secrets'] or 'なし'}")
