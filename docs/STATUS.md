@@ -1,9 +1,9 @@
 ---
 framework: aegis
-framework_version: "1.27.0"
+framework_version: "1.28.0"
 project_name: "Aegis"
 mode: Dev
-phase: implement
+phase: ship
 task_type: framework
 task_size: M
 task_size_rationale: "iteration 69（framework・B1 drill 強化＝Phase 1 項目 1-5）M 確定（brainstorm Step D・update-task.sh 経由）。設計正本: docs/specs/2026-07-14-iter69-drill-hardening-design.md（(1) NO_RUN 拒否＝patterns.sh の AEGIS_TEST_NO_RUN_FLAG_REGEX を bash+grep subprocess で single-source 消費〔evidence.sh と同一エンジン＝意味論ドリフトゼロ〕・R4 フォージ穴閉塞 (2) mutant 構文検証＝適用前 pre-pass で .py→py_compile／.sh→bash -n・構文破壊 mutant を spec エラー化〔元ファイル parse 不能は帰責不能 skip〕 (3) coverage floor からコメント/空行/py docstring のみの連続ランを除外〔緩和は不可能要求の削除のみ・混在ラン維持・AST parse 失敗は厳格側劣化〕＝罠 l (4) .drill spec optional key since で diff baseline ref 指定〔ancestor 検証＋report since: 行で透明化・CLI flag は承認時固定 argv で不達のため spec key〕＝罠 f）。footprint: scripts/run-test-strength-drill.py＋tests/test_test_strength_drill.py＋qa-verification SKILL.md＝M（2-5）。control-plane（qa gate 証拠機構）を触るため review+qa+security 必須・M のため deploy skip。SF-011/012/013 は相乗りせず backlog 維持（テーマ純度・iter68 前例）。"
@@ -14,18 +14,18 @@ gate_approvals:
   client_ready_for_dev: n/a
   brainstorm: approved
   plan: approved
-  review: pending
-  qa: pending
-  security: pending
+  review: approved
+  qa: approved
+  security: approved
   deploy: pending
   dev_ready_for_client: pending
 current_refs:
   requirements: []
   plan: "docs/plans/2026-07-14-iter69-drill-hardening-implementation-plan.md"
   spec: "docs/specs/2026-07-14-iter69-drill-hardening-design.md"
-  review: null
-  qa: null
-  security: null
+  review: "docs/qa-reports/iter69-review.md"
+  qa: "docs/qa-reports/iter69-qa.md"
+  security: "docs/qa-reports/iter69-security.md"
   deploy: null
   translation: null
 external_evidence:
