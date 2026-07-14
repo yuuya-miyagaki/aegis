@@ -371,6 +371,15 @@ SF-001 系の網羅的閉鎖（rounds 5-11）で**実用的なシェル難読化
 - **修正方向（iter69+ hardening）**: (a) sed 範囲終端を `/^[a-z-]/`＋`/^---$/` の複合（または awk 化）で frontmatter 境界に閉じる＋異常構造 fixture のテスト。(b) `--ref` 検証に realpath の repo 包含チェックを追加（YAGNI 評価と併せて判断）。
 - **状態**: **OPEN**。iter68 security gate で residual として評価（1次/盲検2次とも非ブロッキング判定・pre-existing 実証済み）。
 
+### SF-014: B1 drill の NO_RUN は flag 列挙 denylist ＝ 非フラグ no-run コマンドはフォージ可能（**OPEN**・iter69 review 盲検2次＋fix 敵対再検証 検出・pre-existing/Major-class・非ブロッキング）
+
+- **発見**: iter69 review。盲検2次（fable）が **flag の quoting 迂回（F-1 Critical＝検査系 raw grep vs 実行系 shlex.split の不整合）** を実証→本反復で fix-forward 済み（`800948b` shlex 正規化統一）。その fix 敵対再検証（fable・独立）が、**列挙外の非フラグ no-run コマンド**（例 `python3 -c "import src.m"`・`go test -list` 等）は依然 NO_RUN 検査を素通りし、import-crash mutant と組んで **verdict PASS / テスト本体実行0 の偽 DRILL PASS を実際に生成できる**ことを隔離 clone で実測。
+- **種別**: 反ガミング機構（B1 drill）の denylist 網羅性。`check_no_run_command`（`scripts/run-test-strength-drill.py:62`）は「テストランナーの no-run フラグ」を列挙する構造で、**そもそもテストランナーですらないコマンド**（任意の import プローブ）を no-run と判定できない。
+- **重大度**: **Major-class だが本 gate 非ブロック**。理由: **pre-existing**（差分実測で cbc49e7〔iter69 の NO_RUN 機能導入前〕でも同一の偽 PASS＝iter69 は net 改善で回帰ゼロ）。脅威モデルは「自分の qa gate を欺く LLM」（自己欺瞞行為が必要）。iter69 は R4 の flag 系フォージを閉塞し、この denylist 不完全性を `hooks/lib/patterns.sh` コメントに明示済み。
+- **contained**: (a) qa の drill は人手が `.drill` の test_command をプレビュー実走・レビューする運用（qa-verification skill）＝非ランナーコマンドは目視で不審。(b) B1 は多層の1枚で、E1 実行観測（fingerprint＋record-test-result）や judge の claims 検査と併走する。(c) patterns.sh コメントに残余と恒久策を文書化済み。
+- **修正方向（iter70+ 恒久策）**: **列挙 denylist を positive proof に置換／補強** — 「baseline 実行が実際に N≧1 件のテストを走らせた」ことを出力マーカー（`AEGIS_TEST_PASS_MARKER_REGEX` 等の実行証跡）で drill 側でも要求する。これにより flag 迂回・非フラグ probe・未知ランナーを一括で塞げる（denylist の whack-a-mole を終わらせる）。evidence.sh の marker realness と設計を揃える。
+- **状態**: **OPEN**。iter69 review で residual として評価（1次 approve_with_notes／盲検2次は F-1 Critical を fix 後 approve_with_notes／fix 敵対再検証 approve_with_notes・本 residual を pre-existing/非ブロッキングと全員一致で判定・実証済み）。
+
 ## CLOSED
 
 - **SF-010**（Medium・iter65 review 検出→iter66 v1.26.1 で封鎖）: task_size empty-baseline raw-Edit × migration-grace の tamper 逃れ。Fix ①（`feff60c` migration-grace を真の旧フォーマット限定に絞り込み・task fields＋gate loop）＋(i)(ii) Fix ⑤（`6229fd5` python first-match/先勝ち）＋(iii) Fix ④（`c5f5fd2` gate_value 本文 fallback を ---無し限定）。hook 直接発火 4 ケース＋fresh 変異 M1-M5＋1次/盲検2次 approve で裏取り。詳細は上記 SF-010 節。
