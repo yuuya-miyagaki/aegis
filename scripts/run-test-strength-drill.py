@@ -89,6 +89,69 @@ def check_no_run_command(cmd: str, patterns_lib: Path | None = None) -> None:
             f"(rc={proc.returncode}) — fail-closed")
 
 
+_SYNTAX_CHECKED_SUFFIXES = (".py", ".sh", ".bash")
+
+
+def _parses(rel: str, text: str) -> bool | None:
+    """Parse verdict for the file type: True/False, or None when no checker
+    exists for this extension (unknown types are not judged)."""
+    suffix = Path(rel).suffix
+    if suffix == ".py":
+        try:
+            compile(text, rel, "exec")
+            return True
+        except (SyntaxError, ValueError):
+            return False
+    if suffix in (".sh", ".bash"):
+        try:
+            proc = subprocess.run(["bash", "-n"], input=text.encode("utf-8"),
+                                  capture_output=True, timeout=10)
+        except (OSError, subprocess.TimeoutExpired):
+            return False
+        return proc.returncode == 0
+    return None
+
+
+def syntax_check_mutants(root: Path, mutants: list[dict]) -> None:
+    """R4 併発: 構文破壊 mutant は「テストが assert で捕まえた」ことを証明しない
+    （import/収集エラーでも red になる）。適用前 pre-pass で mutant 適用後の全文
+    が構文検査（.py→compile() builtin／.sh→bash -n）を通ることを要求する。
+    元ファイルが parse 不能なファイルは帰責不能として skip（baseline red が別途
+    受け止める）。ファイル不在・行範囲外・original 不一致も skip — それらは
+    apply_mutant の既存エラー経路が正本（メッセージを二重化しない）。"""
+    broken: list[str] = []
+    originals: dict[str, str | None] = {}
+    for m in mutants:
+        rel = m["file"]
+        if Path(rel).suffix not in _SYNTAX_CHECKED_SUFFIXES:
+            continue
+        if rel not in originals:
+            try:
+                text = (root / rel).read_bytes().decode("utf-8")
+            except (OSError, UnicodeDecodeError):
+                originals[rel] = None
+            else:
+                originals[rel] = text if _parses(rel, text) else None
+        text = originals[rel]
+        if text is None:
+            continue
+        line_no = int(m["line"])
+        parts = text.split("\n")
+        if line_no < 1 or line_no > len(parts):
+            continue
+        if parts[line_no - 1] != m["original"]:
+            continue
+        mutated = parts.copy()
+        mutated[line_no - 1] = m["mutated"]
+        if _parses(rel, "\n".join(mutated)) is False:
+            broken.append(f"{rel}:{line_no}")
+    if broken:
+        raise DrillError(
+            "構文破壊 mutant は assert の強さを証明しません（parse エラーでも"
+            "テストは red になるため）。意味を変え構文を保つ mutant に"
+            "書き換えてください: " + ", ".join(broken))
+
+
 class DrillError(Exception):
     """Any condition that makes the drill inconclusive => fail-closed."""
 
@@ -489,6 +552,8 @@ def run_drill(root: Path, spec_path: Path, report_path: Path) -> int:
             write_report(report_path, verdict="FAIL", total=len(spec["mutants"]),
                          caught=0, baseline="n/a", survived=[])
             return 1
+
+        syntax_check_mutants(root, spec["mutants"])
 
         base, base_output = check_baseline(cmd, root, timeout)
         if base != "green":
