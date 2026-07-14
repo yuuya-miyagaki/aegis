@@ -176,7 +176,16 @@ AEGIS_TEST_PASS_MARKER_PAIRS=(
 # regardless of output content. Used to disqualify forged-output cases
 # where a runner-name match is paired with a non-running flag.
 # Each pattern is anchored on word boundaries via ( |^|$).
-AEGIS_TEST_NO_RUN_FLAG_REGEX='(^|[[:space:]])(-{1,2}(version|help|collect-only|co|dry-run|no-run|fixtures|markers|listTests|list-tests|listFiles|listAllFiles)|-h)($|[[:space:]])'
+# iter69 grill-code (2026-07-14): `collectonly` (pytest's no-dash alias for
+# --collect-only), `setup-plan`, `setup-only` were empirically demonstrated to
+# reconstruct the R4 forge (no-run command + import-crash mutant → fake DRILL
+# PASS with zero assertions). They defeat the drill's NO_RUN layer since the
+# denylist missed them. NOTE: an enumerated denylist is inherently incomplete
+# — the robust long-term fix is a positive "N tests actually executed" proof
+# (recorded as a follow-up candidate). --setup-show / --fixtures-per-test run
+# test bodies (or fail-closed) so are NOT no-run. This regex is the single
+# source consumed by both evidence.sh (marker realness) and the B1 drill.
+AEGIS_TEST_NO_RUN_FLAG_REGEX='(^|[[:space:]])(-{1,2}(version|help|collect-only|collectonly|co|dry-run|no-run|setup-plan|setup-only|fixtures|markers|listTests|list-tests|listFiles|listAllFiles)|-h)($|[[:space:]])'
 
 # K-1 (v1.6.2): zero-run output signals. After strong/weak marker has hit,
 # scan the output for runner-emitted "no tests actually ran" lines. This

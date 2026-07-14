@@ -484,6 +484,49 @@ class TestMainEndToEnd(unittest.TestCase):
             self.assertIn("no-run フラグ", res.stdout)
             self.assertIn("verdict: FAIL", report.read_text())
 
+    def test_collectonly_alias_forge_blocked_e2e(self):
+        # grill-code (2026-07-14): the R4 forge reconstructed via the no-dash
+        # alias `--collectonly` (missed by the pre-iter69 denylist) PLUS an
+        # import-crash mutant (syntactically valid, so it slips past
+        # syntax_check_mutants). Both drill layers must still block it — the
+        # NO_RUN denylist now enumerates the alias.
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            _git_init(root)
+            self._commit_seed(root)
+            (root / "src" / "m.py").write_text("a = 1\n\nb = 2\n", encoding="utf-8")
+            spec = root / "s.drill"
+            spec.write_text(json.dumps({
+                "test_command": "python3 -m pytest --collectonly -q",
+                "timeout_seconds": 10,
+                "mutants": [{"file": "src/m.py", "line": 2,
+                             "original": "", "mutated": "raise Exception()"}],
+            }), encoding="utf-8")
+            report = root / "r.md"
+            res = self._run(root, spec, report)
+            self.assertEqual(res.returncode, 1)
+            self.assertIn("no-run フラグ", res.stdout)
+            self.assertIn("verdict: FAIL", report.read_text())
+
+    def test_setup_plan_alias_forge_blocked_e2e(self):
+        # Same forge class via `--setup-plan` (runs fixtures, never test bodies).
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            _git_init(root)
+            self._commit_seed(root)
+            (root / "src" / "m.py").write_text("a = 1\n\nb = 2\n", encoding="utf-8")
+            spec = root / "s.drill"
+            spec.write_text(json.dumps({
+                "test_command": "python3 -m pytest --setup-plan -q",
+                "timeout_seconds": 10,
+                "mutants": [{"file": "src/m.py", "line": 2,
+                             "original": "", "mutated": "raise Exception()"}],
+            }), encoding="utf-8")
+            report = root / "r.md"
+            res = self._run(root, spec, report)
+            self.assertEqual(res.returncode, 1)
+            self.assertIn("no-run フラグ", res.stdout)
+
     def test_since_mode_committed_change_pass(self):
         # 罠 f: per-task コミット済みで diff HEAD 空でも、since=反復基点で drill 成立
         with tempfile.TemporaryDirectory() as d:
