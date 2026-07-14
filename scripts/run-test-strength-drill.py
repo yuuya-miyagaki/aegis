@@ -187,6 +187,15 @@ def parse_spec(path: Path) -> dict:
             or not isinstance(data["timeout_seconds"], int)
             or data["timeout_seconds"] <= 0):
         raise DrillError("'timeout_seconds' must be a positive integer")
+    # 罠 f (full-review R6 / LEARNINGS:76): per-task コミット運用では diff HEAD
+    # が空になり drill 不成立。optional 'since' で反復基点 ref への diff に
+    # 切り替える（committed-this-iteration を追加扱い）。CLI flag でなく spec
+    # key なのは、承認時経路 (check_status.py::run_qa_drill) が固定 argv で
+    # runner を起動するため — spec なら preview と承認が自動一致し、基点 ref
+    # が監査可能な証拠ファイルに残る。
+    if "since" in data:
+        if not isinstance(data["since"], str) or not data["since"].strip():
+            raise DrillError("'since' must be a non-empty string when present")
     for m in data["mutants"]:
         if not isinstance(m, dict):
             raise DrillError(f"each mutant must be an object: {m}")
@@ -312,6 +321,35 @@ def resolve_diff_ref(root: Path) -> str:
         capture_output=True, text=True,
     )
     return "HEAD" if head.returncode == 0 else EMPTY_TREE
+
+
+def resolve_since_ref(root: Path, since: str) -> str:
+    """Validate the spec's 'since' baseline and return its full sha. The ref
+    must resolve to a commit AND be an ancestor of HEAD: a non-ancestor ref
+    would define a diff no reviewer can audit from the report alone.
+    Fail-closed on any git failure."""
+    try:
+        rp = subprocess.run(
+            ["git", "-C", str(root), "rev-parse", "--verify", "-q",
+             f"{since}^{{commit}}"],
+            capture_output=True, text=True)
+    except OSError as exc:
+        raise DrillError(f"git rev-parse failed: {exc}")
+    sha = rp.stdout.strip()
+    if rp.returncode != 0 or not sha:
+        raise DrillError(f"spec 'since' が commit に解決できません: {since}")
+    try:
+        anc = subprocess.run(
+            ["git", "-C", str(root), "merge-base", "--is-ancestor",
+             sha, "HEAD"],
+            capture_output=True, text=True)
+    except OSError as exc:
+        raise DrillError(f"git merge-base failed: {exc}")
+    if anc.returncode != 0:
+        raise DrillError(
+            f"spec 'since' は HEAD の祖先ではありません: {since} — "
+            f"監査不能な diff 基点は拒否します")
+    return sha
 
 
 def added_lines_by_file(root: Path, ref: str = "HEAD",
@@ -563,7 +601,7 @@ def apply_mutant_and_test(root: Path, mutant: dict, command: str,
 
 
 def write_report(report_path: Path, *, verdict: str, total: int, caught: int,
-                 baseline: str, survived: list[str]) -> None:
+                 baseline: str, survived: list[str], since: str = "n/a") -> None:
     """Write the machine block (harness-authored, not LLM prose). The qa agent
     appends a plain-Japanese explanation block below this when presenting."""
     report_path.parent.mkdir(parents=True, exist_ok=True)
@@ -575,6 +613,7 @@ def write_report(report_path: Path, *, verdict: str, total: int, caught: int,
         f"mutants_total: {total}\n"
         f"mutants_caught: {caught}\n"
         f"baseline: {baseline}\n"
+        f"since: {since}\n"
         f"survived: {survived_repr}\n"
         "```\n",
         encoding="utf-8",
@@ -584,6 +623,7 @@ def write_report(report_path: Path, *, verdict: str, total: int, caught: int,
 def run_drill(root: Path, spec_path: Path, report_path: Path) -> int:
     """Orchestrate. Returns 0 (PASS) or 1 (FAIL/inconclusive). Never raises:
     every DrillError becomes a fail-closed verdict + non-zero exit."""
+    since_label = "n/a"
     try:
         spec = parse_spec(spec_path)
         cmd = spec["test_command"]
@@ -592,7 +632,13 @@ def run_drill(root: Path, spec_path: Path, report_path: Path) -> int:
         # transparency: surface what will actually be executed at approval time
         print(f"test command (executed at approval): {cmd}")
 
-        ref = resolve_diff_ref(root)  # 'HEAD', or empty-tree when no commits yet
+        if "since" in spec:
+            ref = resolve_since_ref(root, spec["since"].strip())
+        else:
+            ref = resolve_diff_ref(root)  # 'HEAD', or empty-tree when no commits
+        since_label = ref
+        # transparency: the report records which baseline defined "added lines"
+        print(f"diff baseline (since): {since_label}")
         tracked_map = _tracked_added_lines(root, ref)
         added = added_lines_by_file(root, ref, tracked=tracked_map)
         # coverage floor applies to tracked changes (clearly task code) plus any
@@ -618,7 +664,8 @@ def run_drill(root: Path, spec_path: Path, report_path: Path) -> int:
             for v in ag:
                 print(f"  - {v}")
             write_report(report_path, verdict="FAIL", total=len(spec["mutants"]),
-                         caught=0, baseline="n/a", survived=[])
+                         caught=0, baseline="n/a", survived=[],
+                         since=since_label)
             return 1
 
         syntax_check_mutants(root, spec["mutants"])
@@ -632,7 +679,8 @@ def run_drill(root: Path, spec_path: Path, report_path: Path) -> int:
                 tail = base_output.strip().splitlines()[-BASELINE_OUTPUT_TAIL:]
                 print("\n".join(tail))
             write_report(report_path, verdict="FAIL", total=len(spec["mutants"]),
-                         caught=0, baseline=base, survived=[])
+                         caught=0, baseline=base, survived=[],
+                         since=since_label)
             return 1
 
         survived: list[str] = []
@@ -646,7 +694,8 @@ def run_drill(root: Path, spec_path: Path, report_path: Path) -> int:
 
         verdict = "PASS" if not survived else "FAIL"
         write_report(report_path, verdict=verdict, total=len(spec["mutants"]),
-                     caught=caught, baseline="green", survived=survived)
+                     caught=caught, baseline="green", survived=survived,
+                     since=since_label)
         if survived:
             print("DRILL FAIL — these mutants survived (tests have a hole):")
             for s in survived:
@@ -661,7 +710,8 @@ def run_drill(root: Path, spec_path: Path, report_path: Path) -> int:
         print(f"DRILL BLOCKED (fail-closed): {exc}")
         try:
             write_report(report_path, verdict="FAIL", total=0, caught=0,
-                         baseline="inconclusive", survived=[])
+                         baseline="inconclusive", survived=[],
+                         since=since_label)
         except OSError:
             pass
         return 1
