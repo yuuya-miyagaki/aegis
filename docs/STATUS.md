@@ -3,29 +3,29 @@ framework: aegis
 framework_version: "1.28.0"
 project_name: "Aegis"
 mode: Dev
-phase: docs
+phase: plan
 task_type: framework
 task_size: M
-task_size_rationale: "iteration 69（framework・B1 drill 強化＝Phase 1 項目 1-5）M 確定（brainstorm Step D・update-task.sh 経由）。設計正本: docs/specs/2026-07-14-iter69-drill-hardening-design.md（(1) NO_RUN 拒否＝patterns.sh の AEGIS_TEST_NO_RUN_FLAG_REGEX を bash+grep subprocess で single-source 消費〔evidence.sh と同一エンジン＝意味論ドリフトゼロ〕・R4 フォージ穴閉塞 (2) mutant 構文検証＝適用前 pre-pass で .py→py_compile／.sh→bash -n・構文破壊 mutant を spec エラー化〔元ファイル parse 不能は帰責不能 skip〕 (3) coverage floor からコメント/空行/py docstring のみの連続ランを除外〔緩和は不可能要求の削除のみ・混在ラン維持・AST parse 失敗は厳格側劣化〕＝罠 l (4) .drill spec optional key since で diff baseline ref 指定〔ancestor 検証＋report since: 行で透明化・CLI flag は承認時固定 argv で不達のため spec key〕＝罠 f）。footprint: scripts/run-test-strength-drill.py＋tests/test_test_strength_drill.py＋qa-verification SKILL.md＝M（2-5）。control-plane（qa gate 証拠機構）を触るため review+qa+security 必須・M のため deploy skip。SF-011/012/013 は相乗りせず backlog 維持（テーマ純度・iter68 前例）。"
-iteration: 69
+task_size_rationale: "iteration 70（framework・Phase 1 項目 1-6＝record-test-result 引数事前検証〔R6 罠 n〕＋deps 無 manifest info 降格〔gate F6〕＋judge カード tests スコープ表示〔test #3〕）M 確定（brainstorm Step D）。設計正本: docs/specs/2026-07-14-iter70-record-guard-judge-card-design.md（(1) judge 照合ヘルパ抽出 runner_cmd_matches＋drill.check_no_run_command 再利用で record を実行前 fail-closed 検証 (2) audit_deps 第4状態 no-manifest→info 降格〔package.json あり lock なしは unverified 維持〕 (3) read_test_result_detail 抽出で判定と表示を同一走査化・cmd 表示サニタイズ〔カード注入遮断〕）。footprint: scripts/record-test-result.py＋scripts/build-judge-card.py＋tests/test_record_test_result.py（新規）＋tests/test_judge_card.py＝M（2-5）。control-plane（gate 証拠機構）を触るため review+qa+security 必須・M のため deploy skip。SF-011〜014 は相乗りせず backlog 維持（テーマ純度）。"
+iteration: 70
 ui_surface: false
 last_updated: "2026-07-14T00:00:00Z"
 gate_approvals:
   client_ready_for_dev: n/a
   brainstorm: approved
-  plan: approved
-  review: approved
-  qa: approved
-  security: approved
+  plan: pending
+  review: pending
+  qa: pending
+  security: pending
   deploy: pending
-  dev_ready_for_client: approved
+  dev_ready_for_client: pending
 current_refs:
   requirements: []
-  plan: "docs/plans/2026-07-14-iter69-drill-hardening-implementation-plan.md"
-  spec: "docs/specs/2026-07-14-iter69-drill-hardening-design.md"
-  review: "docs/qa-reports/iter69-review.md"
-  qa: "docs/qa-reports/iter69-qa.md"
-  security: "docs/qa-reports/iter69-security.md"
+  plan: null
+  spec: null
+  review: null
+  qa: null
+  security: null
   deploy: null
   translation: null
 external_evidence:
@@ -37,7 +37,7 @@ external_evidence:
     scope: "v0.13.0 計画 5 ラウンドレビュー"
     findings: "Round 1〜5 で計 25 件の指摘（hook 出力スキーマ陳腐化、TaskCreated/Completed 制御方式、Plan 条件付き許可、effort 配分、pre-compact.sh 同種破損、`if` 単一 rule 制約等）"
     resolution: "Rev.5 で全件反映、Phase 0a 即時実装着手 GO。hotfix/v0122-hook-schema ブランチで開始。"
-next_action: "**【iter69 全 dev ゲート approved → dev_ready_for_client 申請】** iter69/v1.28.0（B1 drill 強化＝Phase 1 項目 1-5・MINOR）は review+qa+security 全 approved・ship/docs 完了（bump 3箇所 2a5cfc9・TO-CLIENT・LEARNINGS 更新済〔line136/146 更新＋新3件〕・SF-014 起票・session_history に iter69 追加＋iter66 を evidence-archive 移設＝≤3 維持・docs-sync 整合）。**次アクション＝ユーザーに dev_ready_for_client 承認を申請→approved 後 `bash scripts/update-gate.sh dev_ready_for_client approve`→push（`gh auth switch --user yuuya-miyagaki` 必須・active tigereye だと 403）→`/clear`→`/recover`**。**Phase 1 スイープ残（各 iter の境目で /clear→/recover）**: 【iter70=1-6】record-test-result 引数事前検証／deps 無 manifest info 降格／judge カード tests スコープ表示（R6 罠 n・F6・test#3）＝Phase 1 完遂。Phase 1 消化: 1-1✅iter64／1-2✅iter67／1-3✅iter68／1-4✅iter65／1-5✅iter69〔本反復〕／残=1-6。◆別トラック: SF-011／SF-012／SF-013／**SF-014〔新規・NO_RUN denylist は非フラグ no-run に不完全・pre-existing・恒久策=positive N-tests-executed proof〕**＝いずれも hardening 候補／routing.md「実験委譲は隔離 clone 既定」昇格提案（LEARNINGS line146 conf8）／#3 session_history 自動アーカイブ＋doctor 誤検出偏り。"
+next_action: "**【iter70 plan フェーズ】** brainstorm approved（設計正本=docs/specs/2026-07-14-iter70-record-guard-judge-card-design.md・record=同 brainstorm-record.md）。次: 実装計画 docs/plans/2026-07-14-iter70-record-guard-judge-card-implementation-plan.md 起案→grill-plan で全指摘反映→plan gate approve --ref→implement（TDD RED→GREEN・implementer=opus per-task commit）。1-6 完了で **Phase 1 完遂**。◆別トラック: SF-011／SF-012／SF-013／SF-014〔NO_RUN 恒久策=positive N-tests-executed proof・iter71+〕／routing.md 隔離 clone 既定昇格（LEARNINGS line146）／#3 session_history 自動アーカイブ＋doctor 誤検出偏り。"
 blockers: []
 failure_tracking: null
 session_history:
