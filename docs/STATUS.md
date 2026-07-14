@@ -3,7 +3,7 @@ framework: aegis
 framework_version: "1.28.0"
 project_name: "Aegis"
 mode: Dev
-phase: plan
+phase: implement
 task_type: framework
 task_size: M
 task_size_rationale: "iteration 70（framework・Phase 1 項目 1-6＝record-test-result 引数事前検証〔R6 罠 n〕＋deps 無 manifest info 降格〔gate F6〕＋judge カード tests スコープ表示〔test #3〕）M 確定（brainstorm Step D）。設計正本: docs/specs/2026-07-14-iter70-record-guard-judge-card-design.md（(1) judge 照合ヘルパ抽出 runner_cmd_matches＋drill.check_no_run_command 再利用で record を実行前 fail-closed 検証 (2) audit_deps 第4状態 no-manifest→info 降格〔package.json あり lock なしは unverified 維持〕 (3) read_test_result_detail 抽出で判定と表示を同一走査化・cmd 表示サニタイズ〔カード注入遮断〕）。footprint: scripts/record-test-result.py＋scripts/build-judge-card.py＋tests/test_record_test_result.py（新規）＋tests/test_judge_card.py＝M（2-5）。control-plane（gate 証拠機構）を触るため review+qa+security 必須・M のため deploy skip。SF-011〜014 は相乗りせず backlog 維持（テーマ純度）。"
@@ -13,7 +13,7 @@ last_updated: "2026-07-14T00:00:00Z"
 gate_approvals:
   client_ready_for_dev: n/a
   brainstorm: approved
-  plan: pending
+  plan: approved
   review: pending
   qa: pending
   security: pending
@@ -21,8 +21,8 @@ gate_approvals:
   dev_ready_for_client: pending
 current_refs:
   requirements: []
-  plan: null
-  spec: null
+  plan: "docs/plans/2026-07-14-iter70-record-guard-judge-card-implementation-plan.md"
+  spec: "docs/specs/2026-07-14-iter70-record-guard-judge-card-design.md"
   review: null
   qa: null
   security: null
@@ -37,7 +37,7 @@ external_evidence:
     scope: "v0.13.0 計画 5 ラウンドレビュー"
     findings: "Round 1〜5 で計 25 件の指摘（hook 出力スキーマ陳腐化、TaskCreated/Completed 制御方式、Plan 条件付き許可、effort 配分、pre-compact.sh 同種破損、`if` 単一 rule 制約等）"
     resolution: "Rev.5 で全件反映、Phase 0a 即時実装着手 GO。hotfix/v0122-hook-schema ブランチで開始。"
-next_action: "**【iter70 plan フェーズ】** brainstorm approved（設計正本=docs/specs/2026-07-14-iter70-record-guard-judge-card-design.md・record=同 brainstorm-record.md）。次: 実装計画 docs/plans/2026-07-14-iter70-record-guard-judge-card-implementation-plan.md 起案→grill-plan で全指摘反映→plan gate approve --ref→implement（TDD RED→GREEN・implementer=opus per-task commit）。1-6 完了で **Phase 1 完遂**。◆別トラック: SF-011／SF-012／SF-013／SF-014〔NO_RUN 恒久策=positive N-tests-executed proof・iter71+〕／routing.md 隔離 clone 既定昇格（LEARNINGS line146）／#3 session_history 自動アーカイブ＋doctor 誤検出偏り。"
+next_action: "**【iter70 implement フェーズ】** plan approved（--ref 原子・grill-plan 致命4/要検討4 全反映済み: 致命1=UNAUDITABLE_MANIFESTS 指標で pyproject 等の実 manifest repo を info 後退させない／致命2=RED 分布 17 件 FAIL＋両側 green ピン 5 件に訂正／致命3=env 代入 prefix・シェル演算子トークンの usage エラー化／致命4=テスト11 の claims/第2意見前提明記）。次: Task1 RED（implementer=opus・分布実測記録）→Task2 record 事前検証→Task3 audit_deps no-manifest→Task4 detail+カード（Task2-4 同一ファイル逐次）→Task5 full suite→grill-code→review。1-6 完了で **Phase 1 完遂**。◆別トラック: SF-011／SF-012／SF-013／SF-014〔NO_RUN 恒久策=positive N-tests-executed proof・iter71+〕／routing.md 隔離 clone 既定昇格（LEARNINGS line146）／#3 session_history 自動アーカイブ＋doctor 誤検出偏り。"
 blockers: []
 failure_tracking: null
 session_history:
