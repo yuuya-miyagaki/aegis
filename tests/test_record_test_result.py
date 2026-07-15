@@ -154,6 +154,19 @@ class TestRecordRejection(_RecordFixture):
         self.assertEqual(rc, 2, err)
         self.assertFalse(self.log.exists())
 
+    def test_unparseable_quote_rejected(self):
+        # iter70 review テスト強度 Finding 2: a command that MATCHES the runner
+        # regex but has an unterminated quote reaches shlex.split → ValueError.
+        # That path (record-test-result.py step 2) was previously unpinned; a
+        # mutation replacing shlex.split with str.split (no ValueError) would
+        # have survived. The command must fail-closed: rc2, no log write, and a
+        # quoting-related message.
+        rc, err = _run_main(
+            ["--root", str(self.root), 'python3 -m pytest -q "abc'])
+        self.assertEqual(rc, 2, err)
+        self.assertFalse(self.log.exists())
+        self.assertIn("クォート", err)
+
 
 class TestRecordAccept(_RecordFixture):
     def test_valid_runner_still_records(self):

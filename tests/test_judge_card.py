@@ -736,6 +736,20 @@ class TestAuditDeps(unittest.TestCase):
             (Path(d) / "pom.xml").write_text("<project/>", encoding="utf-8")
             self.assertEqual(judge.audit_deps(Path(d)), "unverified")
 
+    def test_every_unauditable_manifest_stays_unverified(self):
+        # iter70 review テスト強度 Finding 3: the individual pyproject/go.mod/
+        # pom.xml pins covered only 3 of the UNAUDITABLE_MANIFESTS entries, so
+        # dropping any of the other 15+ (a real regression risk on future edits)
+        # would go undetected. Cover the WHOLE tuple: each indicator alone must
+        # keep audit_deps at the ack-able 'unverified', never the info
+        # 'no-manifest' zero-dependency state.
+        for manifest in judge.UNAUDITABLE_MANIFESTS:
+            with tempfile.TemporaryDirectory() as d:
+                (Path(d) / manifest).write_text("x\n", encoding="utf-8")
+                self.assertEqual(
+                    judge.audit_deps(Path(d)), "unverified",
+                    f"{manifest} must map to 'unverified', not 'no-manifest'")
+
 
 class TestNoManifestVerdict(unittest.TestCase):
     """iter70 (2): deps=='no-manifest' is info, not 🟡.
@@ -908,6 +922,47 @@ class TestCardRender(unittest.TestCase):
                               claims={"verdict": "approve"}, facts=facts,
                               second_opinion={"verdict": "approve"})
             self.assertTrue(out.is_file())
+
+
+class TestSanitizeCardField(unittest.TestCase):
+    """iter70 review テスト強度 Findings 4/5/6: the card-scope tests only
+    asserted the coarse outcome (one '## 総合', one '- テスト:' line, a '…'),
+    so individual sanitize operations (backtick, truncation boundary, the
+    CR/LF vs Unicode-whitespace split) survived mutation untested. These pin
+    each operation of _sanitize_card_field directly."""
+
+    def test_crlf_becomes_semicolon(self):
+        # Finding 4: the CR/LF→';' replace is NOT redundant with the split():
+        # ';' is non-whitespace so it survives " ".join(split()), keeping CR/LF
+        # distinguishable. Dropping the replace would silently yield spaces.
+        self.assertEqual(judge._sanitize_card_field("a\rb\nc"), "a;b;c")
+
+    def test_unicode_line_separators_collapse_to_space(self):
+        # Finding 4 / F-1: U+2028/U+2029/NEL/\v/\f are NOT CR/LF, so they are
+        # collapsed by the positive " ".join(split()) whitespace pass — this is
+        # what stops a second forged card line.
+        self.assertEqual(
+            judge._sanitize_card_field("a b c\x85d\x0be\x0cf"),
+            "a b c d e f")
+
+    def test_backtick_becomes_apostrophe(self):
+        # Finding 5: backtick neutralization was asserted nowhere; a mutation
+        # dropping it passed all card tests. Pin it directly.
+        self.assertEqual(judge._sanitize_card_field("a`b`c"), "a'b'c")
+
+    def test_hash_becomes_fullwidth(self):
+        # F-1: a leading-'#' run must not reproduce the real '## 総合' header.
+        self.assertEqual(judge._sanitize_card_field("## x"), "＃＃ x")
+
+    def test_truncation_is_exactly_limit_chars(self):
+        # Finding 6: existing tests only checked '…' presence, so an off-by-one
+        # (limit-1 → limit) survived. Pin the exact post-truncation length.
+        out = judge._sanitize_card_field("A" * 300)
+        self.assertEqual(len(out), 120)
+        self.assertTrue(out.endswith("…"))
+
+    def test_under_limit_not_truncated(self):
+        self.assertEqual(judge._sanitize_card_field("short"), "short")
 
 
 class TestBinaryScanResilience(unittest.TestCase):

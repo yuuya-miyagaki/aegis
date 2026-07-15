@@ -12,7 +12,17 @@ argv tokens, which this shell-less exec would pass through as red-recording
 arguments), and NO_RUN (drill.check_no_run_command). A non-matching command
 is a usage error (rc2, stderr guidance, no log write, no execution). The
 accepted set is single-sourced with the judge's visible set, so a command the
-judge could never recognize is never recorded."""
+judge could never recognize is never recorded.
+
+Residual (SF-014 class, NOT closed here): this validation is still a denylist
+of non-run flags / non-runner commands. A command that MATCHES a runner yet
+executes ZERO tests and exits 0 is not caught — e.g. `unittest discover -p
+<no-match>` (exits 0, unlike pytest's exit 5) or `npm test` bound to a
+`"test":"true"` script. iter70 narrows the accept set (pre-iter70 recorded ANY
+command, `true` included) but the permanent fix is a POSITIVE proof that N>=1
+tests actually ran (a pass-marker count), tracked in docs/security-followups.md
+SF-014. This is contained by the judge's fingerprint/marker gate and human
+preview; do not mistake this guard for a proof of test execution."""
 from __future__ import annotations
 import hashlib
 import importlib.util
@@ -72,6 +82,10 @@ def main(argv=None) -> int:
     except ValueError as exc:
         return _reject(f"コマンドを解析できません（クォート不整合）: {exc}")
     if not argv:
+        # Defensive guard (iter70 review Finding 1): step 1's runner match
+        # already rejects an empty/whitespace-only command (it matches no
+        # runner regex), so this is not reachable via the current step order.
+        # Kept so a future reordering of the checks stays fail-closed.
         return _reject("コマンドが空です")
     if "=" in argv[0]:
         return _reject(
