@@ -14,15 +14,25 @@ is a usage error (rc2, stderr guidance, no log write, no execution). The
 accepted set is single-sourced with the judge's visible set, so a command the
 judge could never recognize is never recorded.
 
-Residual (SF-014 class, NOT closed here): this validation is still a denylist
-of non-run flags / non-runner commands. A command that MATCHES a runner yet
-executes ZERO tests and exits 0 is not caught — e.g. `unittest discover -p
-<no-match>` (exits 0, unlike pytest's exit 5) or `npm test` bound to a
-`"test":"true"` script. iter70 narrows the accept set (pre-iter70 recorded ANY
-command, `true` included) but the permanent fix is a POSITIVE proof that N>=1
-tests actually ran (a pass-marker count), tracked in docs/security-followups.md
-SF-014. This is contained by the judge's fingerprint/marker gate and human
-preview; do not mistake this guard for a proof of test execution."""
+Zero-run forgery — CLOSED (SF-014 iter71): a command that MATCHES a runner yet
+executes ZERO tests and exits 0 (e.g. `unittest discover -p <no-match>`, which
+exits 0 unlike pytest's exit 5, or `npm test` bound to a `"test":"true"`
+script) is now rejected. A green (exit 0) record additionally requires the
+POSITIVE marker verdict (hooks/lib/marker.sh — the same 4-stage proof the hook
+observer consumes: N>=1 tests actually ran). No marker -> rc2, no log write. A
+red run keeps recording as-is (failure is fail-visible, not a forge vector).
+
+Residual (intentionally NOT closed): a runner whose output is fully controlled
+by an arbitrary script — e.g. an `npm test` script that echoes a marker-shaped
+line (`Tests: 3 passed` etc.) — is not distinguishable by an output-based proof
+like the marker. We do NOT chase this by enumeration (a denylist regression =
+reproducing SF-014). It is contained by defence-in-depth: fingerprint / judge /
+human preview / drill (an echo script cannot kill a mutant -> the drill FAILs).
+Handed off to the SF-014 docs update (iter71 docs phase) and the audit_deps
+positive-proof track (iter72).
+
+The accepted green entry's optional `"marker": true` is an additive audit-
+transparency field; the judge does not consume it."""
 from __future__ import annotations
 import hashlib
 import importlib.util
@@ -57,7 +67,7 @@ def main(argv=None) -> int:
     judge = _load("judge_mod", "build-judge-card.py")
 
     usage = ('正しい例: python3 scripts/record-test-result.py '
-             '"python3 -m pytest -q"')
+             '"python3 -m pytest"')
 
     def _reject(reason: str) -> int:
         print(f"record-test-result: {reason}\n{usage}", file=sys.stderr)
@@ -106,6 +116,38 @@ def main(argv=None) -> int:
 
     status_code, output = drill._execute(args.command, root, 600)
     status = "ok" if status_code == "passed" else "fail"
+    # 4) positive proof (SF-014 iter71): a GREEN record additionally requires
+    # the shared 4-stage marker verdict (hooks/lib/marker.sh — the same
+    # implementation the hook observer consumes) over the FULL output.
+    # payload_sha keeps its 64 KiB cap below, but runners print their summary
+    # at the TAIL — never pass the capped prefix to the verdict.
+    # red (exit != 0) is recorded as-is: failure is fail-visible, not a
+    # gaming vector.
+    # verdict uses the TARGET root's marker.sh (--root-resolved) — same
+    # "judge reads the co-located install" basis as check_no_run_command's
+    # patterns_lib. marker.sh sources its own dir's patterns.sh, so a
+    # patterns/marker mismatch is structurally impossible. exit_code stays 0
+    # (the default): the green path is defined by _execute's returncode==0, so
+    # the constant 0 is correct (pytest exit 5 falls to the red path and is
+    # recorded as red, as before).
+    marker_proven = False
+    if status == "ok":
+        try:
+            marker_proven = drill.marker_verdict(
+                output or "", args.command[:500],
+                marker_lib=root / "hooks" / "lib" / "marker.sh")
+        except drill.DrillError as exc:
+            return _reject(f"marker 検査を実行できません — fail-closed: {exc}")
+        if not marker_proven:
+            return _reject(
+                "exit 0 ですが、テスト実行の positive proof（ランナーのサマリ "
+                "marker）が出力にありません — 0 件実行の green（例: unittest "
+                "discover のパターン不一致 / `npm test` が `true` に束縛）は"
+                "記録しません。pytest は `-q` を外して実行してください（marker "
+                "はデフォルト出力の `===== N passed =====` 行）。対応ランナー: "
+                "pytest（デフォルト出力）/ jest / vitest / go test / cargo test "
+                "/ unittest。未収載ランナーは hooks/lib/patterns.sh の marker "
+                "追加を検討してください")
     out_bytes = (output or "")[:65536].encode("utf-8", errors="replace")
     entry = {
         "v": 1,
@@ -116,6 +158,8 @@ def main(argv=None) -> int:
         "payload_sha": hashlib.sha256(out_bytes).hexdigest(),
         "fp": judge.current_fingerprint(root),
     }
+    if marker_proven:
+        entry["marker"] = True  # additive 監査フィールド（judge 非消費）
     log = root / ".claude" / "evidence-log.jsonl"
     log.parent.mkdir(parents=True, exist_ok=True)
     with log.open("a", encoding="utf-8") as f:

@@ -520,7 +520,7 @@ def compute_verdict(gate: str, claims: dict | None, facts: dict,
         # the bare message forced a docs dig every time).
         yellow.append(
             "テスト結果が未検証（記録なし/コード変更後）— 全編集後に "
-            "`python3 scripts/record-test-result.py \"python3 -m pytest -q\"` で再記録")
+            "`python3 scripts/record-test-result.py \"python3 -m pytest\"` で再記録")
     if facts["deps"] == "unverified":
         yellow.append("依存監査が未検証")
     elif facts["deps"] == "vuln":
