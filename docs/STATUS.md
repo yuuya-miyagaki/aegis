@@ -3,7 +3,7 @@ framework: aegis
 framework_version: "1.29.0"
 project_name: "Aegis"
 mode: Dev
-phase: plan
+phase: implement
 task_type: framework
 task_size: L
 task_size_rationale: "iteration 71（framework・SF-014 恒久策＝marker positive proof 共有 lib 化・record/drill 適用）L 確定（brainstorm Step D）。設計正本: docs/specs/2026-07-15-iter71-marker-positive-proof-design.md（(1) evidence.sh の 4段検証コア〔NO_RUN→STRONG→WEAK pair→zero-run gate〕を hooks/lib/marker.sh に抽出・挙動不変 (2) record-test-result は green 時に verdict 必須＝不成立/評価不能は rc2・ログ非書込〔`unittest discover -p nomatch`／`npm test`→true 偽 green の根治〕・red は marker 不要 (3) drill check_baseline に no-test-proof BLOCKED〔非ランナー import プローブ偽 PASS の根治〕）。footprint: hooks/lib/marker.sh（新規）＋hooks/lib/evidence.sh＋scripts/record-test-result.py＋scripts/run-test-strength-drill.py＋tests 2-3本＝L（6+）。control-plane（反ガミング moat）を触るため review+qa+security 必須・L のため deploy 含む全フェーズ。audit_deps の positive proof（attestation 型・機構別）は iter72 分離起票・marker 覆域拡張は YAGNI（テーマ純度）。"
@@ -13,7 +13,7 @@ last_updated: "2026-07-15T00:00:00Z"
 gate_approvals:
   client_ready_for_dev: n/a
   brainstorm: approved
-  plan: pending
+  plan: approved
   review: pending
   qa: pending
   security: pending
@@ -21,7 +21,7 @@ gate_approvals:
   dev_ready_for_client: pending
 current_refs:
   requirements: []
-  plan: null
+  plan: "docs/plans/2026-07-15-iter71-marker-positive-proof-implementation-plan.md"
   spec: "docs/specs/2026-07-15-iter71-marker-positive-proof-design.md"
   review: null
   qa: null
@@ -37,10 +37,14 @@ external_evidence:
     scope: "v0.13.0 計画 5 ラウンドレビュー"
     findings: "Round 1〜5 で計 25 件の指摘（hook 出力スキーマ陳腐化、TaskCreated/Completed 制御方式、Plan 条件付き許可、effort 配分、pre-compact.sh 同種破損、`if` 単一 rule 制約等）"
     resolution: "Rev.5 で全件反映、Phase 0a 即時実装着手 GO。hotfix/v0122-hook-schema ブランチで開始。"
-next_action: "**【iter71 plan 着手】** brainstorm approved（設計正本=docs/specs/2026-07-15-iter71-marker-positive-proof-design.md・brainstorm-record 同日・commit d9508a4）。ユーザー決定3点: スコープ=record+drill のみ（audit_deps は iter72 分離）／green marker 不成立は rc2 拒否・ログ非書込（red は marker 不要）／実装方式=案A bash 共有 lib（hooks/lib/marker.sh 抽出・evidence.sh 挙動不変・python は subprocess 同一エンジン）。次＝writing-plans skill で docs/plans/2026-07-15-iter71-marker-positive-proof-implementation-plan.md 作成→**grill-plan 必須**→plan gate approve --ref。TDD RED 先行（偽 green/偽 PASS の RED 証明・64KiB 先頭 cap×末尾 marker 罠 pin）。実装は dispatch model:opus per-task commit・grill/盲検2次/security は fable。◆残トラック（iter72+）: audit_deps positive proof（attestation 型）／Phase 2（R9/R8/R5）／routing.md 隔離 clone 昇格／SF-011/012/013。"
+next_action: "**【iter71 implement 進行中】** plan approved（正本=docs/plans/2026-07-15-iter71-marker-positive-proof-implementation-plan.md・grill-plan 致命2/要検討4 反映済み）。Task1 RED（18件期待・npm 有で19）→Task2 marker.sh→Task3 drill no-test-proof→Task4 record green-gate→Task5 SKILL 同期の順で implementer dispatch（model:opus・per-task commit・subagent-dev 2段レビュー・レビュー系は read-only 6拘束）。運用変更に注意: pytest -q の green は record rc2 拒否になる（-q を外す）。◆残トラック（iter72+）: audit_deps positive proof（attestation 型）／npm-echo 残余は SF-014 docs 更新へ／Phase 2（R9/R8/R5）／routing.md 隔離 clone 昇格／SF-011/012/013。"
 blockers: []
 failure_tracking: null
 session_history:
+  - date: "2026-07-15"
+    mode: Dev
+    phase: "plan"
+    note: "iter71 plan セッション（/recover 復帰→writing-plans→grill-plan）。実装計画 docs/plans/2026-07-15-iter71-marker-positive-proof-implementation-plan.md 作成。計画時実測: (1) pytest -q（8.4.2）は STRONG marker・prologue とも出力しない→marker 必須化後は -q の正規 green が rc2 拒否になる意図的運用変更（usage/judge 案内/SKILL 同期を Task 化） (2) unittest discover nomatch は『Ran 0 tests/OK』で zero-run 軸1 が捕捉 (3) 既存 drill テストのダミー test_command（true/grep -q）は新 baseline 検査で全滅→実ランナー移行を Task1 に組込み。grill-plan 致命2（test_check_status.py TestQaDrillGate の移行漏れ=blind rc1 期待が baseline BLOCKED で偶然満たされ続ける fail-silent すり替わり／record docstring CLOSED 過大主張→npm-echo 残余〔echo 'Tests: 3 passed' が STRONG jest marker を踏む・実証済み〕を明記）＋要検討4 全反映。plan gate はユーザー承認待ち。"
   - date: "2026-07-13"
     mode: Dev
     phase: "docs"
