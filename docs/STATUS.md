@@ -3,29 +3,29 @@ framework: aegis
 framework_version: "1.29.0"
 project_name: "Aegis"
 mode: Dev
-phase: docs
+phase: plan
 task_type: framework
-task_size: M
-task_size_rationale: "iteration 70（framework・Phase 1 項目 1-6＝record-test-result 引数事前検証〔R6 罠 n〕＋deps 無 manifest info 降格〔gate F6〕＋judge カード tests スコープ表示〔test #3〕）M 確定（brainstorm Step D）。設計正本: docs/specs/2026-07-14-iter70-record-guard-judge-card-design.md（(1) judge 照合ヘルパ抽出 runner_cmd_matches＋drill.check_no_run_command 再利用で record を実行前 fail-closed 検証 (2) audit_deps 第4状態 no-manifest→info 降格〔package.json あり lock なしは unverified 維持〕 (3) read_test_result_detail 抽出で判定と表示を同一走査化・cmd 表示サニタイズ〔カード注入遮断〕）。footprint: scripts/record-test-result.py＋scripts/build-judge-card.py＋tests/test_record_test_result.py（新規）＋tests/test_judge_card.py＝M（2-5）。control-plane（gate 証拠機構）を触るため review+qa+security 必須・M のため deploy skip。SF-011〜014 は相乗りせず backlog 維持（テーマ純度）。"
-iteration: 70
+task_size: L
+task_size_rationale: "iteration 71（framework・SF-014 恒久策＝marker positive proof 共有 lib 化・record/drill 適用）L 確定（brainstorm Step D）。設計正本: docs/specs/2026-07-15-iter71-marker-positive-proof-design.md（(1) evidence.sh の 4段検証コア〔NO_RUN→STRONG→WEAK pair→zero-run gate〕を hooks/lib/marker.sh に抽出・挙動不変 (2) record-test-result は green 時に verdict 必須＝不成立/評価不能は rc2・ログ非書込〔`unittest discover -p nomatch`／`npm test`→true 偽 green の根治〕・red は marker 不要 (3) drill check_baseline に no-test-proof BLOCKED〔非ランナー import プローブ偽 PASS の根治〕）。footprint: hooks/lib/marker.sh（新規）＋hooks/lib/evidence.sh＋scripts/record-test-result.py＋scripts/run-test-strength-drill.py＋tests 2-3本＝L（6+）。control-plane（反ガミング moat）を触るため review+qa+security 必須・L のため deploy 含む全フェーズ。audit_deps の positive proof（attestation 型・機構別）は iter72 分離起票・marker 覆域拡張は YAGNI（テーマ純度）。"
+iteration: 71
 ui_surface: false
-last_updated: "2026-07-14T00:00:00Z"
+last_updated: "2026-07-15T00:00:00Z"
 gate_approvals:
   client_ready_for_dev: n/a
   brainstorm: approved
-  plan: approved
-  review: approved
-  qa: approved
-  security: approved
+  plan: pending
+  review: pending
+  qa: pending
+  security: pending
   deploy: pending
-  dev_ready_for_client: approved
+  dev_ready_for_client: pending
 current_refs:
   requirements: []
-  plan: "docs/plans/2026-07-14-iter70-record-guard-judge-card-implementation-plan.md"
-  spec: "docs/specs/2026-07-14-iter70-record-guard-judge-card-design.md"
-  review: "docs/qa-reports/iter70-review.md"
-  qa: "docs/qa-reports/iter70-qa.md"
-  security: "docs/qa-reports/iter70-security.md"
+  plan: null
+  spec: "docs/specs/2026-07-15-iter71-marker-positive-proof-design.md"
+  review: null
+  qa: null
+  security: null
   deploy: null
   translation: null
 external_evidence:
@@ -37,7 +37,7 @@ external_evidence:
     scope: "v0.13.0 計画 5 ラウンドレビュー"
     findings: "Round 1〜5 で計 25 件の指摘（hook 出力スキーマ陳腐化、TaskCreated/Completed 制御方式、Plan 条件付き許可、effort 配分、pre-compact.sh 同種破損、`if` 単一 rule 制約等）"
     resolution: "Rev.5 で全件反映、Phase 0a 即時実装着手 GO。hotfix/v0122-hook-schema ブランチで開始。"
-next_action: "**【iter70 全 dev ゲート approved → dev_ready_for_client 申請】** iter70/v1.29.0（Phase 1 項目 1-6・MINOR）は review+qa+security 全 approved・ship/docs 完了（bump 3箇所・TO-CLIENT・LEARNINGS〔line148 conf9／line146 昇格推奨＋新2件〕・session_history に iter70 追加＋iter67 を evidence-archive 移設〔≤3 維持〕・SF-014 拡張・docs-sync 整合）。**Phase 1 完遂**（1-1〜1-6 全消化）。次アクション＝`bash scripts/update-gate.sh dev_ready_for_client approve`→push（`gh auth switch --user yuuya-miyagaki` 必須・active tigereye だと 403）→`/clear`→`/recover`。◆次の別トラック候補（iter71+）: **Phase 2 着手**（R9 guidance 矛盾一掃＋意味ドリフト静的検査／R8 STATUS 縮約＋next_action 語数上限／R5 fable lineage 移行）／SF-014 恒久策=positive N-tests-executed proof（record/drill/audit_deps を横断）／routing.md「実験委譲は隔離 clone 既定」昇格（LEARNINGS line146・3反復支持）／SF-011/012/013。"
+next_action: "**【iter71 plan 着手】** brainstorm approved（設計正本=docs/specs/2026-07-15-iter71-marker-positive-proof-design.md・brainstorm-record 同日・commit d9508a4）。ユーザー決定3点: スコープ=record+drill のみ（audit_deps は iter72 分離）／green marker 不成立は rc2 拒否・ログ非書込（red は marker 不要）／実装方式=案A bash 共有 lib（hooks/lib/marker.sh 抽出・evidence.sh 挙動不変・python は subprocess 同一エンジン）。次＝writing-plans skill で docs/plans/2026-07-15-iter71-marker-positive-proof-implementation-plan.md 作成→**grill-plan 必須**→plan gate approve --ref。TDD RED 先行（偽 green/偽 PASS の RED 証明・64KiB 先頭 cap×末尾 marker 罠 pin）。実装は dispatch model:opus per-task commit・grill/盲検2次/security は fable。◆残トラック（iter72+）: audit_deps positive proof（attestation 型）／Phase 2（R9/R8/R5）／routing.md 隔離 clone 昇格／SF-011/012/013。"
 blockers: []
 failure_tracking: null
 session_history:
