@@ -154,11 +154,17 @@ AEGIS_TEST_RUNNER_REGEX=(
 AEGIS_TEST_PASS_MARKER_REGEX=(
   # pytest: "============ 3 passed in 0.42s ============" or "1 failed, 2 passed in"
   '={3,} [0-9]+ (passed|failed)'
+  # iter71 (M10): bracket classes use a LITERAL TAB character (0x09), not \t —
+  # BSD grep -E does not expand \t inside brackets (it matches literal
+  # backslash + "t", which broke the go marker on macOS), and [[:space:]] is
+  # banned by the grep-E/python-re parity constraint above. A literal TAB
+  # behaves identically in BSD grep -E, GNU grep -E, and python re. Beware
+  # editors converting the embedded tab to spaces.
   # jest / vitest: "Tests:       5 passed, 5 total"
-  '(^|\n)Tests:[ \t]+([0-9]+ failed,[ \t]+)?[0-9]+ passed'
-  '(^|\n)Test Files[ \t]+[0-9]+ passed'
+  '(^|\n)Tests:[ 	]+([0-9]+ failed,[ 	]+)?[0-9]+ passed'
+  '(^|\n)Test Files[ 	]+[0-9]+ passed'
   # go: "ok      example/pkg     0.123s"  or  "FAIL    example/pkg     [build failed]"
-  '(^|\n)(ok|FAIL)[ \t]+[A-Za-z0-9_./-]+[ \t]+[0-9]+\.[0-9]+s'
+  '(^|\n)(ok|FAIL)[ 	]+[A-Za-z0-9_./-]+[ 	]+[0-9]+\.[0-9]+s'
 )
 
 # WEAK markers: each individual line is too easy to forge with `echo`.
@@ -205,10 +211,12 @@ AEGIS_TEST_ZERO_RUN_REGEX=(
   '(^|\n)Ran 0 tests'                           # unittest
   '(^|\n)No tests (found|ran)'                  # pytest/jest variant
   '(^|\n)test result: (ok|FAILED)\. 0 passed'   # cargo
-  '(^|\n)Tests:[ \t]+0 passed[ \t]*,[ \t]*0 total' # jest "0 passed, 0 total"
-  '(^|\n)Test Files[ \t]+0 passed'              # vitest
+  # iter71 (M10): literal TAB (0x09) in brackets, not \t — same BSD grep -E
+  # rationale as AEGIS_TEST_PASS_MARKER_REGEX above.
+  '(^|\n)Tests:[ 	]+0 passed[ 	]*,[ 	]*0 total' # jest "0 passed, 0 total"
+  '(^|\n)Test Files[ 	]+0 passed'              # vitest
   '(^|\n)0 passing(\b|$)'                       # mocha
-  '(^|\n)PASS[ \t]+\([ \t]*0 tests'             # go test -v: "PASS\t(0 tests"
+  '(^|\n)PASS[ 	]+\([ 	]*0 tests'             # go test -v: "PASS\t(0 tests"
 )
 
 # K-1 (v1.6.2): pytest prologue regex. When a pytest-family command runs,
