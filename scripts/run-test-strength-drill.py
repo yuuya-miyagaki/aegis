@@ -5,6 +5,12 @@ Reads a .drill input spec (mutants + scoped test command), applies each mutant
 with byte-exact save/restore, runs the test command, and emits a machine
 verdict. Exit 0 = PASS (all mutants caught), 1 = FAIL/inconclusive. The verdict
 is computed live at approval, so it cannot be forged or go stale.
+
+SF-014 (iter71): the baseline now requires POSITIVE proof — a runner summary
+marker in the output (same engine as hooks/lib/marker.sh) — not just exit 0. The
+NO_RUN denylist (check_no_run_command) stays as a first stage; positive proof is
+the root fix for non-runner probes (e.g. `python3 -c "import m"`) that pass with
+zero tests executed.
 """
 from __future__ import annotations
 
@@ -57,6 +63,44 @@ BASELINE_OUTPUT_TAIL = 20  # lines of failing baseline output to surface
 # と hooks/ が兄弟（update-task.sh の ROOT 解決と同型）。
 FRAMEWORK_ROOT = Path(__file__).resolve().parent.parent
 PATTERNS_LIB = FRAMEWORK_ROOT / "hooks" / "lib" / "patterns.sh"
+# SF-014 (iter71): baseline positive proof. MARKER_LIB is FRAMEWORK_ROOT-relative
+# for the SAME reason as PATTERNS_LIB above — --root can point at a scratch clone
+# / temp repo that has no hooks/lib. marker.sh sources patterns.sh from its own
+# directory, so the pattern data always matches the lib actually consulted.
+MARKER_LIB = FRAMEWORK_ROOT / "hooks" / "lib" / "marker.sh"
+
+
+def marker_verdict(output: str, command: str, exit_code: int = 0,
+                   marker_lib: Path | None = None) -> bool:
+    """Positive proof (SF-014 iter71): run the shared 4-stage verdict
+    (hooks/lib/marker.sh aegis_marker_verdict) over the FULL output.
+    True/False verdict; any condition that prevents evaluation — missing
+    lib, rc3, subprocess failure, unexpected stdout — raises DrillError
+    (fail-closed). marker.sh sources patterns.sh from its own directory,
+    so the pattern data always matches the lib actually consulted."""
+    lib = Path(marker_lib) if marker_lib is not None else MARKER_LIB
+    if not lib.is_file():
+        raise DrillError(
+            f"marker.sh not found: {lib} — positive proof 検査を実行できない"
+            f"ため fail-closed（framework install が壊れています）")
+    script = ('source "$1" >/dev/null 2>&1 || exit 3; '
+              'aegis_marker_verdict "$2" "$3"')
+    try:
+        proc = subprocess.run(
+            ["bash", "-c", script, "_", str(lib), str(exit_code), command],
+            input=(output or "").encode("utf-8", errors="replace"),
+            capture_output=True, timeout=30)
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        raise DrillError(f"marker 検査の実行に失敗（fail-closed）: {exc}")
+    if proc.returncode == 3:
+        raise DrillError(
+            "marker regex を patterns.sh から読み込めません（rc=3）— fail-closed")
+    verdict = proc.stdout.decode("utf-8", errors="replace").strip()
+    if proc.returncode != 0 or verdict not in ("true", "false"):
+        raise DrillError(
+            f"marker 検査が不正終了（rc={proc.returncode}, out={verdict!r}）"
+            f"— fail-closed")
+    return verdict == "true"
 
 
 def check_no_run_command(cmd: str, patterns_lib: Path | None = None) -> None:
@@ -531,7 +575,8 @@ def run_test(command: str, cwd: Path, timeout_seconds: int) -> str:
 def check_baseline(command: str, cwd: Path, timeout_seconds: int) -> tuple[str, str]:
     """Run the test command twice on the UNMODIFIED code. Returns
     (status, failure_output) where status is 'green' (both passed), 'red' (a run
-    failed), 'flaky' (passed then failed or vice versa), or 'inconclusive'
+    failed), 'flaky' (passed then failed or vice versa), 'no-test-proof'
+    (both-passed だが positive proof 不成立), or 'inconclusive'
     (timeout/error). A non-green baseline is fail-closed; failure_output is the
     captured test output so a non-engineer can see WHY it is not green.
     NOTE: assumes an idempotent test command (cleanly runnable twice); a
@@ -543,6 +588,11 @@ def check_baseline(command: str, cwd: Path, timeout_seconds: int) -> tuple[str, 
     if second in ("timeout", "error"):
         return "inconclusive", out2
     if first == "passed" and second == "passed":
+        # SF-014 (iter71): exit 0 alone does not prove any test ran — require
+        # the shared positive-proof verdict on BOTH green outputs.
+        for out in (out1, out2):
+            if not marker_verdict(out, command):
+                return "no-test-proof", out
         return "green", ""
     if first == "failed" and second == "failed":
         return "red", out1
@@ -689,8 +739,15 @@ def run_drill(root: Path, spec_path: Path, report_path: Path) -> int:
 
         base, base_output = check_baseline(cmd, root, timeout)
         if base != "green":
-            print(f"DRILL BLOCKED (baseline {base}): tests must be green and "
-                  f"stable before drilling.")
+            if base == "no-test-proof":
+                print("DRILL BLOCKED (baseline no-test-proof): baseline は "
+                      "exit 0 ですが、テスト実行の positive proof（ランナーの"
+                      "サマリ marker）が出力にありません。test_command は実"
+                      "ランナーで書いてください（pytest はデフォルト出力＝"
+                      "-q 不可 / unittest / jest / vitest / go / cargo）。")
+            else:
+                print(f"DRILL BLOCKED (baseline {base}): tests must be green "
+                      f"and stable before drilling.")
             if base_output.strip():
                 print("---- test output (last lines) ----")
                 tail = base_output.strip().splitlines()[-BASELINE_OUTPUT_TAIL:]
