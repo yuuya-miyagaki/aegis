@@ -33,6 +33,18 @@ def _git_init(root):
     _git(root, "config", "user.name", "t")
 
 
+def _write_probe_test(root: Path, needle: str, target: str) -> str:
+    """grep -q ダミーの実ランナー置換（iter71: baseline は positive proof 必須）。
+    必ず git add/commit の後に呼ぶ（untracked＝coverage floor 非対象を保つ）。"""
+    (root / "t_probe.py").write_text(
+        "import unittest, pathlib\n"
+        "class T(unittest.TestCase):\n"
+        "    def test_probe(self):\n"
+        f"        self.assertIn({needle!r}, "
+        f"pathlib.Path({target!r}).read_text())\n", encoding="utf-8")
+    return "python3 -m unittest t_probe"
+
+
 class TestParseSpec(unittest.TestCase):
     def _write(self, d, **over):
         base = {
@@ -226,9 +238,27 @@ class TestBaseline(unittest.TestCase):
             encoding="utf-8")
         return "python3 flaky.py"
 
-    def test_green(self):
+    def test_green_without_marker_is_no_test_proof(self):
+        # D2 (iter71): `true` passes twice but runs ZERO tests. Post-iter71 the
+        # baseline requires a positive marker proof, so a non-runner green is
+        # reported as "no-test-proof" (BLOCKED), not "green". RED until Task 3.
         with tempfile.TemporaryDirectory() as d:
             status, _ = drill.check_baseline("true", Path(d), 10)
+            self.assertEqual(status, "no-test-proof")
+
+    def test_real_runner_green(self):
+        # D3 (both-green): a real unittest runner that actually runs a test and
+        # passes twice yields a green baseline — the positive-proof path. This
+        # stays green under the current exit-code baseline too.
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            (root / "t_ok.py").write_text(
+                "import unittest\n"
+                "class T(unittest.TestCase):\n"
+                "    def test_ok(self):\n"
+                "        self.assertTrue(True)\n", encoding="utf-8")
+            status, _ = drill.check_baseline(
+                "python3 -m unittest t_ok", root, 30)
             self.assertEqual(status, "green")
 
     def test_red_surfaces_output(self):
@@ -339,10 +369,11 @@ class TestMainEndToEnd(unittest.TestCase):
             _git_init(root)
             self._commit_seed(root)
             (root / "src" / "m.py").write_text("a = 1\nb = 2\n", encoding="utf-8")
+            cmd = _write_probe_test(root, "b = 2", "src/m.py")
             spec = root / "s.drill"
             spec.write_text(json.dumps({
-                "test_command": "grep -q 'b = 2' src/m.py",
-                "timeout_seconds": 10,
+                "test_command": cmd,
+                "timeout_seconds": 30,
                 "mutants": [{"file": "src/m.py", "line": 2,
                              "original": "b = 2", "mutated": "b = 3"}],
             }), encoding="utf-8")
@@ -360,10 +391,11 @@ class TestMainEndToEnd(unittest.TestCase):
             _git(root, "commit", "-qm", "i")
             (root / "src").mkdir()
             (root / "src" / "n.py").write_text("v = 7\n", encoding="utf-8")  # untracked
+            cmd = _write_probe_test(root, "v = 7", "src/n.py")
             spec = root / "s.drill"
             spec.write_text(json.dumps({
-                "test_command": "grep -q 'v = 7' src/n.py",
-                "timeout_seconds": 10,
+                "test_command": cmd,
+                "timeout_seconds": 30,
                 "mutants": [{"file": "src/n.py", "line": 1,
                              "original": "v = 7", "mutated": "v = 8"}],
             }), encoding="utf-8")
@@ -387,10 +419,11 @@ class TestMainEndToEnd(unittest.TestCase):
             _git(root, "commit", "-qm", "i")
             (root / "src" / "m.py").write_text("a = 1\nb = 2\n", encoding="utf-8")
             (docs / "LEARNINGS.md").write_text("# L\n- note\n", encoding="utf-8")
+            cmd = _write_probe_test(root, "b = 2", "src/m.py")
             spec = root / "s.drill"
             spec.write_text(json.dumps({
-                "test_command": "grep -q 'b = 2' src/m.py",
-                "timeout_seconds": 10,
+                "test_command": cmd,
+                "timeout_seconds": 30,
                 "mutants": [{"file": "src/m.py", "line": 2,
                              "original": "b = 2", "mutated": "b = 3"}],
             }), encoding="utf-8")
@@ -406,10 +439,20 @@ class TestMainEndToEnd(unittest.TestCase):
             _git_init(root)
             self._commit_seed(root)
             (root / "src" / "m.py").write_text("a = 1\nb = 2\n", encoding="utf-8")
+            # blind runner: a real test that passes but never touches src/m.py,
+            # so the baseline is green (positive proof) yet the mutant survives
+            # => FAIL. (Was "true", which post-iter71 is baseline no-test-proof
+            # and would BLOCK before reaching the survive check — masking the
+            # "surviving mutant => FAIL" invariant.)
+            (root / "t_blind.py").write_text(
+                "import unittest\n"
+                "class T(unittest.TestCase):\n"
+                "    def test_blind(self):\n"
+                "        self.assertTrue(True)\n", encoding="utf-8")
             spec = root / "s.drill"
             spec.write_text(json.dumps({
-                "test_command": "true",  # blind => survives
-                "timeout_seconds": 10,
+                "test_command": "python3 -m unittest t_blind",  # blind => survives
+                "timeout_seconds": 30,
                 "mutants": [{"file": "src/m.py", "line": 2,
                              "original": "b = 2", "mutated": "b = 3"}],
             }), encoding="utf-8")
@@ -434,10 +477,14 @@ class TestMainEndToEnd(unittest.TestCase):
             (root / "src").mkdir()
             (root / "src" / "m.py").write_text("v = 7\n", encoding="utf-8")
             _git(root, "add", "-A")  # staged, but never committed
+            # probe written AFTER `git add -A` so it stays untracked: with no
+            # HEAD the diff is against the empty tree, so a staged/tracked probe
+            # would itself become a coverage-floor target and BLOCK the drill.
+            cmd = _write_probe_test(root, "v = 7", "src/m.py")
             spec = root / "s.drill"
             spec.write_text(json.dumps({
-                "test_command": "grep -q 'v = 7' src/m.py",
-                "timeout_seconds": 10,
+                "test_command": cmd,
+                "timeout_seconds": 30,
                 "mutants": [{"file": "src/m.py", "line": 1,
                              "original": "v = 7", "mutated": "v = 8"}],
             }), encoding="utf-8")
@@ -452,6 +499,7 @@ class TestMainEndToEnd(unittest.TestCase):
             (root / "m.py").write_text("v = 7\n", encoding="utf-8")
             spec = root / "s.drill"
             spec.write_text(json.dumps({
+                # baseline 到達前に not-a-git-repo で BLOCK するため移行不要（iter71）
                 "test_command": "true", "timeout_seconds": 10,
                 "mutants": [{"file": "m.py", "line": 1,
                              "original": "v = 7", "mutated": "v = 8"}],
@@ -561,10 +609,11 @@ class TestMainEndToEnd(unittest.TestCase):
             (root / "src" / "m.py").write_text("a = 1\nb = 2\n", encoding="utf-8")
             _git(root, "add", "-A")
             _git(root, "commit", "-qm", "task work")
+            cmd = _write_probe_test(root, "b = 2", "src/m.py")
             spec = root / "s.drill"
             spec.write_text(json.dumps({
-                "test_command": "grep -q 'b = 2' src/m.py",
-                "timeout_seconds": 10,
+                "test_command": cmd,
+                "timeout_seconds": 30,
                 "since": base,
                 "mutants": [{"file": "src/m.py", "line": 2,
                              "original": "b = 2", "mutated": "b = 3"}],
@@ -589,10 +638,11 @@ class TestMainEndToEnd(unittest.TestCase):
                           capture_output=True, text=True, check=True).stdout.strip()
             _git(root, "checkout", "-q", "-")
             (root / "src" / "m.py").write_text("a = 1\nb = 2\n", encoding="utf-8")
+            cmd = _write_probe_test(root, "b = 2", "src/m.py")
             spec = root / "s.drill"
             spec.write_text(json.dumps({
-                "test_command": "grep -q 'b = 2' src/m.py",
-                "timeout_seconds": 10,
+                "test_command": cmd,
+                "timeout_seconds": 30,
                 "since": side,
                 "mutants": [{"file": "src/m.py", "line": 2,
                              "original": "b = 2", "mutated": "b = 3"}],
@@ -615,10 +665,11 @@ class TestMainEndToEnd(unittest.TestCase):
             (root / "src" / "m.py").write_text(
                 "a = 1\n# isolated note\nmid = 0\nz = 9\nb = 2\n",
                 encoding="utf-8")
+            cmd = _write_probe_test(root, "b = 2", "src/m.py")
             spec = root / "s.drill"
             spec.write_text(json.dumps({
-                "test_command": "grep -q 'b = 2' src/m.py",
-                "timeout_seconds": 10,
+                "test_command": cmd,
+                "timeout_seconds": 30,
                 "mutants": [{"file": "src/m.py", "line": 5,
                              "original": "b = 2", "mutated": "b = 3"}],
             }), encoding="utf-8")
@@ -628,6 +679,32 @@ class TestMainEndToEnd(unittest.TestCase):
                              f"comment-only hunk must not demand a mutant: "
                              f"{res.stdout}{res.stderr}")
             self.assertIn("verdict: PASS", report.read_text())
+
+    def test_import_probe_baseline_blocked_no_test_proof(self):
+        # D1 (iter71): a non-runner import probe (`python3 -c "import m"`) exits
+        # 0 and, against the current exit-code baseline, the mutant `b = 1/0`
+        # makes the import crash -> "caught" -> PASS (the forge). Post-iter71 the
+        # baseline demands a positive marker; the probe runs zero tests so the
+        # baseline is "no-test-proof" -> BLOCKED (rc1) before any mutant runs.
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            _git_init(root)
+            (root / "m.py").write_text("a = 1\n", encoding="utf-8")
+            _git(root, "add", "-A")
+            _git(root, "commit", "-qm", "i")
+            (root / "m.py").write_text("a = 1\nb = 2\n", encoding="utf-8")  # 行2=added
+            spec = root / "s.drill"
+            spec.write_text(json.dumps({
+                "test_command": 'python3 -c "import m"',
+                "timeout_seconds": 10,
+                "mutants": [{"file": "m.py", "line": 2,
+                             "original": "b = 2", "mutated": "b = 1/0"}],
+            }), encoding="utf-8")
+            report = root / "r.md"
+            res = self._run(root, spec, report)
+            self.assertEqual(res.returncode, 1, res.stdout + res.stderr)
+            self.assertIn("no-test-proof", res.stdout)
+            self.assertIn("baseline: no-test-proof", report.read_text())
 
 
 class TestVendorExclusion(unittest.TestCase):

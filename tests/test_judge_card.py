@@ -667,7 +667,9 @@ class TestRecordTestResultManual(unittest.TestCase):
         self.tmp.cleanup()
 
     def _pytest(self, target):
-        return f"python3 -m pytest -q {self.root / target}"
+        # iter71: `-q` removed — post-iter71 record requires a positive marker
+        # (strong summary + prologue), which `-q` suppresses.
+        return f"python3 -m pytest {self.root / target}"
 
     def test_passing_command_appends_manual_ok(self):
         rc = record.main(["--root", str(self.root), self._pytest("t_pass.py")])

@@ -2361,9 +2361,32 @@ class TestQaDrillGate(unittest.TestCase):
         qa_reports = docs / "qa-reports"
         qa_reports.mkdir(parents=True, exist_ok=True)
         if with_drill:
-            cmd = "true" if blind else "grep -q 'b = 2' src/m.py"
+            # iter71: the drill baseline now demands a POSITIVE marker (a real
+            # test that actually ran), so the old shell dummies ("true" /
+            # "grep -q") no longer stand in for a runner. Both probe modules are
+            # written AFTER the commit above, so they stay untracked and are not
+            # coverage-floor targets. The normal probe asserts the changed line
+            # (so the mutant is caught); the blind probe passes without touching
+            # src/m.py (so the mutant survives → still exercises "surviving
+            # mutant blocks qa"). Leaving blind as "true" would have made this
+            # pin pass by baseline BLOCK instead of by a surviving mutant — a
+            # fail-silent swap.
+            if blind:
+                (root / "t_qa_probe.py").write_text(
+                    "import unittest\n"
+                    "class T(unittest.TestCase):\n"
+                    "    def test_blind(self):\n"
+                    "        self.assertTrue(True)\n", encoding="utf-8")
+            else:
+                (root / "t_qa_probe.py").write_text(
+                    "import unittest, pathlib\n"
+                    "class T(unittest.TestCase):\n"
+                    "    def test_probe(self):\n"
+                    "        self.assertIn('b = 2', "
+                    "pathlib.Path('src/m.py').read_text())\n", encoding="utf-8")
+            cmd = "python3 -m unittest t_qa_probe"
             (qa_reports / "test-strength.drill").write_text(json.dumps({
-                "test_command": cmd, "timeout_seconds": 10,
+                "test_command": cmd, "timeout_seconds": 30,
                 "mutants": [{"file": "src/m.py", "line": 2,
                              "original": "b = 2", "mutated": "b = 3"}],
             }), encoding="utf-8")

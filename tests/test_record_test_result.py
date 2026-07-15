@@ -170,10 +170,12 @@ class TestRecordRejection(_RecordFixture):
 
 class TestRecordAccept(_RecordFixture):
     def test_valid_runner_still_records(self):
-        # 9: the accept path is unchanged — a legitimate runner executes and
-        # appends a decidable src=manual / status=ok entry (rc0). Passes today
-        # (regression pin for the accept path).
-        cmd = f"python3 -m pytest -q {self.root / 't_pass.py'}"
+        # R4 (iter71, updated): the accept path now requires a POSITIVE marker
+        # verdict on a green run. `-q` is removed so pytest emits its prologue +
+        # strong summary (the -q form is intentionally rejected post-iter71).
+        # The recorded entry must carry marker:true (additive audit field).
+        # RED until Task 4 adds the write-time marker gate + marker field.
+        cmd = f"python3 -m pytest {self.root / 't_pass.py'}"
         self.assertLess(len(cmd), 500, "cmd must stay under the 500-char cap")
         rc, err = _run_main(["--root", str(self.root), cmd])
         self.assertEqual(rc, 0, err)
@@ -181,6 +183,91 @@ class TestRecordAccept(_RecordFixture):
         row = json.loads(self.log.read_text(encoding="utf-8").splitlines()[-1])
         self.assertEqual(row["src"], "manual")
         self.assertEqual(row["status"], "ok")
+        self.assertIs(row.get("marker"), True)
+
+
+class TestRecordMarkerProof(_RecordFixture):
+    """iter71 (2): a green (exit 0) record MUST carry a positive marker verdict
+    (N>=1 tests actually ran) before it is written. runner-matching-yet-zero-run
+    commands (unittest discover no-match, npm test -> true, quiet pytest with no
+    strong marker) are the SF-014 forge class the denylist could not catch; they
+    must now be rc2, no log write, with actionable guidance. A red run (exit!=0)
+    keeps recording without a marker (RED cannot be forged into a green claim)."""
+
+    def test_zero_run_green_rejected(self):
+        # R1: `unittest discover -p nomatch*` matches the runner regex and exits
+        # 0 (unlike pytest's exit 5), running ZERO tests. It is currently
+        # recorded as green (the forge). Post-iter71: rc2, no log, positive-proof
+        # guidance.
+        rc, err = _run_main(
+            ["--root", str(self.root),
+             'python3 -m unittest discover -p "nomatch*"'])
+        self.assertEqual(rc, 2, err)
+        self.assertFalse(self.log.exists(),
+                         "zero-run green must not write the evidence log")
+        self.assertIn("positive proof", err)
+
+    def test_quiet_pytest_green_rejected_with_guidance(self):
+        # R2: `pytest -q` on a passing file exits 0 but emits neither the strong
+        # summary nor the prologue -> no positive marker -> rc2, no log, and the
+        # guidance must call out the `-q` operational change.
+        rc, err = _run_main(
+            ["--root", str(self.root),
+             f"python3 -m pytest -q {self.root / 't_pass.py'}"])
+        self.assertEqual(rc, 2, err)
+        self.assertFalse(self.log.exists())
+        self.assertIn("-q", err)
+
+    @unittest.skipUnless(shutil.which("npm"), "npm not installed")
+    def test_npm_true_green_rejected(self):
+        # R3: `npm test` bound to `"test": "true"` matches the jest/npm runner
+        # regex and exits 0 with no test marker -> the classic SF-014 forge.
+        # rc2, no log write.
+        (self.root / "package.json").write_text(
+            json.dumps({"scripts": {"test": "true"}}), encoding="utf-8")
+        rc, err = _run_main(["--root", str(self.root), "npm test"])
+        self.assertEqual(rc, 2, err)
+        self.assertFalse(self.log.exists())
+
+    def test_red_run_recorded_without_marker(self):
+        # R5 (both-green pin): a red run (exit!=0) is still recorded as it is
+        # today — marker proof is only required for the green claim, and a red
+        # run carries no forgeable positive signal. status=fail, no marker field.
+        cmd = f"python3 -m pytest {self.root / 't_fail.py'}"
+        rc, err = _run_main(["--root", str(self.root), cmd])
+        self.assertEqual(rc, 0, err)
+        self.assertTrue(self.log.exists())
+        row = json.loads(self.log.read_text(encoding="utf-8").splitlines()[-1])
+        self.assertEqual(row["status"], "fail")
+        self.assertNotIn("marker", row)
+
+    def test_marker_lib_missing_fail_closed(self):
+        # R6: no marker.sh in the target root -> the verdict cannot be computed
+        # -> fail-closed reject (rc2, no log). A green run must never be recorded
+        # when the proof mechanism itself is missing.
+        (self.root / "hooks" / "lib" / "marker.sh").unlink(missing_ok=True)
+        rc, err = _run_main(
+            ["--root", str(self.root),
+             f"python3 -m pytest {self.root / 't_pass.py'}"])
+        self.assertEqual(rc, 2, err)
+        self.assertFalse(self.log.exists())
+
+    def test_large_output_tail_marker_green(self):
+        # R7: 64KiB-trap pin. A unittest run that prints ~70KB before its WEAK
+        # pair (Ran N + OK) must still verify — the marker window must keep the
+        # tail (head+tail extraction), not a head-only cap. RED until Task 4.
+        (self.root / "t_big.py").write_text(
+            "import unittest\n"
+            "class T(unittest.TestCase):\n"
+            "    def test_big(self):\n"
+            "        print('x' * 70000)\n", encoding="utf-8")
+        rc, err = _run_main(
+            ["--root", str(self.root), "python3 -m unittest t_big"])
+        self.assertEqual(rc, 0, err)
+        self.assertTrue(self.log.exists())
+        row = json.loads(self.log.read_text(encoding="utf-8").splitlines()[-1])
+        self.assertEqual(row["status"], "ok")
+        self.assertIs(row.get("marker"), True)
 
 
 if __name__ == "__main__":

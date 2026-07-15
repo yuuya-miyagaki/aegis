@@ -270,7 +270,13 @@ class TestReadTestResultSchemaMigration(unittest.TestCase):
 
     def test_manual_record_is_trusted_even_without_marker(self):
         """Entries from record-test-result.py have src='manual' and reflect
-        a trusted runner; marker_verified is not required for those."""
+        a trusted runner; marker_verified is not required for those.
+
+        iter71 note: the judge-side READ contract (src=manual is decidable
+        without marker_verified) is UNCHANGED in iter71. iter71 enforces the
+        marker verdict at record WRITE-time instead, closing the green-forge
+        entry point before it is written — direct log tampering remains the
+        job of the fingerprint / human-preview layer (as before)."""
         with self._scratch_repo() as _:
             r = Path(_)
             fp = self._fp(r)
