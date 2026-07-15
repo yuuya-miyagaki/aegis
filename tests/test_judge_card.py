@@ -736,6 +736,37 @@ class TestAuditDeps(unittest.TestCase):
             (Path(d) / "pom.xml").write_text("<project/>", encoding="utf-8")
             self.assertEqual(judge.audit_deps(Path(d)), "unverified")
 
+    def test_dependency_lockfiles_and_ecosystems_stay_unverified(self):
+        # iter70 review 敵対2次 (回帰): the first no-manifest cut let real
+        # dependency declarations of ecosystems NOT in the initial list fall
+        # through to 'no-manifest' (info/silent), weakening the security signal
+        # from the baseline 'unverified' (🟡). A lockfile or ecosystem manifest
+        # means dependencies ARE declared, so it must stay 'unverified'
+        # (fail-visible), never 'no-manifest' (a zero-dependency claim).
+        for m in ("yarn.lock", "pnpm-lock.yaml", "package-lock.json",
+                  "npm-shrinkwrap.json", "bun.lockb", "deno.json", "deno.lock",
+                  "environment.yml", "conda.yaml", "packages.config",
+                  "paket.dependencies", "flake.nix", "shard.yml",
+                  "rebar.config", "Podfile", "Cargo.lock"):
+            with tempfile.TemporaryDirectory() as d:
+                (Path(d) / m).write_text("x\n", encoding="utf-8")
+                self.assertEqual(
+                    judge.audit_deps(Path(d)), "unverified",
+                    f"{m} declares dependencies → must stay 'unverified'")
+
+    def test_globbed_manifests_stay_unverified(self):
+        # iter70 review 敵対2次 (回帰): .NET/CocoaPods/Ruby declare deps via a
+        # NAMED-BY-EXTENSION file (project.csproj, Foo.podspec, bar.gemspec),
+        # not a fixed filename, so an exact-name list misses them. A glob check
+        # must keep them 'unverified'.
+        for fname in ("MyApp.csproj", "Lib.fsproj", "App.vbproj",
+                      "mylib.gemspec", "MyPod.podspec"):
+            with tempfile.TemporaryDirectory() as d:
+                (Path(d) / fname).write_text("x\n", encoding="utf-8")
+                self.assertEqual(
+                    judge.audit_deps(Path(d)), "unverified",
+                    f"{fname} declares dependencies → must stay 'unverified'")
+
     def test_every_unauditable_manifest_stays_unverified(self):
         # iter70 review テスト強度 Finding 3: the individual pyproject/go.mod/
         # pom.xml pins covered only 3 of the UNAUDITABLE_MANIFESTS entries, so

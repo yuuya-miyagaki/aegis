@@ -335,17 +335,44 @@ def scan_secrets(root: Path) -> list[str]:
     return hits
 
 
+# Files whose presence proves DEPENDENCIES ARE DECLARED even though we do not
+# (yet) have an audit path for that ecosystem. Their presence must keep
+# audit_deps at the fail-visible 'unverified' (🟡, ack-able) — NOT the info
+# 'no-manifest' (which is a positive claim that the repo has zero dependencies
+# and nothing to audit). iter70 review 敵対2次 caught that the first cut of
+# this list was too short: real dependency declarations for Node lockfiles,
+# .NET, conda, Deno, CocoaPods, etc. fell through to 'no-manifest', silently
+# weakening the security signal (a fail-visible→fail-silent regression).
+#
+# This list is still a denylist and therefore inherently incomplete — an
+# unknown ecosystem's manifest can still be mis-read as 'no-manifest'. The root
+# fix (a POSITIVE proof of zero dependencies rather than "no known manifest
+# matched") is tracked in docs/security-followups.md (SF-014 class). Until
+# then: keep this broad, and prefer 'unverified' whenever anything looks like a
+# dependency declaration.
 UNAUDITABLE_MANIFESTS = (
+    # Python
     "pyproject.toml", "setup.py", "setup.cfg", "Pipfile", "Pipfile.lock",
-    "poetry.lock", "uv.lock", "go.mod", "Cargo.toml", "Gemfile",
-    "Gemfile.lock", "composer.json",
-    # grill-code F-2: JVM / BEAM / Flutter / Swift ecosystems declare real
-    # dependencies too — presenting them as 'no-manifest' (zero-dependency)
-    # would be a false fact on the security card. Best-effort list: an unknown
-    # ecosystem still degrades only to the advisory info tier, and the card
-    # shows the raw state either way (fail-visible).
+    "poetry.lock", "uv.lock", "requirements.in",
+    # Node / JS / TS (lockfile alone = deps declared even without package.json)
+    "package-lock.json", "npm-shrinkwrap.json", "yarn.lock", "pnpm-lock.yaml",
+    "bun.lockb", "deno.json", "deno.jsonc", "deno.lock",
+    # Go / Rust / PHP / Ruby
+    "go.mod", "Cargo.toml", "Cargo.lock", "composer.json", "Gemfile",
+    "Gemfile.lock",
+    # JVM / BEAM / Flutter / Swift (grill-code F-2)
     "pom.xml", "build.gradle", "build.gradle.kts", "mix.exs",
-    "pubspec.yaml", "Package.swift")
+    "pubspec.yaml", "Package.swift",
+    # .NET / conda / Nix / Crystal / Erlang / CocoaPods (iter70 敵対2次)
+    "packages.config", "paket.dependencies", "environment.yml",
+    "environment.yaml", "conda.yaml", "flake.nix", "shard.yml",
+    "rebar.config", "Podfile", "Podfile.lock")
+
+# Dependency manifests named by EXTENSION rather than a fixed filename
+# (.NET project files, Ruby gemspecs, CocoaPods podspecs). Matched by glob so a
+# repo declaring deps this way also stays 'unverified' (iter70 敵対2次).
+UNAUDITABLE_MANIFEST_GLOBS = (
+    "*.csproj", "*.fsproj", "*.vbproj", "*.gemspec", "*.podspec")
 
 
 def audit_deps(root: Path) -> str:
@@ -391,6 +418,10 @@ def audit_deps(root: Path) -> str:
     # A known dependency manifest exists but no audit path is wired for it —
     # dependencies are present (not zero), so fail-visible as 'unverified'.
     if any((root / m).is_file() for m in UNAUDITABLE_MANIFESTS):
+        return "unverified"
+    # Extension-named manifests (.csproj / .gemspec / .podspec) — same rule.
+    if any(next(root.glob(pat), None) is not None
+           for pat in UNAUDITABLE_MANIFEST_GLOBS):
         return "unverified"
     # No dependency manifest of any kind → proof of a zero-dependency repo.
     return "no-manifest"
