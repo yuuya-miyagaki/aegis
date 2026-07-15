@@ -366,13 +366,20 @@ UNAUDITABLE_MANIFESTS = (
     # .NET / conda / Nix / Crystal / Erlang / CocoaPods (iter70 敵対2次)
     "packages.config", "paket.dependencies", "environment.yml",
     "environment.yaml", "conda.yaml", "flake.nix", "shard.yml",
-    "rebar.config", "Podfile", "Podfile.lock")
+    "rebar.config", "Podfile", "Podfile.lock",
+    # Haskell / Scala / Clojure / Julia / R / Perl / Dart-lock / C++ / build
+    # systems (iter70 security 盲検2次 finding ③ — empirically enumerated).
+    "cabal.project", "stack.yaml", "build.sbt", "deps.edn", "project.clj",
+    "Project.toml", "renv.lock", "cpanfile", "cpanfile.snapshot",
+    "pubspec.lock", "vcpkg.json", "conanfile.txt", "conanfile.py",
+    "meson.build", "WORKSPACE", "WORKSPACE.bazel", "MODULE.bazel")
 
 # Dependency manifests named by EXTENSION rather than a fixed filename
-# (.NET project files, Ruby gemspecs, CocoaPods podspecs). Matched by glob so a
-# repo declaring deps this way also stays 'unverified' (iter70 敵対2次).
+# (.NET project files, Ruby gemspecs, CocoaPods podspecs, Haskell cabal).
+# Matched by glob so a repo declaring deps this way also stays 'unverified'
+# (iter70 敵対2次 / 盲検2次).
 UNAUDITABLE_MANIFEST_GLOBS = (
-    "*.csproj", "*.fsproj", "*.vbproj", "*.gemspec", "*.podspec")
+    "*.csproj", "*.fsproj", "*.vbproj", "*.gemspec", "*.podspec", "*.cabal")
 
 
 def audit_deps(root: Path) -> str:

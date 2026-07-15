@@ -754,13 +754,29 @@ class TestAuditDeps(unittest.TestCase):
                     judge.audit_deps(Path(d)), "unverified",
                     f"{m} declares dependencies → must stay 'unverified'")
 
+    def test_more_ecosystems_stay_unverified(self):
+        # iter70 security 盲検2次 finding ③: 14 further ecosystems that declare
+        # dependencies still fell to the info 'no-manifest' state (visibility
+        # regression, non-blocking). Empirically demonstrated → covered here so
+        # a dependency-declaring repo in these ecosystems keeps the fail-visible
+        # 'unverified'. (Root fix remains positive-proof, SF-014.)
+        for m in ("cabal.project", "stack.yaml", "build.sbt", "deps.edn",
+                  "project.clj", "Project.toml", "renv.lock", "cpanfile",
+                  "pubspec.lock", "vcpkg.json", "conanfile.txt", "conanfile.py",
+                  "meson.build", "WORKSPACE", "WORKSPACE.bazel", "MODULE.bazel"):
+            with tempfile.TemporaryDirectory() as d:
+                (Path(d) / m).write_text("x\n", encoding="utf-8")
+                self.assertEqual(
+                    judge.audit_deps(Path(d)), "unverified",
+                    f"{m} declares dependencies → must stay 'unverified'")
+
     def test_globbed_manifests_stay_unverified(self):
         # iter70 review 敵対2次 (回帰): .NET/CocoaPods/Ruby declare deps via a
         # NAMED-BY-EXTENSION file (project.csproj, Foo.podspec, bar.gemspec),
         # not a fixed filename, so an exact-name list misses them. A glob check
         # must keep them 'unverified'.
         for fname in ("MyApp.csproj", "Lib.fsproj", "App.vbproj",
-                      "mylib.gemspec", "MyPod.podspec"):
+                      "mylib.gemspec", "MyPod.podspec", "my-lib.cabal"):
             with tempfile.TemporaryDirectory() as d:
                 (Path(d) / fname).write_text("x\n", encoding="utf-8")
                 self.assertEqual(

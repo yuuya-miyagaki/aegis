@@ -3,7 +3,7 @@ framework: aegis
 framework_version: "1.28.0"
 project_name: "Aegis"
 mode: Dev
-phase: qa
+phase: security
 task_type: framework
 task_size: M
 task_size_rationale: "iteration 70（framework・Phase 1 項目 1-6＝record-test-result 引数事前検証〔R6 罠 n〕＋deps 無 manifest info 降格〔gate F6〕＋judge カード tests スコープ表示〔test #3〕）M 確定（brainstorm Step D）。設計正本: docs/specs/2026-07-14-iter70-record-guard-judge-card-design.md（(1) judge 照合ヘルパ抽出 runner_cmd_matches＋drill.check_no_run_command 再利用で record を実行前 fail-closed 検証 (2) audit_deps 第4状態 no-manifest→info 降格〔package.json あり lock なしは unverified 維持〕 (3) read_test_result_detail 抽出で判定と表示を同一走査化・cmd 表示サニタイズ〔カード注入遮断〕）。footprint: scripts/record-test-result.py＋scripts/build-judge-card.py＋tests/test_record_test_result.py（新規）＋tests/test_judge_card.py＝M（2-5）。control-plane（gate 証拠機構）を触るため review+qa+security 必須・M のため deploy skip。SF-011〜014 は相乗りせず backlog 維持（テーマ純度）。"
@@ -15,7 +15,7 @@ gate_approvals:
   brainstorm: approved
   plan: approved
   review: approved
-  qa: pending
+  qa: approved
   security: pending
   deploy: pending
   dev_ready_for_client: pending
@@ -24,7 +24,7 @@ current_refs:
   plan: "docs/plans/2026-07-14-iter70-record-guard-judge-card-implementation-plan.md"
   spec: "docs/specs/2026-07-14-iter70-record-guard-judge-card-design.md"
   review: "docs/qa-reports/iter70-review.md"
-  qa: null
+  qa: "docs/qa-reports/iter70-qa.md"
   security: null
   deploy: null
   translation: null
