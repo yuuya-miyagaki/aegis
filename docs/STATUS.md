@@ -3,7 +3,7 @@ framework: aegis
 framework_version: "1.30.0"
 project_name: "Aegis"
 mode: Dev
-phase: implement
+phase: review
 task_type: framework
 task_size: M
 task_size_rationale: "iteration 72（framework・SF-014 恒久策 完結編＝marker positive proof のカウント化）M 確定（brainstorm Step D・update-task.sh 経由）。設計正本: docs/specs/2026-07-16-iter72-count-proof-design.md（(1) aegis_marker_verdict に Stage 5『count proof』追加＝count 族サマリ検出時のみ executed 実数〔unittest: Ran N−Σskipped=K／pytest・jest・vitest・cargo: Σ(passed+failed)／go -v: --- PASS|FAIL 行数〕≧1 を要求・族未検出（素の go）は従来 verdict＝残余 pin (2) cargo zero-run 行 deny をカウント合計に委譲＝doc-tests 空セクションの実在偽陰性を修正〔2026-07-16 実証〕 (3) verdict インターフェース不変＝3 消費者無改修）。footprint: hooks/lib/patterns.sh＋hooks/lib/marker.sh＋scripts/record-test-result.py（docstring/メッセージのみ）＋tests 2本＝M（2-5）。control-plane（反ガミング moat）を触るため review+qa+security 必須・M のため deploy skip（iter69 前例）。go 素出力 all-skip と echo フォージは残余として文書化継続（出力ベース proof の床・drill subsume）・audit_deps positive proof は iter73 分離維持（attestation 型・機構別・テーマ純度）。"
@@ -37,7 +37,7 @@ external_evidence:
     scope: "v0.13.0 計画 5 ラウンドレビュー"
     findings: "Round 1〜5 で計 25 件の指摘（hook 出力スキーマ陳腐化、TaskCreated/Completed 制御方式、Plan 条件付き許可、effort 配分、pre-compact.sh 同種破損、`if` 単一 rule 制約等）"
     resolution: "Rev.5 で全件反映、Phase 0a 即時実装着手 GO。hotfix/v0122-hook-schema ブランチで開始。"
-next_action: "**【iter72 implement フェーズ】** plan approved（371c679・grill-plan Rev.2 致命3〔RED 10 件精密化／hybrid forge residual pin／算術オーバーフロー cap〕＋文法/アンカー修正 反映済み・ref=docs/plans/2026-07-16-iter72-count-proof-implementation-plan.md）。**次アクション＝plan の Task 0（baseline 確認）→Task1 RED（正確に 10 failed を実測）→Task2 GREEN（patterns.sh count 族＋marker.sh Stage 5）→Task3 record 文書同期→Task4 docs 層——implementer=opus per-task commit・Stage1 仕様準拠は親（fable）が diff 検証・Stage2 は ≤5 files で skip（理由記録）→grill-code→review**。◆別トラック: audit_deps positive proof（iter73）／rc3 guard 個別条件回帰網／保守性 minor 2件／SF-011/012/013。◆push=`gh auth switch --user yuuya-miyagaki` 必須。"
+next_action: "**【iter72 review フェーズ】** implement 完了: Task0 baseline green（exit 0）→Task1 RED 5e10163（実測 10 failed/34 passed＝期待と完全一致）→Task2 GREEN be77a85（patterns.sh count 族＋marker.sh Stage 5・対象 44 tests OK・full 1103 OK〔unittest 計数——iter71 の 1271 は pytest 計数＝測定方法差で退行なし・メソッド数 1283→1297〕・literal TAB 検証済み）→Task3 617a5c4（record 文書同期・all-skip 拒否 rc2＋no-log-write 実地裏取り）→Task4 925a8ae（SF-014 追記＋SKILL 同期・budget cap 507 維持のため既存プローズ同量圧縮 505/507・contract PASS）。grill-code（fable）Critical 0・Major 0（所見 3 件は echo-class 残余に包含・記録のみ）。Stage1 は親 fable が全 diff 検証・Stage2 skip（各タスク ≤2 files・plan 逐語）。**次アクション＝aegis-review-gate skill に従い 1次 4 角度 finder（opus）→親 verify（fable）→盲検 2 次（fable）→docs/qa-reports/iter72-review.md→review gate approve --ref**。◆別トラック: audit_deps positive proof（iter73）／rc3 guard 個別条件回帰網／保守性 minor 2件／SF-011/012/013。◆push=`gh auth switch --user yuuya-miyagaki` 必須。"
 blockers: []
 failure_tracking: null
 session_history:
