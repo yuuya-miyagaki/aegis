@@ -43,10 +43,11 @@ QA レポート完了前に以下を全て実施する:
 - [ ] 各検証項目に PASS/FAIL 判定を付与した
 - [ ] FAIL 項目にはブロッカーとして原因を記録した
 
-> **手動記録の green は positive proof 必須（iter71）**: `scripts/record-test-result.py`
-> は green（exit 0）に marker verdict を必須化。0 件実行の偽 green（`unittest discover`
-> パターン不一致・`npm test`→`true`・pytest `-q`）は **rc2 拒否・ログ非書込**。red は
-> 従来どおり記録。受理 green には additive な `"marker": true`（judge 非消費の監査）。
+> **手動記録の green（exit 0）は marker verdict 必須（iter71）**: `scripts/record-test-result.py`
+> は 0 件実行の偽 green（`unittest discover` パターン不一致・`npm test`→`true`・pytest `-q`）を
+> **rc2 拒否・ログ非書込**。red は従来どおり記録。受理 green には additive な
+> `"marker": true`（judge 非消費の監査）。iter72 以降は marker に加え
+> **executed 実数（passed+failed・skip 除外）≧1** を要求（all-skip green 不成立・cargo doc-tests 空も受理）。
 
 ## 機能対照表（必須出力）
 
@@ -107,10 +108,11 @@ qa ゲート承認の前に実施する。承認時にハーネス（`pre_approv
 
    - `original` は対象行の**現在の中身と完全一致**させる（行ズレ防止）。
    - `test_command` は**関連テストにスコープ**し（承認のたび実走するため軽く）・
-     **冪等**にし（2回続けてクリーンに走る形・さもないと flaky で blocked）・**実ランナー
-     必須**（positive proof・iter71＝baseline 出力にサマリ marker〔pytest `===== N passed
-     =====`／unittest `Ran N`+`OK`／jest／vitest／go／cargo〕が要る）。**pytest は `-q` 不可**
-     （marker 非出力）。`grep`／`true` 等の非ランナーは `DRILL BLOCKED (baseline no-test-proof)`。
+     **冪等**にし（2回続けてクリーンに走る形・さもないとflakyでblocked）・**実ランナー
+     必須**（iter71＝baseline出力にサマリmarker〔pytest `===== N passed =====`／unittest
+     `Ran N`+`OK`／jest／vitest／go／cargo〕が要る）。**pytest は `-q` 不可**（marker非出力）。
+     `grep`／`true` 等の非ランナーも、all-skip baseline（unittest全@skip／go -v 全t.Skip・iter72
+     以降）も `DRILL BLOCKED (baseline no-test-proof)`。
    - シェル機能（パイプ・リダイレクト・`&&`）は使えない（単一コマンド＋引数のみ）。no-runフラグ（`--collect-only`等）も承認時に拒否（patterns.shのNO_RUN）。mutantは構文を保って意味を変える（構文破壊は`.py`compile・`.sh`bash-n検査でspecエラー）。コミット済み反復はキー`"since":"<基点sha>"`で基点以降のcommitted変更を対象化（基点はHEAD祖先必須・reportに記録）。コメント・空行・docstringだけのハンクはcoverage-floorから自動除外。
 4. **プレビュー実走**してユーザーに見せる前に結果を確認:
 
@@ -136,9 +138,9 @@ qa ゲート承認の前に実施する。承認時にハーネス（`pre_approv
 {"skip": true, "reason": "ドキュメントのみの変更でテスト対象コードなし"}
 ```
 
-> **skip スペックは手順4のプレビューを実行しない**: standalone runner は
-> `test_command` 必須で skip を解釈できず `verdict: FAIL` になる。skip 解釈は
-> 承認時の `check_status.py::run_qa_drill` のみ（`verdict: SKIP`）。`.drill`設置後は
+> **skip スペックは手順4のプレビューを実行しない**（standalone runner は
+> `test_command` 必須＝skipを解釈できず `verdict: FAIL`）。skip解釈は承認時の
+> `check_status.py::run_qa_drill` のみ（`verdict: SKIP`）。`.drill`設置後は
 > プレビューせず `update-gate.sh qa approve --ref <QAレポート>`へ。
 
 理由はユーザーが見る証拠に残る。安易なスキップは避け、コードがあるなら必ずドリルする。
