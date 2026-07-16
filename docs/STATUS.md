@@ -5,8 +5,8 @@ project_name: "Aegis"
 mode: Dev
 phase: brainstorm
 task_type: framework
-task_size: L
-task_size_rationale: "iteration 71（framework・SF-014 恒久策＝marker positive proof 共有 lib 化・record/drill 適用）L 確定（brainstorm Step D）。設計正本: docs/specs/2026-07-15-iter71-marker-positive-proof-design.md（(1) evidence.sh の 4段検証コア〔NO_RUN→STRONG→WEAK pair→zero-run gate〕を hooks/lib/marker.sh に抽出・挙動不変 (2) record-test-result は green 時に verdict 必須＝不成立/評価不能は rc2・ログ非書込〔`unittest discover -p nomatch`／`npm test`→true 偽 green の根治〕・red は marker 不要 (3) drill check_baseline に no-test-proof BLOCKED〔非ランナー import プローブ偽 PASS の根治〕）。footprint: hooks/lib/marker.sh（新規）＋hooks/lib/evidence.sh＋scripts/record-test-result.py＋scripts/run-test-strength-drill.py＋tests 2-3本＝L（6+）。control-plane（反ガミング moat）を触るため review+qa+security 必須・L のため deploy 含む全フェーズ。audit_deps の positive proof（attestation 型・機構別）は iter72 分離起票・marker 覆域拡張は YAGNI（テーマ純度）。"
+task_size: M
+task_size_rationale: "iteration 72（framework・SF-014 恒久策 完結編＝marker positive proof のカウント化）M 確定（brainstorm Step D・update-task.sh 経由）。設計正本: docs/specs/2026-07-16-iter72-count-proof-design.md（(1) aegis_marker_verdict に Stage 5『count proof』追加＝count 族サマリ検出時のみ executed 実数〔unittest: Ran N−Σskipped=K／pytest・jest・vitest・cargo: Σ(passed+failed)／go -v: --- PASS|FAIL 行数〕≧1 を要求・族未検出（素の go）は従来 verdict＝残余 pin (2) cargo zero-run 行 deny をカウント合計に委譲＝doc-tests 空セクションの実在偽陰性を修正〔2026-07-16 実証〕 (3) verdict インターフェース不変＝3 消費者無改修）。footprint: hooks/lib/patterns.sh＋hooks/lib/marker.sh＋scripts/record-test-result.py（docstring/メッセージのみ）＋tests 2本＝M（2-5）。control-plane（反ガミング moat）を触るため review+qa+security 必須・M のため deploy skip（iter69 前例）。go 素出力 all-skip と echo フォージは残余として文書化継続（出力ベース proof の床・drill subsume）・audit_deps positive proof は iter73 分離維持（attestation 型・機構別・テーマ純度）。"
 iteration: 72
 ui_surface: false
 last_updated: "2026-07-16T00:00:00Z"
@@ -22,7 +22,7 @@ gate_approvals:
 current_refs:
   requirements: []
   plan: null
-  spec: null
+  spec: "docs/specs/2026-07-16-iter72-count-proof-design.md"
   review: null
   qa: null
   security: null
