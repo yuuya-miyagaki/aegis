@@ -3,7 +3,7 @@ framework: aegis
 framework_version: "1.29.0"
 project_name: "Aegis"
 mode: Dev
-phase: security
+phase: deploy
 task_type: framework
 task_size: L
 task_size_rationale: "iteration 71（framework・SF-014 恒久策＝marker positive proof 共有 lib 化・record/drill 適用）L 確定（brainstorm Step D）。設計正本: docs/specs/2026-07-15-iter71-marker-positive-proof-design.md（(1) evidence.sh の 4段検証コア〔NO_RUN→STRONG→WEAK pair→zero-run gate〕を hooks/lib/marker.sh に抽出・挙動不変 (2) record-test-result は green 時に verdict 必須＝不成立/評価不能は rc2・ログ非書込〔`unittest discover -p nomatch`／`npm test`→true 偽 green の根治〕・red は marker 不要 (3) drill check_baseline に no-test-proof BLOCKED〔非ランナー import プローブ偽 PASS の根治〕）。footprint: hooks/lib/marker.sh（新規）＋hooks/lib/evidence.sh＋scripts/record-test-result.py＋scripts/run-test-strength-drill.py＋tests 2-3本＝L（6+）。control-plane（反ガミング moat）を触るため review+qa+security 必須・L のため deploy 含む全フェーズ。audit_deps の positive proof（attestation 型・機構別）は iter72 分離起票・marker 覆域拡張は YAGNI（テーマ純度）。"
@@ -16,7 +16,7 @@ gate_approvals:
   plan: approved
   review: approved
   qa: approved
-  security: pending
+  security: approved
   deploy: pending
   dev_ready_for_client: pending
 current_refs:
@@ -25,7 +25,7 @@ current_refs:
   spec: "docs/specs/2026-07-15-iter71-marker-positive-proof-design.md"
   review: "docs/qa-reports/iter71-review.md"
   qa: "docs/qa-reports/iter71-qa.md"
-  security: null
+  security: "docs/qa-reports/iter71-security.md"
   deploy: null
   translation: null
 external_evidence:
