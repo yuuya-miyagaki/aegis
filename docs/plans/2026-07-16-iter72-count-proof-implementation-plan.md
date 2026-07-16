@@ -179,6 +179,33 @@ class TestCountProof(unittest.TestCase):
         rc, verdict = _verdict(out, "python3 -m unittest t", "0")
         self.assertEqual((rc, verdict), (0, "true"))
 
+    def test_cargo_hybrid_echo_forge_true_known_residual(self):
+        # ACCEPTED RESIDUAL pin (design addendum 3): an echoed pair PLUS a
+        # real zero-run cargo line now reads true (the removed line-deny
+        # caught it). Accepted because the attacker strictly dominates by
+        # just NOT running cargo (pure echo was already true pre-iter72 —
+        # cargo has no prologue/exit-code second axis). Echo-class residual
+        # (b), contained by drill/human preview. This pin makes the deny-
+        # surface change explicit; flipping it back requires reintroducing
+        # the empty-doc-tests false negative — do NOT "fix" without reading
+        # SF-014.
+        out = ("running 3 tests\n"
+               "test result: ok. 3 passed; 0 failed; 0 ignored\n"
+               "running 0 tests\n"
+               "test result: ok. 0 passed; 0 failed; 0 ignored\n")
+        rc, verdict = _verdict(out, "cargo test", "0")
+        self.assertEqual((rc, verdict), (0, "true"))
+
+    def test_forged_huge_count_stays_false_path(self):
+        # A forged astronomically large count must not crash the arithmetic
+        # (bash overflow) out of the normal verdict path: digit tokens are
+        # capped at 9 chars before summation. unittest family: Ran(huge->cap)
+        # - skipped(huge->cap) = 0 -> false (all-skip shape preserved).
+        out = ("Ran 99999999999999999999 tests in 0.000s\n\n"
+               "OK (skipped=99999999999999999999)\n")
+        rc, verdict = _verdict(out, "python3 -m unittest t", "0")
+        self.assertEqual((rc, verdict), (0, "false"))
+
     def test_rc3_when_count_families_missing(self):
         # The rc3 guard must cover the NEW array: a patterns.sh without
         # AEGIS_TEST_COUNT_FAMILIES (stale install) -> evaluation impossible.
@@ -270,17 +297,19 @@ class TestCountFamilyParity(unittest.TestCase):
 
 Run: `python3 -m unittest tests.test_marker_lib tests.test_patterns_parity -v 2>&1 | tail -20`
 
-Expected FAIL（7 件・理由付き）:
-1. `test_unittest_all_skip_false_closed` — 現行は true（反転対象）
-2. `test_go_verbose_all_skip_false_closed` — 現行は true
-3. `test_cargo_empty_doctests_section_true_fixed` — 現行は false（偽陰性）
-4. `test_jest_skipped_mixed_true_fixed` — 現行は false（偽陰性）
-5. `test_vitest_indented_summary_true` — 現行は false（アンカー）
-6. `test_rc3_when_count_families_missing` — 現行は rc0（guard 未対応）
-7. `test_entry_format_five_fields` — 配列が未定義（len 0）
-8. `test_marker_tab_space_parity` — 追加 fixture 2 件が expected True に対し False
+Expected: **正確に 10 failed**（grill-plan Rev.2 で精密化）:
+1. `test_unittest_all_skip_false_closed` — 現行は true（反転対象＝本反復の目的）
+2. `test_go_verbose_all_skip_false_closed` — 現行は true（`--- SKIP` のみでも STRONG `ok pkg dur` が通る）
+3. `test_cargo_empty_doctests_section_true_fixed` — 現行は false（zero-run 行 deny の偽陰性）
+4. `test_jest_skipped_mixed_true_fixed` — 現行は false（STRONG 隣接要求の偽陰性）
+5. `test_vitest_indented_summary_true` — 現行は false（行頭アンカー）
+6. `test_forged_huge_count_stays_false_path` — 現行は true（pair 成立・zero-run 非該当・Stage 5 不在）
+7. `test_cargo_hybrid_echo_forge_true_known_residual` — 現行は **false**（fixture が zero-run 行を含み現行 deny が命中。削除後に true 化＝deny 面変更の pin そのもの。pure-echo 形〔zero 行なし〕は現行でも true である点と混同しない）
+8. `test_rc3_when_count_families_missing` — 現行は rc0/true（guard 未対応・除去ループは HEAD では no-op）
+9. `test_entry_format_five_fields` — 配列未定義（len 0）
+10. `test_marker_tab_space_parity` — 追加 fixture 2 件が expected True に対し両エンジン False（parity 自体は一致）
 
-（7-8 は同時に出るため実測は **8 failed** 前後。既に green の pin〔boundary/go_verbose_pass/jest_all_skip/unittest_failed_with_skips/go_bare 残余〕は PASS のまま＝回帰 pin として正しい。）実測の failed/passed 数を commit message に記録する。
+**注記**: `TestCountFamilyParity` の他 2 テスト（`test_regexes_common_subset_and_compile`／`test_detect_fixture_parity`）は空配列に対しループが回らず **vacuous PASS** する（RED に数えない）。**already-green の回帰 pin（PASS のまま）**: `test_unittest_partial_skip_true_boundary`／`test_go_verbose_pass_true`／`test_jest_all_skip_false`／`test_unittest_failed_with_skips_true`／`test_go_bare_all_skip_true_known_residual`。実測の failed/passed 数を commit message に記録し、期待 10 件と差異があれば原因を特定してから進む。
 
 - [ ] **Step 1-7: Commit**
 
@@ -492,13 +521,18 @@ AEGIS_TEST_COUNT_FAMILIES=(
     else
       n=0
       # digit tokens only after the final grep -oE '[0-9]+' — unquoted word
-      # splitting is glob-safe; 10# blocks octal on zero-padded counts.
+      # splitting is glob-safe; 10# blocks octal on zero-padded counts; the
+      # 9-char cap keeps a FORGED astronomic count inside bash arithmetic
+      # (overflow would crash out of the normal "false" path) — >=1
+      # semantics only need magnitude, not precision.
       for num in $(printf '%s' "$lines" | grep -oE "$fam_exec" | grep -oE '[0-9]+' || true); do
+        num="${num:0:9}"
         n=$((n + 10#$num))
       done
       if [ -n "$fam_minus" ]; then
         m=0
         for num in $(printf '%s' "$out" | grep -oE "$fam_minus" | grep -oE '[0-9]+' || true); do
+          num="${num:0:9}"
           m=$((m + 10#$num))
         done
         n=$((n - m))
@@ -577,13 +611,20 @@ closing the unittest / `go test -v` all-skip forgery classes.
 
 - [ ] **Step 3-2: 拒否メッセージへ skip 起因の説明を追記**
 
-`_reject(` の green 不成立メッセージ内、`"記録しません。pytest は `-q` を外して実行してください` の直前に以下を挿入:
+`_reject(` の green 不成立メッセージは隣接文字列リテラルの連結で構成されており、直前リテラルが「…束縛）は」で終わって「記録しません。」へ係る。**行の途中挿入は文を壊す**ため、リテラル行
 
 ```python
-"全テストが skip のスイート（実行 0 件）も不成立です。"
+                "記録しません。pytest は `-q` を外して実行してください（marker "
 ```
 
-（既存の文字列連結リテラル群に 1 行足す形。メッセージを pin する既存テストは無いことを確認済み——変更後 `python3 -m unittest tests.test_record_test_result 2>/dev/null || python3 -m unittest discover -s tests -p "test_record*" 2>&1 | tail -3` で record 系テストが green のこと。）
+を次の 1 行に**置換**する（「記録しません。」の直後に skip 文を差し込む形・インデント維持）:
+
+```python
+                "記録しません。全テストが skip のスイート（実行 0 件）も不成立"
+                "です。pytest は `-q` を外して実行してください（marker "
+```
+
+（メッセージ文字列を pin する既存テストは無いことを 2026-07-16 に grep で確認済み。変更後 `python3 -m unittest discover -s tests -p "test_record*" -v 2>&1 | tail -3` で record 系テストが green のこと。）
 
 - [ ] **Step 3-3: 動作不変の確認（実行系スモーク）**
 
@@ -615,14 +656,20 @@ git commit -m "docs(iter72): Task3 — record docstring/メッセージを count
 
 - [ ] **Step 4-2: qa-verification SKILL の marker 記述を count 契約へ同期**
 
-`.claude/skills/qa-verification/SKILL.md` の line 47 付近（record の marker 必須の説明）に、count 条件を 1 文追記:
+`.claude/skills/qa-verification/SKILL.md` を編集（**行番号でなくアンカー文で位置決めする**——行はドリフトする）:
+
+1. 「green（exit 0）に marker verdict を必須化」を含む段落（`従来どおり記録。受理 green には additive な ...` の文の後）に追記:
 
 ```markdown
 > iter72 以降は marker のマッチに加えて **executed 実数（passed+failed・skip 除外）≧1** を要求
-> （all-skip suite の green 記録は不成立）。cargo は doc-tests 空でも受理（偽陰性修正済み）。
+> （all-skip suite の green 記録は不成立）。cargo は doc-tests 空セクションがあっても受理（偽陰性修正済み）。
 ```
 
-（挿入位置は「green（exit 0）に marker verdict を必須化」の文の直後。行 111 付近の drill 側説明にも「all-skip baseline は no-test-proof/DRILL FAIL」の 1 句を追記。）
+2. 「`DRILL BLOCKED (baseline no-test-proof)`」を含む drill 側説明文の直後に 1 句追記:
+
+```markdown
+     all-skip の baseline（unittest 全 @skip／go -v 全 t.Skip）も iter72 以降は no-test-proof で BLOCKED。
+```
 
 - [ ] **Step 4-3: budget/整合確認**
 
@@ -637,6 +684,14 @@ git commit -m "docs(iter72): Task4 — SF-014 に count proof 適用を追記＋
 ```
 
 ---
+
+## grill-plan 反映記録（Rev.2・2026-07-16）
+
+- 致命 1: RED 期待を「正確に 10 failed」へ精密化（vacuous-pass 2 件と already-green pin 5 件を明示）→ Step 1-6 反映
+- 致命 2: cargo deny 削除で受理される hybrid forge の residual pin テスト追加（`test_cargo_hybrid_echo_forge_true_known_residual`・HEAD では false→削除後 true＝deny 面変更の pin）→ Step 1-3 反映
+- 致命 3: 偽装巨大数の bash 算術オーバーフロー→桁 9 文字 cap＋pin テスト（`test_forged_huge_count_stays_false_path`）→ Step 1-3／2-6 反映
+- 追加修正: record メッセージの挿入位置が前行「…）は」と連結して文が壊れる→行置換方式へ（Step 3-2）／SKILL 編集を行番号→アンカー文指定へ（Step 4-2）
+- 要検討（記録のみ）: evidence.sh window の巨大 cargo clip は現行と同値（false→false・退行なし）／vitest all-skip ファイルの Test Files 計上は未実証（qa で npx 試行）／新 marker.sh×旧 patterns.sh 混載は rc3 全停止だが同 dir 一括配布で構造回避（iter71 と同判断）／shellcheck 全体ゲートなし確認済み（SC2046 はコメントで意図明示）
 
 ## Self-Review（記録）
 
