@@ -215,7 +215,7 @@ AEGIS_TEST_ZERO_RUN_REGEX=(
   # rationale as AEGIS_TEST_PASS_MARKER_REGEX above.
   '(^|\n)Tests:[ 	]+0 passed[ 	]*,[ 	]*0 total' # jest "0 passed, 0 total"
   '(^|\n)Test Files[ 	]+0 passed'              # vitest
-  '(^|\n)0 passing(\b|$)'                       # mocha
+  '(^|\n)0 passing($|[^a-zA-Z])'               # mocha (iter71: \b -> common subset; BSD grep -E does not honor \b)
   '(^|\n)PASS[ 	]+\([ 	]*0 tests'             # go test -v: "PASS\t(0 tests"
 )
 

@@ -22,12 +22,20 @@ POSITIVE marker verdict (hooks/lib/marker.sh — the same 4-stage proof the hook
 observer consumes: N>=1 tests actually ran). No marker -> rc2, no log write. A
 red run keeps recording as-is (failure is fail-visible, not a forge vector).
 
-Residual (intentionally NOT closed): a runner whose output is fully controlled
-by an arbitrary script — e.g. an `npm test` script that echoes a marker-shaped
-line (`Tests: 3 passed` etc.) — is not distinguishable by an output-based proof
-like the marker. We do NOT chase this by enumeration (a denylist regression =
-reproducing SF-014). It is contained by defence-in-depth: fingerprint / judge /
-human preview / drill (an echo script cannot kill a mutant -> the drill FAILs).
+Residual (intentionally NOT closed): the marker is an OUTPUT-based proof, so two
+classes it cannot distinguish remain, both in the SF-014 bucket:
+  (a) arbitrary-script output — e.g. an `npm test` script that echoes a
+      marker-shaped line (`Tests: 3 passed` etc.).
+  (b) all-skip suites — a unittest suite where every test is @skip'd still
+      prints `Ran N tests ... OK (skipped=N)` (unittest counts a skipped test as
+      "run"), and go prints `ok pkg dur` when every test t.Skip()s; both satisfy
+      the marker with ZERO bodies executed. (pytest `N skipped in` and cargo
+      `0 passed` are correctly rejected — see tests/test_marker_lib.py
+      TestSkipSuiteResidual.)
+We do NOT chase either by enumeration (a denylist regression = reproducing
+SF-014). Contained by defence-in-depth: fingerprint / judge / human preview /
+drill (a skip/echo baseline kills no mutant -> the drill FAILs). The permanent
+fix is a passed/failed-COUNT positive proof (not just a pass-marker match).
 Handed off to the SF-014 docs update (iter71 docs phase) and the audit_deps
 positive-proof track (iter72).
 

@@ -111,5 +111,63 @@ class TestMarkerVerdict(unittest.TestCase):
         self.assertEqual((rc, out), (0, "false"))
 
 
+class TestSkipSuiteResidual(unittest.TestCase):
+    """iter71 review 敵対角度 F-A / 親 verify: an all-skip suite runs ZERO test
+    bodies. Runners split by how their success marker treats a skipped test:
+
+      - pytest (`N skipped in`), cargo (`0 passed`): the marker/zero-run gate
+        rejects it -> false. These are MOAT-PROTECTION pins — a future marker
+        edit that lets an all-skip pytest/cargo run read as `true` is a
+        regression these lock down.
+      - unittest (`Ran N tests ... OK (skipped=N)`), go (`ok pkg dur`): the
+        runner counts a collected-then-skipped test as "run", so the WEAK pair
+        (unittest) / STRONG `ok` line (go) is satisfied with zero bodies
+        executed -> true. This is a PRE-EXISTING residual of an output-based
+        proof (verified: pre-iter71 evidence.sh returns the same true; marker.sh
+        is a verbatim move). Same class as the npm-echo residual, tracked in
+        docs/security-followups.md SF-014; the permanent fix is a
+        passed/failed-COUNT positive proof (iter72+). Contained: the B1 drill
+        subsumes it (an all-skip baseline catches no mutant -> DRILL FAIL), so
+        the qa gate (drill + judge) is not defeated by this alone. These tests
+        PIN the split so a change in either camp is noticed."""
+
+    def test_pytest_all_skip_false_moat_pin(self):
+        out = ("platform darwin -- Python 3.9.6, pytest-8.4.2\n"
+               "rootdir: /tmp/x\ncollected 1 item\n\n"
+               "t.py s  [100%]\n\n=========== 1 skipped in 0.01s ===========\n")
+        rc, verdict = _verdict(out, "python3 -m pytest t.py", "0")
+        self.assertEqual((rc, verdict), (0, "false"))
+
+    def test_cargo_all_ignored_false_moat_pin(self):
+        out = ("running 3 tests\n"
+               "test result: ok. 0 passed; 0 failed; 3 ignored\n")
+        rc, verdict = _verdict(out, "cargo test", "0")
+        self.assertEqual((rc, verdict), (0, "false"))
+
+    def test_unittest_all_skip_true_known_residual(self):
+        # PRE-EXISTING residual (SF-014): unittest counts skipped as `Ran N`.
+        out = "Ran 1 test in 0.000s\n\nOK (skipped=1)\n"
+        rc, verdict = _verdict(out, "python3 -m unittest t", "0")
+        self.assertEqual((rc, verdict), (0, "true"))
+
+    def test_go_all_skip_true_known_residual(self):
+        # PRE-EXISTING residual (SF-014): go emits `ok pkg dur` even when every
+        # test t.Skip()s.
+        out = "ok  \texample.com/pkg\t0.012s\n"
+        rc, verdict = _verdict(out, "go test ./...", "0")
+        self.assertEqual((rc, verdict), (0, "true"))
+
+
+class TestWeakPairBoundary(unittest.TestCase):
+    """iter71 review テスト強度 F2: the WEAK pair needs BOTH anchor and
+    companion. M6 pins anchor-only -> false; this pins companion-only -> false,
+    so a refactor that drops the anchor requirement (accepting a bare `OK`) is
+    caught."""
+
+    def test_companion_only_false(self):
+        rc, verdict = _verdict("OK\n", "python3 -m unittest t", "0")
+        self.assertEqual((rc, verdict), (0, "false"))
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -204,6 +204,74 @@ class TestTestRunnerParity(unittest.TestCase):
                              f"is_test_runner_cmd: {cmd!r}")
 
 
+def bash_array(name: str) -> list[str]:
+    out = subprocess.run(
+        ["bash", "-c",
+         'source "$1"; printf "%s\\n" "${' + name + '[@]}"',
+         "_", str(PATTERNS)],
+        capture_output=True, text=True, timeout=10, check=True)
+    return [l for l in out.stdout.splitlines() if l.strip()]
+
+
+class TestMarkerZeroRunParity(unittest.TestCase):
+    """iter71 review F-2 (仕様/敵対角度): AEGIS_TEST_PASS_MARKER_REGEX と
+    AEGIS_TEST_ZERO_RUN_REGEX も grep -E ∩ python-re parity 契約下に置く。
+    iter71 で bracket 内の `\\t` をリテラル TAB へ修正した（BSD grep -E は `\\t`
+    を展開しない・[[:space:]] は parity 違反）ため、TAB/space 両表現で両エンジンの
+    判定が一致することをピンする。従来 parity テストは RUNNER_REGEX のみ対象だった。"""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.markers = bash_array("AEGIS_TEST_PASS_MARKER_REGEX")
+        cls.zeroruns = bash_array("AEGIS_TEST_ZERO_RUN_REGEX")
+
+    def _both_engines(self, patterns, text):
+        py = any(re.compile(p).search(text) for p in patterns)
+        gr = grep_match(text, patterns)
+        return py, gr
+
+    def test_arrays_nonempty(self):
+        self.assertGreaterEqual(len(self.markers), 3)
+        self.assertGreaterEqual(len(self.zeroruns), 3)
+
+    def test_no_engine_splitting_syntax(self):
+        for p in self.markers + self.zeroruns:
+            self.assertNotIn("[[:", p, f"POSIX class in {p}")
+            self.assertNotIn("\\b", p, f"\\b in {p}")
+
+    def test_python_re_compiles(self):
+        for p in self.markers + self.zeroruns:
+            re.compile(p)
+
+    def test_marker_tab_space_parity(self):
+        # TAB と space 両表現で go/jest/vitest STRONG marker がマッチし、grep -E と
+        # python re が同一判定であること。
+        fixtures = [
+            ("ok  \texample.com/pkg\t0.123s", True),   # go TAB 区切り
+            ("ok  example.com/pkg  0.123s", True),      # go space 区切り
+            ("Tests:\t3 passed, 3 total", True),        # jest TAB
+            ("Tests:       3 passed, 3 total", True),   # jest space
+            ("Test Files\t1 passed", True),             # vitest TAB
+            ("nothing to see here", False),
+        ]
+        for text, expected in fixtures:
+            py, gr = self._both_engines(self.markers, text)
+            self.assertEqual(py, gr, f"engine split (marker): {text!r} py={py} grep={gr}")
+            self.assertEqual(py, expected, f"marker expected {expected}: {text!r}")
+
+    def test_zerorun_tab_space_parity(self):
+        fixtures = [
+            ("Tests:\t0 passed, 0 total", True),        # jest zero TAB
+            ("Tests:       0 passed, 0 total", True),   # jest zero space
+            ("Test Files\t0 passed", True),             # vitest zero TAB
+            ("Tests:       5 passed, 5 total", False),  # 非 zero は不一致
+        ]
+        for text, expected in fixtures:
+            py, gr = self._both_engines(self.zeroruns, text)
+            self.assertEqual(py, gr, f"engine split (zerorun): {text!r} py={py} grep={gr}")
+            self.assertEqual(py, expected, f"zerorun expected {expected}: {text!r}")
+
+
 class TestMaskScopeBoundary(unittest.TestCase):
     """マスクは分類専用 — deny 系 hook に波及していないこと（fail-open 防止）。"""
 
