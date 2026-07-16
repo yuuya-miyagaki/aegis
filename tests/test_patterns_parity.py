@@ -252,6 +252,8 @@ class TestMarkerZeroRunParity(unittest.TestCase):
             ("Tests:\t3 passed, 3 total", True),        # jest TAB
             ("Tests:       3 passed, 3 total", True),   # jest space
             ("Test Files\t1 passed", True),             # vitest TAB
+            ("Tests:       2 skipped, 3 passed, 5 total", True),  # jest skipped 混在（iter72 緩和）
+            (" Test Files  1 passed (1)", True),        # vitest インデント（iter72 緩和）
             ("nothing to see here", False),
         ]
         for text, expected in fixtures:
@@ -270,6 +272,58 @@ class TestMarkerZeroRunParity(unittest.TestCase):
             py, gr = self._both_engines(self.zeroruns, text)
             self.assertEqual(py, gr, f"engine split (zerorun): {text!r} py={py} grep={gr}")
             self.assertEqual(py, expected, f"zerorun expected {expected}: {text!r}")
+
+
+class TestCountFamilyParity(unittest.TestCase):
+    """iter72 (SF-014 count proof): AEGIS_TEST_COUNT_FAMILIES の DETECT/EXEC/
+    MINUS も grep -E ∩ python-re parity 契約下に置く（5 フィールド `|||` 形式・
+    共通部分集合・fixture 両エンジン一致）。"""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.entries = bash_array("AEGIS_TEST_COUNT_FAMILIES")
+
+    def test_entry_format_five_fields(self):
+        self.assertGreaterEqual(len(self.entries), 6)
+        for e in self.entries:
+            parts = e.split("|||")
+            self.assertEqual(len(parts), 5, f"NAME|||DETECT|||EXEC|||MODE|||MINUS: {e!r}")
+            name, detect, exec_pat, mode, _minus = parts
+            self.assertTrue(name, e)
+            self.assertTrue(detect, e)
+            self.assertTrue(exec_pat, e)
+            self.assertIn(mode, ("sum", "lines"), e)
+
+    def test_regexes_common_subset_and_compile(self):
+        for e in self.entries:
+            _n, detect, exec_pat, _m, minus = e.split("|||")
+            pats = [detect, exec_pat] + ([minus] if minus else [])
+            for p in pats:
+                self.assertNotIn("[[:", p, f"POSIX class in {p}")
+                self.assertNotIn("\\b", p, f"\\b in {p}")
+                re.compile(p)
+
+    def test_detect_fixture_parity(self):
+        # (text, family-that-must-detect-or-None, expected)
+        fixtures = [
+            ("Ran 2 tests in 0.000s", "unittest", True),
+            ("=========== 3 passed in 0.42s ===========", "pytest", True),
+            ("Tests:       2 skipped, 3 passed, 5 total", "jest", True),
+            ("      Tests  2 passed (2)", "vitest", True),
+            ("test result: ok. 0 passed; 0 failed; 3 ignored", "cargo", True),
+            ("--- SKIP: TestA (0.00s)", "go-verbose", True),
+            ("ok  \texample.com/pkg\t0.012s", None, False),  # 素の go は族なし
+        ]
+        by_name = {e.split("|||")[0]: e.split("|||")[1] for e in self.entries}
+        for text, fam, expected in fixtures:
+            for name, detect in by_name.items():
+                py = re.compile(detect).search(text) is not None
+                gr = grep_match(text, [detect])
+                self.assertEqual(py, gr, f"engine split ({name}): {text!r}")
+                if fam is not None and name == fam:
+                    self.assertEqual(py, expected, f"{name} detect: {text!r}")
+                if fam is None:
+                    self.assertFalse(py, f"{name} must NOT detect: {text!r}")
 
 
 class TestMaskScopeBoundary(unittest.TestCase):

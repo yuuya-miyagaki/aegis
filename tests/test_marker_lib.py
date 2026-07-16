@@ -19,6 +19,7 @@ aegis_marker_verdict is undefined (source of a missing file -> exit 3, but the
 subprocess helper below returns rc3 for that too, so the assertions on
 (0,"true"/"false") fail); M1 raises FileNotFoundError copying the missing lib.
 """
+import re
 import shutil
 import subprocess
 import tempfile
@@ -112,24 +113,25 @@ class TestMarkerVerdict(unittest.TestCase):
 
 
 class TestSkipSuiteResidual(unittest.TestCase):
-    """iter71 review 敵対角度 F-A / 親 verify: an all-skip suite runs ZERO test
-    bodies. Runners split by how their success marker treats a skipped test:
+    """iter71 review F-A / iter72 count proof: an all-skip suite runs ZERO test
+    bodies. iter72's Stage 5 (count proof: executed = passed+failed, skips
+    excluded, >=1 required per detected count family) CLOSES the unittest and
+    `go test -v` halves of the residual; the remaining split:
 
-      - pytest (`N skipped in`), cargo (`0 passed`): the marker/zero-run gate
-        rejects it -> false. These are MOAT-PROTECTION pins — a future marker
-        edit that lets an all-skip pytest/cargo run read as `true` is a
-        regression these lock down.
-      - unittest (`Ran N tests ... OK (skipped=N)`), go (`ok pkg dur`): the
-        runner counts a collected-then-skipped test as "run", so the WEAK pair
-        (unittest) / STRONG `ok` line (go) is satisfied with zero bodies
-        executed -> true. This is a PRE-EXISTING residual of an output-based
-        proof (verified: pre-iter71 evidence.sh returns the same true; marker.sh
-        is a verbatim move). Same class as the npm-echo residual, tracked in
-        docs/security-followups.md SF-014; the permanent fix is a
-        passed/failed-COUNT positive proof (iter72+). Contained: the B1 drill
-        subsumes it (an all-skip baseline catches no mutant -> DRILL FAIL), so
-        the qa gate (drill + judge) is not defeated by this alone. These tests
-        PIN the split so a change in either camp is noticed."""
+      - pytest (`N skipped in`), cargo (`0 passed`), jest (no `passed`
+        segment): false. MOAT-PROTECTION pins (cargo now via the Stage 5 sum
+        — the zero-run line-deny was removed to fix the empty-doc-tests
+        false negative — but the pin below is black-box identical).
+      - unittest all-skip: false since iter72 (Ran N - skipped=N = 0). CLOSED.
+      - go -v all-skip: false since iter72 (`--- SKIP:` only -> 0 PASS/FAIL
+        lines). CLOSED for the top-level all-`t.Skip()` form; a parent
+        t.Run holder still prints `--- PASS:` (its body DID run) — design
+        addendum 4.
+      - bare `go test`: `ok pkg dur` carries no counts; an all-skip package
+        is byte-identical to a real pass (iter71 verified). PRE-EXISTING
+        residual, SF-014 bucket, contained by the B1 drill (an all-skip
+        baseline kills no mutant -> DRILL FAIL). Permanent-fix candidate:
+        execution attestation (iter73+ track)."""
 
     def test_pytest_all_skip_false_moat_pin(self):
         out = ("platform darwin -- Python 3.9.6, pytest-8.4.2\n"
@@ -144,15 +146,40 @@ class TestSkipSuiteResidual(unittest.TestCase):
         rc, verdict = _verdict(out, "cargo test", "0")
         self.assertEqual((rc, verdict), (0, "false"))
 
-    def test_unittest_all_skip_true_known_residual(self):
-        # PRE-EXISTING residual (SF-014): unittest counts skipped as `Ran N`.
-        out = "Ran 1 test in 0.000s\n\nOK (skipped=1)\n"
+    def test_unittest_all_skip_false_closed(self):
+        # iter72 CLOSED: Ran(2) - skipped(2) = 0 bodies. Real output captured
+        # 2026-07-16 (python3 -m unittest, two @unittest.skip tests, rc=0).
+        out = ("ss\n" + "-" * 70 +
+               "\nRan 2 tests in 0.000s\n\nOK (skipped=2)\n")
+        rc, verdict = _verdict(out, "python3 -m unittest t", "0")
+        self.assertEqual((rc, verdict), (0, "false"))
+
+    def test_unittest_partial_skip_true_boundary(self):
+        # Boundary pin: Ran(2) - skipped(1) = 1 executed -> true. Real output
+        # captured 2026-07-16.
+        out = ("s.\n" + "-" * 70 +
+               "\nRan 2 tests in 0.000s\n\nOK (skipped=1)\n")
         rc, verdict = _verdict(out, "python3 -m unittest t", "0")
         self.assertEqual((rc, verdict), (0, "true"))
 
-    def test_go_all_skip_true_known_residual(self):
-        # PRE-EXISTING residual (SF-014): go emits `ok pkg dur` even when every
-        # test t.Skip()s.
+    def test_go_verbose_all_skip_false_closed(self):
+        # iter72 CLOSED: -v output present but zero `--- PASS:`/`--- FAIL:`.
+        out = ("=== RUN   TestA\n--- SKIP: TestA (0.00s)\n"
+               "=== RUN   TestB\n--- SKIP: TestB (0.00s)\n"
+               "PASS\nok  \texample.com/pkg\t0.012s\n")
+        rc, verdict = _verdict(out, "go test -v ./...", "0")
+        self.assertEqual((rc, verdict), (0, "false"))
+
+    def test_go_verbose_pass_true(self):
+        out = ("=== RUN   TestA\n--- PASS: TestA (0.00s)\n"
+               "PASS\nok  \texample.com/pkg\t0.010s\n")
+        rc, verdict = _verdict(out, "go test -v ./...", "0")
+        self.assertEqual((rc, verdict), (0, "true"))
+
+    def test_go_bare_all_skip_true_known_residual(self):
+        # PRE-EXISTING residual (SF-014): bare `go test` emits `ok pkg dur`
+        # with no counts; all-skip and real pass are byte-identical (iter71
+        # verified). No count family detects -> Stage 1-4 verdict -> true.
         out = "ok  \texample.com/pkg\t0.012s\n"
         rc, verdict = _verdict(out, "go test ./...", "0")
         self.assertEqual((rc, verdict), (0, "true"))
@@ -167,6 +194,109 @@ class TestWeakPairBoundary(unittest.TestCase):
     def test_companion_only_false(self):
         rc, verdict = _verdict("OK\n", "python3 -m unittest t", "0")
         self.assertEqual((rc, verdict), (0, "false"))
+
+
+class TestCountProof(unittest.TestCase):
+    """iter72 Stage 5 (count proof) — false-negative fixes and the guard.
+
+    The two `..._fixed` tests pin REAL-WORLD summary shapes that the pre-iter72
+    verdict REJECTED (both empirically demonstrated on 2026-07-16, see the
+    design addendum): cargo's empty doc-tests section tripped the zero-run
+    line-deny; jest's `skipped,` segment broke the STRONG marker adjacency."""
+
+    def test_cargo_empty_doctests_section_true_fixed(self):
+        # Real-world shape: unit section 5 passed + EMPTY doc-tests section
+        # (`running 0 tests` -> `0 passed`). Pre-iter72: false (zero-run
+        # line-deny). Stage 5 sums across ALL `test result:` lines: 5 >= 1.
+        out = ("running 5 tests\n"
+               "test a ... ok\ntest b ... ok\ntest c ... ok\n"
+               "test d ... ok\ntest e ... ok\n"
+               "test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; "
+               "0 filtered out; finished in 0.00s\n\n"
+               "   Doc-tests mylib\n\nrunning 0 tests\n\n"
+               "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; "
+               "0 filtered out; finished in 0.00s\n")
+        rc, verdict = _verdict(out, "cargo test", "0")
+        self.assertEqual((rc, verdict), (0, "true"))
+
+    def test_jest_skipped_mixed_true_fixed(self):
+        # Real jest segment order is failed, skipped, todo, passed, total —
+        # any skipped test broke the old `(N failed,)? N passed` adjacency.
+        out = ("Tests:       2 skipped, 3 passed, 5 total\n"
+               "Snapshots:   0 total\nTime:        1.2 s\n")
+        rc, verdict = _verdict(out, "npx jest", "0")
+        self.assertEqual((rc, verdict), (0, "true"))
+
+    def test_jest_all_skip_false(self):
+        # All-skip jest prints NO `passed` segment -> no STRONG hit -> false
+        # (unchanged behavior, now double-covered by the count stage).
+        out = "Tests:       3 skipped, 3 total\n"
+        rc, verdict = _verdict(out, "npx jest", "0")
+        self.assertEqual((rc, verdict), (0, "false"))
+
+    def test_vitest_indented_summary_true(self):
+        # Real vitest indents its summary lines (design addendum 2); the
+        # anchors now allow leading blanks.
+        out = (" Test Files  1 passed (1)\n"
+               "      Tests  2 passed (2)\n")
+        rc, verdict = _verdict(out, "npx vitest run", "0")
+        self.assertEqual((rc, verdict), (0, "true"))
+
+    def test_unittest_failed_with_skips_true(self):
+        # Red-run verdict (the verdict proves "tests ran", not "green"):
+        # Ran(5) - skipped(2) = 3 bodies executed -> true.
+        out = ("Ran 5 tests in 0.010s\n\nFAILED (failures=1, skipped=2)\n")
+        rc, verdict = _verdict(out, "python3 -m unittest t", "0")
+        self.assertEqual((rc, verdict), (0, "true"))
+
+    def test_cargo_hybrid_echo_forge_true_known_residual(self):
+        # ACCEPTED RESIDUAL pin (design addendum 3): an echoed pair PLUS a
+        # real zero-run cargo line now reads true (the removed line-deny
+        # caught it). Accepted because the attacker strictly dominates by
+        # just NOT running cargo (pure echo was already true pre-iter72 —
+        # cargo has no prologue/exit-code second axis). Echo-class residual
+        # (b), contained by drill/human preview. This pin makes the deny-
+        # surface change explicit; flipping it back requires reintroducing
+        # the empty-doc-tests false negative — do NOT "fix" without reading
+        # SF-014.
+        out = ("running 3 tests\n"
+               "test result: ok. 3 passed; 0 failed; 0 ignored\n"
+               "running 0 tests\n"
+               "test result: ok. 0 passed; 0 failed; 0 ignored\n")
+        rc, verdict = _verdict(out, "cargo test", "0")
+        self.assertEqual((rc, verdict), (0, "true"))
+
+    def test_forged_huge_count_stays_false_path(self):
+        # A forged astronomically large count must not crash the arithmetic
+        # (bash overflow) out of the normal verdict path: digit tokens are
+        # capped at 9 chars before summation. unittest family: Ran(huge->cap)
+        # - skipped(huge->cap) = 0 -> false (all-skip shape preserved).
+        out = ("Ran 99999999999999999999 tests in 0.000s\n\n"
+               "OK (skipped=99999999999999999999)\n")
+        rc, verdict = _verdict(out, "python3 -m unittest t", "0")
+        self.assertEqual((rc, verdict), (0, "false"))
+
+    def test_rc3_when_count_families_missing(self):
+        # The rc3 guard must cover the NEW array: a patterns.sh without
+        # AEGIS_TEST_COUNT_FAMILIES (stale install) -> evaluation impossible.
+        src = (ROOT / "hooks" / "lib" / "patterns.sh").read_text()
+        kept, skip = [], False
+        for ln in src.splitlines(keepends=True):
+            if ln.startswith("AEGIS_TEST_COUNT_FAMILIES=("):
+                skip = True
+                continue
+            if skip and ln.strip() == ")":
+                skip = False
+                continue
+            if not skip:
+                kept.append(ln)
+        with tempfile.TemporaryDirectory() as d:
+            (Path(d) / "patterns.sh").write_text("".join(kept))
+            shutil.copy(MARKER_LIB, Path(d) / "marker.sh")
+            rc, _out = _verdict(
+                PYTEST_REAL, "python3 -m pytest tests/", "0",
+                lib=Path(d) / "marker.sh")
+            self.assertEqual(rc, 3)
 
 
 if __name__ == "__main__":
