@@ -3,7 +3,7 @@ framework: aegis
 framework_version: "1.29.0"
 project_name: "Aegis"
 mode: Dev
-phase: qa
+phase: security
 task_type: framework
 task_size: L
 task_size_rationale: "iteration 71（framework・SF-014 恒久策＝marker positive proof 共有 lib 化・record/drill 適用）L 確定（brainstorm Step D）。設計正本: docs/specs/2026-07-15-iter71-marker-positive-proof-design.md（(1) evidence.sh の 4段検証コア〔NO_RUN→STRONG→WEAK pair→zero-run gate〕を hooks/lib/marker.sh に抽出・挙動不変 (2) record-test-result は green 時に verdict 必須＝不成立/評価不能は rc2・ログ非書込〔`unittest discover -p nomatch`／`npm test`→true 偽 green の根治〕・red は marker 不要 (3) drill check_baseline に no-test-proof BLOCKED〔非ランナー import プローブ偽 PASS の根治〕）。footprint: hooks/lib/marker.sh（新規）＋hooks/lib/evidence.sh＋scripts/record-test-result.py＋scripts/run-test-strength-drill.py＋tests 2-3本＝L（6+）。control-plane（反ガミング moat）を触るため review+qa+security 必須・L のため deploy 含む全フェーズ。audit_deps の positive proof（attestation 型・機構別）は iter72 分離起票・marker 覆域拡張は YAGNI（テーマ純度）。"
@@ -15,7 +15,7 @@ gate_approvals:
   brainstorm: approved
   plan: approved
   review: approved
-  qa: pending
+  qa: approved
   security: pending
   deploy: pending
   dev_ready_for_client: pending
@@ -24,7 +24,7 @@ current_refs:
   plan: "docs/plans/2026-07-15-iter71-marker-positive-proof-implementation-plan.md"
   spec: "docs/specs/2026-07-15-iter71-marker-positive-proof-design.md"
   review: "docs/qa-reports/iter71-review.md"
-  qa: null
+  qa: "docs/qa-reports/iter71-qa.md"
   security: null
   deploy: null
   translation: null
@@ -37,7 +37,7 @@ external_evidence:
     scope: "v0.13.0 計画 5 ラウンドレビュー"
     findings: "Round 1〜5 で計 25 件の指摘（hook 出力スキーマ陳腐化、TaskCreated/Completed 制御方式、Plan 条件付き許可、effort 配分、pre-compact.sh 同種破損、`if` 単一 rule 制約等）"
     resolution: "Rev.5 で全件反映、Phase 0a 即時実装着手 GO。hotfix/v0122-hook-schema ブランチで開始。"
-next_action: "**【iter71 review approved→qa】** review gate approved（ref=docs/qa-reports/iter71-review.md・judge 🟢＝test-fact green〔manual record〕＋第2意見 approve_with_notes）。実装 HEAD=9dc77b1（fix-forward）。1次4角度（仕様/敵対/テスト強度/保守性 全 approve_with_notes）＋grill-code Critical0＋親verify 独立実証＋盲検2次 fable 独立 approve_with_notes＝収束・divergence なし。**核心 finding=F-A（unittest/go all-skip suite が marker true→judge green・pre-existing〔marker.sh 逐語移動・pre-iter71 でも同 true 差分実走〕・contained〔drill が subsume＝all-skip baseline は mutant 殺せず FAIL〕）→SF-014 恒久策（passed/failed 実数カウント proof・iter72+）へ**。fix-forward で skip-suite 残余記録＋moat 保護 pin（TestSkipSuiteResidual/TestWeakPairBoundary/TestMarkerZeroRunParity）＋mocha `\\b`→共通部分集合 修正（parity テストが摘発した cross-engine 欠陥）。full suite 1272 passed/2 skipped/0 failed（253s）。次＝qa（B1 drill＋fresh 変異 独立 clone＋実環境 E2E＝nomatch/-q 拒否・正規 pytest 受理・import プローブ drill BLOCKED）。◆残トラック（iter72+）: audit_deps positive proof／rc3 guard 個別条件回帰網（テスト強度 F1）／保守性 minor 2件（命名語彙・record→drill 依存）／SF-011/012/013。"
+next_action: "**【iter71 qa approved→security】** qa gate approved（ref=docs/qa-reports/iter71-qa.md・judge 🟢＝test-fact green＋B1 drill SKIP sanctioned〔per-task committed〕）。qa 実証: 独立 clone baseline 1271 passed/3 skipped＋fresh 変異 6/6 KILLED〔M1-M6・対称変異も二層被覆で subsumed〕＋実環境 E2E 4/4 PASS〔nomatch/-q 拒否・正規受理 marker:true・import プローブ BLOCKED〕＋本体 tree 無変更。実装 HEAD=9dc77b1。全 review 収束（1次4角度＋grill-code＋親verify＋盲検2次 approve系・核心 F-A skip-suite は pre-existing/contained→SF-014 iter72）。次＝security（反ガミング moat＝control-plane を触るため必須・1次＋盲検2次 物理隔離 clone・injection/fail-open/secrets/data-exposure・marker subprocess の command injection 面）。◆残トラック（iter72+）: audit_deps positive proof／rc3 guard 個別条件回帰網（テスト強度 F1）／保守性 minor 2件／SF-011/012/013。"
 blockers: []
 failure_tracking: null
 session_history:
