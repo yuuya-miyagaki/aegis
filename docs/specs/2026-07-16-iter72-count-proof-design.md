@@ -122,6 +122,13 @@ AEGIS_TEST_COUNT_FAMILIES=(
 - **evidence.sh の window clip**: 巨大 go `-v` 出力で head+tail window から `--- PASS:` が欠け `--- SKIP:` だけ残ると observed 経路が過剰 false になりうる（record/drill は全文なので影響なし）。摩擦方向のみ・稀・許容（設計上のトレードオフとして記録）。
 - **pytest 偽陰性の非退行**: `={3,} .* in [0-9.]+s` DETECT は実 pytest サマリ形（`===== 3 passed in 0.42s =====`）に一致し、既存 M2 が黒箱ピン。
 
+## plan 時追補（2026-07-16・実証に基づく設計精密化）
+
+1. **jest 偽陰性（新発見・実証済み）**: 実 jest はサマリ順序が `failed, skipped, todo, passed, total` のため、skipped/todo が 1 件でもあると現行 STRONG marker `Tests:[ 	]+([0-9]+ failed,[ 	]+)?[0-9]+ passed` の隣接要求が破れ **false**（`Tests:       2 skipped, 3 passed, 5 total` で grep 不一致・marker.sh verdict=false を実測）。修正: 中間セグメントを許容する `Tests:[ 	]+([0-9]+ [a-z]+,[ 	]+)*[0-9]+ passed` へ緩和。緩和は STRONG の受理側拡大だが、攻撃者は厳格形をそのまま echo できたため forge 価値は不変（緩和で開く攻撃なし）。all-skip jest は `passed` セグメント自体が出ないため引き続き false＋Stage 5 count が二重防衛。
+2. **vitest インデント疑義**: 実 vitest のサマリ（` Test Files  1 passed (1)` / `      Tests  2 passed (2)`）は行頭インデントされ、現行 `(^|\n)Test Files` アンカーに不一致の可能性（ローカルに vitest なし・未実証）。修正: アンカーに `[ 	]*` を許容（STRONG・zero-run・count DETECT とも）。同じく受理側拡大のみで forge 価値不変。qa フェーズで `npx vitest` 実行を試行し実証（不可なら fixture 根拠を記録）。
+3. **cargo zero-run 行 deny 削除の安全性論証**（grill 観点の先回り）: 削除で開くのは「echo で pair を偽造＋実 cargo zero-run を併走させる」ハイブリッド forge のみ。だが**実 cargo を走らせず echo だけにすれば今日でも true**（cargo には pytest の prologue/exit5 に相当する第2軸がなく、pure-echo は現行でも素通り）。つまり攻撃者は実 run を省くだけで deny を回避できており、当該 deny の限界防御価値は「不合理に実 zero-run を併走させる攻撃者」に対してのみ。一方で偽陰性コスト（doc-tests 空の全 crate の実 green 拒否）は全正当ユーザーに恒常発生。ゆえに削除＋count 委譲が正。pytest の zero-run 系 deny（prologue/exit5 と重層）は全維持。
+4. **go -v の親テスト nuance**: サブテスト全 skip でも親 `t.Run` ホルダーは `--- PASS:` を出す（親 body は実行されている）ため、-v 封鎖の対象は「トップレベル全 `t.Skip()`」形（iter71 F-A の実証形）。残余として test コメントに記録。
+
 ## footprint / task_size
 
 - 変更ファイル: `hooks/lib/patterns.sh`・`hooks/lib/marker.sh`・`scripts/record-test-result.py`（docstring/メッセージのみ）・`tests/test_marker_lib.py`・`tests/test_patterns_parity.py` ＝ **5 ファイル → M（2-5）**。
