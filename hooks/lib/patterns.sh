@@ -160,9 +160,16 @@ AEGIS_TEST_PASS_MARKER_REGEX=(
   # banned by the grep-E/python-re parity constraint above. A literal TAB
   # behaves identically in BSD grep -E, GNU grep -E, and python re. Beware
   # editors converting the embedded tab to spaces.
-  # jest / vitest: "Tests:       5 passed, 5 total"
-  '(^|\n)Tests:[ 	]+([0-9]+ failed,[ 	]+)?[0-9]+ passed'
-  '(^|\n)Test Files[ 	]+[0-9]+ passed'
+  # jest / vitest: "Tests:       5 passed, 5 total". iter72: real jest orders
+  # segments failed, skipped, todo, passed — any skipped/todo test broke the
+  # old `(N failed,)? N passed` adjacency (empirically a false negative for
+  # every suite with a skipped test). `([0-9]+ [a-z]+,[ 	]+)*` accepts the
+  # intermediate segments; forge value is unchanged (the strict form was
+  # already echoable) and Stage 5 still requires passed+failed >= 1.
+  '(^|\n)Tests:[ 	]+([0-9]+ [a-z]+,[ 	]+)*[0-9]+ passed'
+  # vitest: real output indents its summary (" Test Files  1 passed (1)") —
+  # iter72 allows leading blanks (accept-side only; forge value unchanged).
+  '(^|\n)[ 	]*Test Files[ 	]+[0-9]+ passed'
   # go: "ok      example/pkg     0.123s"  or  "FAIL    example/pkg     [build failed]"
   '(^|\n)(ok|FAIL)[ 	]+[A-Za-z0-9_./-]+[ 	]+[0-9]+\.[0-9]+s'
 )
@@ -205,20 +212,69 @@ AEGIS_TEST_NO_RUN_FLAG_REGEX='(^|[[:space:]])(-{1,2}(version|help|collect-only|c
 #
 # CONSTRAINT (same as runner regex): grep-E ∩ python-re common subset — no
 # [[:space:]], no \b. Use ( |^|$) style boundaries.
+# iter72: the cargo line-deny (`test result: ... 0 passed`) was REMOVED — an
+# empty doc-tests section emits exactly that line on every real run of a
+# doc-test-less crate (empirically: verdict false = false negative), while
+# the attack it guarded (echoed pair + a REAL zero-run cargo alongside) is
+# strictly dominated by pure echo with no cargo run at all (already true
+# today; cargo has no prologue/exit-code second axis). The all-ignored case
+# stays rejected by the Stage 5 count sum in marker.sh (moat pin unchanged:
+# tests/test_marker_lib.py test_cargo_all_ignored_false_moat_pin).
 AEGIS_TEST_ZERO_RUN_REGEX=(
   '(^|\n)collected 0 items'                     # pytest
   '(^|\n)no tests ran'                          # pytest -k <NOMATCH>
   '(^|\n)Ran 0 tests'                           # unittest
   '(^|\n)No tests (found|ran)'                  # pytest/jest variant
-  '(^|\n)test result: (ok|FAILED)\. 0 passed'   # cargo
   # iter71 (M10): literal TAB (0x09) in brackets, not \t — same BSD grep -E
   # rationale as AEGIS_TEST_PASS_MARKER_REGEX above.
   '(^|\n)Tests:[ 	]+0 passed[ 	]*,[ 	]*0 total' # jest "0 passed, 0 total"
-  '(^|\n)Test Files[ 	]+0 passed'              # vitest
+  '(^|\n)[ 	]*Test Files[ 	]+0 passed'         # vitest（iter72: インデント許容）
   '(^|\n)0 passing($|[^a-zA-Z])'               # mocha (iter71: \b -> common subset; BSD grep -E does not honor \b)
   '(^|\n)PASS[ 	]+\([ 	]*0 tests'             # go test -v: "PASS\t(0 tests"
 )
 
+# iter72 (SF-014 count proof): count-family data for marker.sh Stage 5. A
+# STRONG/WEAK marker hit proves a summary LINE exists; the count stage
+# additionally requires the summary's arithmetic to show >=1 test body
+# actually executed (skips excluded). Entry format (`|||`-separated, the
+# AEGIS_TEST_PASS_MARKER_PAIRS convention): NAME|||DETECT|||EXEC|||MODE|||MINUS
+#   DETECT: family is present when any output line matches.
+#   EXEC  : MODE=sum   -> sum every digit-run inside each EXEC match found on
+#                         DETECT-matching lines (unittest MINUS scans the whole
+#                         output — see the entry comment).
+#           MODE=lines -> count EXEC-matching lines over the whole output.
+#   MINUS : (sum only, may be empty) digit-run sum over the WHOLE output,
+#           subtracted from the EXEC sum (floored at 0).
+# Families NOT listed (bare `go test`: non-verbose output carries no counts)
+# fall back to the Stage 1-4 verdict; that residual is pinned in
+# tests/test_marker_lib.py and tracked in docs/security-followups.md SF-014.
+# Extraction is heuristic text-mining over untrusted-ish output: mis-detection
+# and over-subtraction fail CLOSED (false); over-addition needs attacker-
+# controlled output = the echo residual (b), out of scope.
+# CONSTRAINT (same as above): grep-E ∩ python-re common subset — no
+# [[:space:]], no \b, literal TAB (0x09) inside brackets.
+AEGIS_TEST_COUNT_FAMILIES=(
+  # unittest: `Ran 5 tests in 0.010s` + `OK (skipped=2)` -> 5-2=3. MINUS scans
+  # the WHOLE output because `skipped=K` lives on the OK/FAILED line, not the
+  # `Ran` line.
+  'unittest|||(^|\n)Ran [0-9]+ tests? in|||Ran [0-9]+ tests?|||sum|||skipped=[0-9]+'
+  # pytest: `===== 2 failed, 3 passed in 1.20s =====` -> 2+3. (`3 skipped in`
+  # has no passed/failed token -> 0.)
+  'pytest|||={3,} .* in [0-9.]+s|||[0-9]+ (passed|failed)|||sum|||'
+  # jest: `Tests:       1 failed, 2 skipped, 3 passed, 6 total` -> 1+3
+  # (skipped/todo segments carry no passed|failed token).
+  'jest|||(^|\n)Tests:[ 	]|||[0-9]+ (passed|failed)|||sum|||'
+  # vitest: `      Tests  2 passed (2)` (indented) -> 2. Older outputs without
+  # the Tests line fall back to Stage 1-4 (Test Files STRONG marker).
+  'vitest|||(^|\n)[ 	]*Tests[ 	]+[0-9]+ passed|||[0-9]+ (passed|failed)|||sum|||'
+  # cargo: sum across ALL `test result:` lines (unit + doc-tests sections) —
+  # fixes the empty-doc-tests false negative; all-ignored sums to 0 -> false.
+  'cargo|||(^|\n)test result: (ok|FAILED)\.|||[0-9]+ (passed|failed)|||sum|||'
+  # go -v: count `--- PASS:`/`--- FAIL:` lines; an all-skip -v run has only
+  # `--- SKIP:` -> 0 -> false. Bare `go test` emits no counts -> family not
+  # detected -> Stage 1-4 verdict (known residual, see array comment).
+  'go-verbose|||(^|\n)--- (PASS|FAIL|SKIP):|||(^|\n)--- (PASS|FAIL):|||lines|||'
+)
 # K-1 (v1.6.2): pytest prologue regex. When a pytest-family command runs,
 # pytest prints a multi-line prologue (platform/Python version, rootdir,
 # collected N items) BEFORE the strong summary. A forged `echo "== 3 passed

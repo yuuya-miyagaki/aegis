@@ -32,6 +32,11 @@
 #       AEGIS_TEST_IS_PYTEST_REGEX. The gate ensures REDTEAM-01 and its
 #       grill-derived variants (output filter / stderr suppression /
 #       prologue-less forge) all fail-closed.
+#   (5) iter72 (SF-014 count proof) — for each count-capable family whose
+#       summary is DETECTed in the output (AEGIS_TEST_COUNT_FAMILIES), compute
+#       executed = passed+failed (skips excluded) and require >=1 in at least
+#       one detected family. No family detected (bare `go test`) keeps the
+#       stage-1-4 verdict — the documented SF-014 residual.
 #
 # aegis_marker_verdict <exit_code> <command>
 #   stdin : test output text (the CALLER decides windowing; record/drill pass
@@ -39,7 +44,7 @@
 #   stdout: "true" | "false" with rc 0
 #   rc 3  : evaluation impossible (patterns.sh not loaded / pattern data
 #           missing) — every caller must treat this as NOT verified.
-# NOTE: the rc3 guard below requires ALL SIX pattern sources non-empty.
+# NOTE: the rc3 guard below requires ALL SEVEN pattern sources non-empty.
 # If a future patterns.sh edit legitimately empties one (e.g. every runner
 # gains a STRONG marker and PAIRS goes away), update the guard in the SAME
 # change — otherwise every consumer hard-fails with rc3.
@@ -57,7 +62,8 @@ aegis_marker_verdict() {
      [ -z "${AEGIS_TEST_PASS_MARKER_PAIRS[*]:-}" ] || \
      [ -z "${AEGIS_TEST_ZERO_RUN_REGEX[*]:-}" ] || \
      [ -z "${AEGIS_TEST_PROLOGUE_REGEX[*]:-}" ] || \
-     [ -z "${AEGIS_TEST_IS_PYTEST_REGEX:-}" ]; then
+     [ -z "${AEGIS_TEST_IS_PYTEST_REGEX:-}" ] || \
+     [ -z "${AEGIS_TEST_COUNT_FAMILIES[*]:-}" ]; then
     return 3
   fi
   out="$(cat)"
@@ -137,6 +143,65 @@ aegis_marker_verdict() {
         return 0
       fi
     fi
+  fi
+  # Stage 5 (iter72 SF-014): count proof. Stages 2-4 prove a summary LINE
+  # exists; they do not prove any test BODY ran (all-skip suites: unittest
+  # counts skipped tests inside `Ran N`; go -v prints only `--- SKIP:`).
+  # ANY rule: multiple families in one real run's output only occur under
+  # attacker-controlled output (the echo residual (b), out of scope), while
+  # an ALL rule would misreject a real run that happens to quote a nested
+  # runner's output. Arithmetic errors fail CLOSED (true->false only).
+  local entry rest fam_detect fam_exec fam_mode fam_minus lines n m num
+  local family_detected=0 count_ok=0
+  for entry in "${AEGIS_TEST_COUNT_FAMILIES[@]}"; do
+    rest="${entry#*\|\|\|}"
+    if [ "$rest" = "$entry" ]; then
+      continue  # malformed (no ||| at all): the family cannot veto
+    fi
+    fam_detect="${rest%%\|\|\|*}"; rest="${rest#*\|\|\|}"
+    fam_exec="${rest%%\|\|\|*}"; rest="${rest#*\|\|\|}"
+    fam_mode="${rest%%\|\|\|*}"; fam_minus="${rest#*\|\|\|}"
+    if [ "$fam_minus" = "$rest" ]; then
+      fam_minus=""  # 4-field entry: no MINUS
+    fi
+    if [ -z "$fam_detect" ] || [ -z "$fam_exec" ] || [ -z "$fam_mode" ]; then
+      continue
+    fi
+    lines="$(printf '%s' "$out" | grep -E "$fam_detect")" || continue
+    family_detected=1
+    if [ "$fam_mode" = "lines" ]; then
+      n="$(printf '%s' "$out" | grep -cE "$fam_exec")" || true
+    else
+      n=0
+      # digit tokens only after the final grep -oE '[0-9]+' — unquoted word
+      # splitting is glob-safe; 10# blocks octal on zero-padded counts; the
+      # 9-char cap keeps a FORGED astronomic count inside bash arithmetic
+      # (overflow would crash out of the normal "false" path) — >=1
+      # semantics only need magnitude, not precision.
+      for num in $(printf '%s' "$lines" | grep -oE "$fam_exec" | grep -oE '[0-9]+' || true); do
+        num="${num:0:9}"
+        n=$((n + 10#$num))
+      done
+      if [ -n "$fam_minus" ]; then
+        m=0
+        for num in $(printf '%s' "$out" | grep -oE "$fam_minus" | grep -oE '[0-9]+' || true); do
+          num="${num:0:9}"
+          m=$((m + 10#$num))
+        done
+        n=$((n - m))
+        if [ "$n" -lt 0 ]; then
+          n=0
+        fi
+      fi
+    fi
+    if [ "$n" -ge 1 ]; then
+      count_ok=1
+      break
+    fi
+  done
+  if [ "$family_detected" -eq 1 ] && [ "$count_ok" -eq 0 ]; then
+    printf 'false'
+    return 0
   fi
   printf 'true'
 }
