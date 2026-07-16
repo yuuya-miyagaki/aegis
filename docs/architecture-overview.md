@@ -1,11 +1,11 @@
 # Aegis — アーキテクチャ概観
 
-
-
-
 > 作成日: 2026-04-17（最終更新: 2026-06-12）
 > バージョン: v1.6.0
 > 対象: フレームワーク全体の構造・設計思想・構成要素の解説
+
+
+
 
 ---
 
@@ -526,20 +526,20 @@ python3 scripts/check_framework_contract.py --profile=standard --root <your-proj
 
 ## 14. ファイル数サマリ
 
-| カテゴリ                           | ファイル数                                                                                                                                                                   |
-| ---------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 制御カーネル（CLAUDE.md）          | 1                                                                                                                                                                            |
-| ルール（.claude/rules/）           | 2                                                                                                                                                                            |
-| エージェント（.claude/agents/）    | 12                                                                                                                                                                           |
-| スキル（.claude/skills/）          | 19（SKILL.md x18 + platforms.md x1）                                                                                                                                         |
-| コマンド（.claude/commands/）      | 8                                                                                                                                                                            |
+| カテゴリ                           | ファイル数                                                                                                                                                                            |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 制御カーネル（CLAUDE.md）          | 1                                                                                                                                                                                     |
+| ルール（.claude/rules/）           | 2                                                                                                                                                                                     |
+| エージェント（.claude/agents/）    | 12                                                                                                                                                                                    |
+| スキル（.claude/skills/）          | 19（SKILL.md x18 + platforms.md x1）                                                                                                                                                  |
+| コマンド（.claude/commands/）      | 8                                                                                                                                                                                     |
 | フック（hooks/）                   | 31（メイン 18 + lib/ 13: emit / patterns / extract-input / frontmatter / evidence / fingerprint / marker / phase-skills / secrets-patterns / safety / sanitize / cp-lock / snapshot） |
-| スクリプト（scripts/）             | 13                                                                                                                                                                           |
-| テンプレート（templates/）         | 30（.template.md x26 + hooks.template.json + profiles x3）                                                                                                                   |
-| 拡張（extensions/）                | 11                                                                                                                                                                           |
-| ドキュメント（docs/）              | 約96（plans/specs/qa-reports 等を含み随時増減）                                                                                                                              |
-| その他（README, .gitignore, bin/） | 3                                                                                                                                                                            |
-| **合計（.git 除く）**        | **約 215**                                                                                                                                                             |
+| スクリプト（scripts/）             | 13                                                                                                                                                                                    |
+| テンプレート（templates/）         | 30（.template.md x26 + hooks.template.json + profiles x3）                                                                                                                            |
+| 拡張（extensions/）                | 11                                                                                                                                                                                    |
+| ドキュメント（docs/）              | 約96（plans/specs/qa-reports 等を含み随時増減）                                                                                                                                       |
+| その他（README, .gitignore, bin/） | 3                                                                                                                                                                                     |
+| **合計（.git 除く）**        | **約 215**                                                                                                                                                                      |
 
 > ドキュメントは作業に伴い増減する。構造的カテゴリ（エージェント〜テンプレート）の数値が正本。
 
