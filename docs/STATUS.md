@@ -3,7 +3,7 @@ framework: aegis
 framework_version: "1.30.0"
 project_name: "Aegis"
 mode: Dev
-phase: brainstorm
+phase: plan
 task_type: framework
 task_size: M
 task_size_rationale: "iteration 72（framework・SF-014 恒久策 完結編＝marker positive proof のカウント化）M 確定（brainstorm Step D・update-task.sh 経由）。設計正本: docs/specs/2026-07-16-iter72-count-proof-design.md（(1) aegis_marker_verdict に Stage 5『count proof』追加＝count 族サマリ検出時のみ executed 実数〔unittest: Ran N−Σskipped=K／pytest・jest・vitest・cargo: Σ(passed+failed)／go -v: --- PASS|FAIL 行数〕≧1 を要求・族未検出（素の go）は従来 verdict＝残余 pin (2) cargo zero-run 行 deny をカウント合計に委譲＝doc-tests 空セクションの実在偽陰性を修正〔2026-07-16 実証〕 (3) verdict インターフェース不変＝3 消費者無改修）。footprint: hooks/lib/patterns.sh＋hooks/lib/marker.sh＋scripts/record-test-result.py（docstring/メッセージのみ）＋tests 2本＝M（2-5）。control-plane（反ガミング moat）を触るため review+qa+security 必須・M のため deploy skip（iter69 前例）。go 素出力 all-skip と echo フォージは残余として文書化継続（出力ベース proof の床・drill subsume）・audit_deps positive proof は iter73 分離維持（attestation 型・機構別・テーマ純度）。"
@@ -12,7 +12,7 @@ ui_surface: false
 last_updated: "2026-07-16T00:00:00Z"
 gate_approvals:
   client_ready_for_dev: n/a
-  brainstorm: pending
+  brainstorm: approved
   plan: pending
   review: pending
   qa: pending
@@ -37,7 +37,7 @@ external_evidence:
     scope: "v0.13.0 計画 5 ラウンドレビュー"
     findings: "Round 1〜5 で計 25 件の指摘（hook 出力スキーマ陳腐化、TaskCreated/Completed 制御方式、Plan 条件付き許可、effort 配分、pre-compact.sh 同種破損、`if` 単一 rule 制約等）"
     resolution: "Rev.5 で全件反映、Phase 0a 即時実装着手 GO。hotfix/v0122-hook-schema ブランチで開始。"
-next_action: "**【iter72 着手＝SF-014 恒久策の完結編：passed/failed 実数カウント proof】** rollover 完了（iter71 は v1.30.0 で完全クローズ・push 済 origin/main=1e70fa0・dev ゲート全 pending・iteration=72・非 requirements refs=null）。今回タスク＝SF-014 残余 F-A の根治: marker の出力**マッチ**でなく passed/failed の**実数カウント**（skip 除外・N≧1 実行）を要求する positive proof（unittest all-skip『Ran N tests OK (skipped=N)』／go all-skip『ok pkg dur』の marker=true 偽 green を封鎖）。audit_deps positive proof（attestation 型・機構別）は iter73 分離のまま維持（テーマ純度・iter71 判断踏襲）。**次アクション＝aegis-brainstorm skill に従い brainstorm 実施（→Step D で update-task.sh・その後 plan→grill-plan→implement〔TDD RED-first・書く=opus〕→grill-code→review〔1次4角度=opus→親verify=fable・盲検2次=fable〕→qa→security→（size 次第で deploy）→ship〔bump〕→docs〔LEARNINGS・session_history 追加時 iter69 を evidence-archive 移設＝≤3 維持〕→dev_ready_for_client 申請→push はユーザー判断）**。◆別トラック: audit_deps positive proof（iter73）／rc3 guard 個別条件回帰網（テスト強度 F1）／保守性 minor 2件（命名語彙・record→drill 依存）／SF-011/012/013。◆push=`gh auth switch --user yuuya-miyagaki` 必須（active が tigereye だと 403）。"
+next_action: "**【iter72 plan フェーズ】** brainstorm approved（18bba82・設計正本=docs/specs/2026-07-16-iter72-count-proof-design.md・size M=deploy skip）。設計核: aegis_marker_verdict に Stage 5 count proof（count 族検出時のみ executed≧1 要求・unittest=Ran N−Σskipped／pytest・jest・vitest・cargo=Σ(passed+failed)／go -v=--- PASS|FAIL 行数・族未検出=従来 verdict）＋cargo zero-run 行 deny をカウント委譲（doc-tests 空の実在偽陰性修正・実証済み）。**次アクション＝writing-plans に従い implementation plan 作成→grill-plan（fable）全指摘反映→plan gate approve --ref→implement（TDD RED-first・Task1 RED は実測 failed 数記録・書く=opus per-task commit）**。◆別トラック: audit_deps positive proof（iter73）／rc3 guard 個別条件回帰網／保守性 minor 2件／SF-011/012/013。◆push=`gh auth switch --user yuuya-miyagaki` 必須。"
 blockers: []
 failure_tracking: null
 session_history:
