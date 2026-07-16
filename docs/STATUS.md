@@ -1,6 +1,6 @@
 ---
 framework: aegis
-framework_version: "1.29.0"
+framework_version: "1.30.0"
 project_name: "Aegis"
 mode: Dev
 phase: ship
