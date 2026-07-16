@@ -21,23 +21,24 @@ script) is now rejected. A green (exit 0) record additionally requires the
 POSITIVE marker verdict (hooks/lib/marker.sh — the same 4-stage proof the hook
 observer consumes: N>=1 tests actually ran). No marker -> rc2, no log write. A
 red run keeps recording as-is (failure is fail-visible, not a forge vector).
+Since iter72 the verdict additionally COUNTS executed tests (skips excluded),
+closing the unittest / `go test -v` all-skip forgery classes.
 
-Residual (intentionally NOT closed): the marker is an OUTPUT-based proof, so two
-classes it cannot distinguish remain, both in the SF-014 bucket:
-  (a) arbitrary-script output — e.g. an `npm test` script that echoes a
-      marker-shaped line (`Tests: 3 passed` etc.).
-  (b) all-skip suites — a unittest suite where every test is @skip'd still
-      prints `Ran N tests ... OK (skipped=N)` (unittest counts a skipped test as
-      "run"), and go prints `ok pkg dur` when every test t.Skip()s; both satisfy
-      the marker with ZERO bodies executed. (pytest `N skipped in` and cargo
-      `0 passed` are correctly rejected — see tests/test_marker_lib.py
-      TestSkipSuiteResidual.)
+Residual (intentionally NOT closed): the marker is an OUTPUT-based proof, so
+two classes remain, both in the SF-014 bucket:
+  (a) arbitrary-script output — e.g. an `npm test` script that echoes
+      marker-shaped lines; counts can be echoed too, so no output parsing
+      distinguishes it.
+  (b) bare `go test` all-skip — non-verbose go output (`ok pkg dur`) carries
+      no per-test counts; an all-skip package is byte-identical to a real
+      pass. (unittest all-skip and `go test -v` all-skip ARE closed since
+      iter72: marker.sh Stage 5 requires executed = passed+failed with skips
+      excluded >= 1 per detected count family — AEGIS_TEST_COUNT_FAMILIES.)
 We do NOT chase either by enumeration (a denylist regression = reproducing
 SF-014). Contained by defence-in-depth: fingerprint / judge / human preview /
 drill (a skip/echo baseline kills no mutant -> the drill FAILs). The permanent
-fix is a passed/failed-COUNT positive proof (not just a pass-marker match).
-Handed off to the SF-014 docs update (iter71 docs phase) and the audit_deps
-positive-proof track (iter72).
+fix candidate for both is execution attestation (the audit_deps
+positive-proof track, iter73+).
 
 The accepted green entry's optional `"marker": true` is an additive audit-
 transparency field; the judge does not consume it."""
@@ -151,7 +152,8 @@ def main(argv=None) -> int:
                 "exit 0 ですが、テスト実行の positive proof（ランナーのサマリ "
                 "marker）が出力にありません — 0 件実行の green（例: unittest "
                 "discover のパターン不一致 / `npm test` が `true` に束縛）は"
-                "記録しません。pytest は `-q` を外して実行してください（marker "
+                "記録しません。全テストが skip のスイート（実行 0 件）も不成立"
+                "です。pytest は `-q` を外して実行してください（marker "
                 "はデフォルト出力の `===== N passed =====` 行）。対応ランナー: "
                 "pytest（デフォルト出力）/ jest / vitest / go test / cargo test "
                 "/ unittest。未収載ランナーは hooks/lib/patterns.sh の marker "
