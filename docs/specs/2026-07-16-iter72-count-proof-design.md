@@ -86,7 +86,8 @@ AEGIS_TEST_COUNT_FAMILIES=(
 | unittest | **false（本反復で CLOSE）** | `Ran N` − Σ`skipped=K` = 0 | 実測 fixture: `Ran 2 tests ... OK (skipped=2)` |
 | pytest | false（既存 moat pin 維持） | サマリに `N passed/failed` なし（Stage 2） | `N skipped in` 形 |
 | cargo | false（既存 moat pin 維持・機構は Stage 5 に交換） | Σ(passed+failed)=0 | 併せて doc-tests 空の偽陰性を修正（true 化） |
-| jest/vitest | false（既存動作維持＋count 防衛追加） | `Tests:` 行の passed+failed=0 | 全 skip は `N skipped, N total`＝Stage 2 で従来から false |
+| jest | false（既存動作維持＋count 防衛） | STRONG `Tests:` に passed なし（Stage 2）＋count 0 | 全 skip は `N skipped, N total` |
+| vitest | **false（review fix で CLOSE）** | count DETECT `Tests N (passed\|failed\|skipped\|todo)` → passed+failed=0 で veto | ⚠ 当初設計は「Stage 2 で false」と誤認。実 vitest all-skip は `Test Files 1 passed`（file 単位）で STRONG 緩和アンカーに一致し **iter71 false→iter72 true の false-GREEN に反転**していた（review 敵対角度 F-2 が摘発）。count DETECT に skipped/todo を含め veto で封鎖（下記 review 追補） |
 | go `-v` | **false（本反復で CLOSE）** | `--- PASS:|--- FAIL:` 行数 = 0（`--- SKIP:` のみ） | verbose 出力がある場合のみ |
 | go（素） | **true（残余・pin 継続）** | count 族未検出 → Stage 5 適用不能 | `ok pkg dur` は all-skip と実 run が byte 同形（iter71 実測）。`-v` 強制は全 go ユーザーの UX 退行＞残余利得（drill が subsume・自己欺瞞脅威）。iter73+ attestation で根治候補 |
 | echo フォージ（残余 b） | true（残余・文書化維持） | 出力ベース proof の原理的床 | 数字ごと偽装可能。drill subsume＋人手プレビューで contained |
@@ -129,7 +130,24 @@ AEGIS_TEST_COUNT_FAMILIES=(
 3. **cargo zero-run 行 deny 削除の安全性論証**（grill 観点の先回り）: 削除で開くのは「echo で pair を偽造＋実 cargo zero-run を併走させる」ハイブリッド forge のみ。だが**実 cargo を走らせず echo だけにすれば今日でも true**（cargo には pytest の prologue/exit5 に相当する第2軸がなく、pure-echo は現行でも素通り）。つまり攻撃者は実 run を省くだけで deny を回避できており、当該 deny の限界防御価値は「不合理に実 zero-run を併走させる攻撃者」に対してのみ。一方で偽陰性コスト（doc-tests 空の全 crate の実 green 拒否）は全正当ユーザーに恒常発生。ゆえに削除＋count 委譲が正。pytest の zero-run 系 deny（prologue/exit5 と重層）は全維持。
 4. **go -v の親テスト nuance**: サブテスト全 skip でも親 `t.Run` ホルダーは `--- PASS:` を出す（親 body は実行されている）ため、-v 封鎖の対象は「トップレベル全 `t.Skip()`」形（iter71 F-A の実証形）。残余として test コメントに記録。
 
+## review 追補（2026-07-16・1次4角度＋workflow＋親verify＋盲検2次で摘発した fix-forward）
+
+count proof の初版（commit be77a85）に対する多角レビューで、**正当な green run の誤拒否（false-negative）と 1 件の false-GREEN（false-positive）** を実測摘発。fail-closed 原則（moat は誤検出を false 側へ倒す）を維持したまま以下を fix-forward:
+
+1. **F-2（Major・false-POSITIVE＝最優先）**: 上記追補 2 の vitest アンカー緩和に単調性の見落とし。実 vitest の all-skip ファイルは `Test Files 1 passed`（file 単位 pass）を出し、緩和 STRONG アンカーに一致 → iter71 false→iter72 **true の false-GREEN**。count DETECT が `Tests N passed` のみ要求だったため veto できていなかった。**修正**: vitest count DETECT を `Tests N (passed|failed|skipped|todo)` に拡張＝all-skip の `Tests N skipped` 行を検出し passed+failed=0 で veto。pin: `test_vitest_all_skip_false_closed`。
+2. **F0（false-negative・common）**: unittest MINUS `skipped=[0-9]+` が全文無アンカーで、テスト本体が印字する偶発的 `skipped=N`（config dump・子プロセス出力）を過剰減算し実 green を false 化。**修正**: MINUS を `[(,] ?skipped=[0-9]+` にアンカー（unittest 自身のサマリトークンのみ）。pin: `test_unittest_stray_skipped_token_true`。
+3. **F1（false-negative・common）**: pytest DETECT `={3,} .* in [0-9.]+s` が CI/wrapper バナー（`===== build finished in 3.21s =====`）を誤検出し、**他ランナー**（素の go 等）の実 green を cross-family veto。**修正**: DETECT に `N (passed|failed)` トークンを必須化。pin: `test_bare_go_with_ci_banner_true`。
+4. **F4（GNU 限定 robustness）**: GNU grep が UTF-8 locale で非 UTF-8 バイトを binary 検出し「Binary file matches」を返すと count が 0 化。**修正**: Stage 5 の全 grep に `-a`（BSD は無影響・parity 回復）。BSD grep では binary 検出が発動しないことを実測確認（GNU は文書仕様ベース）。
+5. **F5/F6（fail-open→fail-closed hygiene）**: DETECT grep の rc≥2（host grep が regex 非対応）を no-match と混同する経路と、malformed entry の silent skip を rc3（評価不能・fail-closed）へ。strict 5-field parse。
+6. **強度F-1/F-4・docstring**: count DETECT の literal-TAB parity fixture・EXEC/MINUS の両エンジン behavioral parity・record docstring「4-stage→5-stage」を追加/訂正。
+
+**受容した fail-closed 残余（doctrine 準拠・非修正）**: 素の go log に偶発的な他族ゼロカウント行（`Tests: N skipped` / `test result: 0 passed`）が column-0 で現れると cross-family veto で実 go run が false（friction・稀・**安全側**）。output-based 検出の原理的コストで、command-keying は `npm test` ラッパで false-positive 方向へ倒れるため moat 原則上むしろ不採。
+
+**marker 層の原理的天井（SF-014 継続・非修正）**: (a) echo フォージ、(b) 素 go all-skip、(c) **unittest の skip レポータ抑止**（`TextTestResult.addSkip` を no-op に monkeypatch すると `Ran N`+`OK` で `skipped=` が消え、unittest 既定出力は pass 件数を持たないため実 N-pass と区別不能）。(c) は「ランナーが skip を honest に自己申告する」前提下での unittest CLOSED という条件性の露呈。いずれも drill が subsume（all-skip baseline は mutant を殺せず DRILL FAIL）。恒久策候補は execution attestation（iter73+）。
+
+**pre-existing（iter72 scope 外・SF 起票）**: pytest all-xfail suite（`===== 3 xfailed in 0.5s =====` のみ）は STRONG の `passed|failed` に不一致で marker 不成立→false（実 body 実行済みの green を誤拒否・fail-closed 摩擦）。iter72 は STRONG 未改修＝既存挙動。
+
 ## footprint / task_size
 
-- 変更ファイル: `hooks/lib/patterns.sh`・`hooks/lib/marker.sh`・`scripts/record-test-result.py`（docstring/メッセージのみ）・`tests/test_marker_lib.py`・`tests/test_patterns_parity.py` ＝ **5 ファイル → M（2-5）**。
+- 変更ファイル: `hooks/lib/patterns.sh`・`hooks/lib/marker.sh`・`scripts/record-test-result.py`（docstring/メッセージのみ）・`tests/test_marker_lib.py`・`tests/test_patterns_parity.py` ＝ **5 ファイル → M（2-5）**（review fix-forward も同じ 5 ファイル内・footprint 不変）。
 - control-plane（反ガミング moat）変更のため **review＋qa＋security 必須**・M のため **deploy skip**（iter69 前例: patterns.sh/drill 変更で M）。

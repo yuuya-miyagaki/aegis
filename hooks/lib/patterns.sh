@@ -255,18 +255,31 @@ AEGIS_TEST_ZERO_RUN_REGEX=(
 # [[:space:]], no \b, literal TAB (0x09) inside brackets.
 AEGIS_TEST_COUNT_FAMILIES=(
   # unittest: `Ran 5 tests in 0.010s` + `OK (skipped=2)` -> 5-2=3. MINUS scans
-  # the WHOLE output because `skipped=K` lives on the OK/FAILED line, not the
-  # `Ran` line.
-  'unittest|||(^|\n)Ran [0-9]+ tests? in|||Ran [0-9]+ tests?|||sum|||skipped=[0-9]+'
-  # pytest: `===== 2 failed, 3 passed in 1.20s =====` -> 2+3. (`3 skipped in`
-  # has no passed/failed token -> 0.)
-  'pytest|||={3,} .* in [0-9.]+s|||[0-9]+ (passed|failed)|||sum|||'
+  # the WHOLE output. iter72 review (F0): the MINUS is ANCHORED to `[(,] ?` so
+  # it only matches unittest's own `(skipped=N)` / `, skipped=N` summary tokens.
+  # Without the anchor, incidental `skipped=N` text a test body prints (config
+  # dumps, captured child output) over-subtracted and flipped a genuinely green
+  # `python3 -m unittest` run to false (empirically confirmed). `unskipped=3`
+  # substring hits are excluded by the same anchor.
+  'unittest|||(^|\n)Ran [0-9]+ tests? in|||Ran [0-9]+ tests?|||sum|||[(,] ?skipped=[0-9]+'
+  # pytest: `===== 2 failed, 3 passed in 1.20s =====` -> 2+3. iter72 review (F1):
+  # DETECT now REQUIRES a `N passed|failed` token, so a decorative wrapper/CI
+  # banner (`===== build finished in 3.21s =====`) no longer false-detects the
+  # pytest family and cross-family-vetoes a real green run of another runner.
+  # (`3 skipped in` still has no passed/failed token -> not detected -> Stage
+  # 1-4 verdict, which for pytest already rejects all-skip via the STRONG gate.)
+  'pytest|||={3,} .*[0-9]+ (passed|failed).* in [0-9.]+s|||[0-9]+ (passed|failed)|||sum|||'
   # jest: `Tests:       1 failed, 2 skipped, 3 passed, 6 total` -> 1+3
   # (skipped/todo segments carry no passed|failed token).
   'jest|||(^|\n)Tests:[ 	]|||[0-9]+ (passed|failed)|||sum|||'
-  # vitest: `      Tests  2 passed (2)` (indented) -> 2. Older outputs without
-  # the Tests line fall back to Stage 1-4 (Test Files STRONG marker).
-  'vitest|||(^|\n)[ 	]*Tests[ 	]+[0-9]+ passed|||[0-9]+ (passed|failed)|||sum|||'
+  # vitest: `      Tests  2 passed (2)` (indented) -> 2. iter72 review (F-2):
+  # DETECT includes skipped|failed|todo so an all-skip vitest file (which still
+  # prints `Test Files 1 passed` at file level, matching the relaxed STRONG
+  # anchor) is DETECTed here and count(passed+failed)=0 -> vetoed to false.
+  # Without this, the STRONG relaxation flipped a real all-skip vitest run from
+  # false (iter71) to true (a false GREEN — the dangerous direction). Older
+  # vitest with no `Tests` line at all still falls back to Stage 1-4.
+  'vitest|||(^|\n)[ 	]*Tests[ 	]+[0-9]+ (passed|failed|skipped|todo)|||[0-9]+ (passed|failed)|||sum|||'
   # cargo: sum across ALL `test result:` lines (unit + doc-tests sections) —
   # fixes the empty-doc-tests false negative; all-ignored sums to 0 -> false.
   'cargo|||(^|\n)test result: (ok|FAILED)\.|||[0-9]+ (passed|failed)|||sum|||'

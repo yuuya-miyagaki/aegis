@@ -18,22 +18,29 @@ Zero-run forgery — CLOSED (SF-014 iter71): a command that MATCHES a runner yet
 executes ZERO tests and exits 0 (e.g. `unittest discover -p <no-match>`, which
 exits 0 unlike pytest's exit 5, or `npm test` bound to a `"test":"true"`
 script) is now rejected. A green (exit 0) record additionally requires the
-POSITIVE marker verdict (hooks/lib/marker.sh — the same 4-stage proof the hook
+POSITIVE marker verdict (hooks/lib/marker.sh — the same 5-stage proof the hook
 observer consumes: N>=1 tests actually ran). No marker -> rc2, no log write. A
 red run keeps recording as-is (failure is fail-visible, not a forge vector).
-Since iter72 the verdict additionally COUNTS executed tests (skips excluded),
-closing the unittest / `go test -v` all-skip forgery classes.
+Since iter72 the verdict additionally COUNTS executed tests (skips excluded,
+Stage 5), closing the unittest / `go test -v` / vitest all-skip forgery classes.
 
 Residual (intentionally NOT closed): the marker is an OUTPUT-based proof, so
-two classes remain, both in the SF-014 bucket:
+these classes remain, all in the SF-014 bucket:
   (a) arbitrary-script output — e.g. an `npm test` script that echoes
       marker-shaped lines; counts can be echoed too, so no output parsing
       distinguishes it.
   (b) bare `go test` all-skip — non-verbose go output (`ok pkg dur`) carries
       no per-test counts; an all-skip package is byte-identical to a real
-      pass. (unittest all-skip and `go test -v` all-skip ARE closed since
-      iter72: marker.sh Stage 5 requires executed = passed+failed with skips
-      excluded >= 1 per detected count family — AEGIS_TEST_COUNT_FAMILIES.)
+      pass. (unittest all-skip, `go test -v` all-skip, and vitest all-skip ARE
+      closed since iter72: marker.sh Stage 5 requires executed = passed+failed
+      with skips excluded >= 1 per detected count family —
+      AEGIS_TEST_COUNT_FAMILIES.)
+  (c) unittest with the skip REPORTER suppressed — a suite that monkeypatches
+      `TextTestResult.addSkip` to a no-op prints `Ran N tests` + `OK` with no
+      `skipped=` token, indistinguishable at the output layer from N real
+      passes (unittest's default output carries no per-test pass count). The
+      Stage 5 "CLOSED" for unittest is thus conditional on the runner HONESTLY
+      self-reporting skips; a reporter-sabotaging test is echo-class (a).
 We do NOT chase either by enumeration (a denylist regression = reproducing
 SF-014). Contained by defence-in-depth: fingerprint / judge / human preview /
 drill (a skip/echo baseline kills no mutant -> the drill FAILs). The permanent
@@ -126,7 +133,7 @@ def main(argv=None) -> int:
     status_code, output = drill._execute(args.command, root, 600)
     status = "ok" if status_code == "passed" else "fail"
     # 4) positive proof (SF-014 iter71): a GREEN record additionally requires
-    # the shared 4-stage marker verdict (hooks/lib/marker.sh — the same
+    # the shared 5-stage marker verdict (hooks/lib/marker.sh — the same
     # implementation the hook observer consumes) over the FULL output.
     # payload_sha keeps its 64 KiB cap below, but runners print their summary
     # at the TAIL — never pass the capped prefix to the verdict.

@@ -151,26 +151,49 @@ aegis_marker_verdict() {
   # attacker-controlled output (the echo residual (b), out of scope), while
   # an ALL rule would misreject a real run that happens to quote a nested
   # runner's output. Arithmetic errors fail CLOSED (true->false only).
-  local entry rest fam_detect fam_exec fam_mode fam_minus lines n m num
+  local entry seg t nsep fam_detect fam_exec fam_mode fam_minus rest
+  local lines grc n m num
   local family_detected=0 count_ok=0
+  # -a on every Stage-5 grep: in a UTF-8 locale GNU grep treats a stray
+  # non-UTF-8 byte (which out="$(cat)" does not strip, unlike NUL) as "binary"
+  # and prints "Binary file (standard input) matches" INSTEAD of the matching
+  # lines — the digit extraction would then sum to 0 and flip a real green run
+  # to false (iter72 review F4). -a forces text mode (no-op on BSD grep, which
+  # never triggered this) and restores BSD/GNU parity per the file header.
   for entry in "${AEGIS_TEST_COUNT_FAMILIES[@]}"; do
-    rest="${entry#*\|\|\|}"
-    if [ "$rest" = "$entry" ]; then
-      continue  # malformed (no ||| at all): the family cannot veto
-    fi
-    fam_detect="${rest%%\|\|\|*}"; rest="${rest#*\|\|\|}"
+    # iter72 review (F6): strict 5-field parse — a stale/hand-edited entry
+    # (typo'd `||` separator, emptied field) is a CORRUPT install, not a
+    # skippable family. Silently `continue`-ing would fail OPEN (reopen the
+    # all-skip veto hole with no signal), so malformation returns rc3 =
+    # "evaluation impossible", which every caller treats as NOT verified.
+    seg="$entry"; nsep=0
+    while :; do
+      t="${seg#*\|\|\|}"
+      [ "$t" = "$seg" ] && break
+      nsep=$((nsep + 1)); seg="$t"
+    done
+    [ "$nsep" -eq 4 ] || return 3
+    fam_detect="${entry#*\|\|\|}"
+    rest="${fam_detect#*\|\|\|}"
+    fam_detect="${fam_detect%%\|\|\|*}"
     fam_exec="${rest%%\|\|\|*}"; rest="${rest#*\|\|\|}"
     fam_mode="${rest%%\|\|\|*}"; fam_minus="${rest#*\|\|\|}"
-    if [ "$fam_minus" = "$rest" ]; then
-      fam_minus=""  # 4-field entry: no MINUS
+    if [ -z "$fam_detect" ] || [ -z "$fam_exec" ] || \
+       { [ "$fam_mode" != "sum" ] && [ "$fam_mode" != "lines" ]; }; then
+      return 3
     fi
-    if [ -z "$fam_detect" ] || [ -z "$fam_exec" ] || [ -z "$fam_mode" ]; then
-      continue
-    fi
-    lines="$(printf '%s' "$out" | grep -E "$fam_detect")" || continue
+    # iter72 review (F5): distinguish grep rc1 (no match = family absent) from
+    # rc>1 (the host grep REJECTED the DETECT regex). Swallowing the latter as
+    # "absent" would silently disable this family's veto on that install —
+    # exactly the all-skip forgery class Stage 5 closes — so a regex the host
+    # grep cannot compile fails CLOSED to rc3, not open.
+    lines="$(printf '%s' "$out" | grep -aE "$fam_detect")"; grc=$?
+    [ "$grc" -gt 1 ] && return 3
+    [ "$grc" -eq 0 ] || continue    # rc1: family not present in this output
     family_detected=1
     if [ "$fam_mode" = "lines" ]; then
-      n="$(printf '%s' "$out" | grep -cE "$fam_exec")" || true
+      n="$(printf '%s' "$out" | grep -acE "$fam_exec")"; grc=$?
+      [ "$grc" -gt 1 ] && return 3
     else
       n=0
       # digit tokens only after the final grep -oE '[0-9]+' — unquoted word
@@ -178,13 +201,13 @@ aegis_marker_verdict() {
       # 9-char cap keeps a FORGED astronomic count inside bash arithmetic
       # (overflow would crash out of the normal "false" path) — >=1
       # semantics only need magnitude, not precision.
-      for num in $(printf '%s' "$lines" | grep -oE "$fam_exec" | grep -oE '[0-9]+' || true); do
+      for num in $(printf '%s' "$lines" | grep -aoE "$fam_exec" | grep -aoE '[0-9]+' || true); do
         num="${num:0:9}"
         n=$((n + 10#$num))
       done
       if [ -n "$fam_minus" ]; then
         m=0
-        for num in $(printf '%s' "$out" | grep -oE "$fam_minus" | grep -oE '[0-9]+' || true); do
+        for num in $(printf '%s' "$out" | grep -aoE "$fam_minus" | grep -aoE '[0-9]+' || true); do
           num="${num:0:9}"
           m=$((m + 10#$num))
         done
