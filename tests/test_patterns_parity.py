@@ -312,6 +312,10 @@ class TestCountFamilyParity(unittest.TestCase):
             ("      Tests  2 passed (2)", "vitest", True),
             ("test result: ok. 0 passed; 0 failed; 3 ignored", "cargo", True),
             ("--- SKIP: TestA (0.00s)", "go-verbose", True),
+            # iter72 review 強度F-1: literal-TAB 形も DETECT が両エンジン一致すること
+            ("Tests:\t1 failed, 2 passed, 3 total", "jest", True),   # jest TAB 区切り
+            ("\tTests  2 passed (2)", "vitest", True),               # vitest TAB インデント
+            ("      Tests  3 skipped (3)", "vitest", True),          # vitest all-skip 行も DETECT
             ("ok  \texample.com/pkg\t0.012s", None, False),  # 素の go は族なし
         ]
         by_name = {e.split("|||")[0]: e.split("|||")[1] for e in self.entries}
@@ -324,6 +328,26 @@ class TestCountFamilyParity(unittest.TestCase):
                     self.assertEqual(py, expected, f"{name} detect: {text!r}")
                 if fam is None:
                     self.assertFalse(py, f"{name} must NOT detect: {text!r}")
+
+    def test_exec_minus_fixture_parity(self):
+        # 強度F-4: EXEC/MINUS も grep -E と python re で同一挙動であることを
+        # fixture で pin（従来は DETECT のみ両エンジン照合だった）。
+        by_name = {e.split("|||")[0]: e.split("|||") for e in self.entries}
+        # (family, field_index, text, expected_match)  field: 2=EXEC, 4=MINUS
+        fixtures = [
+            ("unittest", 2, "Ran 5 tests in 0.01s", True),
+            ("cargo", 2, "test result: ok. 5 passed; 0 failed", True),
+            ("cargo", 2, "test result: ok. 0 passed; 0 failed; 3 ignored", True),
+            ("unittest", 4, "OK (skipped=2)", True),
+            ("unittest", 4, "config: skipped=10", False),
+            ("unittest", 4, "unskipped=3", False),
+        ]
+        for fam, idx, text, expected in fixtures:
+            pat = by_name[fam][idx]
+            py = re.compile(pat).search(text) is not None
+            gr = grep_match(text, [pat])
+            self.assertEqual(py, gr, f"engine split ({fam}[{idx}]): {text!r} py={py} grep={gr}")
+            self.assertEqual(py, expected, f"{fam}[{idx}] expected {expected}: {text!r}")
 
 
 class TestMaskScopeBoundary(unittest.TestCase):

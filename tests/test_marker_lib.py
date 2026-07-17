@@ -131,7 +131,11 @@ class TestSkipSuiteResidual(unittest.TestCase):
         is byte-identical to a real pass (iter71 verified). PRE-EXISTING
         residual, SF-014 bucket, contained by the B1 drill (an all-skip
         baseline kills no mutant -> DRILL FAIL). Permanent-fix candidate:
-        execution attestation (iter73+ track)."""
+        execution attestation (iter73+ track).
+
+    iter72 review closed a vitest all-skip false-GREEN (STRONG anchor
+    relaxation side effect) via the count DETECT — see
+    TestCountProof.test_vitest_all_skip_false_closed."""
 
     def test_pytest_all_skip_false_moat_pin(self):
         out = ("platform darwin -- Python 3.9.6, pytest-8.4.2\n"
@@ -297,6 +301,37 @@ class TestCountProof(unittest.TestCase):
                 PYTEST_REAL, "python3 -m pytest tests/", "0",
                 lib=Path(d) / "marker.sh")
             self.assertEqual(rc, 3)
+
+    def test_vitest_all_skip_false_closed(self):
+        # iter72 review F-2: the STRONG anchor relaxation ([ \t]*Test Files)
+        # made a real all-skip vitest file (which still prints `Test Files 1
+        # passed` at file level) read as true — a false GREEN. Stage 5's vitest
+        # DETECT now includes skipped/todo so the `Tests N skipped` line is
+        # detected and count(passed+failed)=0 vetoes it back to false.
+        out = (" Test Files  1 passed (1)\n"
+               "      Tests  3 skipped (3)\n"
+               "   Start at  10:00:00\n   Duration  1.20s\n")
+        rc, verdict = _verdict(out, "npx vitest run", "0")
+        self.assertEqual((rc, verdict), (0, "false"))
+
+    def test_unittest_stray_skipped_token_true(self):
+        # iter72 review F0: a genuinely green unittest run whose test body
+        # prints an incidental `skipped=N` token (config dump / captured child
+        # output) must NOT be over-subtracted to false. The MINUS anchor
+        # `[(,] ?skipped=` only matches unittest's own summary tokens.
+        out = ("config: retries=3 skipped=10\n..\n"
+               + "-" * 70 + "\nRan 2 tests in 0.001s\n\nOK\n")
+        rc, verdict = _verdict(out, "python3 -m unittest t", "0")
+        self.assertEqual((rc, verdict), (0, "true"))
+
+    def test_bare_go_with_ci_banner_true(self):
+        # iter72 review F1: a CI/wrapper banner `===== ... finished in N.Ns =====`
+        # (no passed/failed token) must not false-detect the pytest family and
+        # cross-family-veto a real green bare `go test` run.
+        out = ("===== integration suite finished in 3.21s =====\n"
+               "ok  \texample.com/pkg\t0.012s\n")
+        rc, verdict = _verdict(out, "npm test", "0")
+        self.assertEqual((rc, verdict), (0, "true"))
 
 
 if __name__ == "__main__":
