@@ -58,18 +58,19 @@
 ```claims
 tests_pass: true
 no_stubs: true
-first_review:
-  verdict: approve（fix-forward 後）
-  findings_resolved: [F-2, F0, F1, F4, F5, F6, 強度F-1, 強度F-4, 保守性]
-  residuals_documented: [cross-family fail-closed, SF-014(a)(b)(c), SF-015]
+verdict: approve
+first_review_verdict: approve
 second_opinion:
-  verdict: approve_with_notes（fresh context・1次verdict非共有・fix-forward後の状態をレビュー）
+  verdict: approve_with_notes
+  note: fresh context・1次verdict非共有・fix-forward後の状態をレビュー・結論は1次と収束
   new_false_green: 0
   new_false_negative: 0
   parity: 25/25 一致（BSD grep + python re）
   full_suite: 1107 OK (skipped=2)
   notes: [M-1（round-2 で是正済み）, M-2（doc・是正済み）]
-  divergence_points: []   # 他者verdict未参照の純粋独立判断・結論は1次と収束
+  divergence_points: []
+findings_resolved: [F-2, F0, F1, F4, F5, F6, M-1, M-2, 強度F-1, 強度F-4, 保守性]
+residuals_documented: [cross-family fail-closed, SF-014(a)(b)(c), SF-015]
 ```
 
 ## Verdict（親・1次＋盲検2次 統合）
