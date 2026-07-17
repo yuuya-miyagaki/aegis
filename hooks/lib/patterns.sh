@@ -260,7 +260,11 @@ AEGIS_TEST_COUNT_FAMILIES=(
   # Without the anchor, incidental `skipped=N` text a test body prints (config
   # dumps, captured child output) over-subtracted and flipped a genuinely green
   # `python3 -m unittest` run to false (empirically confirmed). `unskipped=3`
-  # substring hits are excluded by the same anchor.
+  # substring hits are excluded by the same anchor. review M-2 (accepted
+  # fail-closed residual, SF-014): an incidental `(skipped=N)` printed by a test
+  # BODY still matches the `[(` half and over-subtracts -> the real run reads
+  # false. Safe direction (never a false GREEN), rare, drill-subsumed; a
+  # body-vs-summary split is not expressible in the grep-E∩python-re subset.
   'unittest|||(^|\n)Ran [0-9]+ tests? in|||Ran [0-9]+ tests?|||sum|||[(,] ?skipped=[0-9]+'
   # pytest: `===== 2 failed, 3 passed in 1.20s =====` -> 2+3. iter72 review (F1):
   # DETECT now REQUIRES a `N passed|failed` token, so a decorative wrapper/CI

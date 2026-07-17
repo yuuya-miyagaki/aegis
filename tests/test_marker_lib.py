@@ -302,6 +302,24 @@ class TestCountProof(unittest.TestCase):
                 lib=Path(d) / "marker.sh")
             self.assertEqual(rc, 3)
 
+    def test_broken_minus_regex_rc3_not_failopen(self):
+        # iter72 review round-2 (M-1): a corrupt patterns.sh whose unittest
+        # MINUS is a regex the host grep REJECTS must fail CLOSED (rc3), not
+        # swallow the subtraction. Before the fix the broken MINUS was `|| true`d
+        # away, leaving `Ran N` un-subtracted -> an all-skip unittest read TRUE
+        # (fail OPEN). Pin the DETECT/EXEC/MINUS grep paths to the same rc3.
+        src = (ROOT / "hooks" / "lib" / "patterns.sh").read_text()
+        broken = src.replace(
+            "[(,] ?skipped=[0-9]+", "(((skipped=[0-9]+")  # unbalanced parens
+        self.assertIn("(((skipped", broken)  # replacement actually applied
+        with tempfile.TemporaryDirectory() as d:
+            (Path(d) / "patterns.sh").write_text(broken)
+            shutil.copy(MARKER_LIB, Path(d) / "marker.sh")
+            rc, _out = _verdict(
+                "Ran 2 tests in 0.001s\n\nOK (skipped=2)\n",
+                "python3 -m unittest t", "0", lib=Path(d) / "marker.sh")
+            self.assertEqual(rc, 3)
+
     def test_vitest_all_skip_false_closed(self):
         # iter72 review F-2: the STRONG anchor relaxation ([ \t]*Test Files)
         # made a real all-skip vitest file (which still prints `Test Files 1

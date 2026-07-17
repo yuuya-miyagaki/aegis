@@ -152,7 +152,7 @@ aegis_marker_verdict() {
   # an ALL rule would misreject a real run that happens to quote a nested
   # runner's output. Arithmetic errors fail CLOSED (true->false only).
   local entry seg t nsep fam_detect fam_exec fam_mode fam_minus rest
-  local lines grc n m num
+  local lines grc n m num exec_hits minus_hits erc mrc
   local family_detected=0 count_ok=0
   # -a on every Stage-5 grep: in a UTF-8 locale GNU grep treats a stray
   # non-UTF-8 byte (which out="$(cat)" does not strip, unlike NUL) as "binary"
@@ -201,13 +201,23 @@ aegis_marker_verdict() {
       # 9-char cap keeps a FORGED astronomic count inside bash arithmetic
       # (overflow would crash out of the normal "false" path) — >=1
       # semantics only need magnitude, not precision.
-      for num in $(printf '%s' "$lines" | grep -aoE "$fam_exec" | grep -aoE '[0-9]+' || true); do
+      # iter72 review round-2 (M-1): the EXEC and MINUS greps rc-discriminate
+      # like DETECT above — a host grep that REJECTS the pattern (rc>1) is
+      # eval-impossible -> rc3, NOT a silently-skipped extraction. Without this
+      # a broken MINUS regex on a corrupt install would swallow the subtraction
+      # (fail OPEN: an all-skip unittest's Ran N would go un-subtracted -> true),
+      # an asymmetry vs the fail-closed DETECT/EXEC paths.
+      exec_hits="$(printf '%s' "$lines" | grep -aoE "$fam_exec")"; erc=$?
+      [ "$erc" -gt 1 ] && return 3
+      for num in $(printf '%s' "$exec_hits" | grep -aoE '[0-9]+' || true); do
         num="${num:0:9}"
         n=$((n + 10#$num))
       done
       if [ -n "$fam_minus" ]; then
         m=0
-        for num in $(printf '%s' "$out" | grep -aoE "$fam_minus" | grep -aoE '[0-9]+' || true); do
+        minus_hits="$(printf '%s' "$out" | grep -aoE "$fam_minus")"; mrc=$?
+        [ "$mrc" -gt 1 ] && return 3
+        for num in $(printf '%s' "$minus_hits" | grep -aoE '[0-9]+' || true); do
           num="${num:0:9}"
           m=$((m + 10#$num))
         done
