@@ -1,10 +1,6 @@
 # テスト強度ドリル結果（機械ブロック・ハーネス生成）
 
 ```
-verdict: FAIL
-mutants_total: 2
-mutants_caught: 0
-baseline: n/a
-since: b0eb8a10d211a10bdc3b0fcf9ccb2f28e8e16bbb
-survived: []
+verdict: SKIP
+reason: iter73（locale/byte 掃討・deny 側フック byte-wise 決定化）は framework 改修を per-task commit 済み（677b71a RED／61b276f・7bfb8f7・95e08ae GREEN＋配置／2c5c575・8be219d review fix-forward）＝qa 承認時の working-tree diff（git diff HEAD）が空になる想定どおりの縁ケース（qa-verification SKILL 147-150）。`"since":b0eb8a1` 案は tracked 変更（新規テストファイル tests/test_hook_locale_byte.py を含む）を全て coverage-floor 対象化しテスト本体への無意味な mutant を要求するため不採用（テストは task code だが mutant 対象ではない）。代替実証（手動 mutation 同等）: (1) RED-first TDD＝Task1（677b71a）で crash 回帰 4 ケースが RED（tr: Illegal byte sequence・rc=1・stdout 空＝fail-open crash）を実測してから export LC_ALL=C で GREEN 化。(2) 手動 mutation バッテリー（2026-07-19・一時適用→scoped 実行→byte 一致 revert・本体 tree 不接触）: [M1] check-destructive.sh:51 の `export LC_ALL=C LC_CTYPE=C LANG=C`→`export LC_ALL=en_US.UTF-8 …`（C-locale を UTF-8 へ戻す＝バグ再導入）で test_destructive_byte_in_comment/trailing/unicode_ws_separator が RED（3 failed/7 passed）＝killed。[M2] check-secrets.sh:62 同 mutant で test_secrets_real_env/byte_after_env/unicode_ws_separator が RED（3 failed）＝killed。[M3] 配置 mutation（export を抽出後へ移動）で強化後の destructive pin（main-path「再帰削除」msg アサート）＋secrets pin が RED＝killed（review fix-forward 2c5c575 で対称化）。[M4] export 全削除で両フック crash→RED（reviewer-testing 独立実測）＝killed。復元後 tree clean・test_hook_locale_byte.py 10 passed。(3) 独立レビュー: reviewer-testing（Major F-T1 摘発→強化）＋盲検2次 fable（Major F-B1 narrowing 摘発→非 exploitable 実証・SF-016 accept）。(4) full suite green（1302 passed/2 skipped・record green marker:true）・check_framework_contract PASS。(5) 掃討完全性: runtime-state/deploy-gate は同型不成立（python3 抽出でバイト→空 CMD or tr 前に BSD grep で非 crash）を再確認。詳細=docs/qa-reports/iter73-qa.md・iter73-review.md。
 ```
