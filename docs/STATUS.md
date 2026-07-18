@@ -1,9 +1,9 @@
 ---
 framework: aegis
-framework_version: "1.30.0"
+framework_version: "1.31.0"
 project_name: "Aegis"
 mode: Dev
-phase: security
+phase: ship
 task_type: framework
 task_size: M
 task_size_rationale: "iteration 72（framework・SF-014 恒久策 完結編＝marker positive proof のカウント化）M 確定（brainstorm Step D・update-task.sh 経由）。設計正本: docs/specs/2026-07-16-iter72-count-proof-design.md（(1) aegis_marker_verdict に Stage 5『count proof』追加＝count 族サマリ検出時のみ executed 実数〔unittest: Ran N−Σskipped=K／pytest・jest・vitest・cargo: Σ(passed+failed)／go -v: --- PASS|FAIL 行数〕≧1 を要求・族未検出（素の go）は従来 verdict＝残余 pin (2) cargo zero-run 行 deny をカウント合計に委譲＝doc-tests 空セクションの実在偽陰性を修正〔2026-07-16 実証〕 (3) verdict インターフェース不変＝3 消費者無改修）。footprint: hooks/lib/patterns.sh＋hooks/lib/marker.sh＋scripts/record-test-result.py（docstring/メッセージのみ）＋tests 2本＝M（2-5）。control-plane（反ガミング moat）を触るため review+qa+security 必須・M のため deploy skip（iter69 前例）。go 素出力 all-skip と echo フォージは残余として文書化継続（出力ベース proof の床・drill subsume）・audit_deps positive proof は iter73 分離維持（attestation 型・機構別・テーマ純度）。"
@@ -16,7 +16,7 @@ gate_approvals:
   plan: approved
   review: approved
   qa: approved
-  security: pending
+  security: approved
   deploy: pending
   dev_ready_for_client: pending
 current_refs:
@@ -25,7 +25,7 @@ current_refs:
   spec: "docs/specs/2026-07-16-iter72-count-proof-design.md"
   review: "docs/qa-reports/iter72-review.md"
   qa: "docs/qa-reports/iter72-qa.md"
-  security: null
+  security: "docs/qa-reports/iter72-security.md"
   deploy: null
   translation: null
 external_evidence:
