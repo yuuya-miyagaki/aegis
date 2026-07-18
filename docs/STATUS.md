@@ -3,29 +3,29 @@ framework: aegis
 framework_version: "1.31.0"
 project_name: "Aegis"
 mode: Dev
-phase: docs
+phase: brainstorm
 task_type: framework
 task_size: M
 task_size_rationale: "iteration 72（framework・SF-014 恒久策 完結編＝marker positive proof のカウント化）M 確定（brainstorm Step D・update-task.sh 経由）。設計正本: docs/specs/2026-07-16-iter72-count-proof-design.md（(1) aegis_marker_verdict に Stage 5『count proof』追加＝count 族サマリ検出時のみ executed 実数〔unittest: Ran N−Σskipped=K／pytest・jest・vitest・cargo: Σ(passed+failed)／go -v: --- PASS|FAIL 行数〕≧1 を要求・族未検出（素の go）は従来 verdict＝残余 pin (2) cargo zero-run 行 deny をカウント合計に委譲＝doc-tests 空セクションの実在偽陰性を修正〔2026-07-16 実証〕 (3) verdict インターフェース不変＝3 消費者無改修）。footprint: hooks/lib/patterns.sh＋hooks/lib/marker.sh＋scripts/record-test-result.py（docstring/メッセージのみ）＋tests 2本＝M（2-5）。control-plane（反ガミング moat）を触るため review+qa+security 必須・M のため deploy skip（iter69 前例）。go 素出力 all-skip と echo フォージは残余として文書化継続（出力ベース proof の床・drill subsume）・audit_deps positive proof は iter73 分離維持（attestation 型・機構別・テーマ純度）。"
-iteration: 72
+iteration: 73
 ui_surface: false
-last_updated: "2026-07-16T00:00:00Z"
+last_updated: "2026-07-18T00:00:00Z"
 gate_approvals:
   client_ready_for_dev: n/a
-  brainstorm: approved
-  plan: approved
-  review: approved
-  qa: approved
-  security: approved
+  brainstorm: pending
+  plan: pending
+  review: pending
+  qa: pending
+  security: pending
   deploy: pending
-  dev_ready_for_client: approved
+  dev_ready_for_client: pending
 current_refs:
   requirements: []
-  plan: "docs/plans/2026-07-16-iter72-count-proof-implementation-plan.md"
-  spec: "docs/specs/2026-07-16-iter72-count-proof-design.md"
-  review: "docs/qa-reports/iter72-review.md"
-  qa: "docs/qa-reports/iter72-qa.md"
-  security: "docs/qa-reports/iter72-security.md"
+  plan: null
+  spec: null
+  review: null
+  qa: null
+  security: null
   deploy: null
   translation: null
 external_evidence:
@@ -37,7 +37,7 @@ external_evidence:
     scope: "v0.13.0 計画 5 ラウンドレビュー"
     findings: "Round 1〜5 で計 25 件の指摘（hook 出力スキーマ陳腐化、TaskCreated/Completed 制御方式、Plan 条件付き許可、effort 配分、pre-compact.sh 同種破損、`if` 単一 rule 制約等）"
     resolution: "Rev.5 で全件反映、Phase 0a 即時実装着手 GO。hotfix/v0122-hook-schema ブランチで開始。"
-next_action: "**【iter72 完全クローズ済み→次は iter73 = locale/byte 掃討、その後 Fable+Codex 二重網羅レビュー】** iter72（v1.31.0・marker count proof・SF-014 完結編）は全 dev ゲート approved・**push 済み origin/main=c9b0f99**・working tree clean。**合意した次の方針（2026-07-18 ユーザーと確認）**: (1) **iter73 = locale/byte-injection 掃討**を先にやる——今回の F-CRIT-1（UTF-8 locale 下で grep 抽出が 1 バイトで破綻し false-GREEN）と**同型の locale 依存 grep が deny 側 security フックに残存**（実測: `hooks/check-destructive.sh` grep 6箇所・`hooks/check-secrets.sh` grep 17箇所とも LC_ALL 設定ゼロ）。deny 側での同型は「破壊的コマンド/シークレットのパターンとりこぼし＝fail-open」で成立すれば moat より深刻（HIGH 相当・**ただし exploitable かは未確認**）。修正手札は既知（`LC_ALL=C` byte-wise 固定＋非 ASCII 回帰 pin）で footprint 数フック＝M/S。**Low な SF（011/012/013/015）は今やらない**（網羅レビューが再優先度付けする類・先食いしない）。(2) iter73 クローズ後に **Fable+Codex 二重網羅レビュー**——OPEN SF 全件＋F-CRIT-1＋掃討結果を両レビュアーに context 投入・**verdict が割れた箇所を最優先で掘る**（1次approve/盲検2次reject の divergence が HIGH バグの在処だった今回の再現）・観点に locale/encoding/byte 前提を1次元明示。(3) レビュー出力を Phase 化して消化（2026-07-06 レビューが Phase 1 を駆動した形）・**SF-014 恒久策（execution attestation＝go -json/pytest プラグイン等・全ランナーのテスト証拠契約に触る大きな横断設計）はレビューで設計を pressure-test してから着手**。◆前回の網羅レビュー正本＝docs/full-review-2026-07-06-six-dimensions-evolution.md（iter60→72 で約12反復経過）。◆push=`gh auth switch --user yuuya-miyagaki` 必須（active が tigereye だと 403）。"
+next_action: "**【iter73 着手＝locale/byte-injection 掃討（deny 側フックの LC_ALL 未設定 grep 封鎖）】** rollover 完了（iter72 は v1.31.0 で完全クローズ・push 済 origin/main=4f8cc71・dev ゲート全 pending・iteration=73・非 requirements refs=null）。今回タスク＝iter72 F-CRIT-1（UTF-8 locale 下で grep が敵対バイトで破綻）と**同型の locale 依存 grep が deny 側 security フックに残存**する件の掃討: `hooks/check-destructive.sh` grep 6箇所・`hooks/check-secrets.sh` grep 17箇所とも LC_ALL 設定ゼロ（実測 2026-07-18）。deny 側は成立すれば「破壊的コマンド/シークレットのとりこぼし＝fail-open」で moat より深刻（HIGH 相当・exploitable かは brainstorm で実証確認）。修正手札は既知（`LC_ALL=C` byte-wise 固定＋非 ASCII 回帰 pin）・footprint 数フック＝M/S 想定。**Low な SF（011/012/013/015）は先食いしない**。**次アクション＝aegis-brainstorm skill に従い brainstorm 実施（exploitability 実証→Step D で update-task.sh・その後 plan→grill-plan→implement〔TDD RED-first・書く=opus〕→grill-code→review〔1次4角度=opus→親verify=fable・盲検2次=fable〕→qa→security→（size 次第で deploy）→ship〔bump〕→docs→dev_ready_for_client 申請→push はユーザー判断）**。◆iter73 クローズ後: Fable+Codex 二重網羅レビュー（OPEN SF 全件＋F-CRIT-1＋掃討結果投入・divergence 最優先・locale/encoding/byte 観点1次元明示）→レビュー出力 Phase 化→SF-014 恒久策（execution attestation）はレビューで pressure-test 後。前回網羅レビュー正本=docs/full-review-2026-07-06-six-dimensions-evolution.md。◆push=`gh auth switch --user yuuya-miyagaki` 必須（active が tigereye だと 403）。"
 blockers: []
 failure_tracking: null
 session_history:
