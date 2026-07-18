@@ -31,6 +31,17 @@ INPUT=$(cat)
 # Extract command.
 CMD=$(extract_command "$INPUT")
 
+# iter73 (locale/byte hardening): force BYTE-WISE (C locale) matching for every
+# tr/grep below. Under a UTF-8 locale, `tr` aborts with "Illegal byte sequence"
+# on an invalid UTF-8 byte in the command, and `set -euo pipefail` then kills the
+# hook (rc=1, no decision emitted) — a crash that bypasses this hook's own
+# raw-payload fail-safe fallback. All destructive patterns are ASCII + literal,
+# so byte-wise is exactly correct. extract_command already ran under the inherited
+# locale (preserving UTF-8 fidelity for its python3 path); this hook makes NO
+# python3 call after extraction, so exporting C locale here is safe and does not
+# corrupt any downstream UTF-8 handling. Mirrors hooks/lib/marker.sh (iter72 F-CRIT-1).
+export LC_ALL=C LC_CTYPE=C LANG=C
+
 # If no command extracted, allow — UNLESS the raw payload still matches a
 # destructive pattern. Extraction can fail on truncated/oversized JSON; CC emits
 # well-formed JSON, so this is a defense-in-depth fail-closed fallback (mirrors
