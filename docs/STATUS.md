@@ -3,7 +3,7 @@ framework: aegis
 framework_version: "1.30.0"
 project_name: "Aegis"
 mode: Dev
-phase: qa
+phase: security
 task_type: framework
 task_size: M
 task_size_rationale: "iteration 72（framework・SF-014 恒久策 完結編＝marker positive proof のカウント化）M 確定（brainstorm Step D・update-task.sh 経由）。設計正本: docs/specs/2026-07-16-iter72-count-proof-design.md（(1) aegis_marker_verdict に Stage 5『count proof』追加＝count 族サマリ検出時のみ executed 実数〔unittest: Ran N−Σskipped=K／pytest・jest・vitest・cargo: Σ(passed+failed)／go -v: --- PASS|FAIL 行数〕≧1 を要求・族未検出（素の go）は従来 verdict＝残余 pin (2) cargo zero-run 行 deny をカウント合計に委譲＝doc-tests 空セクションの実在偽陰性を修正〔2026-07-16 実証〕 (3) verdict インターフェース不変＝3 消費者無改修）。footprint: hooks/lib/patterns.sh＋hooks/lib/marker.sh＋scripts/record-test-result.py（docstring/メッセージのみ）＋tests 2本＝M（2-5）。control-plane（反ガミング moat）を触るため review+qa+security 必須・M のため deploy skip（iter69 前例）。go 素出力 all-skip と echo フォージは残余として文書化継続（出力ベース proof の床・drill subsume）・audit_deps positive proof は iter73 分離維持（attestation 型・機構別・テーマ純度）。"
@@ -15,7 +15,7 @@ gate_approvals:
   brainstorm: approved
   plan: approved
   review: approved
-  qa: pending
+  qa: approved
   security: pending
   deploy: pending
   dev_ready_for_client: pending
@@ -24,7 +24,7 @@ current_refs:
   plan: "docs/plans/2026-07-16-iter72-count-proof-implementation-plan.md"
   spec: "docs/specs/2026-07-16-iter72-count-proof-design.md"
   review: "docs/qa-reports/iter72-review.md"
-  qa: null
+  qa: "docs/qa-reports/iter72-qa.md"
   security: null
   deploy: null
   translation: null
@@ -37,7 +37,7 @@ external_evidence:
     scope: "v0.13.0 計画 5 ラウンドレビュー"
     findings: "Round 1〜5 で計 25 件の指摘（hook 出力スキーマ陳腐化、TaskCreated/Completed 制御方式、Plan 条件付き許可、effort 配分、pre-compact.sh 同種破損、`if` 単一 rule 制約等）"
     resolution: "Rev.5 で全件反映、Phase 0a 即時実装着手 GO。hotfix/v0122-hook-schema ブランチで開始。"
-next_action: "**【iter72 qa フェーズ】** review approved（ref=docs/qa-reports/iter72-review.md・judge 🟢＋2次 approve_with_notes 記録・fix-forward 2 ラウンド）。多角レビュー（1次4角度＋code-review workflow 16agent＋親verify＋盲検2次）が摘発した全指摘を fix-forward 済み: F-2（vitest all-skip false-GREEN 封鎖）／F0（unittest MINUS アンカー）／F1（pytest DETECT banner 誤検出）／F4-F6・M-1（Stage5 grep fail-closed 統一 -a/rc3）／強度F-1（TAB parity pin）。コミット: 5e10163/be77a85/617a5c4/925a8ae/fa97241/8e9d589/06b4556。full suite 1291 passed/2 skipped（pytest）・1107 OK（unittest）実測 green。**次アクション＝qa-verification skill に従い B1 drill（per-task コミット済みのため sanctioned skip＋代替実証明記）＋独立 clone で fresh 変異（Stage5 の核心行 mutant）＋実環境 E2E（unittest all-skip→record rc2／混在→green／vitest all-skip→verdict false）→docs/qa-reports/iter72-qa.md→qa gate approve --ref**。◆別トラック: audit_deps positive proof（iter73）／SF-015 pytest all-xfail／SF-011/012/013。◆push=`gh auth switch --user yuuya-miyagaki` 必須。"
+next_action: "**【iter72 security フェーズ】** qa approved（ref=docs/qa-reports/iter72-qa.md・judge 🟢・drill SKIP sanctioned・fresh 変異 8/8 KILLED〔M6 gap は qa 内 pin 追加 e989bcf で是正〕・E2E 6/6・clone baseline 1290 passed）。**次アクション＝aegis-security-gate skill に従い 1次（opus・injection/secrets/deps 中心＝Stage5 bash の command/output injection・`10#$num` 算術・grep -E 経路）→盲検2次（fable・物理隔離 clone）→docs/qa-reports/iter72-security.md→security gate approve --ref**。脅威モデル: control-plane（反ガミング moat）変更・入力は command＋test 出力（自己欺瞞下で攻撃者統制可）。◆別トラック: audit_deps positive proof（iter73）／SF-015 pytest all-xfail／SF-011/012/013。◆push=`gh auth switch --user yuuya-miyagaki` 必須。"
 blockers: []
 failure_tracking: null
 session_history:
