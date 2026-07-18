@@ -9,7 +9,7 @@ task_size: M
 task_size_rationale: "iteration 73（framework・locale/byte-injection 掃討＝deny 側 moat フックの `tr`/`grep` を byte-wise 決定化）M 確定（brainstorm Step D・update-task.sh 経由）。設計正本: docs/specs/2026-07-18-iter73-locale-byte-sweep-design.md／記録: docs/specs/2026-07-18-iter73-locale-byte-sweep-brainstorm-record.md。**実証結論（2026-07-18）**: 支配機構は grep 取りこぼしでなく **`tr` クラッシュ**（不正 UTF-8 バイト→`Illegal byte sequence`→`set -euo pipefail` でフックが rc=1・出力なし→fail-open）。crash は check-destructive.sh・check-secrets.sh の**2本に限定**（実測。runtime-state/deploy-gate は python3 抽出でバイト→空 CMD or tr 前に BSD grep でcrashせず＝同型不成立）。**severity は defensive robustness hardening（脅威モデル内の到達性ゼロ・grill1 で実証・2026-07-19）**＝crash は不正バイトのみ・モデルの command は常に valid UTF-8（Unicode→必ず valid UTF-8）で不正バイト到達不能＝SF-009 と同カテゴリ（next_action の HIGH 仮説を実証格下げ）。**それでも直す**＝(1) 制御フックは任意 stdin でクラッシュしない堅牢性契約〔自前 raw fail-safe fallback 迂回・第3の未定義状態=parse 成功後の下流 crash〕(2) iter72 marker.sh 一貫性 (3) stderr ノイズ除去 (4) forward-looking。修正＝各フックの `CMD=$(extract_command)` 直後に `export LC_ALL=C LC_CTYPE=C LANG=C`（抽出の python3 は inherited locale で UTF-8 fidelity 維持・以降 tr/grep byte-wise・両フックは抽出後 python3 非依存を pin）。footprint: hooks/check-destructive.sh＋hooks/check-secrets.sh＋tests＝M（2-5）。control-plane moat を触るため review+qa+security 必須・M のため deploy skip（iter69 前例）。crash-safe trap 等の構造変更は YAGNI で不採（将来 SF 候補）。"
 iteration: 73
 ui_surface: false
-last_updated: "2026-07-18T00:00:00Z"
+last_updated: "2026-07-19T00:00:00Z"
 gate_approvals:
   client_ready_for_dev: n/a
   brainstorm: approved
@@ -18,7 +18,7 @@ gate_approvals:
   qa: approved
   security: approved
   deploy: pending
-  dev_ready_for_client: pending
+  dev_ready_for_client: approved
 current_refs:
   requirements: []
   plan: "docs/plans/2026-07-18-iter73-locale-byte-sweep-implementation-plan.md"
