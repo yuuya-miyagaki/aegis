@@ -38,13 +38,20 @@ _UTF8_ENV = dict(
 def run(hook, command_str):
     """Invoke a hook with a Bash command that may contain a lone 0xFF byte.
 
-    Returns (returncode, permission_decision). The invalid byte is carried as a
-    lone chr(0xFF) in the Python str, serialized with ensure_ascii=False, then
-    UTF-8-encoded. Because chr(0xFF) UTF-8-encodes to the two bytes 0xC3 0xBF,
-    we collapse that sequence back to a single raw 0xFF so a genuinely invalid
-    UTF-8 byte lands on stdin (while valid multibyte text — Japanese etc. —
-    stays intact as proper UTF-8). If stdout is empty or not JSON, the decision
-    is the literal string "CRASH" (distinguishes a crash from allow).
+    Returns (returncode, permission_decision, reason). The invalid byte is
+    carried as a lone chr(0xFF) in the Python str, serialized with
+    ensure_ascii=False, then UTF-8-encoded. Because chr(0xFF) UTF-8-encodes to
+    the two bytes 0xC3 0xBF, we collapse that sequence back to a single raw 0xFF
+    so a genuinely invalid UTF-8 byte lands on stdin (while valid multibyte text
+    — Japanese etc. — stays intact as proper UTF-8). NOTE: callers must pass the
+    invalid byte only as chr(0xFF); a legitimate U+00FF (ÿ) in a command string
+    would also be collapsed — no current test uses ÿ.
+
+    If stdout is empty or not JSON, the decision is the literal string "CRASH"
+    (distinguishes a fail-open crash from a legitimate allow). `reason` is the
+    permissionDecisionReason (empty string when absent) — used to prove WHICH
+    code path fired (the main byte-wise path emits a specific pattern message,
+    the [ -z "$CMD" ] raw fallback emits a generic "解析に失敗" message).
     """
     payload = json.dumps(
         {"tool_name": "Bash", "tool_input": {"command": command_str}},
@@ -58,41 +65,60 @@ def run(hook, command_str):
     )
     out = proc.stdout.decode(errors="replace").strip()
     if not out:
-        return proc.returncode, "CRASH"
+        return proc.returncode, "CRASH", ""
     try:
         obj = json.loads(out)
     except (ValueError, json.JSONDecodeError):
-        return proc.returncode, "CRASH"
-    decision = obj.get("hookSpecificOutput", {}).get("permissionDecision")
-    return proc.returncode, decision  # None == allow ({} empty object)
+        return proc.returncode, "CRASH", ""
+    hso = obj.get("hookSpecificOutput", {})
+    decision = hso.get("permissionDecision")  # None == allow ({} empty object)
+    reason = hso.get("permissionDecisionReason", "")
+    return proc.returncode, decision, reason
 
 
 # --- check-destructive.sh: destructive commands must ASK ---
 
+# The check-destructive fallback ([ -z "$CMD" ]) emits this generic reason when
+# extraction is blanked; the byte-wise MAIN path emits a specific pattern message
+# ("再帰削除"). Asserting the main-path message pins that extraction SUCCEEDED
+# byte-wise — this is what fails if `export LC_ALL=C` is moved back to AFTER
+# extraction (mutation B: extraction drops -> fallback -> generic message), which
+# a bare `decision == "ask"` assertion could NOT catch (both paths yield "ask").
+_FALLBACK_MSG = "コマンドの解析に失敗しました"
+_MAIN_RECURSIVE_MSG = "再帰削除"
+
+
 def test_destructive_byte_in_comment_still_asks():
-    # RED now: 0xFF in a trailing comment crashes `tr` -> rc=1, decision CRASH.
-    rc, decision = run(DESTRUCTIVE, "rm -rf /realdir #" + chr(0xFF))
+    # RED before fix: 0xFF in a trailing comment crashes `tr` -> rc=1, CRASH.
+    # After fix: byte-wise extraction succeeds -> MAIN path -> recursive-delete msg.
+    rc, decision, reason = run(DESTRUCTIVE, "rm -rf /realdir #" + chr(0xFF))
     assert rc == 0, f"hook crashed (rc={rc})"
     assert decision == "ask", f"expected ask, got {decision!r}"
+    assert _MAIN_RECURSIVE_MSG in reason and _FALLBACK_MSG not in reason, (
+        f"expected MAIN-path recursive-delete warning (proves byte-wise extraction), "
+        f"got fallback/other reason: {reason!r}")
 
 
 def test_destructive_trailing_byte_still_asks():
-    # RED now.
-    rc, decision = run(DESTRUCTIVE, "rm -rf /realdir" + chr(0xFF))
+    # RED before fix. After fix: MAIN path (not the extraction-drop fallback).
+    rc, decision, reason = run(DESTRUCTIVE, "rm -rf /realdir" + chr(0xFF))
     assert rc == 0, f"hook crashed (rc={rc})"
     assert decision == "ask", f"expected ask, got {decision!r}"
+    assert _MAIN_RECURSIVE_MSG in reason and _FALLBACK_MSG not in reason, (
+        f"expected MAIN-path recursive-delete warning (proves byte-wise extraction), "
+        f"got fallback/other reason: {reason!r}")
 
 
 def test_destructive_valid_multibyte_still_asks():
     # i18n non-regression (already PASS): valid UTF-8 multibyte must not crash.
-    rc, decision = run(DESTRUCTIVE, "rm -rf ~/プロジェクト")
+    rc, decision, _ = run(DESTRUCTIVE, "rm -rf ~/プロジェクト")
     assert rc == 0, f"hook crashed (rc={rc})"
     assert decision == "ask", f"expected ask, got {decision!r}"
 
 
 def test_destructive_ascii_baseline_asks():
     # Non-regression baseline (already PASS).
-    rc, decision = run(DESTRUCTIVE, "rm -rf /realdir")
+    rc, decision, _ = run(DESTRUCTIVE, "rm -rf /realdir")
     assert rc == 0, f"hook crashed (rc={rc})"
     assert decision == "ask", f"expected ask, got {decision!r}"
 
@@ -100,29 +126,32 @@ def test_destructive_ascii_baseline_asks():
 # --- check-secrets.sh: staging secrets must DENY ---
 
 def test_secrets_real_env_with_trailing_byte_still_denies():
-    # PRIMARY pin. RED now: staging the REAL .env with a stray byte elsewhere on
-    # the line must still deny — but `tr` crashes -> fail-open.
-    rc, decision = run(SECRETS, "git add .env realfile" + chr(0xFF))
+    # PRIMARY pin. RED before fix: staging the REAL .env with a stray byte
+    # elsewhere on the line must still deny — but extraction drops (grep) and/or
+    # `tr` crashes -> fallback ASKs / crash. This pin is mutation-sensitive: it
+    # goes RED both if the export is deleted AND if it is moved to after
+    # extraction (deny->ask downgrade), unlike the destructive pins.
+    rc, decision, _ = run(SECRETS, "git add .env realfile" + chr(0xFF))
     assert rc == 0, f"hook crashed (rc={rc})"
     assert decision == "deny", f"expected deny, got {decision!r}"
 
 
 def test_secrets_byte_after_env_still_denies():
-    # Auxiliary (non-crash intent, but crashes now). RED now.
-    rc, decision = run(SECRETS, "git add .env" + chr(0xFF))
+    # Auxiliary (non-crash intent, but crashes/downgrades before fix).
+    rc, decision, _ = run(SECRETS, "git add .env" + chr(0xFF))
     assert rc == 0, f"hook crashed (rc={rc})"
     assert decision == "deny", f"expected deny, got {decision!r}"
 
 
 def test_secrets_valid_multibyte_still_denies():
     # i18n non-regression (already PASS): valid UTF-8 multibyte must not crash.
-    rc, decision = run(SECRETS, "git add テスト/.env")
+    rc, decision, _ = run(SECRETS, "git add テスト/.env")
     assert rc == 0, f"hook crashed (rc={rc})"
     assert decision == "deny", f"expected deny, got {decision!r}"
 
 
 def test_secrets_ascii_baseline_denies():
     # Non-regression baseline (already PASS).
-    rc, decision = run(SECRETS, "git add .env")
+    rc, decision, _ = run(SECRETS, "git add .env")
     assert rc == 0, f"hook crashed (rc={rc})"
     assert decision == "deny", f"expected deny, got {decision!r}"
