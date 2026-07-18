@@ -302,6 +302,29 @@ class TestCountProof(unittest.TestCase):
                 lib=Path(d) / "marker.sh")
             self.assertEqual(rc, 3)
 
+    def test_malformed_field_count_rc3_not_failopen(self):
+        # iter72 qa (M6 survivor): the strict field-count guard (`nsep -eq 4`)
+        # in marker.sh is load-bearing but was unpinned — the existing rc3 tests
+        # only cover a MISSING array and a bad-GREP-regex, never a structurally
+        # short entry. A COUNT_FAMILIES entry with the wrong separator count (4
+        # fields = dropped MINUS) must fail CLOSED (rc3): without the guard the
+        # misparse leaves `Ran N` un-subtracted and an all-skip unittest reads
+        # true (fail OPEN — verified by the qa mutation battery).
+        src = (ROOT / "hooks" / "lib" / "patterns.sh").read_text()
+        five = ("'unittest|||(^|\\n)Ran [0-9]+ tests? in|||Ran [0-9]+ tests?"
+                "|||sum|||[(,] ?skipped=[0-9]+'")
+        four = ("'unittest|||(^|\\n)Ran [0-9]+ tests? in|||Ran [0-9]+ tests?"
+                "|||sum'")
+        self.assertIn(five, src)  # guard against the entry text drifting
+        malformed = src.replace(five, four)
+        with tempfile.TemporaryDirectory() as d:
+            (Path(d) / "patterns.sh").write_text(malformed)
+            shutil.copy(MARKER_LIB, Path(d) / "marker.sh")
+            rc, _out = _verdict(
+                "Ran 2 tests in 0.001s\n\nOK (skipped=2)\n",
+                "python3 -m unittest t", "0", lib=Path(d) / "marker.sh")
+            self.assertEqual(rc, 3)
+
     def test_broken_minus_regex_rc3_not_failopen(self):
         # iter72 review round-2 (M-1): a corrupt patterns.sh whose unittest
         # MINUS is a regex the host grep REJECTS must fail CLOSED (rc3), not
