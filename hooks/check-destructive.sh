@@ -35,7 +35,14 @@ INPUT=$(cat)
 # and makes `tr` abort with "Illegal byte sequence" (set -euo pipefail then kills
 # the hook rc=1, no decision — fail-open crash that bypasses the raw fail-safe
 # fallback). Set C locale BEFORE extraction so the grep fast-path is byte-wise too.
-# All destructive patterns are ASCII + literal, so byte-wise is exactly correct.
+# Byte-wise is correct for every runnable command: the patterns are ASCII literals
+# plus `[[:space:]]` token separators, and under C those classes match ASCII
+# whitespace only. Since bash word-splits ONLY on ASCII IFS whitespace, a real
+# destructive command always separates tokens with ASCII space/tab — so no runnable
+# command is missed. (A non-ASCII-whitespace separator, e.g. `rm<NBSP>-rf`, makes
+# the whole thing a single non-existent token → "command not found"; not matching it
+# loses nothing. Accepted residual, pinned in tests/test_hook_locale_byte.py; see
+# docs/security-followups.md SF-016.)
 # The C locale does NOT corrupt extract_command's python3 path: CPython auto-enables
 # UTF-8 Mode under a C/POSIX locale (PEP 540), so stdin/stdout stay UTF-8 and valid
 # multibyte text (Japanese paths etc.) is preserved byte-for-byte (verified:

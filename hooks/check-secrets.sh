@@ -46,8 +46,15 @@ INPUT=$(cat)
 # then returns empty → the [ -z "$CMD" ] fallback only ASKs, downgrading a real
 # DENY) and makes `tr` abort with "Illegal byte sequence" (set -euo pipefail then
 # kills the hook rc=1, no decision — fail-open). Set C locale BEFORE extraction
-# so the grep fast-path is byte-wise too. All secret/credential patterns are
-# ASCII + literal, so byte-wise is exactly correct. The C locale does NOT corrupt
+# so the grep fast-path is byte-wise too. Byte-wise is correct for every runnable
+# command: the patterns are ASCII literals plus `[[:space:]]` token separators
+# (`git[[:space:]]+…add`), and under C those classes match ASCII whitespace only.
+# Since bash word-splits ONLY on ASCII IFS whitespace, a real staging command
+# always uses ASCII separators — so no runnable command is missed. (A non-ASCII
+# separator, e.g. `git<NBSP>add .env`, makes `git<NBSP>add` a single non-existent
+# token → "command not found"; not matching it loses nothing. Accepted residual,
+# pinned in tests/test_hook_locale_byte.py; see docs/security-followups.md SF-016.)
+# The C locale does NOT corrupt
 # extract_command's python3 path: CPython auto-enables UTF-8 Mode under a C/POSIX
 # locale (PEP 540), so stdin/stdout stay UTF-8 and valid multibyte text (Japanese
 # paths etc.) is preserved byte-for-byte (verified: identical extraction bytes

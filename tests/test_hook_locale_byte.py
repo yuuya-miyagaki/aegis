@@ -155,3 +155,36 @@ def test_secrets_ascii_baseline_denies():
     rc, decision, _ = run(SECRETS, "git add .env")
     assert rc == 0, f"hook crashed (rc={rc})"
     assert decision == "deny", f"expected deny, got {decision!r}"
+
+
+# --- Accepted residual (SF-016): C locale narrows [[:space:]]/\s to ASCII, so a
+# NON-ASCII whitespace SEPARATOR (NBSP U+00A0, ideographic space U+3000) between
+# command tokens no longer matches the moat pattern. This is NOT a real bypass:
+# bash word-splits only on ASCII IFS whitespace, so `rm<NBSP>-rf` / `git<NBSP>add`
+# is a SINGLE non-existent token ("command not found") — it never deletes or
+# stages anything. Re-widening would spuriously match non-runnable non-commands
+# and fight C-locale determinism, so we ACCEPT and PIN the residual here (blind
+# 2nd review divergence, iter73). If a future change re-widens to match Unicode
+# whitespace, these two tests flip to warn/deny and must be revisited. ---
+NBSP = " "
+
+
+def test_destructive_unicode_ws_separator_is_accepted_residual_allow():
+    # `rm<NBSP>-rf /x` is a single non-existent token, not a runnable `rm -rf`.
+    # Under C locale the [[:space:]] separator does not match → allow. Pinned.
+    rc, decision, _ = run(DESTRUCTIVE, "rm" + NBSP + "-rf /realdir")
+    assert rc == 0, f"hook crashed (rc={rc})"
+    assert decision is None, (
+        f"accepted residual: NBSP-separated non-command should allow, got {decision!r}. "
+        f"If this changed to 'ask', the whitespace class was re-widened — revisit SF-016.")
+
+
+def test_secrets_unicode_ws_separator_is_accepted_residual_allow():
+    # `git<NBSP>add .env`: `git<NBSP>add` is a single non-existent token, not a
+    # runnable `git add`. Under C locale the git[[:space:]]+add pattern does not
+    # match → allow. Pinned as accepted residual.
+    rc, decision, _ = run(SECRETS, "git" + NBSP + "add .env")
+    assert rc == 0, f"hook crashed (rc={rc})"
+    assert decision is None, (
+        f"accepted residual: NBSP-separated non-command should allow, got {decision!r}. "
+        f"If this changed to 'deny', the whitespace class was re-widened — revisit SF-016.")
