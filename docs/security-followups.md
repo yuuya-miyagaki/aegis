@@ -395,6 +395,16 @@ SF-001 系の網羅的閉鎖（rounds 5-11）で**実用的なシェル難読化
 - **pre-existing**: STRONG marker は iter71 以前（commit 1587a69 由来）から `passed|failed` のみで、iter72 は STRONG を未改修。count proof（Stage 5）とは独立。
 - **恒久策候補**: STRONG/count に `xpassed`（＝実行され予期せず pass＝body 実行済み）を実行証跡として含めるか、pytest の `collected N items` prologue を実行下限の proof に使う。ただし `xfailed` を「実行済み」と数えるべきかは意味論判断（期待された失敗も body は走っている）を要するため、単純拡張でなく設計判断として iter73+ で扱う。marker 層の他残余（SF-014）と同バケット。
 
+### SF-016: deny 側フックの `LC_ALL=C` 固定が Unicode 空白区切りの moat マッチを狭める（**OPEN**・iter73 review 盲検2次検出・非 exploitable/accepted residual）
+
+- **発見**: iter73 review 盲検2次（fable・blind・1次結論非開示）。1次（opus・approve）が「NBSP 区切りは bash が単一トークン化＝非コマンドゆえ無害」と判定したのに対し、盲検2次が「coverage narrowing＋コメント事実誤り」を Major で摘発した divergence。
+- **種別**: locale 固定の副作用（moat パターンの `[[:space:]]`/`\s` が C locale で ASCII 空白のみに狭まる）。iter73 の byte-wise 化（`export LC_ALL=C LC_CTYPE=C LANG=C`・commit 7bfb8f7/95e08ae）で導入。
+- **重大度**: **非 exploitable（accepted residual）**。実測（2026-07-19）: `[[:space:]]`/`\s` は UTF-8 で NBSP(U+00A0)/U+3000 に match するが C では non-match。しかし **bash は NBSP/U+3000 で word-split しない**ため `rm<NBSP>-rf`・`git<NBSP>add` は**単一の非存在トークン→`command not found`**＝削除もステージングも起きない＝機能的に無害。ASCII space/TAB は C でも match するため、**runnable な破壊的/シークレットコマンド（ASCII IFS 区切り必須）は取りこぼさない**。
+- **経路（pre→post 実測）**: `rm<NBSP>-rf /x` は pre-change UTF-8 で `ask`→post-change C で `allow`、`git<NBSP>add .env` は `deny`→`allow`。いずれも対象コマンドは非実行。
+- **なぜ re-widen しないか**: Unicode 空白まで match させると (1) 非コマンド（実行不能）への spurious な warn/deny が復活し、(2) C-locale の決定性（byte-injection crash/grep-drop の封鎖）と矛盾する。narrowing は「実行可能コマンドの網羅」を損なわず「非コマンドへの誤マッチ」だけを除くため、accept が筋。
+- **対処済み**: (a) 両フックの誤コメント「ASCII + literal だから byte-wise が正」を「runnable command は ASCII IFS 区切り必須ゆえ byte-wise で取りこぼさない・非 ASCII 区切りは非コマンド」へ訂正（commit 8be219d）。(b) 受容 residual を pin（`tests/test_hook_locale_byte.py::test_{destructive,secrets}_unicode_ws_separator_is_accepted_residual_allow`＝将来 re-widen 時に flip して revisit を強制）。
+- **状態**: **OPEN（accepted residual・記録のみ・コード再修正なし）**。将来トリガ＝Unicode 空白を IFS に含める非標準シェル対応が要件化された場合、または「moat は非コマンドにも警告すべき」という UX 判断が出た場合に再評価。
+
 ## CLOSED
 
 - **SF-010**（Medium・iter65 review 検出→iter66 v1.26.1 で封鎖）: task_size empty-baseline raw-Edit × migration-grace の tamper 逃れ。Fix ①（`feff60c` migration-grace を真の旧フォーマット限定に絞り込み・task fields＋gate loop）＋(i)(ii) Fix ⑤（`6229fd5` python first-match/先勝ち）＋(iii) Fix ④（`c5f5fd2` gate_value 本文 fallback を ---無し限定）。hook 直接発火 4 ケース＋fresh 変異 M1-M5＋1次/盲検2次 approve で裏取り。詳細は上記 SF-010 節。
