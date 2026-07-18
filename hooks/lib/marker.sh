@@ -66,6 +66,20 @@ aegis_marker_verdict() {
      [ -z "${AEGIS_TEST_COUNT_FAMILIES[*]:-}" ]; then
     return 3
   fi
+  # iter72 security (F-CRIT-1, blind-2nd): force BYTE-WISE (C locale) matching
+  # for EVERY grep in this function. Test output is attacker-controllable under
+  # the self-deception threat model; a single stray non-UTF-8 byte on a summary
+  # line makes grep locale-dependent under a UTF-8 LC_CTYPE (the macOS/Linux
+  # interactive default that hooks / record-test-result.py inherit): the byte
+  # poisons the line so a zero-run signal or a `skipped=N` token is MISSED,
+  # yielding a false GREEN — it defeated BOTH the Stage-4 zero-run veto
+  # (pre-existing since iter71) and the Stage-5 count subtraction (iter72). C
+  # locale makes each byte its own character so matching is deterministic; all
+  # patterns are ASCII + literal TAB (0x09), so byte-wise is exactly correct.
+  # `local`+`export` keeps it scoped (restored on return, no caller leak) and
+  # works even when LC_ALL is unset in the parent (LANG-only environments).
+  local LC_ALL=C LC_CTYPE=C LANG=C
+  export LC_ALL LC_CTYPE LANG
   out="$(cat)"
   if [ -z "$out" ]; then
     printf 'false'

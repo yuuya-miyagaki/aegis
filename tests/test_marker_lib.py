@@ -343,6 +343,45 @@ class TestCountProof(unittest.TestCase):
                 "python3 -m unittest t", "0", lib=Path(d) / "marker.sh")
             self.assertEqual(rc, 3)
 
+    def test_stray_byte_all_skip_stays_false_utf8_locale(self):
+        # iter72 security F-CRIT-1 (blind-2nd): a stray non-UTF-8 byte on the
+        # `OK (skipped=N)` line of an all-skip unittest run made the MINUS
+        # extraction miss under a UTF-8 LC_CTYPE -> the skip was not subtracted
+        # -> false GREEN. marker.sh now forces LC_ALL=C (byte-wise) internally,
+        # so the verdict is false regardless of the caller's locale. Run the
+        # helper under an explicit UTF-8 locale to pin the dangerous direction.
+        import os
+        env = dict(os.environ, LC_ALL="en_US.UTF-8", LC_CTYPE="en_US.UTF-8",
+                   LANG="en_US.UTF-8")
+        out = "Ran 2 tests in 0.001s\n\nOK (skipped=2)\xff\n"
+        proc = subprocess.run(
+            ["bash", "-c",
+             'source "$1" >/dev/null 2>&1 || exit 3; '
+             'aegis_marker_verdict "$2" "$3"',
+             "_", str(MARKER_LIB), "0", "python3 -m unittest t"],
+            input=out.encode("latin-1"), capture_output=True, env=env)
+        self.assertEqual((proc.returncode, proc.stdout.decode().strip()),
+                         (0, "false"))
+
+    def test_stray_byte_zero_run_gate_stays_false_utf8_locale(self):
+        # iter72 security F-CRIT-1 (pre-existing iter71 Stage-4 instance): a
+        # forged STRONG pytest marker paired with a real `collected 0 items`
+        # zero-run signal carrying a stray byte also flipped to true under a
+        # UTF-8 locale (the zero-run veto missed). LC_ALL=C closes it too.
+        import os
+        env = dict(os.environ, LC_ALL="en_US.UTF-8", LC_CTYPE="en_US.UTF-8",
+                   LANG="en_US.UTF-8")
+        out = ("platform darwin -- Python 3.9.6\nrootdir: /x\n"
+               "collected 0 items\xff\n\n===== 3 passed in 0.42s =====\n")
+        proc = subprocess.run(
+            ["bash", "-c",
+             'source "$1" >/dev/null 2>&1 || exit 3; '
+             'aegis_marker_verdict "$2" "$3"',
+             "_", str(MARKER_LIB), "0", "python3 -m pytest t"],
+            input=out.encode("latin-1"), capture_output=True, env=env)
+        self.assertEqual((proc.returncode, proc.stdout.decode().strip()),
+                         (0, "false"))
+
     def test_vitest_all_skip_false_closed(self):
         # iter72 review F-2: the STRONG anchor relaxation ([ \t]*Test Files)
         # made a real all-skip vitest file (which still prints `Test Files 1
