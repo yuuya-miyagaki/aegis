@@ -3,7 +3,7 @@ framework: aegis
 framework_version: "1.30.0"
 project_name: "Aegis"
 mode: Dev
-phase: review
+phase: qa
 task_type: framework
 task_size: M
 task_size_rationale: "iteration 72（framework・SF-014 恒久策 完結編＝marker positive proof のカウント化）M 確定（brainstorm Step D・update-task.sh 経由）。設計正本: docs/specs/2026-07-16-iter72-count-proof-design.md（(1) aegis_marker_verdict に Stage 5『count proof』追加＝count 族サマリ検出時のみ executed 実数〔unittest: Ran N−Σskipped=K／pytest・jest・vitest・cargo: Σ(passed+failed)／go -v: --- PASS|FAIL 行数〕≧1 を要求・族未検出（素の go）は従来 verdict＝残余 pin (2) cargo zero-run 行 deny をカウント合計に委譲＝doc-tests 空セクションの実在偽陰性を修正〔2026-07-16 実証〕 (3) verdict インターフェース不変＝3 消費者無改修）。footprint: hooks/lib/patterns.sh＋hooks/lib/marker.sh＋scripts/record-test-result.py（docstring/メッセージのみ）＋tests 2本＝M（2-5）。control-plane（反ガミング moat）を触るため review+qa+security 必須・M のため deploy skip（iter69 前例）。go 素出力 all-skip と echo フォージは残余として文書化継続（出力ベース proof の床・drill subsume）・audit_deps positive proof は iter73 分離維持（attestation 型・機構別・テーマ純度）。"
@@ -14,7 +14,7 @@ gate_approvals:
   client_ready_for_dev: n/a
   brainstorm: approved
   plan: approved
-  review: pending
+  review: approved
   qa: pending
   security: pending
   deploy: pending
@@ -23,7 +23,7 @@ current_refs:
   requirements: []
   plan: "docs/plans/2026-07-16-iter72-count-proof-implementation-plan.md"
   spec: "docs/specs/2026-07-16-iter72-count-proof-design.md"
-  review: null
+  review: "docs/qa-reports/iter72-review.md"
   qa: null
   security: null
   deploy: null
@@ -37,7 +37,7 @@ external_evidence:
     scope: "v0.13.0 計画 5 ラウンドレビュー"
     findings: "Round 1〜5 で計 25 件の指摘（hook 出力スキーマ陳腐化、TaskCreated/Completed 制御方式、Plan 条件付き許可、effort 配分、pre-compact.sh 同種破損、`if` 単一 rule 制約等）"
     resolution: "Rev.5 で全件反映、Phase 0a 即時実装着手 GO。hotfix/v0122-hook-schema ブランチで開始。"
-next_action: "**【iter72 review フェーズ】** implement 完了: Task0 baseline green（exit 0）→Task1 RED 5e10163（実測 10 failed/34 passed＝期待と完全一致）→Task2 GREEN be77a85（patterns.sh count 族＋marker.sh Stage 5・対象 44 tests OK・full 1103 OK〔unittest 計数——iter71 の 1271 は pytest 計数＝測定方法差で退行なし・メソッド数 1283→1297〕・literal TAB 検証済み）→Task3 617a5c4（record 文書同期・all-skip 拒否 rc2＋no-log-write 実地裏取り）→Task4 925a8ae（SF-014 追記＋SKILL 同期・budget cap 507 維持のため既存プローズ同量圧縮 505/507・contract PASS）。grill-code（fable）Critical 0・Major 0（所見 3 件は echo-class 残余に包含・記録のみ）。Stage1 は親 fable が全 diff 検証・Stage2 skip（各タスク ≤2 files・plan 逐語）。**次アクション＝aegis-review-gate skill に従い 1次 4 角度 finder（opus）→親 verify（fable）→盲検 2 次（fable）→docs/qa-reports/iter72-review.md→review gate approve --ref**。◆別トラック: audit_deps positive proof（iter73）／rc3 guard 個別条件回帰網／保守性 minor 2件／SF-011/012/013。◆push=`gh auth switch --user yuuya-miyagaki` 必須。"
+next_action: "**【iter72 qa フェーズ】** review approved（ref=docs/qa-reports/iter72-review.md・judge 🟢＋2次 approve_with_notes 記録・fix-forward 2 ラウンド）。多角レビュー（1次4角度＋code-review workflow 16agent＋親verify＋盲検2次）が摘発した全指摘を fix-forward 済み: F-2（vitest all-skip false-GREEN 封鎖）／F0（unittest MINUS アンカー）／F1（pytest DETECT banner 誤検出）／F4-F6・M-1（Stage5 grep fail-closed 統一 -a/rc3）／強度F-1（TAB parity pin）。コミット: 5e10163/be77a85/617a5c4/925a8ae/fa97241/8e9d589/06b4556。full suite 1291 passed/2 skipped（pytest）・1107 OK（unittest）実測 green。**次アクション＝qa-verification skill に従い B1 drill（per-task コミット済みのため sanctioned skip＋代替実証明記）＋独立 clone で fresh 変異（Stage5 の核心行 mutant）＋実環境 E2E（unittest all-skip→record rc2／混在→green／vitest all-skip→verdict false）→docs/qa-reports/iter72-qa.md→qa gate approve --ref**。◆別トラック: audit_deps positive proof（iter73）／SF-015 pytest all-xfail／SF-011/012/013。◆push=`gh auth switch --user yuuya-miyagaki` 必須。"
 blockers: []
 failure_tracking: null
 session_history:
