@@ -39,6 +39,21 @@ aegis_require_lib "${SCRIPT_DIR}/lib/secrets-patterns.sh"
 # Read stdin.
 INPUT=$(cat)
 
+# iter73 (locale/byte hardening): force BYTE-WISE (C locale) matching for the
+# ENTIRE hook — extract_command's grep/sed fast-path AND every tr/grep below
+# (command text, and the git-staged-diff pipe). Under a UTF-8 locale, an invalid
+# UTF-8 byte in the command makes grep silently emit NOTHING (extract_command
+# then returns empty → the [ -z "$CMD" ] fallback only ASKs, downgrading a real
+# DENY) and makes `tr` abort with "Illegal byte sequence" (set -euo pipefail then
+# kills the hook rc=1, no decision — fail-open). Set C locale BEFORE extraction
+# so the grep fast-path is byte-wise too. All secret/credential patterns are
+# ASCII + literal, so byte-wise is exactly correct. The C locale does NOT corrupt
+# extract_command's python3 path: CPython auto-enables UTF-8 Mode under a C/POSIX
+# locale (PEP 540), so stdin/stdout stay UTF-8 and valid multibyte text (Japanese
+# paths etc.) is preserved byte-for-byte (verified: identical extraction bytes
+# under C vs UTF-8). Mirrors hooks/lib/marker.sh (iter72 F-CRIT-1).
+export LC_ALL=C LC_CTYPE=C LANG=C
+
 # Extract command.
 CMD=$(extract_command "$INPUT")
 
