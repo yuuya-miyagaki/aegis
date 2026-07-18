@@ -1,6 +1,10 @@
 # テスト強度ドリル結果（機械ブロック・ハーネス生成）
 
 ```
-verdict: SKIP
-reason: iter72（marker count proof・SF-014 完結編）は framework 改修を per-task commit 済み（5e10163/be77a85/617a5c4/925a8ae/fa97241/8e9d589/06b4556）＝qa 承認時の working-tree diff（git diff HEAD）が空になる想定どおりの縁ケース（qa-verification SKILL 145-149）。代替実証: (1) RED-first TDD＝Task1（5e10163）で正確に 10 failed/34 passed を実測してから GREEN 化（全て機能未実装由来）。(2) qa fresh 変異バッテリー 8 種を独立 clone（scratchpad/qa72clone・HEAD 一致）で実走し 8/8 KILLED — Stage5 の核心行（family veto／sum 加算／MINUS 減算／9桁 cap／-ge 1 境界／strict 5-field parse rc3／grep -a／DETECT rc>1 rc3）各々に mutant を置き対象テストが赤化。各変異→scoped 実行→revert・本体 tree 不接触。(3) 実環境 E2E 6 機能とも PASS（unittest all-skip→record rc2/ログ非書込・混在→green marker:true・vitest all-skip fixture→verdict false・banner+go→true・stray skipped=→true・broken MINUS→rc3）。(4) full suite green（本体 1291 passed/2 skipped pytest・1107 OK unittest・record green marker:true）。多角レビュー（1次4角度＋code-review workflow 16agent＋親verify＋盲検2次）で摘発した false-GREEN 1件（F-2 vitest）・false-negative 2件（F0/F1）・fail-open 3件（F5/F6/M-1）を fix-forward 済み・盲検2次は fix-forward 後に新規 false-GREEN/false-negative ゼロを実測。残余（SF-014 (a)echo/(b)素go all-skip/(c)unittest skip レポータ抑止・SF-015 pytest all-xfail）は pre-existing/marker 層天井・drill が subsume。詳細=docs/qa-reports/iter72-qa.md・iter72-review.md。
+verdict: FAIL
+mutants_total: 2
+mutants_caught: 0
+baseline: n/a
+since: b0eb8a10d211a10bdc3b0fcf9ccb2f28e8e16bbb
+survived: []
 ```
