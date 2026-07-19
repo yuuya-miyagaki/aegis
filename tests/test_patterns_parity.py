@@ -350,6 +350,27 @@ class TestCountFamilyParity(unittest.TestCase):
             self.assertEqual(py, expected, f"{fam}[{idx}] expected {expected}: {text!r}")
 
 
+class TestDequoteNormalize(unittest.TestCase):
+    """iter75 SF-017: aegis_dequote_normalize — quote/backslash/${IFS} を畳んで
+    deny 系 hook が生 regex 判定できるよう正規化する共有 helper（純 bash・parser なし）。
+    r""m / g""it a""dd .e""nv / r\\m / rm${IFS}-rf / git${IFS}add .env の難読化を捕捉し、
+    非難読化コマンドは不変。brace 展開（SF-019 残余）は畳まないことを pin する。"""
+
+    def test_dequote_normalize(self):
+        def norm(s):
+            script = 'source hooks/lib/patterns.sh; printf %s "$(aegis_dequote_normalize "$1")"'
+            return subprocess.run(["bash", "-c", script, "_", s], cwd=ROOT,
+                                  capture_output=True, text=True).stdout
+        self.assertEqual(norm('r""m -rf /x'), 'rm -rf /x')
+        self.assertEqual(norm('g""it a""dd .e""nv'), 'git add .env')
+        self.assertEqual(norm('r\\m -rf'), 'rm -rf')
+        self.assertEqual(norm('rm${IFS}-rf /x'), 'rm -rf /x')          # ${IFS} → 空白（grill 致命1）
+        self.assertEqual(norm('git${IFS}add .env'), 'git add .env')    # secret bypass 綴り
+        self.assertEqual(norm('rm -rf /x'), 'rm -rf /x')               # 非難読化は不変
+        # 残余（SF-019・iter75 では畳まない＝不変を pin）:
+        self.assertEqual(norm('r{,}m -rf'), 'r{,}m -rf')               # brace 展開は非対応（構造化 argv 待ち）
+
+
 class TestMaskScopeBoundary(unittest.TestCase):
     """マスクは分類専用 — deny 系 hook に波及していないこと（fail-open 防止）。"""
 

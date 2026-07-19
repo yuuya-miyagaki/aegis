@@ -320,3 +320,17 @@ AEGIS_TEST_IS_PYTEST_REGEX='(^|[;&|]| |\()(npx +|bunx +|(uv|poetry|pipenv) +run 
 # reliable cross-version signal.
 # Reference: https://docs.pytest.org/en/stable/reference/exit-codes.html
 AEGIS_TEST_ZERO_RUN_EXIT_PYTEST=5
+
+# --- iter75 SF-017: quote/backslash/${IFS} 正規化（純 bash・parser なし） ---
+# _obfuscated_unlock_on_cp（check-runtime-state.sh）と同一手法の拡張。呼び出し側は
+# LC_ALL=C を export 済み前提。brace/param-default/cmdsub は解決しない（SF-019 残余・
+# 構造化 argv 待ち）。
+aegis_dequote_normalize() {
+  local c=$1
+  c=${c//\\/}              # バックスラッシュ除去
+  c=${c//\"/}              # 二重クォート除去
+  c=${c//\'/}              # 単一クォート除去
+  c=${c//'${IFS}'/ }       # ${IFS} → 空白（grill 致命1: git${IFS}add .env を捕捉）
+  c=${c//'$IFS'/ }         # $IFS  → 空白
+  printf '%s' "$c"
+}
