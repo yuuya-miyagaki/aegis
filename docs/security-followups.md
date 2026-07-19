@@ -405,6 +405,38 @@ SF-001 系の網羅的閉鎖（rounds 5-11）で**実用的なシェル難読化
 - **対処済み**: (a) 両フックの誤コメント「ASCII + literal だから byte-wise が正」を「runnable command は ASCII IFS 区切り必須ゆえ byte-wise で取りこぼさない・非 ASCII 区切りは非コマンド」へ訂正（commit 8be219d）。(b) 受容 residual を pin（`tests/test_hook_locale_byte.py::test_{destructive,secrets}_unicode_ws_separator_is_accepted_residual_allow`＝将来 re-widen 時に flip して revisit を強制）。
 - **状態**: **OPEN（accepted residual・記録のみ・コード再修正なし）**。将来トリガ＝Unicode 空白を IFS に含める非標準シェル対応が要件化された場合、または「moat は非コマンドにも警告すべき」という UX 判断が出た場合に再評価。
 
+### SF-017: `check-destructive.sh` / `check-secrets.sh` の空クォート トークン分割バイパス（**Critical・OPEN**・iter74 二重レビュー Codex 検出＝SF-001 防御の未伝播）
+
+- **発見**: iter74 二重網羅レビュー（Codex 外部・層1 moat 次元）。Fable（盲検2次）は同次元を「健在」と結論したが、Fable が試したのは平文 decoy（`echo "safe" ; rm -rf /etc`＝ASK 正常）で、**token 内空クォート形は未攻撃**。親（本セッション）が実走再現し確定＝乖離が摘発した実バグ。
+- **種別**: SF-001 クラス（クォート除去＋隣接トークン連結）の**未伝播**。SF-001（iter32-35）は shlex トークン化＋パス解決で control-plane **書込み先**検出に対し同クラスを網羅閉鎖したが、その防御が `check-destructive.sh` の破壊語検出（生 regex）と `check-secrets.sh` の `.env` 検出（生 regex）に**適用されていない**。
+- **重大度**: **Critical**。`g""it a""dd .e""nv` は bash で正規の `git add .env` になるが **secret DENY が ALLOW に落ちる**（＝認証情報の staging/commit を止められない）。フレームワーク自身の脅威モデルは SF-001 で同クラスを Critical 認定済み（「非 framework エージェントが任意書込み」）。到達性: モデルが emit する単一 valid-UTF-8 コマンドで到達（hostile FS や evidence-log 直接編集は不要）。
+- **再現（HEAD 77566ed・親実走生出力）**:
+  ```
+  check-destructive  r""m -rf /tmp/x     -> {}  [ALLOW]   （平文 rm -rf は ASK）
+  check-secrets      g""it a""dd .e""nv  -> {}  [ALLOW]   （平文 git add .env は DENY）
+  変種  r\m -rf /tmp/x  -> ALLOW   "rm" -rf /tmp/x  -> ALLOW
+  対照  hooks/check-control-plane 系（SF-001 で token 化済）は同形を deny/ask（既存テストで pin）
+  ```
+- **根本原因**: destructive/secrets の判定が「生コマンド文字列上の literal 部分文字列 regex」で、シェルのクォート除去＋隣接連結を再現しない。SF-001 が control-plane 判定に導入した「shlex トークン化→各語の literal value を再構成→判定」プリミティブが両フックに無い。
+- **修正方針**: SF-001 の token 化プリミティブを destructive の破壊語判定・secrets の対象パス判定へ一般化（python 優先＋bash fail-closed フォールバック・parse 不能は destructive=ask/secret=deny）。`git commit -m "…STATUS.md…"` 等のクォート内メッセージ救済（OBS-006）を壊さないこと。footprint: check-destructive.sh＋check-secrets.sh＋patterns.sh（共有トークナイザ）＋tests。effort S/M。
+- **状態**: **OPEN（未修正・iter75 P0 で消化予定）**。正本＝`docs/full-review-2026-07-19-dual-codex-fable.md` §4.1。回帰 pin（旧=赤/新=緑）を fix と同時に追加すること。
+
+### SF-018: `check-runtime-state.sh` が不正 UTF-8 バイトで `tr` crash → fail-open（**Medium・OPEN**・iter74 二重レビュー Fable 検出＝iter73 完全性主張の反証）
+
+- **発見**: iter74 二重網羅レビュー（Fable 盲検2次・層1 locale-byte 次元）。Codex（外部）は同次元を「iter72/73 の byte hardening は closed」と結論したが、Codex は runtime-state フックを未攻撃。親が実走再現し確定＝乖離が摘発。
+- **種別**: iter73 の locale/byte 掃討（`export LC_ALL=C` を抽出直後に張る）が **check-destructive/secrets の2本のみに適用され、`check-runtime-state.sh`（3本目）に未適用**。iter73 設計正本は「runtime-state は python3 抽出でバイト→空 CMD＝同型不成立」と記録したが、**python3 は surrogateescape でバイトを温存し空にならない**（実測で反証）。
+- **重大度**: **Medium**（fail-open だが到達性は valid-UTF-8 制約下ゼロ＝モデルは 0xFF を emit しない。iter73 自身の格下げ較正と整合）。ただし本フックは**非 framework モードで Bash 経由の runtime-state（gate 値含む）改竄を止める唯一の PreToolUse ガード**で、fail-open の落ち先が moat の要である点は destructive/secrets より重い。robustness 契約（制御フックは任意 stdin で crash しない）違反＋durable な誤完全性主張の残存が本質。
+- **再現（HEAD 77566ed・親実走生出力）**:
+  ```
+  echo x > docs/STATUS.md            -> rc=0 {}                                   [allow]
+  echo <0xFF> x > docs/STATUS.md     -> rc=1 '' stderr:"tr: Illegal byte sequence"  [FAIL-OPEN crash]
+  同バイト -> check-destructive（iter73修正済）  -> rc=0 {}   （crash せず）
+  同バイト + LC_ALL=C -> check-runtime-state       -> rc=0 {}   （一行修正で解消）
+  ```
+- **根本原因**: `hooks/check-runtime-state.sh:120-122` の `tr '\n\r' ';;'`（および下流 grep）が C locale 非固定のまま、抽出済み CMD 中のバイトで crash。`set -euo pipefail` で rc=1・decision 未出力＝fail-open。
+- **修正方針**: check-destructive/secrets と同一＝`INPUT=$(cat)`（もしくは CMD 抽出）直後に `export LC_ALL=C LC_CTYPE=C LANG=C`（抽出の python3 は PEP 540 で UTF-8 fidelity 維持）。併せて iter73 設計正本の「同型不成立」記述を訂正し、`tests/test_hook_locale_byte.py` に runtime-state の crash-regression pin を追加。effort S。
+- **状態**: **OPEN（未修正・iter76 P0 で消化予定）**。正本＝`docs/full-review-2026-07-19-dual-codex-fable.md` §4.3。
+
 ## CLOSED
 
 - **SF-010**（Medium・iter65 review 検出→iter66 v1.26.1 で封鎖）: task_size empty-baseline raw-Edit × migration-grace の tamper 逃れ。Fix ①（`feff60c` migration-grace を真の旧フォーマット限定に絞り込み・task fields＋gate loop）＋(i)(ii) Fix ⑤（`6229fd5` python first-match/先勝ち）＋(iii) Fix ④（`c5f5fd2` gate_value 本文 fallback を ---無し限定）。hook 直接発火 4 ケース＋fresh 変異 M1-M5＋1次/盲検2次 approve で裏取り。詳細は上記 SF-010 節。
