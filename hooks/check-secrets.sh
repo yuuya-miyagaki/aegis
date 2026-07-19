@@ -35,6 +35,13 @@ fi
 aegis_require_lib "${SCRIPT_DIR}/lib/extract-input.sh"
 aegis_require_lib "${SCRIPT_DIR}/lib/emit.sh"
 aegis_require_lib "${SCRIPT_DIR}/lib/secrets-patterns.sh"
+# iter75 SF-017: aegis_dequote_normalize（quote/backslash/${IFS} 畳み込み）を提供。
+# OPTIONAL（fail-open）: 正規化 re-check は defense-in-depth ASK 補強であり、生形の
+# deny は上流で確定済み。patterns.sh 欠落時はこの補強のみ無効化し、他の deny/allow
+# 判定は不変（require_lib=fail-closed にすると欠落 install が全 deny に退行するため不採）。
+if [ -r "${SCRIPT_DIR}/lib/patterns.sh" ]; then
+  set +e; source "${SCRIPT_DIR}/lib/patterns.sh" 2>/dev/null; set -e
+fi
 
 # Read stdin.
 INPUT=$(cat)
@@ -142,8 +149,12 @@ _aegis_git_dir_args() {
 # [A-Za-z] classes, so they match unchanged on lowercased text.
 CMD_LC=$(printf '%s' "$CMD" | tr '[:upper:]' '[:lower:]')
 
+# iter75 SF-017: staging 検出 regex を単一ソース化（raw deny と正規化 ask が同一検出器）。
+_STAGE_HIGHRISK_RE="git[[:space:]]+${GIT_PRE_OPTS}${GIT_STAGE_VERB}([[:space:]]+(--[A-Za-z][-A-Za-z0-9]*[[:space:]]+)*)?.*(${AEGIS_HIGH_RISK_RE})"
+_STAGE_ENV_RE="git[[:space:]]+${GIT_PRE_OPTS}${GIT_STAGE_VERB}([[:space:]]+(--[A-Za-z][-A-Za-z0-9]*[[:space:]]+)*)?.*\.env"
+
 # --- Check 0: Deny staging high-risk credential files (Form 1: command-text regex) ---
-if printf '%s' "$CMD_LC" | grep -qE "git[[:space:]]+${GIT_PRE_OPTS}${GIT_STAGE_VERB}([[:space:]]+(--[A-Za-z][-A-Za-z0-9]*[[:space:]]+)*)?.*(${AEGIS_HIGH_RISK_RE})" 2>/dev/null; then
+if printf '%s' "$CMD_LC" | grep -qE "$_STAGE_HIGHRISK_RE" 2>/dev/null; then
   emit_deny "[secrets] 高リスク認証ファイル (PEM鍵/SSH鍵/credentials.json/service-account.json 等) を git に追加しないでください。鍵が漏洩します。"
   exit 0
 fi
@@ -159,7 +170,7 @@ STRIPPED=$(printf '%s' "$CMD_LC" | sed -E "s/${SAFE_ENV_SUFFIXES}//g")
 
 # Direct .env staging across all variants. Case-insensitive: on case-insensitive
 # FS (macOS/Windows default) `git add .ENV` stages the real `.env` secret.
-if printf '%s' "$STRIPPED" | grep -qE "git[[:space:]]+${GIT_PRE_OPTS}${GIT_STAGE_VERB}([[:space:]]+(--[A-Za-z][-A-Za-z0-9]*[[:space:]]+)*)?.*\.env" 2>/dev/null; then
+if printf '%s' "$STRIPPED" | grep -qE "$_STAGE_ENV_RE" 2>/dev/null; then
   # iter56 ①付随: .env.test 等は safe-list に入れない設計判断（中身無検査で
   # 「テスト用だから安全」は成立しない）。回避策の案内のみ文言で行う。
   emit_deny "[secrets] .env ファイルを git に追加しないでください。認証情報がリポジトリに漏洩します。プレースホルダのみのテンプレートは .env.example / .env.template / .env.sample 名なら追加できます。"
@@ -326,6 +337,23 @@ if printf '%s' "$STRIPPED_WRITE" | grep -qE '>\s*\.env|>\s*\S+/\.env|cp\s+.*\.en
     emit_ask "[secrets] .gitignore が見つかりません。.env をリポジトリに含めないよう .gitignore を先に作成してください。"
     exit 0
   fi
+fi
+
+# iter75 SF-017: 生 CMD で全 deny を通過したとき、quote/backslash/${IFS} 難読化を
+# 正規化し、同じ staging 検出器（単一ソース）を再適用。難読化実在かつ一致 → ASK
+# （DENY でなく: command 位置非解釈ゆえ commit -m 内 .env 言及と区別不能・
+# _obfuscated_unlock_on_cp 一貫）。
+if command -v aegis_dequote_normalize >/dev/null 2>&1; then
+NORM=$(aegis_dequote_normalize "$CMD")
+if [ "$NORM" != "$CMD" ]; then
+  NORM_LC=$(printf '%s' "$NORM" | tr '[:upper:]' '[:lower:]')
+  NORM_STRIPPED=$(printf '%s' "$NORM_LC" | sed -E "s/${SAFE_ENV_SUFFIXES}//g")
+  if printf '%s' "$NORM_LC" | grep -qE "$_STAGE_HIGHRISK_RE" 2>/dev/null \
+     || printf '%s' "$NORM_STRIPPED" | grep -qE "$_STAGE_ENV_RE" 2>/dev/null; then
+    emit_ask "[secrets] 難読化された形（連結クォート/バックスラッシュ/\${IFS}）で認証ファイル (.env / 鍵 / credentials 等) を git に staging しようとしている可能性があります。意図を確認してください。生の形（例: git add .env）は拒否されます。"
+    exit 0
+  fi
+fi
 fi
 
 # No issue found — allow.
