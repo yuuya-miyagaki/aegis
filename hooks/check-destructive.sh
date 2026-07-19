@@ -139,6 +139,33 @@ if [ -z "$WARN" ]; then
   done
 fi
 
+# iter75 SF-017: 生 CMD で miss したとき、quote/backslash 難読化を正規化して再判定。
+# 正規化で command が変わった（難読化実在）かつ破壊パターンに一致 → ASK。
+# 安全形除外（build artifact）は再適用しない（難読化自体が確認対象）。
+if [ -z "$WARN" ]; then
+  NORM=$(aegis_dequote_normalize "$CMD")
+  if [ "$NORM" != "$CMD" ]; then
+    NORM_LOWER=$(printf '%s' "$NORM" | tr '[:upper:]' '[:lower:]')
+    if printf '%s' "$NORM" | grep -qE 'rm\s+(-[a-zA-Z]*[rR]|--recursive)' 2>/dev/null; then
+      WARN="難読化された破壊的コマンド（連結クォート/バックスラッシュ）の可能性: 再帰削除。意図を確認してください。"
+    fi
+    if [ -z "$WARN" ]; then
+      for i in "${!AEGIS_DESTRUCTIVE_LOWER_REGEX[@]}"; do
+        if printf '%s' "$NORM_LOWER" | grep -qE "${AEGIS_DESTRUCTIVE_LOWER_REGEX[$i]}" 2>/dev/null; then
+          WARN="難読化された破壊的コマンドの可能性: ${AEGIS_DESTRUCTIVE_LOWER_WARN[$i]}"; break
+        fi
+      done
+    fi
+    if [ -z "$WARN" ]; then
+      for i in "${!AEGIS_DESTRUCTIVE_CMD_REGEX[@]}"; do
+        if printf '%s' "$NORM" | grep -qE "${AEGIS_DESTRUCTIVE_CMD_REGEX[$i]}" 2>/dev/null; then
+          WARN="難読化された破壊的コマンドの可能性: ${AEGIS_DESTRUCTIVE_CMD_WARN[$i]}"; break
+        fi
+      done
+    fi
+  fi
+fi
+
 if [ -n "$WARN" ]; then
   emit_ask "[careful] $WARN"
 else
