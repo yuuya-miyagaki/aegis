@@ -437,6 +437,22 @@ SF-001 系の網羅的閉鎖（rounds 5-11）で**実用的なシェル難読化
 - **修正方針**: check-destructive/secrets と同一＝`INPUT=$(cat)`（もしくは CMD 抽出）直後に `export LC_ALL=C LC_CTYPE=C LANG=C`（抽出の python3 は PEP 540 で UTF-8 fidelity 維持）。併せて iter73 設計正本の「同型不成立」記述を訂正し、`tests/test_hook_locale_byte.py` に runtime-state の crash-regression pin を追加。effort S。
 - **状態**: **OPEN（未修正・iter76 P0 で消化予定）**。正本＝`docs/full-review-2026-07-19-dual-codex-fable.md` §4.3。
 
+### SF-019: check-destructive/secrets の brace/param-default/cmdsub トークン分割は文字列正規化で塞げない（残余・構造化 argv 待ち）
+
+- **発見**: iter75 / SF-017 修正（quote/BS/`${IFS}` 封鎖）の網羅性自己検証。2026-07-19。
+- **種別**: SF-017 と同クラス（静的 matcher がシェルのトークン化を再現しない）の**未畳み込み綴り**。iter75 は quote/BS/`${IFS}` を静的文字列畳み込みで閉じたが、brace 展開（`{r,x}m`/`r{,}m`）・param-default（`${x:-rm}`）・cmdsub（`$(...)`/backtick）は**文字列正規化では塞げず残存**。SF-001 系（control-plane）が resolver で brace/param を展開済みなのと非対称。
+- **重大度**: **Medium（残余・記録のみ）**。理由: (1) brace は実行時に重複トークンを生む綴りもあり（`r{,}m -rf` → `rm rm -rf`）到達は非自明。(2) cmdsub/param は SF-004 隣接＝**runtime 構築（静的解析の原理的限界・実証済み）**。(3) secret-staging の主要綴り（quote/BS/`${IFS}`）は iter75（SF-017）で閉鎖済み。
+- **再現（HEAD iter75 実装後・不変。grill_verify 確認）**:
+  ```
+  check-destructive  r{,}m -rf /tmp/x   -> {}  [ALLOW]   （brace で 'rm' に展開）
+  check-secrets      g{,}it add .env    -> {}  [ALLOW]   （brace で 'git add .env'）
+  同型  ${x:-rm} -rf /tmp/x  -> ALLOW（param-default）   $(printf rm) -rf  -> ALLOW（cmdsub）
+  pin   tests/test_moat_quote_split.py の test_residual_* 2 件が iter75 実装後も allow を固定
+  ```
+- **根本原因**: destructive/secrets の判定は「クォート除去＋隣接連結の静的畳み込み」までは SF-017 で実装したが、brace/param-default/cmdsub は**語の literal value がコマンド文字列に現れない**（実行時展開/構築）ため文字列正規化の射程外。cmdsub は実行しない限り出力（=破壊語/対象パス）を静的復元できない＝SF-003/SF-004 と同じ原理的限界。brace/param は静的展開可能だが、それには control-plane resolver 相当の展開器が要る。
+- **修正方針**: **ロードマップ iter77 の構造化 argv（実行イベント/argv 判定）で根治**——raw shell text ではなく実際に渡る argv を真実とすれば brace/param/cmdsub の展開結果を直接判定できる。または SF-001 の control-plane リゾルバ（brace/param 展開対応済み）を destructive/secrets へ移植（重い・共有トークナイザの複雑化＝North Star の作者保守可能性に非整合ぎみ）。系としては**「raw shell text を真実の代理にするな」**の一般化。
+- **状態**: **OPEN（accepted residual・iter77 系で根治予定）**。iter75 の残余 pin（`tests/test_moat_quote_split.py::test_residual_*` 2 件）が将来対応時に flip して revisit を強制する。cmdsub 部分は SF-004 と同じく敵対閉鎖は原理的に不可（脅威モデル外）。
+
 ## CLOSED
 
 - **SF-010**（Medium・iter65 review 検出→iter66 v1.26.1 で封鎖）: task_size empty-baseline raw-Edit × migration-grace の tamper 逃れ。Fix ①（`feff60c` migration-grace を真の旧フォーマット限定に絞り込み・task fields＋gate loop）＋(i)(ii) Fix ⑤（`6229fd5` python first-match/先勝ち）＋(iii) Fix ④（`c5f5fd2` gate_value 本文 fallback を ---無し限定）。hook 直接発火 4 ケース＋fresh 変異 M1-M5＋1次/盲検2次 approve で裏取り。詳細は上記 SF-010 節。
