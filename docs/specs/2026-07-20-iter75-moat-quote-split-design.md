@@ -80,3 +80,10 @@ INPUT(JSON) → extract_command → CMD
 
 ## 次のステップ
 plan（実装計画）→ grill-plan → implement（opus dispatch）→ grill-code → review+qa+security。
+
+## 実装済み（2026-07-20）
+
+- commit 範囲: 5398e72（Task1 RED 6件実証）→ 9ccf295（Task2 helper）→ 3171949（Task3 destructive）→ a763653（Task4 secrets）→ 60bd9cb（Task5 回帰 pin）。
+- `tests/test_moat_quote_split.py` 14/14 GREEN（バイパス 6・回帰 6・SF-019 残余 pin 2）。
+- 実装時逸脱（Task4・Stage1 レビューで accept）: check-secrets.sh は patterns.sh を未 source だったため source 追加。ただし fail-closed（aegis_require_lib）でなく optional source＋`command -v` ガード（欠落時は二次補強 ASK のみ無効化・一次 deny 不変）。根拠: 一次防御は secrets-patterns.sh（fail-closed）由来で不変・copy_hooks が hooks/lib/*.sh を glob 全配布ゆえ欠落 install は正常経路で到達不能・HOOK_LIB_DEPS 契約（patterns.sh を check-secrets の fail-close 対象に含めない）と整合。
+- SF-017 の quote/BS/${IFS} 綴りは封鎖。brace/param-default/cmdsub は SF-019 として残余起票（Task7）。
