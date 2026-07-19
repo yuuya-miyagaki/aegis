@@ -3,7 +3,7 @@ framework: aegis
 framework_version: "1.31.1"
 project_name: "Aegis"
 mode: Dev
-phase: plan
+phase: implement
 task_type: framework
 task_size: M
 task_size_rationale: "iter75（framework・P0＝SF-017 MOAT-BYPASS の修正＝check-destructive.sh/check-secrets.sh の生 regex 判定に SF-001 の shlex トークン化防御を一般化）。footprint: hooks/check-destructive.sh＋hooks/check-secrets.sh＋hooks/lib/patterns.sh（共有トークナイザ）＋tests＝M（2-5）。control-plane moat を触るため review+qa+security 必須・M のため deploy skip。正本＝docs/full-review-2026-07-19-dual-codex-fable.md §4.1／§5。size は brainstorm Step D で確定。"
@@ -13,7 +13,7 @@ last_updated: "2026-07-19T16:30:00Z"
 gate_approvals:
   client_ready_for_dev: n/a
   brainstorm: approved
-  plan: pending
+  plan: approved
   review: pending
   qa: pending
   security: pending
@@ -21,7 +21,7 @@ gate_approvals:
   dev_ready_for_client: pending
 current_refs:
   requirements: []
-  plan: null
+  plan: "docs/plans/2026-07-20-iter75-moat-quote-split-implementation-plan.md"
   spec: "docs/specs/2026-07-20-iter75-moat-quote-split-design.md"
   review: null
   qa: null
@@ -37,7 +37,7 @@ external_evidence:
     scope: "v0.13.0 計画 5 ラウンドレビュー"
     findings: "Round 1〜5 で計 25 件の指摘（hook 出力スキーマ陳腐化、TaskCreated/Completed 制御方式、Plan 条件付き許可、effort 配分、pre-compact.sh 同種破損、`if` 単一 rule 制約等）"
     resolution: "Rev.5 で全件反映、Phase 0a 即時実装着手 GO。hotfix/v0122-hook-schema ブランチで開始。"
-next_action: "**【iter75 plan 完了＋grill-plan 反映済／plan ゲート承認待ち→実装】** SF-017 MOAT-BYPASS 修正。brainstorm=approved。設計正本=docs/specs/2026-07-20-iter75-moat-quote-split-design.md（aegis_dequote_normalize＝クォート/BS/${IFS} 畳み込み・両フックが生形＋正規化形で判定・難読化のみ一致は ASK）。実装計画=docs/plans/2026-07-20-iter75-moat-quote-split-implementation-plan.md（Task1-7・TDD RED→GREEN・per-task commit）。**grill-plan 反映済**: 致命1（${IFS}/$IFS 未対応で git${IFS}add .env が残る→正規化に追加・実証）・致命2（secrets 正規化 grep の drift→_STAGE_*_RE 単一ソース化）・致命3（挿入位置の到達性実測）・SF-019 起票（brace/param/cmdsub 残余＝構造化 argv 待ち・Task7）。次=**plan ゲート承認（ユーザー）→ 実装は opus dispatch**（工程別モデル: session=fable/実装=opus）→ grill-code → review+qa+security。コンテキスト過多のため plan 地点で /clear→/recover 推奨。未 push（HEAD 更新・ユーザー判断）。"
+next_action: "**【iter75 implement 着手・plan approved】** SF-017 MOAT-BYPASS 修正。brainstorm=approved・plan=approved（ref=docs/plans/2026-07-20-iter75-moat-quote-split-implementation-plan.md・grill-plan 反映済）。実装は Task1→7 を TDD RED→GREEN・per-task commit で。**実装は opus dispatch**（工程別モデル: session=fable/実装=opus）。Task1=RED（r""m/rm${IFS}-rf/g""it a""dd .e""nv/git${IFS}add .env が現状 allow を 6 FAIL で実証）→Task2 helper（quote/BS/${IFS} 正規化）→Task3 destructive→Task4 secrets（staging 単一ソース化＋到達性実測）→Task5 回帰＋残余 pin→Task6 フル green→Task7 SF-019 起票。完了後 grill-code→review+qa+security（moat 変更ゆえ盲検2次必須）。設計=docs/specs/2026-07-20-iter75-moat-quote-split-design.md。未 push（HEAD 更新・ユーザー判断）。"
 blockers: []
 failure_tracking: null
 session_history:
