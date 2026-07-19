@@ -3,7 +3,7 @@ framework: aegis
 framework_version: "1.31.1"
 project_name: "Aegis"
 mode: Dev
-phase: brainstorm
+phase: plan
 task_type: framework
 task_size: M
 task_size_rationale: "iter75（framework・P0＝SF-017 MOAT-BYPASS の修正＝check-destructive.sh/check-secrets.sh の生 regex 判定に SF-001 の shlex トークン化防御を一般化）。footprint: hooks/check-destructive.sh＋hooks/check-secrets.sh＋hooks/lib/patterns.sh（共有トークナイザ）＋tests＝M（2-5）。control-plane moat を触るため review+qa+security 必須・M のため deploy skip。正本＝docs/full-review-2026-07-19-dual-codex-fable.md §4.1／§5。size は brainstorm Step D で確定。"
@@ -12,7 +12,7 @@ ui_surface: false
 last_updated: "2026-07-19T16:30:00Z"
 gate_approvals:
   client_ready_for_dev: n/a
-  brainstorm: pending
+  brainstorm: approved
   plan: pending
   review: pending
   qa: pending
@@ -22,7 +22,7 @@ gate_approvals:
 current_refs:
   requirements: []
   plan: null
-  spec: null
+  spec: "docs/specs/2026-07-20-iter75-moat-quote-split-design.md"
   review: null
   qa: null
   security: null
@@ -37,7 +37,7 @@ external_evidence:
     scope: "v0.13.0 計画 5 ラウンドレビュー"
     findings: "Round 1〜5 で計 25 件の指摘（hook 出力スキーマ陳腐化、TaskCreated/Completed 制御方式、Plan 条件付き許可、effort 配分、pre-compact.sh 同種破損、`if` 単一 rule 制約等）"
     resolution: "Rev.5 で全件反映、Phase 0a 即時実装着手 GO。hotfix/v0122-hook-schema ブランチで開始。"
-next_action: "**【iter75 立ち上げ／P0 MOAT-BYPASS 修正・brainstorm 未着手】** iter74 二重レビュー完遂・突合正本＝docs/full-review-2026-07-19-dual-codex-fable.md（§5 ロードマップ iter75-82）。iter75＝SF-017（Critical・secret DENY が `g\"\"it a\"\"dd .e\"\"nv` で ALLOW＝SF-001 の token 化防御が check-destructive/secrets に未伝播）を修正。方針＝SF-001 の shlex トークン化 primitive を両フックの語判定へ一般化（python 優先＋bash fail-closed・OBS-006 のクォート内メッセージ救済を壊さない・旧=赤/新=緑の回帰 pin）。次＝brainstorm（aegis-brainstorm→grill-plan）で修正設計を確定→plan→implement→review+qa+security。後続 P0: iter76（EVIDENCE-FORGE washed-green＋SF-018 LOCALE-1）／iter77（pytest execution attestation＝SF-014 恒久策）。未 push（HEAD=a51a3f9＝ユーザー判断）。"
+next_action: "**【iter75 plan 完了＋grill-plan 反映済／plan ゲート承認待ち→実装】** SF-017 MOAT-BYPASS 修正。brainstorm=approved。設計正本=docs/specs/2026-07-20-iter75-moat-quote-split-design.md（aegis_dequote_normalize＝クォート/BS/${IFS} 畳み込み・両フックが生形＋正規化形で判定・難読化のみ一致は ASK）。実装計画=docs/plans/2026-07-20-iter75-moat-quote-split-implementation-plan.md（Task1-7・TDD RED→GREEN・per-task commit）。**grill-plan 反映済**: 致命1（${IFS}/$IFS 未対応で git${IFS}add .env が残る→正規化に追加・実証）・致命2（secrets 正規化 grep の drift→_STAGE_*_RE 単一ソース化）・致命3（挿入位置の到達性実測）・SF-019 起票（brace/param/cmdsub 残余＝構造化 argv 待ち・Task7）。次=**plan ゲート承認（ユーザー）→ 実装は opus dispatch**（工程別モデル: session=fable/実装=opus）→ grill-code → review+qa+security。コンテキスト過多のため plan 地点で /clear→/recover 推奨。未 push（HEAD 更新・ユーザー判断）。"
 blockers: []
 failure_tracking: null
 session_history:
