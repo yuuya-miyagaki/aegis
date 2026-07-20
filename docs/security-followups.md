@@ -472,6 +472,21 @@ SF-001 系の網羅的閉鎖（rounds 5-11）で**実用的なシェル難読化
 - **関連実測（ANSI-C quoting は無害＝穴でない・記録のみ）**: 同グリルで `rm$'\t'-rf`・`git$'\t'add .env` を exploit 候補として疑ったが実測で反証。ANSI-C quoting `$'\t'` はタブを生成するが**それ自体がクォート**ゆえ単語分割を起こさない（実測: `set -- foo$'\t'bar` → argc=1・`foo<TAB>bar` が単一語。対照 `${IFS}` は argc=2）。よって `rm$'\t'-rf` は実行時に `rm<TAB>-rf` という非存在1語コマンド→`command not found`＝機能的に無害。現状 allow は正しく moat の穴ではない（SF-019 の残余にも含めない）。同カテゴリで unicode 全角 `ｒｍ`（`ｒｍ -rf`）も fix-forward の grill-plan で helper 非畳み込みを実測したが、bash で `ｒｍ` は別コードポイント＝非存在コマンド・case-insensitive FS でも `rm` に解決されず＝**SF-016（Unicode 空白）と同カテゴリの無害**（塞ぐ必要なし・pin 不要）。
 - **状態**: **OPEN（未修正・iter76 P0 候補で消化予定）**。iter54 が secrets case-fold を単独 iter で扱った前例に倣い、destructive case-fold も独立 iter・独立 TDD で対応（quote-split 修正への混載は review/qa/security の焦点を割るため不採）。
 
+### SF-021: `check-secrets.sh` の broad-stage 検出器が `git stage` エイリアスを見ておらず `git stage -A/.` が silent allow（**High・OPEN**・iter75 fix-forward grill-code 検出＝broad 検出器の動詞網羅穴）
+
+- **発見**: iter75 fix-forward grill-code（本セッション・fable・2026-07-20）。盲検2次 F1（broad-stage 難読化）の封鎖検証中に、broad-stage 検出器自体が `git add` のみで `git stage` を見ていない動詞網羅穴を隣接検出。
+- **種別**: broad-stage 検出器（`_STAGE_BROAD_RE`・`git...add...(-a|--all|.)`）の**動詞網羅漏れ**。`git stage` は `git add` の完全なエイリアス（git 公式・`-A`/`--all`/`.` を取る）だが、regex は `add` のみ。SF-017（quote-split クラス）とも SF-020（case-fold）とも別軸。
+- **重大度**: **High**。実 exploit 可能。生でも難読化でも `git stage -A`（実 .env 存在）→ 全ファイル broad staging で .env silent 漏洩。難読化以前に**生でも通る**（F1 の難読化とは別・より基本的）。
+- **再現（iter75 fix-forward 後・本セッション実走生出力）**:
+  ```
+  check-secrets  git stage -A        (実 .env) -> {}   [ALLOW]   （silent broad staging）
+  check-secrets  git${IFS}stage -A   (実 .env) -> {}   [ALLOW]
+  対照  check-secrets  git add -A     (実 .env) -> deny            （add は捕捉）
+  ```
+- **根本原因**: `check-secrets.sh` の `_STAGE_BROAD_RE`（および旧 inline regex）が `git[[:space:]]+...add[[:space:]]+...` で `add` 固定。加えてコメント `:181`「Only `add` (not stage / update-index) has the -A/--all/. broad-stage spellings」は**事実誤認**（`git stage` は add と同一の broad 綴りを持つ。`update-index` は別＝低レベルで挙動が異なるが `stage` は完全同義）。
+- **修正方針**: `_STAGE_BROAD_RE` の `add` を `(add|stage)` に拡張。二経路トリガ（raw=deny/norm=ask）は既存構造のまま流用（`git stage -A`→deny・`git${IFS}stage -A`→ask）。コメント :181 を訂正。回帰 pin: `git stage`（実 .env）→deny・`git stagearea`(誤マッチ回避)→allow。effort S。**iter76 で SF-020（raw 大文字）と併せて broad/destructive 網羅 iter として消化**（iter75 は review reject 分〔F1/F2/F3/F4〕でクローズ・焦点保全）。
+- **状態**: **OPEN（未修正・iter76 で SF-020 と併合消化予定）**。iter75 fix-forward の diff が導入した穴ではなく既存の動詞網羅漏れ（生 `git stage -A` も iter75 前から allow）。
+
 ## CLOSED
 
 - **SF-010**（Medium・iter65 review 検出→iter66 v1.26.1 で封鎖）: task_size empty-baseline raw-Edit × migration-grace の tamper 逃れ。Fix ①（`feff60c` migration-grace を真の旧フォーマット限定に絞り込み・task fields＋gate loop）＋(i)(ii) Fix ⑤（`6229fd5` python first-match/先勝ち）＋(iii) Fix ④（`c5f5fd2` gate_value 本文 fallback を ---無し限定）。hook 直接発火 4 ケース＋fresh 変異 M1-M5＋1次/盲検2次 approve で裏取り。詳細は上記 SF-010 節。
