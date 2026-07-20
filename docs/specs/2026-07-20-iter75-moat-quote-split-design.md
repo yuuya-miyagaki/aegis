@@ -87,3 +87,19 @@ plan（実装計画）→ grill-plan → implement（opus dispatch）→ grill-c
 - `tests/test_moat_quote_split.py` 14/14 GREEN（バイパス 6・回帰 6・SF-019 残余 pin 2）。
 - 実装時逸脱（Task4・Stage1 レビューで accept）: check-secrets.sh は patterns.sh を未 source だったため source 追加。ただし fail-closed（aegis_require_lib）でなく optional source＋`command -v` ガード（欠落時は二次補強 ASK のみ無効化・一次 deny 不変）。根拠: 一次防御は secrets-patterns.sh（fail-closed）由来で不変・copy_hooks が hooks/lib/*.sh を glob 全配布ゆえ欠落 install は正常経路で到達不能・HOOK_LIB_DEPS 契約（patterns.sh を check-secrets の fail-close 対象に含めない）と整合。
 - SF-017 の quote/BS/${IFS} 綴りは封鎖。brace/param-default/cmdsub は SF-019 として残余起票（Task7）。
+- grill-code 副産物: 大文字 case-fold 非対称を SF-020 起票（ffb1108・当初は raw/難読化ともに iter76 送り）。ANSI-C `$'\t'` は実測で無害（クォート内で非分割）と反証。
+
+## fix-forward（2026-07-20・review reject 対応）
+
+初回実装（5398e72..66c4d09）の review で **盲検2次(fable・独立)が2つの High バイパスを摘発**（1次 opus は見逃し＝乖離が実バグの在処）:
+- **F1**: broad-stage/commit 難読化（`git${IFS}add -A`→実 .env silent staging→`git${IFS}commit`→commit backstop 回避→漏洩チェーン完成）。正規化 re-check が明示ファイル名検出器のみで broad-stage(:196)/commit(:270) 検出器を NORM に再適用していなかった。
+- **F2**: backslash-newline 行継続（`git add \<NL>.env`→実行時 `git add .env`・helper が改行を残し grep 行分割で miss）。
+reviewer-testing が **F3**（難読化大文字 `R""M -RF` の destructive 素通り＝:149 が NORM でなく NORM_LOWER を使い忘れ）・**F4**（弱い pin＝メッセージ非検証）を検出。いずれも SF-017 が「封鎖」と宣言した quote/${IFS}/backslash クラス**内**の穴（SF-019/020 の deferred クラスではない）。ユーザー裁定＝**道1（iter75 で塞ぐ・網羅性徹底）**。
+
+- commit: `292f4a9`(FF1 RED 7件)→`23a8b61`(FF2 helper backslash-newline/残改行)→`b5e5390`(FF3 broad/commit スキャン再利用)→`5f03ac0`(FF4 難読化大文字 NORM_LOWER)→`0d3d95d`(FF5 pin 強化)。
+- **helper 拡張**: backslash-newline(行継続)除去＋残改行/タブ→空白（順序: BS-NL を裸 BS 除去より前・bash 3.2.57 実測）。
+- **broad-stage/commit**: FS/staged スキャンを `_aegis_broad_secret_kind`/`_aegis_staged_secret_kind` に関数抽出し NORM でも再利用（raw=deny/norm=ask）。**当初「難読化→ASK 一律(スキャン省略)」案は grill-plan で `git commit -m "quoted"` の誤検知爆発が判明し撤回**→スキャン再利用で誤検知なし。
+- **難読化大文字**: destructive 正規化経路 :149 を `NORM_LOWER` 化（`R""M -RF`→ask）。raw 大文字(`RM -rf`・NORM==CMD)は正規化経路外＝SF-020 に限定据置。
+- **封鎖範囲**: quote・backslash・backslash-newline・`${IFS}`/`$IFS`・broad-stage 難読化・commit 難読化・難読化大文字。`tests/test_moat_quote_split.py` **25/25 GREEN**（初回14＋ff 10＋pin 強化1）。
+- **封鎖実測（fix-forward 後）**: F1/F2/F3 難読化→ask・生 broad(`git add -A`,実 .env)→deny・`git commit -m ".."`(.env 非staged)→allow(誤検知なし)・raw `RM -rf`→allow(SF-020)。
+- 残余: SF-019（brace/param/cmdsub・構造化 argv 待ち）・SF-020（raw 大文字直打ちに限定）・unicode 全角/ANSI-C（SF-016 カテゴリ＝無害）。

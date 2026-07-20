@@ -3,13 +3,13 @@ framework: aegis
 framework_version: "1.31.1"
 project_name: "Aegis"
 mode: Dev
-phase: implement
+phase: review
 task_type: framework
 task_size: M
 task_size_rationale: "iter75（framework・P0＝SF-017 MOAT-BYPASS の修正＝check-destructive.sh/check-secrets.sh の生 regex 判定に SF-001 の shlex トークン化防御を一般化）。footprint: hooks/check-destructive.sh＋hooks/check-secrets.sh＋hooks/lib/patterns.sh（共有トークナイザ）＋tests＝M（2-5）。control-plane moat を触るため review+qa+security 必須・M のため deploy skip。正本＝docs/full-review-2026-07-19-dual-codex-fable.md §4.1／§5。size は brainstorm Step D で確定。"
 iteration: 75
 ui_surface: false
-last_updated: "2026-07-19T16:30:00Z"
+last_updated: "2026-07-20T12:00:00Z"
 gate_approvals:
   client_ready_for_dev: n/a
   brainstorm: approved
@@ -37,7 +37,7 @@ external_evidence:
     scope: "v0.13.0 計画 5 ラウンドレビュー"
     findings: "Round 1〜5 で計 25 件の指摘（hook 出力スキーマ陳腐化、TaskCreated/Completed 制御方式、Plan 条件付き許可、effort 配分、pre-compact.sh 同種破損、`if` 単一 rule 制約等）"
     resolution: "Rev.5 で全件反映、Phase 0a 即時実装着手 GO。hotfix/v0122-hook-schema ブランチで開始。"
-next_action: "**【iter75 implement 着手・plan approved】** SF-017 MOAT-BYPASS 修正。brainstorm=approved・plan=approved（ref=docs/plans/2026-07-20-iter75-moat-quote-split-implementation-plan.md・grill-plan 反映済）。実装は Task1→7 を TDD RED→GREEN・per-task commit で。**実装は opus dispatch**（工程別モデル: session=fable/実装=opus）。Task1=RED（r""m/rm${IFS}-rf/g""it a""dd .e""nv/git${IFS}add .env が現状 allow を 6 FAIL で実証）→Task2 helper（quote/BS/${IFS} 正規化）→Task3 destructive→Task4 secrets（staging 単一ソース化＋到達性実測）→Task5 回帰＋残余 pin→Task6 フル green→Task7 SF-019 起票。完了後 grill-code→review+qa+security（moat 変更ゆえ盲検2次必須）。設計=docs/specs/2026-07-20-iter75-moat-quote-split-design.md。未 push（HEAD 更新・ユーザー判断）。"
+next_action: "**【iter75 fix-forward 完了・review 再走待ち】** 初回実装(5398e72..66c4d09)の review で盲検2次(fable)が2 High バイパス摘発（F1 broad-stage/commit 難読化＝漏洩チェーン・F2 backslash-newline）＋reviewer-testing が F3(難読化大文字)/F4(弱い pin)。1次(opus)は F1/F2 見逃し＝乖離が実バグの在処。ユーザー裁定=道1(塞ぐ)。fix-forward 実装(opus dispatch)完了: FF1 RED(292f4a9)→FF2 helper backslash-newline(23a8b61)→FF3 broad/commit スキャン再利用(b5e5390)→FF4 難読化大文字 NORM_LOWER(5f03ac0)→FF5 pin 強化(0d3d95d)→FF6 docs。**grill-plan で ASK 一律の commit 誤検知を実装前に発見しスキャン再利用に改訂**。25/25 GREEN・封鎖実測済(F1/F2/F3 難読化→ask・生 broad→deny・commit -m 誤検知なし・raw 大文字 RM -rf→allow=SF-020 据置)。次＝grill-code(再)→**review 再走(1次+盲検2次・moat 変更ゆえ必須)**→qa→security→ship→docs。fix-forward plan=docs/plans/2026-07-20-iter75-moat-fix-forward-plan.md。未 push。"
 blockers: []
 failure_tracking: null
 session_history:
