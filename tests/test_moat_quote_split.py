@@ -14,6 +14,22 @@ def _run(hook, cmd):
         return "ask"
     return "other:" + out.strip()[:40]
 
+def _run_msg(hook, cmd):
+    """hook の JSON 出力から reason 文字列を返す（無ければ ''）。"""
+    p = subprocess.run(["bash", os.path.join(ROOT, "hooks", hook)],
+                       input=json.dumps({"tool_input": {"command": cmd}}).encode(),
+                       capture_output=True, cwd=ROOT)
+    out = p.stdout.decode("utf-8", "replace").strip()
+    if not out or out == "{}":
+        return ""
+    try:
+        obj = json.loads(out)
+    except Exception:
+        return out
+    # hookSpecificOutput.permissionDecisionReason を優先、なければ全体を文字列化
+    hso = obj.get("hookSpecificOutput", {})
+    return hso.get("permissionDecisionReason", "") or json.dumps(obj, ensure_ascii=False)
+
 def _run_in_repo(hook, cmd, files=None, staged=None):
     """一時 git repo で hook を実行。files={name:content} 作成、staged=[names] を git add 済みに。"""
     d = tempfile.mkdtemp()
@@ -69,7 +85,16 @@ def test_plain_git_add_env_still_denies():
 
 # --- 変数展開クォート（生で一致）は従来経路のまま（誤 ASK 二重化しない）---
 def test_rm_rf_quoted_var_asks_via_raw():
+    # 生経路一致（rm -rf が生で再帰削除 regex にマッチ）。正規化経路の
+    # 「難読化された」プレフィクスが付かないことで生経路を通ったことを pin。
+    # 評決 ask だけでは正規化経路へフォールスルーしても flip しない（mutant で実証）ため
+    # メッセージ本文でも生経路を検証する。
     assert _run("check-destructive.sh", 'rm -rf "$DIR"') == "ask"
+    assert "難読化された" not in _run_msg("check-destructive.sh", 'rm -rf "$DIR"')
+
+# --- 対照: 難読化形は「難読化された」プレフィクスを含む（pin を両側から締める）---
+def test_obfuscated_rm_has_obfuscation_prefix():
+    assert "難読化された" in _run_msg("check-destructive.sh", 'r""m -rf /tmp/x')
 
 # --- 安全形の難読化は allow（.env.example は除外維持）---
 def test_obfuscated_safe_env_allows():
