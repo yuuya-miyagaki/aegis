@@ -37,9 +37,12 @@ external_evidence:
     scope: "v0.13.0 計画 5 ラウンドレビュー"
     findings: "Round 1〜5 で計 25 件の指摘（hook 出力スキーマ陳腐化、TaskCreated/Completed 制御方式、Plan 条件付き許可、effort 配分、pre-compact.sh 同種破損、`if` 単一 rule 制約等）"
     resolution: "Rev.5 で全件反映、Phase 0a 即時実装着手 GO。hotfix/v0122-hook-schema ブランチで開始。"
-next_action: "**【iter75 fix-forward 完了・review 再走待ち】** 初回実装(5398e72..66c4d09)の review で盲検2次(fable)が2 High バイパス摘発（F1 broad-stage/commit 難読化＝漏洩チェーン・F2 backslash-newline）＋reviewer-testing が F3(難読化大文字)/F4(弱い pin)。1次(opus)は F1/F2 見逃し＝乖離が実バグの在処。ユーザー裁定=道1(塞ぐ)。fix-forward 実装(opus dispatch)完了: FF1 RED(292f4a9)→FF2 helper backslash-newline(23a8b61)→FF3 broad/commit スキャン再利用(b5e5390)→FF4 難読化大文字 NORM_LOWER(5f03ac0)→FF5 pin 強化(0d3d95d)→FF6 docs。**grill-plan で ASK 一律の commit 誤検知を実装前に発見しスキャン再利用に改訂**。25/25 GREEN・封鎖実測済(F1/F2/F3 難読化→ask・生 broad→deny・commit -m 誤検知なし・raw 大文字 RM -rf→allow=SF-020 据置)。次＝grill-code(再)→**review 再走(1次+盲検2次・moat 変更ゆえ必須)**→qa→security→ship→docs。fix-forward plan=docs/plans/2026-07-20-iter75-moat-fix-forward-plan.md。未 push。"
+next_action: "**【iter75 FF7 完了・review 再々走待ち】** review を2回 reject（盲検2次が段階摘発: 1回目 broad-stage/commit 難読化・backslash-newline→fix-forward〔FF1-6〕／2回目 難読化大文字が非rm の全19 CMD_REGEX〔chmod/find/dd/shred/mkfs/git 系〕で ASK 回避→FF7）。**1次 opus は2回とも盲点を見逃し＝独立盲検2次の価値**。FF7(9c3d7ea)で正規化経路の全 grep を grep -i（case-insensitive）on NORM 化しクラス全体封鎖（実測: NORM_LOWER では chmod -R の R リテラルが壊れ捕捉不可）。36/36 GREEN・回帰全 PASS。failure_tracking count=2（FF7 が通れば reset・通らねば 3-failure で second-opinion）。次＝**review 再々走(1次+盲検2次+testing)**→qa→security(盲検2次)→ship→docs。plan=docs/plans/2026-07-20-iter75-moat-fix-forward-plan.md。未 push。"
 blockers: []
-failure_tracking: null
+failure_tracking:
+  goal: "SF-017 moat 網羅封鎖（難読化クラス全体）"
+  count: 2
+  last_attempt: "2026-07-20 fix-forward review 再走 reject（盲検2次＋reviewer-testing FAIL: 難読化大文字が非rm の全19 AEGIS_DESTRUCTIVE_CMD_REGEX パターン〔chmod/find/dd/shred/mkfs/git branch -D/reset --hard/push -f 等〕で ASK 回避・check-destructive.sh:161 が NORM を fold せず照合）。FF7 で正規化経路の全 grep を grep -i（case-insensitive）on NORM 化しクラス全体封鎖予定（実測: NORM_LOWER では chmod の -R リテラルが壊れ捕捉不可）。FF7 が通れば reset・通らねば 3-failure で second-opinion。"
 session_history:
   - date: "2026-07-19"
     mode: Dev

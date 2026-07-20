@@ -96,10 +96,10 @@ plan（実装計画）→ grill-plan → implement（opus dispatch）→ grill-c
 - **F2**: backslash-newline 行継続（`git add \<NL>.env`→実行時 `git add .env`・helper が改行を残し grep 行分割で miss）。
 reviewer-testing が **F3**（難読化大文字 `R""M -RF` の destructive 素通り＝:149 が NORM でなく NORM_LOWER を使い忘れ）・**F4**（弱い pin＝メッセージ非検証）を検出。いずれも SF-017 が「封鎖」と宣言した quote/${IFS}/backslash クラス**内**の穴（SF-019/020 の deferred クラスではない）。ユーザー裁定＝**道1（iter75 で塞ぐ・網羅性徹底）**。
 
-- commit: `292f4a9`(FF1 RED 7件)→`23a8b61`(FF2 helper backslash-newline/残改行)→`b5e5390`(FF3 broad/commit スキャン再利用)→`5f03ac0`(FF4 難読化大文字 NORM_LOWER)→`0d3d95d`(FF5 pin 強化)。
+- commit: `292f4a9`(FF1 RED 7件)→`23a8b61`(FF2 helper backslash-newline/残改行)→`b5e5390`(FF3 broad/commit スキャン再利用)→`5f03ac0`(FF4 難読化大文字 rm)→`0d3d95d`(FF5 pin 強化)→`9c3d7ea`(FF7 難読化大文字クラス全体を grep -i 化)。**review 再走で盲検2次＋reviewer-testing が FF4 の残穴〔非rm 全 CMD_REGEX が NORM fold 漏れ〕を摘発→FF7 で根本封鎖**。
 - **helper 拡張**: backslash-newline(行継続)除去＋残改行/タブ→空白（順序: BS-NL を裸 BS 除去より前・bash 3.2.57 実測）。
 - **broad-stage/commit**: FS/staged スキャンを `_aegis_broad_secret_kind`/`_aegis_staged_secret_kind` に関数抽出し NORM でも再利用（raw=deny/norm=ask）。**当初「難読化→ASK 一律(スキャン省略)」案は grill-plan で `git commit -m "quoted"` の誤検知爆発が判明し撤回**→スキャン再利用で誤検知なし。
-- **難読化大文字**: destructive 正規化経路 :149 を `NORM_LOWER` 化（`R""M -RF`→ask）。raw 大文字(`RM -rf`・NORM==CMD)は正規化経路外＝SF-020 に限定据置。
-- **封鎖範囲**: quote・backslash・backslash-newline・`${IFS}`/`$IFS`・broad-stage 難読化・commit 難読化・難読化大文字。`tests/test_moat_quote_split.py` **25/25 GREEN**（初回14＋ff 10＋pin 強化1）。
+- **難読化大文字**: destructive 正規化経路の**全 grep を `grep -i`（case-insensitive）on NORM 化**（FF4 で rm/LOWER、FF7 で CMD_REGEX 全19パターン＝chmod/find/dd/shred/mkfs/git 系）。`NORM_LOWER` 案は `chmod -R` の `R` リテラルが小文字化で壊れ捕捉不可のため不採（実測）。raw 大文字(`RM -rf`・NORM==CMD)は正規化経路外＝SF-020 に限定据置。
+- **封鎖範囲**: quote・backslash・backslash-newline・`${IFS}`/`$IFS`・broad-stage 難読化・commit 難読化・難読化大文字クラス全体（rm/chmod/find/dd/shred/mkfs/git 系）。`tests/test_moat_quote_split.py` **36/36 GREEN**（初回14＋ff 10＋pin 強化1＋FF7 非rm 大文字10＋midword 1）。
 - **封鎖実測（fix-forward 後）**: F1/F2/F3 難読化→ask・生 broad(`git add -A`,実 .env)→deny・`git commit -m ".."`(.env 非staged)→allow(誤検知なし)・raw `RM -rf`→allow(SF-020)。
 - 残余: SF-019（brace/param/cmdsub・構造化 argv 待ち）・SF-020（raw 大文字直打ちに限定）・unicode 全角/ANSI-C（SF-016 カテゴリ＝無害）。
