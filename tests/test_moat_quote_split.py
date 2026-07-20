@@ -172,6 +172,15 @@ def test_ff_uppercase_ifs_split_asks():
     'G""IT BRANCH -D foo',
     'GIT${IFS}RESET --HARD',
     'GIT${IFS}PUSH origin main --FORCE',
+    # FF8（review-testing F1 補強）: CMD_REGEX の残りカテゴリも大文字難読化で pin。
+    # 実装は grep -i ループで配列全体に効く（共通コードパス）ため即 GREEN の回帰 pin。
+    'GIT${IFS}FILTER-BRANCH --all',
+    'G""IT UPDATE-REF -D refs/heads/x',
+    'GIT${IFS}REFLOG EXPIRE --EXPIRE=NOW --ALL',
+    'G""IT STASH DROP',
+    'GIT${IFS}CLEAN -FD',
+    'NPX${IFS}RIMRAF /tmp/x',
+    'echo x >${IFS}/ETC/passwd',
 ])
 def test_ff_uppercase_nonrm_destructive_asks(cmd):
     assert _run("check-destructive.sh", cmd) == "ask"
