@@ -146,7 +146,7 @@ if [ -z "$WARN" ]; then
   NORM=$(aegis_dequote_normalize "$CMD")
   if [ "$NORM" != "$CMD" ]; then
     NORM_LOWER=$(printf '%s' "$NORM" | tr '[:upper:]' '[:lower:]')
-    if printf '%s' "$NORM" | grep -qE 'rm\s+(-[a-zA-Z]*[rR]|--recursive)' 2>/dev/null; then
+    if printf '%s' "$NORM_LOWER" | grep -qE 'rm\s+(-[a-zA-Z]*[rR]|--recursive)' 2>/dev/null; then
       WARN="難読化された破壊的コマンド（連結クォート/バックスラッシュ）の可能性: 再帰削除。意図を確認してください。"
     fi
     if [ -z "$WARN" ]; then
