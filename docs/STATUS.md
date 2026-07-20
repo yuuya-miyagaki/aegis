@@ -9,7 +9,7 @@ task_size: M
 task_size_rationale: "iter75（framework・P0＝SF-017 MOAT-BYPASS の修正＝check-destructive.sh/check-secrets.sh の生 regex 判定に SF-001 の shlex トークン化防御を一般化）。footprint: hooks/check-destructive.sh＋hooks/check-secrets.sh＋hooks/lib/patterns.sh（共有トークナイザ）＋tests＝M（2-5）。control-plane moat を触るため review+qa+security 必須・M のため deploy skip。正本＝docs/full-review-2026-07-19-dual-codex-fable.md §4.1／§5。size は brainstorm Step D で確定。"
 iteration: 75
 ui_surface: false
-last_updated: "2026-07-21T02:00:00Z"
+last_updated: "2026-07-21T04:00:00Z"
 gate_approvals:
   client_ready_for_dev: n/a
   brainstorm: approved
@@ -37,9 +37,14 @@ external_evidence:
     scope: "v0.13.0 計画 5 ラウンドレビュー"
     findings: "Round 1〜5 で計 25 件の指摘（hook 出力スキーマ陳腐化、TaskCreated/Completed 制御方式、Plan 条件付き許可、effort 配分、pre-compact.sh 同種破損、`if` 単一 rule 制約等）"
     resolution: "Rev.5 で全件反映、Phase 0a 即時実装着手 GO。hotfix/v0122-hook-schema ブランチで開始。"
-next_action: "**【iter75 review+qa approved・security 着手】** review approved（ref=iter75-review.md・🟢 3体 approve/PASS）・qa approved（ref=iter75-qa.md・🟢 対照表8/8・drill skip+代替実証・フル 1341 passed）。2回 reject→FF1-8 で全穴封鎖（quote/BS/backslash-newline/${IFS}/broad-stage/commit/難読化大文字クラス全体）。**次＝security フェーズ**（moat 変更ゆえ 1次 opus＋盲検2次 fable 独立必須・OWASP/exploit/secrets 露出/fail-open）→deploy(M skip=n/a)→ship→docs。残余 SF-019/020/021 は iter76+（SF-020 は破壊ガードが raw 大文字で無反応＝P0 推奨）。実装 commit 5398e72..402fdd9・未 push。"
-blockers: []
-failure_tracking: null
+next_action: "**【iter75 security reject・3-failure 到達・ユーザー方針待ち】** security 1次(opus)=approve_with_notes／盲検2次(fable)=**reject**。両者が iter75 の「${IFS} クラス封鎖」オーバークレームを別綴りで摘発: SEC-1(High・盲検2次)=IFS param-expansion `${IFS:0:1}` family→silent secret commit chain・Finding 1(Medium・1次)=SAFE_TARGETS early-exit が `rm -rf${IFS}/x` を swallow→silent 再帰削除。SF-017 封鎖 goal への reject が review×2+security×1=**3回目**＝3-failure ルール発動。docs/second-opinion.md に3選択肢を整理（道A FF9 で IFS family＋SAFE_TARGETS 根本封鎖=推奨／道B 構造化 argv iter77 前倒し／道C 主張縮小して残余 SF 化・iter75 クローズ）。**deploy blocker なし**（Bash=threshold-raising 層）。review+qa は approved 済み・実装 96b6da8 は push 済み。ユーザー方針決定後に着手。"
+blockers:
+  - "SEC-1（High・security 盲検2次）: IFS param-expansion family（${IFS:0:1}/${IFS: -1}/${IFS/x/y}/${IFS#}）が未畳み込み→git${IFS:0:1}add .env＋commit で silent secret commit chain 再開（runtime 実証）。patterns.sh:335-336。安価に塞げる（原理的限界でない）。"
+  - "Finding 1（Medium・security 1次・pre-existing）: SAFE_TARGETS early-exit（check-destructive.sh:84-109）が rm -rf${IFS}/x を NORM 再判定（:145）前に swallow→silent 再帰削除（runtime victim 実削除）。iter75 の regression でなく既存穴だが ${IFS} 封鎖宣言クラス内・未記録。"
+failure_tracking:
+  goal: "SF-017 moat 網羅封鎖（難読化クラス全体）"
+  count: 3
+  last_attempt: "2026-07-21 security reject（盲検2次 SEC-1 High: IFS param-expansion ${IFS:0:1} family→silent secret commit chain／1次 Finding 1 Medium: SAFE_TARGETS early-exit が rm -rf${IFS}/x を swallow）。3-failure 到達＝docs/second-opinion.md 作成・ユーザー方針相談（道A FF9 で IFS family＋SAFE_TARGETS 根本封鎖=推奨／道B 構造化 argv iter77 前倒し／道C 主張縮小して残余 SF 化・iter75 クローズ）。"
 session_history:
   - date: "2026-07-19"
     mode: Dev
