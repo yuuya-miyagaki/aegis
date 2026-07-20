@@ -149,9 +149,118 @@ _aegis_git_dir_args() {
 # [A-Za-z] classes, so they match unchanged on lowercased text.
 CMD_LC=$(printf '%s' "$CMD" | tr '[:upper:]' '[:lower:]')
 
+# iter75-ff (SF-017 F1): NORM / NORM_LC を前倒し計算（broad-stage :196 / commit :270
+# の二経路トリガで使うため、それらより前で用意する）。aegis_dequote_normalize
+# （quote/backslash/${IFS} 畳み込み）は OPTIONAL（patterns.sh 欠落時は未定義）ので
+# ガードし、欠落時は NORM="" として NORM 経路を無効化（生の deny/allow は不変）。
+# 末尾の明示 .env 正規化 re-check（:346-）は依然この NORM を使う。
+NORM=""; NORM_LC=""
+if command -v aegis_dequote_normalize >/dev/null 2>&1; then
+  NORM=$(aegis_dequote_normalize "$CMD")
+  NORM_LC=$(printf '%s' "$NORM" | tr '[:upper:]' '[:lower:]')
+fi
+
 # iter75 SF-017: staging 検出 regex を単一ソース化（raw deny と正規化 ask が同一検出器）。
 _STAGE_HIGHRISK_RE="git[[:space:]]+${GIT_PRE_OPTS}${GIT_STAGE_VERB}([[:space:]]+(--[A-Za-z][-A-Za-z0-9]*[[:space:]]+)*)?.*(${AEGIS_HIGH_RISK_RE})"
 _STAGE_ENV_RE="git[[:space:]]+${GIT_PRE_OPTS}${GIT_STAGE_VERB}([[:space:]]+(--[A-Za-z][-A-Za-z0-9]*[[:space:]]+)*)?.*\.env"
+# iter75-ff (SF-017 F1): broad-stage / commit のトリガも単一ソース化。生 CMD の
+# deny 経路と正規化 NORM の ask 経路が同一トリガを共有する（NORM でも broad/commit
+# を再検出して難読化バイパスを塞ぐ・盲検2次 F1）。
+_STAGE_BROAD_RE="git[[:space:]]+${GIT_PRE_OPTS}add[[:space:]]+(-a|--all|\.\.?/?($|[^[:alnum:]._/-])|\.[^[:space:]]*[*?[])"
+_STAGE_COMMIT_RE="git[[:space:]]+${GIT_PRE_OPTS}commit"
+
+# iter75-ff (SF-017 F1): broad-stage スキャンを関数抽出（挙動保存リファクタ）。
+# repo に高リスク cred / secret .env が存在するかを走査し、検出種別を stdout に返す:
+#   highrisk … 高リスク cred（PEM/SSH/credentials/service-account）検出
+#   env      … secret .env 検出（safe variant 除外後）
+#   （空）    … いずれも無し
+# highrisk を env より優先（従来の raw 経路が high-risk を先に deny していた順序を保存）。
+# ROOT 計算・find・safe-variant 除外の既存ロジックを完全保存。
+_aegis_broad_secret_kind() {
+  local ROOT; ROOT=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
+
+  # v0.13.0 Phase 0b NO-GO fix: broad staging must also catch high-risk credentials
+  # (these have no "safe variant", so any presence in the repo is risky).
+  # Form 3 (find -name globs) + Form 2 (basename case glob): broad capture by
+  # find, then tight match by case.
+  # C-1 (iter54): -iname (was -name) — a KEY.PEM / ID_RSA in the repo is a real
+  # credential file on ANY filesystem; the over-fetch step folds case.
+  local FIND_ARGS=()
+  local _name
+  for _name in "${AEGIS_HIGH_RISK_FIND_NAMES[@]}"; do
+    FIND_ARGS+=( -iname "$_name" -o )
+  done
+  # Trim the trailing -o.
+  unset 'FIND_ARGS[${#FIND_ARGS[@]}-1]'
+
+  local HAS_HIGH_RISK=false f BN _glob
+  while IFS= read -r f; do
+    # C-1: fold the basename before the tight gate — the form-2 globs are
+    # lowercase and [[ == ]] is case-sensitive.
+    BN=$(basename "$f" | tr '[:upper:]' '[:lower:]')
+    # Iterate AEGIS_HIGH_RISK_CASE_GLOB_ARR — `case "$x" in $JOINED)` does NOT
+    # honor `|` as alternation after variable expansion (the whole expanded
+    # string becomes ONE pattern). Per-entry [[ == glob ]] preserves the
+    # narrow-match intent of the original literal case stanza.
+    for _glob in "${AEGIS_HIGH_RISK_CASE_GLOB_ARR[@]}"; do
+      # shellcheck disable=SC2053
+      # Intentional unquoted RHS — _glob is a glob pattern.
+      if [[ $BN == $_glob ]]; then
+        HAS_HIGH_RISK=true; break 2
+      fi
+    done
+  done < <(find "$ROOT" \
+    \( "${FIND_ARGS[@]}" \) \
+    -not -path '*/node_modules/*' \
+    -not -path '*/.git/*' \
+    -not -path '*/vendor/*' \
+    -not -path '*/.venv/*' \
+    2>/dev/null || true)
+  if [ "$HAS_HIGH_RISK" = true ]; then
+    printf 'highrisk\n'
+    return
+  fi
+
+  # Check if actual secret .env files exist anywhere in the repo (excluding safe variants).
+  # Recursive search handles monorepo layouts (e.g., services/api/.env).
+  local HAS_SECRET_ENV=false
+  while IFS= read -r f; do
+    # C-1: -iname over-fetches case variants; the folded basename keeps the
+    # safe-variant exemption symmetric (.ENV.EXAMPLE is exempt like .env.example).
+    case "$(basename "$f" | tr '[:upper:]' '[:lower:]')" in
+      .env.example|.env.template|.env.sample) ;;
+      *) HAS_SECRET_ENV=true; break ;;
+    esac
+  done < <(find "$ROOT" -iname '.env*' \
+    -not -path '*/node_modules/*' \
+    -not -path '*/.git/*' \
+    -not -path '*/vendor/*' \
+    -not -path '*/.venv/*' \
+    2>/dev/null || true)
+  if [ "$HAS_SECRET_ENV" = true ]; then
+    printf 'env\n'
+    return
+  fi
+}
+
+# iter75-ff (SF-017 F1): commit-time staged-diff スキャンを関数抽出（挙動保存）。
+# 引数: GIT_DIR_ARGS 相当（-C/--git-dir 解決済みの git オプション列）。
+# highrisk / env / （空）を stdout に返す。既存 raw 経路と同じ順序・除外規則。
+_aegis_staged_secret_kind() {
+  # v0.13.0 Phase 0b NO-GO fix: high-risk credential files in staged diff (Form 4).
+  # C-1 (iter54): staged names are folded (tr) before matching, so KEY.PEM is
+  # caught; the .env safe-variant -v exclusion runs on the SAME folded stream
+  # (symmetric — a staged .ENV.EXAMPLE stays allowed).
+  if git ${@+"$@"} diff --cached --name-only 2>/dev/null | tr '[:upper:]' '[:lower:]' | grep -E "${AEGIS_HIGH_RISK_STAGED_RE}" | grep -q . 2>/dev/null; then
+    printf 'highrisk\n'
+    return
+  fi
+  # Check if any secret .env file is in the staging area (exclude safe variants)
+  if git ${@+"$@"} diff --cached --name-only 2>/dev/null | tr '[:upper:]' '[:lower:]' | grep -E '\.env' | grep -vE "${SAFE_ENV_SUFFIXES}$" | grep -q . 2>/dev/null; then
+    printf 'env\n'
+    return
+  fi
+}
 
 # --- Check 0: Deny staging high-risk credential files (Form 1: command-text regex) ---
 if printf '%s' "$CMD_LC" | grep -qE "$_STAGE_HIGHRISK_RE" 2>/dev/null; then
@@ -193,68 +302,27 @@ fi
 # a non-leading-dot glob like `foo.txt*` stays allowed.
 # Known residual: dot-files whose 2nd char is outside [[:alnum:]._/-] (e.g.
 # `.~x`, `.@foo`) still read as broad => deny. Deny-side = safe; use `--`.
-if printf '%s' "$CMD_LC" | grep -qE "git[[:space:]]+${GIT_PRE_OPTS}add[[:space:]]+(-a|--all|\.\.?/?($|[^[:alnum:]._/-])|\.[^[:space:]]*[*?[])" 2>/dev/null; then
-  ROOT=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
-
-  # v0.13.0 Phase 0b NO-GO fix: broad staging must also catch high-risk credentials
-  # (these have no "safe variant", so any presence in the repo is risky).
-  # Form 3 (find -name globs) + Form 2 (basename case glob): broad capture by
-  # find, then tight match by case.
-  # C-1 (iter54): -iname (was -name) — a KEY.PEM / ID_RSA in the repo is a real
-  # credential file on ANY filesystem; the over-fetch step folds case.
-  FIND_ARGS=()
-  for _name in "${AEGIS_HIGH_RISK_FIND_NAMES[@]}"; do
-    FIND_ARGS+=( -iname "$_name" -o )
-  done
-  # Trim the trailing -o.
-  unset 'FIND_ARGS[${#FIND_ARGS[@]}-1]'
-
-  HAS_HIGH_RISK=false
-  while IFS= read -r f; do
-    # C-1: fold the basename before the tight gate — the form-2 globs are
-    # lowercase and [[ == ]] is case-sensitive.
-    BN=$(basename "$f" | tr '[:upper:]' '[:lower:]')
-    # Iterate AEGIS_HIGH_RISK_CASE_GLOB_ARR — `case "$x" in $JOINED)` does NOT
-    # honor `|` as alternation after variable expansion (the whole expanded
-    # string becomes ONE pattern). Per-entry [[ == glob ]] preserves the
-    # narrow-match intent of the original literal case stanza.
-    for _glob in "${AEGIS_HIGH_RISK_CASE_GLOB_ARR[@]}"; do
-      # shellcheck disable=SC2053
-      # Intentional unquoted RHS — _glob is a glob pattern.
-      if [[ $BN == $_glob ]]; then
-        HAS_HIGH_RISK=true; break 2
+# iter75-ff (SF-017 F1): 二経路トリガ。BROAD_RAW=生 CMD_LC が broad regex に一致
+# （従来 deny・不変）。BROAD_NORM=難読化を畳んだ NORM_LC のみが一致（NORM!=CMD の
+# とき）。どちらでもスキャン（_aegis_broad_secret_kind）し、種別が非空なら:
+# RAW→emit_deny（従来メッセージ・種別で出し分け）／NORM のみ→emit_ask（難読化文言）。
+BROAD_RAW=false; BROAD_NORM=false
+printf '%s' "$CMD_LC" | grep -qE "$_STAGE_BROAD_RE" 2>/dev/null && BROAD_RAW=true
+if [ "$BROAD_RAW" != true ] && [ -n "$NORM" ] && [ "$NORM" != "$CMD" ]; then
+  printf '%s' "$NORM_LC" | grep -qE "$_STAGE_BROAD_RE" 2>/dev/null && BROAD_NORM=true
+fi
+if [ "$BROAD_RAW" = true ] || [ "$BROAD_NORM" = true ]; then
+  BROAD_KIND=$(_aegis_broad_secret_kind)
+  if [ -n "$BROAD_KIND" ]; then
+    if [ "$BROAD_RAW" = true ]; then
+      if [ "$BROAD_KIND" = highrisk ]; then
+        emit_deny "[secrets] git add -A / git add . は repository 内の高リスク認証ファイル (PEM鍵/SSH鍵/credentials.json/service-account.json) を含む可能性があります。個別のファイル名を指定し、高リスクファイルは事前に削除/移動してください。"
+      else
+        emit_deny "[secrets] git add -A / git add . は .env を含む可能性があります。個別のファイル名を指定して git add してください。"
       fi
-    done
-  done < <(find "$ROOT" \
-    \( "${FIND_ARGS[@]}" \) \
-    -not -path '*/node_modules/*' \
-    -not -path '*/.git/*' \
-    -not -path '*/vendor/*' \
-    -not -path '*/.venv/*' \
-    2>/dev/null || true)
-  if [ "$HAS_HIGH_RISK" = true ]; then
-    emit_deny "[secrets] git add -A / git add . は repository 内の高リスク認証ファイル (PEM鍵/SSH鍵/credentials.json/service-account.json) を含む可能性があります。個別のファイル名を指定し、高リスクファイルは事前に削除/移動してください。"
-    exit 0
-  fi
-
-  # Check if actual secret .env files exist anywhere in the repo (excluding safe variants).
-  # Recursive search handles monorepo layouts (e.g., services/api/.env).
-  HAS_SECRET_ENV=false
-  while IFS= read -r f; do
-    # C-1: -iname over-fetches case variants; the folded basename keeps the
-    # safe-variant exemption symmetric (.ENV.EXAMPLE is exempt like .env.example).
-    case "$(basename "$f" | tr '[:upper:]' '[:lower:]')" in
-      .env.example|.env.template|.env.sample) ;;
-      *) HAS_SECRET_ENV=true; break ;;
-    esac
-  done < <(find "$ROOT" -iname '.env*' \
-    -not -path '*/node_modules/*' \
-    -not -path '*/.git/*' \
-    -not -path '*/vendor/*' \
-    -not -path '*/.venv/*' \
-    2>/dev/null || true)
-  if [ "$HAS_SECRET_ENV" = true ]; then
-    emit_deny "[secrets] git add -A / git add . は .env を含む可能性があります。個別のファイル名を指定して git add してください。"
+    else
+      emit_ask "[secrets] 難読化された形（連結クォート/バックスラッシュ/\${IFS}）で repository 内の .env / 認証ファイルを broad staging（git add -A / git add .）しようとしている可能性があります。意図を確認してください。生の形（例: git add -A）は拒否されます。"
+    fi
     exit 0
   fi
 fi
@@ -267,22 +335,33 @@ fi
 # C-1 (iter54): the TRIGGER matches on CMD_LC (a `GIT COMMIT` resolves to
 # /bin/git via the FS on a case-insensitive system); the -C/--git-dir path
 # EXTRACTION below stays on the raw $CMD — folding it would corrupt the path.
-if printf '%s' "$CMD_LC" | grep -qE "git[[:space:]]+${GIT_PRE_OPTS}commit" 2>/dev/null; then
+# iter75-ff (SF-017 F1): commit も二経路トリガ。COMMIT_RAW=生 CMD_LC が commit regex に
+# 一致（従来 deny・不変）。COMMIT_NORM=NORM_LC のみ一致（難読化 `git${IFS}commit` 等）。
+# staged-diff スキャン（_aegis_staged_secret_kind）で .env/高リスクが staged なら:
+# RAW→emit_deny（従来メッセージ・種別で出し分け）／NORM のみ→emit_ask（難読化文言）。
+COMMIT_RAW=false; COMMIT_NORM=false
+printf '%s' "$CMD_LC" | grep -qE "$_STAGE_COMMIT_RE" 2>/dev/null && COMMIT_RAW=true
+if [ "$COMMIT_RAW" != true ] && [ -n "$NORM" ] && [ "$NORM" != "$CMD" ]; then
+  printf '%s' "$NORM_LC" | grep -qE "$_STAGE_COMMIT_RE" 2>/dev/null && COMMIT_NORM=true
+fi
+if [ "$COMMIT_RAW" = true ] || [ "$COMMIT_NORM" = true ]; then
   # G2: resolve -C/--git-dir so the staged-diff scan targets the right repo.
   # Empty when absent → git runs in the hook CWD (current behavior, no regression).
+  # 難読化 NORM-only 経路も生 $CMD から解決（obfuscated commit は通常 -C を持たず、
+  # 持てば raw regex 側で既に一致するため CMD 基準で不変）。
   GIT_DIR_ARGS=()
   while IFS= read -r _a; do [ -n "$_a" ] && GIT_DIR_ARGS+=("$_a"); done < <(_aegis_git_dir_args "$CMD")
-  # v0.13.0 Phase 0b NO-GO fix: high-risk credential files in staged diff (Form 4).
-  # C-1 (iter54): staged names are folded (tr) before matching, so KEY.PEM is
-  # caught; the .env safe-variant -v exclusion runs on the SAME folded stream
-  # (symmetric — a staged .ENV.EXAMPLE stays allowed).
-  if git ${GIT_DIR_ARGS[@]+"${GIT_DIR_ARGS[@]}"} diff --cached --name-only 2>/dev/null | tr '[:upper:]' '[:lower:]' | grep -E "${AEGIS_HIGH_RISK_STAGED_RE}" | grep -q . 2>/dev/null; then
-    emit_deny "[secrets] 高リスク認証ファイル (PEM鍵/SSH鍵/credentials.json/service-account.json) がステージングされています。git reset HEAD でファイル名を指定して除外してからコミットしてください。"
-    exit 0
-  fi
-  # Check if any secret .env file is in the staging area (exclude safe variants)
-  if git ${GIT_DIR_ARGS[@]+"${GIT_DIR_ARGS[@]}"} diff --cached --name-only 2>/dev/null | tr '[:upper:]' '[:lower:]' | grep -E '\.env' | grep -vE "${SAFE_ENV_SUFFIXES}$" | grep -q . 2>/dev/null; then
-    emit_deny "[secrets] .env ファイルがステージングされています。git reset HEAD .env で除外してからコミットしてください。"
+  COMMIT_KIND=$(_aegis_staged_secret_kind ${GIT_DIR_ARGS[@]+"${GIT_DIR_ARGS[@]}"})
+  if [ -n "$COMMIT_KIND" ]; then
+    if [ "$COMMIT_RAW" = true ]; then
+      if [ "$COMMIT_KIND" = highrisk ]; then
+        emit_deny "[secrets] 高リスク認証ファイル (PEM鍵/SSH鍵/credentials.json/service-account.json) がステージングされています。git reset HEAD でファイル名を指定して除外してからコミットしてください。"
+      else
+        emit_deny "[secrets] .env ファイルがステージングされています。git reset HEAD .env で除外してからコミットしてください。"
+      fi
+    else
+      emit_ask "[secrets] 難読化された形（連結クォート/バックスラッシュ/\${IFS}）で .env / 認証ファイルが staged のまま commit しようとしている可能性があります。意図を確認してください。生の形（例: git commit）は拒否されます。"
+    fi
     exit 0
   fi
 fi
@@ -342,18 +421,15 @@ fi
 # iter75 SF-017: 生 CMD で全 deny を通過したとき、quote/backslash/${IFS} 難読化を
 # 正規化し、同じ staging 検出器（単一ソース）を再適用。難読化実在かつ一致 → ASK
 # （DENY でなく: command 位置非解釈ゆえ commit -m 内 .env 言及と区別不能・
-# _obfuscated_unlock_on_cp 一貫）。
-if command -v aegis_dequote_normalize >/dev/null 2>&1; then
-NORM=$(aegis_dequote_normalize "$CMD")
-if [ "$NORM" != "$CMD" ]; then
-  NORM_LC=$(printf '%s' "$NORM" | tr '[:upper:]' '[:lower:]')
+# _obfuscated_unlock_on_cp 一貫）。NORM/NORM_LC は CMD_LC 直後で前倒し計算済み
+# （iter75-ff）。patterns.sh 欠落時は NORM="" ゆえこのブロックは自然に skip。
+if [ -n "$NORM" ] && [ "$NORM" != "$CMD" ]; then
   NORM_STRIPPED=$(printf '%s' "$NORM_LC" | sed -E "s/${SAFE_ENV_SUFFIXES}//g")
   if printf '%s' "$NORM_LC" | grep -qE "$_STAGE_HIGHRISK_RE" 2>/dev/null \
      || printf '%s' "$NORM_STRIPPED" | grep -qE "$_STAGE_ENV_RE" 2>/dev/null; then
     emit_ask "[secrets] 難読化された形（連結クォート/バックスラッシュ/\${IFS}）で認証ファイル (.env / 鍵 / credentials 等) を git に staging しようとしている可能性があります。意図を確認してください。生の形（例: git add .env）は拒否されます。"
     exit 0
   fi
-fi
 fi
 
 # No issue found — allow.
