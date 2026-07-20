@@ -15,12 +15,15 @@
 
 ## 設計方針（fable 確定・grill-plan で叩く論点を明記）
 
-### F1 — broad-stage/commit 検出器を正規化経路に配線
-- `check-secrets.sh:196` の broad-stage トリガ regex を `_STAGE_BROAD_RE` に、`:270` の commit トリガ regex を `_STAGE_COMMIT_RE` に**変数化**（単一ソース化＝grill 致命2 の drift 回避と一貫。raw と正規化が同一検出器）。
-- 正規化 re-check（`:346-357`）に、NORM_LC に対する `_STAGE_BROAD_RE`／`_STAGE_COMMIT_RE` の grep を追加。マッチ→**emit_ask**。
-- **設計判断（grill 論点1）**: 難読化 broad-stage/commit は **FS/staged スキャンを省略し ASK 一律**。理由: (a) 正規化経路は一貫して DENY でなく ASK（command 位置非解釈）。(b) `git${IFS}add -A` を書くこと自体が異常＝実 .env の有無に関わらず確認対象。(c) ASK でユーザーが止められ silent 性が消える＝漏洩チェーン切断（moat の目的達成）。(d) find/git-diff の重い再走を難読化検出時に避ける。過剰 ASK は非ブロック・安全側。
-- **grill-plan 反映（非対称の明示・2026-07-20）**: 「生 broad=DENY（実 .env 存在時）／難読化 broad=ASK」の非対称は**既存の明示 .env 経路と同一**（生 `git add .env`=DENY／難読化=ASK）で意図的。残余として「難読化 broad + 実 .env 存在が ASK 止まり（DENY でない）」を記録し、将来 DENY 化（正規化経路から FS スキャン再利用）の余地を pin する。
-- **grill-plan 反映（実装注意・致命1・2026-07-20）**: `_STAGE_BROAD_RE`/`_STAGE_COMMIT_RE` は **`GIT_PRE_OPTS` 定義後**（既存 `_STAGE_HIGHRISK_RE`/`_STAGE_ENV_RE` と同一ブロック :152-154）に定義。secrets-patterns.sh 単体には `GIT_PRE_OPTS` が無い（実測 UNDEF）＝定義順を誤ると空展開で regex 破損。正規化経路は broad regex を **`NORM_LC`（小文字化済み）** に適用（`git add -A`→`-a` fold 前提。実測: 生 `-A` 大文字は broad regex `-a` に非マッチ／`git add .` は fold 不要でマッチ）。
+### F1 — broad-stage/commit 検出器を正規化経路に配線（既存スキャン再利用・ASK 一律を撤回）
+- **設計改訂（grill-plan 致命・ASK 一律を撤回・2026-07-20）**: 当初「難読化 broad/commit→FS/staged スキャン省略で ASK 一律」としたが、grill-plan 自己検証で **commit は ASK 一律だと誤検知爆発**が判明。`git commit -m "quoted message"` はクォート必須で `NORM != CMD` が常態→commit trigger にマッチ→**正当な全 commit が誤 ask**。よって既存の FS/staged スキャンを **NORM でも再利用**し、実際に .env/高リスクが repo 存在/staged のときのみ反応させる（`git commit -m "..."` は staged に .env が無ければ allow＝誤検知なし）。
+- **実装（関数抽出＋二経路トリガ）**:
+  - broad-stage の FS スキャン（`:197-259`）を関数 `_aegis_broad_has_secret`、commit の staged-diff スキャン（`:279-287`）を関数 `_aegis_staged_has_secret` に**抽出**（挙動保存リファクタ・raw ブロックはこの関数を呼ぶ形に）。
+  - broad/commit トリガ regex を `_STAGE_BROAD_RE`/`_STAGE_COMMIT_RE` に変数化。
+  - broad/commit ブロックのトリガを「`CMD_LC` にマッチ（raw）**または** `NORM != CMD` かつ `NORM_LC` にマッチ（難読化）」に拡張。スキャンは共通。**raw マッチ時は emit_deny（従来）／NORM のみマッチ時は emit_ask**（正規化経路一貫）。
+- **評決マトリクス**: 生 `git add -A`（実 .env 存在）→deny／難読化 `git${IFS}add -A`（実 .env 存在）→ask／難読化 broad（.env 不在）→allow（スキャン空）。commit も同型。`git commit -m "msg"`（.env 非staged）→allow（誤検知なし）。
+- **grill-plan 反映（実装注意・致命1・2026-07-20）**: `_STAGE_BROAD_RE`/`_STAGE_COMMIT_RE` は **`GIT_PRE_OPTS` 定義後**（既存 `_STAGE_HIGHRISK_RE`/`_STAGE_ENV_RE` と同一ブロック :152-154）に定義。secrets-patterns.sh 単体には `GIT_PRE_OPTS` が無い（実測 UNDEF）＝定義順を誤ると空展開で regex 破損。broad regex は **`NORM_LC`（小文字化済み）** に適用（`git add -A`→`-a` fold 前提。実測: 生 `-A` 大文字は broad regex `-a` に非マッチ／`git add .` は fold 不要でマッチ）。
+- **NORM 計算の前倒し**: 現状 NORM は末尾（:347）で計算。broad/commit ブロック（:196/:270）より前（CMD_LC 定義 :150 の直後）で NORM/NORM_LC を計算する（command -v ガード付き）。末尾の明示 .env 正規化 re-check（:346-357）は既存維持（Check0/1 の norm 版）。
 
 ### F2 — helper で backslash-newline を畳む
 - `hooks/lib/patterns.sh` の `aegis_dequote_normalize` を修正。**順序が要**（backslash 単独除去より前に backslash-newline を除去）:
@@ -51,10 +54,10 @@
 
 ### Task FF1: RED — F1/F2/F3 の現状 allow を実証
 **Create/Modify:** `tests/test_moat_quote_split.py`（追記）
-- F1: `git${IFS}add -A`→ask 期待・`g""it a""dd -A`→ask 期待・`git${IFS}commit`→ask 期待（実 .env が repo に無くても難読化 broad/commit は ask）。
-- F2: `git add \<NL>.env`（Python で `'git add \\\n.env'`）→ask・`rm \<NL>-rf /tmp/x`→ask。
-- F3: `R""M -RF /tmp/x`→ask・`RM${IFS}-rf /tmp/x`→ask。
-- 実測で現状 allow を確認（RED）。commit。
+- **F1（実 .env を含む一時 repo で検証）**: pytest tmp_path で `git init` + `.env`（実ファイル・中身 `SECRET=x`）を作成し、hook を `cwd=tmp` で実行する helper を追加。broad-stage 難読化 `git${IFS}add -A`・`g""it a""dd -A`→**ask 期待**（生 `git add -A`→**deny** で対照）。commit 難読化はステージング後: `.env` を `git add` 済みの repo で `git${IFS}commit`→**ask 期待**（生 `git commit`→deny 対照）。**誤検知回帰**: `.env` 非staged の repo で `git commit -m "msg"`→**allow 期待**（クォートで NORM!=CMD だが staged に .env 無し）。**.env 不在 repo** で `git${IFS}add -A`→**allow 期待**（スキャン空）。
+- F2: `git add \<NL>.env`（Python で `'git add \\\n.env'`）→ask・`rm \<NL>-rf /tmp/x`→ask（明示 .env / destructive ゆえ既存 `_run`〔cwd=ROOT〕で可）。
+- F3: `R""M -RF /tmp/x`→ask・`RM${IFS}-rf /tmp/x`→ask（既存 `_run` で可）。
+- 実測で現状 allow を確認（RED）。誤検知回帰テスト（`git commit -m "msg"`→allow）は現状既に allow なので GREEN のまま＝pin として追加。commit。
 
 ### Task FF2: helper backslash-newline（F2 GREEN 化の一部）
 **Modify:** `hooks/lib/patterns.sh`・`tests/test_patterns_parity.py`
