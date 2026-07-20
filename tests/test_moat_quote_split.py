@@ -1,4 +1,4 @@
-import json, subprocess, os
+import json, subprocess, os, tempfile, shutil
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 def _run(hook, cmd):
@@ -13,6 +13,33 @@ def _run(hook, cmd):
     if '"permissionDecision":"ask"' in out or '"permissionDecision": "ask"' in out:
         return "ask"
     return "other:" + out.strip()[:40]
+
+def _run_in_repo(hook, cmd, files=None, staged=None):
+    """一時 git repo で hook を実行。files={name:content} 作成、staged=[names] を git add 済みに。"""
+    d = tempfile.mkdtemp()
+    try:
+        env = {**os.environ, "GIT_CONFIG_GLOBAL": "/dev/null", "GIT_CONFIG_SYSTEM": "/dev/null"}
+        subprocess.run(["git", "init", "-q"], cwd=d, env=env)
+        subprocess.run(["git", "config", "user.email", "t@t"], cwd=d, env=env)
+        subprocess.run(["git", "config", "user.name", "t"], cwd=d, env=env)
+        for name, content in (files or {}).items():
+            with open(os.path.join(d, name), "w") as f:
+                f.write(content)
+        for name in (staged or []):
+            subprocess.run(["git", "add", name], cwd=d, env=env)
+        p = subprocess.run(["bash", os.path.join(ROOT, "hooks", hook)],
+                           input=json.dumps({"tool_input": {"command": cmd}}).encode(),
+                           capture_output=True, cwd=d, env=env)
+        out = p.stdout.decode("utf-8", "replace")
+    finally:
+        shutil.rmtree(d, ignore_errors=True)
+    if out.strip() == "{}":
+        return "allow"
+    if '"permissionDecision":"deny"' in out or '"permissionDecision": "deny"' in out:
+        return "deny"
+    if '"permissionDecision":"ask"' in out or '"permissionDecision": "ask"' in out:
+        return "ask"
+    return "other:" + out.strip()[:60]
 
 # --- destructive: 空クォート/バックスラッシュ/${IFS} 分割は ASK になるべき ---
 def test_destructive_empty_quote_split_asks():
@@ -62,3 +89,43 @@ def test_residual_brace_split_still_allows_SF019():
     assert _run("check-destructive.sh", 'r{,}m -rf /tmp/x') == "allow"
 def test_residual_secrets_brace_split_still_allows_SF019():
     assert _run("check-secrets.sh", 'g{,}it add .env') == "allow"
+
+# === fix-forward RED（iter75 review reject 対応）===
+
+# --- F1: broad-stage/commit 難読化（実 .env が repo 存在/staged のとき ASK）---
+ENV_FILE = {".env": "SECRET=x\n"}
+
+def test_ff_broad_stage_ifs_split_asks():
+    assert _run_in_repo("check-secrets.sh", 'git${IFS}add -A', files=ENV_FILE) == "ask"
+
+def test_ff_broad_stage_quote_split_asks():
+    assert _run_in_repo("check-secrets.sh", 'g""it a""dd -A', files=ENV_FILE) == "ask"
+
+def test_ff_commit_ifs_split_asks():
+    assert _run_in_repo("check-secrets.sh", 'git${IFS}commit', files=ENV_FILE, staged=[".env"]) == "ask"
+
+# --- F1 対照（生形は従来 deny）---
+def test_ff_broad_stage_raw_still_denies():
+    assert _run_in_repo("check-secrets.sh", 'git add -A', files=ENV_FILE) == "deny"
+
+# --- F1 誤検知回帰 pin（.env 非staged の正当 commit は allow）---
+def test_ff_commit_quoted_msg_not_falsely_asked():
+    assert _run_in_repo("check-secrets.sh", 'git commit -m "fix bug"', files=ENV_FILE) == "allow"
+
+# --- F1 .env 不在 repo では難読化 broad も allow（スキャン空）---
+def test_ff_broad_stage_no_env_allows():
+    assert _run_in_repo("check-secrets.sh", 'git${IFS}add -A', files={"README.md": "x"}) == "allow"
+
+# --- F2: backslash-newline 行継続（明示 .env / destructive ゆえ既存 _run で可）---
+def test_ff_backslash_newline_staging_asks():
+    assert _run("check-secrets.sh", 'git add \\\n.env') == "ask"
+
+def test_ff_backslash_newline_rm_asks():
+    assert _run("check-destructive.sh", 'rm \\\n-rf /tmp/x') == "ask"
+
+# --- F3: 難読化大文字（destructive）---
+def test_ff_uppercase_quote_split_asks():
+    assert _run("check-destructive.sh", 'R""M -RF /tmp/x') == "ask"
+
+def test_ff_uppercase_ifs_split_asks():
+    assert _run("check-destructive.sh", 'RM${IFS}-rf /tmp/x') == "ask"
