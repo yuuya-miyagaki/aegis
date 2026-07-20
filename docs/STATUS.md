@@ -3,18 +3,18 @@ framework: aegis
 framework_version: "1.31.1"
 project_name: "Aegis"
 mode: Dev
-phase: review
+phase: qa
 task_type: framework
 task_size: M
 task_size_rationale: "iter75（framework・P0＝SF-017 MOAT-BYPASS の修正＝check-destructive.sh/check-secrets.sh の生 regex 判定に SF-001 の shlex トークン化防御を一般化）。footprint: hooks/check-destructive.sh＋hooks/check-secrets.sh＋hooks/lib/patterns.sh（共有トークナイザ）＋tests＝M（2-5）。control-plane moat を触るため review+qa+security 必須・M のため deploy skip。正本＝docs/full-review-2026-07-19-dual-codex-fable.md §4.1／§5。size は brainstorm Step D で確定。"
 iteration: 75
 ui_surface: false
-last_updated: "2026-07-20T12:00:00Z"
+last_updated: "2026-07-21T02:00:00Z"
 gate_approvals:
   client_ready_for_dev: n/a
   brainstorm: approved
   plan: approved
-  review: pending
+  review: approved
   qa: pending
   security: pending
   deploy: pending
@@ -23,7 +23,7 @@ current_refs:
   requirements: []
   plan: "docs/plans/2026-07-20-iter75-moat-quote-split-implementation-plan.md"
   spec: "docs/specs/2026-07-20-iter75-moat-quote-split-design.md"
-  review: null
+  review: "docs/qa-reports/iter75-review.md"
   qa: null
   security: null
   deploy: null
@@ -37,12 +37,9 @@ external_evidence:
     scope: "v0.13.0 計画 5 ラウンドレビュー"
     findings: "Round 1〜5 で計 25 件の指摘（hook 出力スキーマ陳腐化、TaskCreated/Completed 制御方式、Plan 条件付き許可、effort 配分、pre-compact.sh 同種破損、`if` 単一 rule 制約等）"
     resolution: "Rev.5 で全件反映、Phase 0a 即時実装着手 GO。hotfix/v0122-hook-schema ブランチで開始。"
-next_action: "**【iter75 FF7 完了・review 再々走待ち】** review を2回 reject（盲検2次が段階摘発: 1回目 broad-stage/commit 難読化・backslash-newline→fix-forward〔FF1-6〕／2回目 難読化大文字が非rm の全19 CMD_REGEX〔chmod/find/dd/shred/mkfs/git 系〕で ASK 回避→FF7）。**1次 opus は2回とも盲点を見逃し＝独立盲検2次の価値**。FF7(9c3d7ea)で正規化経路の全 grep を grep -i（case-insensitive）on NORM 化しクラス全体封鎖（実測: NORM_LOWER では chmod -R の R リテラルが壊れ捕捉不可）。36/36 GREEN・回帰全 PASS。failure_tracking count=2（FF7 が通れば reset・通らねば 3-failure で second-opinion）。次＝**review 再々走(1次+盲検2次+testing)**→qa→security(盲検2次)→ship→docs。plan=docs/plans/2026-07-20-iter75-moat-fix-forward-plan.md。未 push。"
+next_action: "**【iter75 review approved・qa 着手】** review ゲート approved（ref=docs/qa-reports/iter75-review.md・JUDGE CARD 🟢: テスト green・2次 approve）。2回 reject→FF1-8 で全穴封鎖（quote/BS/backslash-newline/${IFS}/broad-stage/commit/難読化大文字クラス全体）・36/36 GREEN・フル 1341 passed。failure_tracking reset 済（FF7 が review 通過）。**次＝qa フェーズ**（moat 変更ゆえ対照表＋mutation バッテリー＋掃討完全性・qा-verification skill）→security(盲検2次・物理隔離 clone)→ship→docs。残余 SF-019/020/021 は iter76+。実装 commit 5398e72..402fdd9・未 push。"
 blockers: []
-failure_tracking:
-  goal: "SF-017 moat 網羅封鎖（難読化クラス全体）"
-  count: 2
-  last_attempt: "2026-07-20 fix-forward review 再走 reject（盲検2次＋reviewer-testing FAIL: 難読化大文字が非rm の全19 AEGIS_DESTRUCTIVE_CMD_REGEX パターン〔chmod/find/dd/shred/mkfs/git branch -D/reset --hard/push -f 等〕で ASK 回避・check-destructive.sh:161 が NORM を fold せず照合）。FF7 で正規化経路の全 grep を grep -i（case-insensitive）on NORM 化しクラス全体封鎖予定（実測: NORM_LOWER では chmod の -R リテラルが壊れ捕捉不可）。FF7 が通れば reset・通らねば 3-failure で second-opinion。"
+failure_tracking: null
 session_history:
   - date: "2026-07-19"
     mode: Dev
