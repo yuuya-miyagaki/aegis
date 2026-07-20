@@ -3,7 +3,7 @@ framework: aegis
 framework_version: "1.31.1"
 project_name: "Aegis"
 mode: Dev
-phase: qa
+phase: security
 task_type: framework
 task_size: M
 task_size_rationale: "iter75（framework・P0＝SF-017 MOAT-BYPASS の修正＝check-destructive.sh/check-secrets.sh の生 regex 判定に SF-001 の shlex トークン化防御を一般化）。footprint: hooks/check-destructive.sh＋hooks/check-secrets.sh＋hooks/lib/patterns.sh（共有トークナイザ）＋tests＝M（2-5）。control-plane moat を触るため review+qa+security 必須・M のため deploy skip。正本＝docs/full-review-2026-07-19-dual-codex-fable.md §4.1／§5。size は brainstorm Step D で確定。"
@@ -15,7 +15,7 @@ gate_approvals:
   brainstorm: approved
   plan: approved
   review: approved
-  qa: pending
+  qa: approved
   security: pending
   deploy: pending
   dev_ready_for_client: pending
@@ -24,7 +24,7 @@ current_refs:
   plan: "docs/plans/2026-07-20-iter75-moat-quote-split-implementation-plan.md"
   spec: "docs/specs/2026-07-20-iter75-moat-quote-split-design.md"
   review: "docs/qa-reports/iter75-review.md"
-  qa: null
+  qa: "docs/qa-reports/iter75-qa.md"
   security: null
   deploy: null
   translation: null
@@ -37,7 +37,7 @@ external_evidence:
     scope: "v0.13.0 計画 5 ラウンドレビュー"
     findings: "Round 1〜5 で計 25 件の指摘（hook 出力スキーマ陳腐化、TaskCreated/Completed 制御方式、Plan 条件付き許可、effort 配分、pre-compact.sh 同種破損、`if` 単一 rule 制約等）"
     resolution: "Rev.5 で全件反映、Phase 0a 即時実装着手 GO。hotfix/v0122-hook-schema ブランチで開始。"
-next_action: "**【iter75 review approved・qa 着手】** review ゲート approved（ref=docs/qa-reports/iter75-review.md・JUDGE CARD 🟢: テスト green・2次 approve）。2回 reject→FF1-8 で全穴封鎖（quote/BS/backslash-newline/${IFS}/broad-stage/commit/難読化大文字クラス全体）・36/36 GREEN・フル 1341 passed。failure_tracking reset 済（FF7 が review 通過）。**次＝qa フェーズ**（moat 変更ゆえ対照表＋mutation バッテリー＋掃討完全性・qा-verification skill）→security(盲検2次・物理隔離 clone)→ship→docs。残余 SF-019/020/021 は iter76+。実装 commit 5398e72..402fdd9・未 push。"
+next_action: "**【iter75 review+qa approved・security 着手】** review approved（ref=iter75-review.md・🟢 3体 approve/PASS）・qa approved（ref=iter75-qa.md・🟢 対照表8/8・drill skip+代替実証・フル 1341 passed）。2回 reject→FF1-8 で全穴封鎖（quote/BS/backslash-newline/${IFS}/broad-stage/commit/難読化大文字クラス全体）。**次＝security フェーズ**（moat 変更ゆえ 1次 opus＋盲検2次 fable 独立必須・OWASP/exploit/secrets 露出/fail-open）→deploy(M skip=n/a)→ship→docs。残余 SF-019/020/021 は iter76+（SF-020 は破壊ガードが raw 大文字で無反応＝P0 推奨）。実装 commit 5398e72..402fdd9・未 push。"
 blockers: []
 failure_tracking: null
 session_history:
