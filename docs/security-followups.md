@@ -453,6 +453,23 @@ SF-001 系の網羅的閉鎖（rounds 5-11）で**実用的なシェル難読化
 - **修正方針**: **ロードマップ iter77 の構造化 argv（実行イベント/argv 判定）で根治**——raw shell text ではなく実際に渡る argv を真実とすれば brace/param/cmdsub の展開結果を直接判定できる。または SF-001 の control-plane リゾルバ（brace/param 展開対応済み）を destructive/secrets へ移植（重い・共有トークナイザの複雑化＝North Star の作者保守可能性に非整合ぎみ）。系としては**「raw shell text を真実の代理にするな」**の一般化。
 - **状態**: **OPEN（accepted residual・iter77 系で根治予定）**。iter75 の残余 pin（`tests/test_moat_quote_split.py::test_residual_*` 2 件）が将来対応時に flip して revisit を強制する。cmdsub 部分は SF-004 と同じく敵対閉鎖は原理的に不可（脅威モデル外）。
 
+### SF-020: `check-destructive.sh` が大文字コマンド名を case-fold せず case-insensitive FS で破壊コマンドが silent allow（**High・OPEN**・iter75 grill-code 検出＝iter54 secrets case-fold の destructive 版・非対称）
+
+- **発見**: iter75 grill-code（本セッション・fable・2026-07-20）。SF-017 修正（quote-split 封鎖）の網羅性グリルで隣接検出。iter75 diff の欠陥ではなく既存挙動の穴。
+- **種別**: iter54（case-insensitive FS の moat バイパス封鎖・commit 9a36d72）が secrets 側で塞いだ case-fold 非対称の **destructive 版**。`check-secrets.sh` は `CMD_LC`（小文字化）で `.ENV`→`.env` を捕捉し `GIT ADD .ENV` を deny するが、`check-destructive.sh` は raw CMD を生 grep し大文字コマンド名（`RM`）を取りこぼす。
+- **重大度**: **High**。実 exploit 可能（前提＝case-insensitive FS＝macOS APFS デフォルト/Windows デフォルト）。ASK 止まりでなく **silent allow**（破壊コマンドの唯一の PreToolUse ガードが無反応）。SF-017 とは独立の既存穴で、iter75 の quote-split 修正は本穴を導入も解消もしない。
+- **再現（iter75 HEAD・本セッション実走生出力）**:
+  ```
+  check-destructive  RM -rf /tmp/x     -> {}    [ALLOW]   （小文字 rm -rf は ASK）
+  check-destructive  R""M -RF /tmp/x   -> {}    [ALLOW]   （難読化大文字も同穴）
+  対照  check-secrets  GIT ADD .ENV    -> deny            （iter54 で case-fold 済み＝非対称）
+  傍証  type -p RM -> /bin/RM           （case-insensitive FS で /bin/rm に解決＝RM -rf は実行される）
+  ```
+- **根本原因**: `check-destructive.sh` の破壊語判定（`AEGIS_DESTRUCTIVE_CMD_REGEX` 等）が CMD を小文字化せず生 grep で、regex は `rm` 小文字固定。secrets は iter54 で `CMD_LC` 化したが destructive は未適用。iter75 の正規化経路は `NORM_LOWER` を作るが (a) 再帰削除 regex（`check-destructive.sh:146`）は `NORM`（生・大文字のまま）に向いており、かつ raw 大文字（`NORM==CMD`）は正規化経路自体に入らないため raw case は塞げない。
+- **修正方針**: destructive の raw 破壊語判定を `CMD_LC` ベースへ寄せ secrets と対称化（大文字コマンド名も小文字 regex にマッチ）。併せて正規化経路の再帰削除 regex を `NORM_LOWER` に向け難読化大文字（`R""M -RF`）もカバー。回帰 pin: safe-artifact 除外（`rm -rf node_modules`）が case-fold で誤変化しないこと・LOWER 化が iter73 の C locale narrowing（SF-016）と衝突しないこと。TDD で `RM -rf`/`R""M -RF`→ASK（旧=赤/新=緑）。effort S/M。
+- **関連実測（ANSI-C quoting は無害＝穴でない・記録のみ）**: 同グリルで `rm$'\t'-rf`・`git$'\t'add .env` を exploit 候補として疑ったが実測で反証。ANSI-C quoting `$'\t'` はタブを生成するが**それ自体がクォート**ゆえ単語分割を起こさない（実測: `set -- foo$'\t'bar` → argc=1・`foo<TAB>bar` が単一語。対照 `${IFS}` は argc=2）。よって `rm$'\t'-rf` は実行時に `rm<TAB>-rf` という非存在1語コマンド→`command not found`＝機能的に無害。現状 allow は正しく moat の穴ではない（SF-019 の残余にも含めない）。
+- **状態**: **OPEN（未修正・iter76 P0 候補で消化予定）**。iter54 が secrets case-fold を単独 iter で扱った前例に倣い、destructive case-fold も独立 iter・独立 TDD で対応（quote-split 修正への混載は review/qa/security の焦点を割るため不採）。
+
 ## CLOSED
 
 - **SF-010**（Medium・iter65 review 検出→iter66 v1.26.1 で封鎖）: task_size empty-baseline raw-Edit × migration-grace の tamper 逃れ。Fix ①（`feff60c` migration-grace を真の旧フォーマット限定に絞り込み・task fields＋gate loop）＋(i)(ii) Fix ⑤（`6229fd5` python first-match/先勝ち）＋(iii) Fix ④（`c5f5fd2` gate_value 本文 fallback を ---無し限定）。hook 直接発火 4 ケース＋fresh 変異 M1-M5＋1次/盲検2次 approve で裏取り。詳細は上記 SF-010 節。
