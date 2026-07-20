@@ -145,20 +145,24 @@ fi
 if [ -z "$WARN" ]; then
   NORM=$(aegis_dequote_normalize "$CMD")
   if [ "$NORM" != "$CMD" ]; then
-    NORM_LOWER=$(printf '%s' "$NORM" | tr '[:upper:]' '[:lower:]')
-    if printf '%s' "$NORM_LOWER" | grep -qE 'rm\s+(-[a-zA-Z]*[rR]|--recursive)' 2>/dev/null; then
+    # 正規化形は case-insensitive（grep -i）で照合する。NORM_LOWER 化は不可:
+    # AEGIS_DESTRUCTIVE_CMD_REGEX は大文字リテラルを含む（chmod の -R:[a-zA-Z]*R、
+    # git branch の [dD]、restore の W）ため、事前 lower 化すると chmod -R → chmod -r
+    # で regex 内の R リテラルが非マッチとなり大文字難読化を捕捉できない（実測）。
+    # 生ではなく NORM に grep -i を当てることで rm 系・SQL・全 CMD_REGEX を一様に捕捉。
+    if printf '%s' "$NORM" | grep -iqE 'rm\s+(-[a-zA-Z]*[rR]|--recursive)' 2>/dev/null; then
       WARN="難読化された破壊的コマンド（連結クォート/バックスラッシュ）の可能性: 再帰削除。意図を確認してください。"
     fi
     if [ -z "$WARN" ]; then
       for i in "${!AEGIS_DESTRUCTIVE_LOWER_REGEX[@]}"; do
-        if printf '%s' "$NORM_LOWER" | grep -qE "${AEGIS_DESTRUCTIVE_LOWER_REGEX[$i]}" 2>/dev/null; then
+        if printf '%s' "$NORM" | grep -iqE "${AEGIS_DESTRUCTIVE_LOWER_REGEX[$i]}" 2>/dev/null; then
           WARN="難読化された破壊的コマンドの可能性: ${AEGIS_DESTRUCTIVE_LOWER_WARN[$i]}"; break
         fi
       done
     fi
     if [ -z "$WARN" ]; then
       for i in "${!AEGIS_DESTRUCTIVE_CMD_REGEX[@]}"; do
-        if printf '%s' "$NORM" | grep -qE "${AEGIS_DESTRUCTIVE_CMD_REGEX[$i]}" 2>/dev/null; then
+        if printf '%s' "$NORM" | grep -iqE "${AEGIS_DESTRUCTIVE_CMD_REGEX[$i]}" 2>/dev/null; then
           WARN="難読化された破壊的コマンドの可能性: ${AEGIS_DESTRUCTIVE_CMD_WARN[$i]}"; break
         fi
       done

@@ -1,4 +1,5 @@
 import json, subprocess, os, tempfile, shutil
+import pytest
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 def _run(hook, cmd):
@@ -154,3 +155,28 @@ def test_ff_uppercase_quote_split_asks():
 
 def test_ff_uppercase_ifs_split_asks():
     assert _run("check-destructive.sh", 'RM${IFS}-rf /tmp/x') == "ask"
+
+# --- FF7: 非rm 大文字難読化が CMD_REGEX ループ（:161）で ASK になるべき ---
+# review 再走で盲検2次＋reviewer-testing が摘発: :161 の CMD_REGEX ループは $NORM
+# （大文字のまま）で照合しており、chmod/find/dd/shred/mkfs/git 系の大文字難読化が
+# ASK を silent 回避していた。正規化経路の全 grep を grep -i on NORM に統一して封鎖。
+# NORM_LOWER 化では chmod の -R リテラル（regex 内 R）が壊れ捕捉不可のため grep -i を採用。
+@pytest.mark.parametrize("cmd", [
+    'C""HMOD -R 777 /tmp/x',
+    'CHMOD${IFS}-R 777 /tmp/x',
+    'F""IND /tmp/x -delete',
+    'FIND${IFS}/tmp/x -delete',
+    'D""D if=/dev/zero of=/tmp/x',
+    'S""HRED /tmp/x',
+    'M""KFS.EXT4 /dev/x',
+    'G""IT BRANCH -D foo',
+    'GIT${IFS}RESET --HARD',
+    'GIT${IFS}PUSH origin main --FORCE',
+])
+def test_ff_uppercase_nonrm_destructive_asks(cmd):
+    assert _run("check-destructive.sh", cmd) == "ask"
+
+# F-2（reviewer-testing 指摘）: 語中継続の統合層 pin（backslash-newline 行の検知力）
+def test_ff_backslash_newline_midword_rm_asks():
+    # gi<改行>t でなく r<改行>m -rf（rm の語中継続）→ 実行時 rm -rf
+    assert _run("check-destructive.sh", 'r\\\nm -rf /tmp/x') == "ask"
