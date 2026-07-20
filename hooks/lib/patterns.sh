@@ -321,16 +321,20 @@ AEGIS_TEST_IS_PYTEST_REGEX='(^|[;&|]| |\()(npx +|bunx +|(uv|poetry|pipenv) +run 
 # Reference: https://docs.pytest.org/en/stable/reference/exit-codes.html
 AEGIS_TEST_ZERO_RUN_EXIT_PYTEST=5
 
-# --- iter75 SF-017: quote/backslash/${IFS} 正規化（純 bash・parser なし） ---
+# --- iter75 SF-017: quote/backslash/${IFS}/行継続・改行 正規化（純 bash・parser なし） ---
 # _obfuscated_unlock_on_cp（check-runtime-state.sh）と同一手法の拡張。呼び出し側は
-# LC_ALL=C を export 済み前提。brace/param-default/cmdsub は解決しない（SF-019 残余・
-# 構造化 argv 待ち）。
+# LC_ALL=C を export 済み前提。backslash-newline（行継続）と裸改行/タブも畳んで
+# 行指向 grep の分割バイパス（iter75 fix-forward F2）を塞ぐ。brace/param-default/
+# cmdsub は解決しない（SF-019 残余・構造化 argv 待ち）。
 aegis_dequote_normalize() {
   local c=$1
-  c=${c//\\/}              # バックスラッシュ除去
+  c=${c//\\$'\n'/}         # backslash-newline（行継続）除去 ← 最初（後段の裸BS除去より前）
+  c=${c//\\/}              # 残り backslash 除去
   c=${c//\"/}              # 二重クォート除去
   c=${c//\'/}              # 単一クォート除去
   c=${c//'${IFS}'/ }       # ${IFS} → 空白（grill 致命1: git${IFS}add .env を捕捉）
   c=${c//'$IFS'/ }         # $IFS  → 空白
+  c=${c//$'\n'/ }          # 残る改行 → 空白（複数行の単一行化・行指向 grep 対策）
+  c=${c//$'\t'/ }          # 残るタブ → 空白（改行と対称・raw でも \s カバー済みだが一貫のため）
   printf '%s' "$c"
 }

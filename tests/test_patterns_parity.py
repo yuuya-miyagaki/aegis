@@ -367,6 +367,11 @@ class TestDequoteNormalize(unittest.TestCase):
         self.assertEqual(norm('rm${IFS}-rf /x'), 'rm -rf /x')          # ${IFS} → 空白（grill 致命1）
         self.assertEqual(norm('git${IFS}add .env'), 'git add .env')    # secret bypass 綴り
         self.assertEqual(norm('rm -rf /x'), 'rm -rf /x')               # 非難読化は不変
+        # iter75 fix-forward F2: backslash-newline（行継続）と残改行の畳み込み
+        self.assertEqual(norm('git add \\\n.env'), 'git add .env')     # 行継続 → 実コマンド再構成
+        self.assertEqual(norm('rm \\\n-rf'), 'rm -rf')
+        self.assertEqual(norm('gi\\\nt add'), 'git add')               # 語中の行継続
+        self.assertEqual(norm('a\nb'), 'a b')                          # 裸の改行 → 空白
         # 残余（SF-019・iter75 では畳まない＝不変を pin）:
         self.assertEqual(norm('r{,}m -rf'), 'r{,}m -rf')               # brace 展開は非対応（構造化 argv 待ち）
 
