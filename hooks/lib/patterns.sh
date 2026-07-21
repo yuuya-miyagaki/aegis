@@ -332,9 +332,18 @@ aegis_dequote_normalize() {
   c=${c//\\/}              # 残り backslash 除去
   c=${c//\"/}              # 二重クォート除去
   c=${c//\'/}              # 単一クォート除去
-  c=${c//'${IFS}'/ }       # ${IFS} → 空白（grill 致命1: git${IFS}add .env を捕捉）
-  c=${c//'$IFS'/ }         # $IFS  → 空白
   c=${c//$'\n'/ }          # 残る改行 → 空白（複数行の単一行化・行指向 grep 対策）
   c=${c//$'\t'/ }          # 残るタブ → 空白（改行と対称・raw でも \s カバー済みだが一貫のため）
+  # ${IFS...} parameter-expansion family（${IFS}/${IFS:0:1}/${IFS: -1}/${IFS/x/y}/
+  # ${IFS#}/${IFS:-x} 等）＋裸 $IFS → 空白。IFS 由来の展開値は常に空白の部分集合
+  # （shell 仕様: IFS 既定 = space/tab/newline）ゆえ空白畳みが保守側 — 実 word-split
+  # バイパスは捕捉し、:+/+ 等の非バイパス変種は無害な false-ASK に倒れる（MISS なし）。
+  # 単一 sed で O(n)・非貪欲（[^}]* が } を跨がず a${IFS}b${IFS}c を a b c に保つ）。
+  # bash の ${c//…} 全置換は多数一致で O(n²)・秒オーダー（grill-code G9 実測 5000 件で
+  # ~21s）だが sed 全置換は同ケース ~40ms。呼び出し側 export の LC_ALL=C 下で sed は
+  # 不正バイトでも crash しない（iter73 実証・両フックとも既に C locale で sed 使用）。
+  # 改行/タブは上で畳み済みゆえ command-sub の trailing-NL strip は無害。
+  # iter75 SEC-1（security 盲検2次・bash runtime 実証）。
+  c=$(printf '%s' "$c" | sed -E 's/\$\{IFS[^}]*\}/ /g; s/\$IFS/ /g')
   printf '%s' "$c"
 }

@@ -78,10 +78,20 @@ fi
 
 CMD_LOWER=$(printf '%s' "$CMD" | tr '[:upper:]' '[:lower:]')
 
+# iter75 Finding 1 (security 1次): 難読化正規化を SAFE_TARGETS 判定より前で計算する。
+# patterns.sh は required-lib（欠落=fail-closed deny）ゆえ常に定義済み。NORM!=CMD
+# なら「空白注入等の難読化が実在」＝safe-artifact 例外を適用しない（下記参照）。
+NORM=$(aegis_dequote_normalize "$CMD")
+
 # Safe exceptions for build artifacts.
 # Strip the rm command and its flags, then check if all remaining args are safe.
 SAFE_TARGETS=$(printf '%s' "$CMD" | sed -E 's/^[[:space:]]*rm[[:space:]]+(-[a-zA-Z]+[[:space:]]+)*//;s/--recursive[[:space:]]*//;s/--force[[:space:]]*//')
-if [ -n "$SAFE_TARGETS" ]; then
+# iter75 Finding 1: 難読化が実在するとき（NORM!=CMD）は safe-artifact 早期 allow を
+# SKIP する。`rm -rf${IFS}/x` は flag 密着 ${IFS} を sed が strip できず SAFE_TARGETS=
+# `-rf${IFS}/x`（単一 flag トークン扱い）→ SAFE_ONLY=true で silent allow していた
+# （NORM 再判定 :下記 に到達せず）。難読化 rm を artifact-only とみなさず、下流の
+# 再帰削除検知（生 CMD）と NORM 再判定に委ねる。平文 safe delete は NORM==CMD ゆえ不変。
+if [ -n "$SAFE_TARGETS" ] && [ "$NORM" = "$CMD" ]; then
   SAFE_ONLY=true
   # S-glob-1 (iter54): word-split WITHOUT pathname expansion. The unquoted
   # $SAFE_TARGETS previously glob-expanded against the hook CWD, so in a
@@ -139,11 +149,11 @@ if [ -z "$WARN" ]; then
   done
 fi
 
-# iter75 SF-017: 生 CMD で miss したとき、quote/backslash 難読化を正規化して再判定。
-# 正規化で command が変わった（難読化実在）かつ破壊パターンに一致 → ASK。
+# iter75 SF-017: 生 CMD で miss したとき、quote/backslash/${IFS} 難読化を正規化して
+# 再判定。正規化で command が変わった（難読化実在）かつ破壊パターンに一致 → ASK。
 # 安全形除外（build artifact）は再適用しない（難読化自体が確認対象）。
+# NORM は SAFE_TARGETS 判定の前で計算済み（iter75 Finding 1）。
 if [ -z "$WARN" ]; then
-  NORM=$(aegis_dequote_normalize "$CMD")
   if [ "$NORM" != "$CMD" ]; then
     # 正規化形は case-insensitive（grep -i）で照合する。NORM_LOWER 化は不可:
     # AEGIS_DESTRUCTIVE_CMD_REGEX は大文字リテラルを含む（chmod の -R:[a-zA-Z]*R、

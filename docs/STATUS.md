@@ -1,22 +1,22 @@
 ---
 framework: aegis
-framework_version: "1.31.1"
+framework_version: "1.31.2"
 project_name: "Aegis"
 mode: Dev
-phase: security
+phase: docs
 task_type: framework
 task_size: M
 task_size_rationale: "iter75（framework・P0＝SF-017 MOAT-BYPASS の修正＝check-destructive.sh/check-secrets.sh の生 regex 判定に SF-001 の shlex トークン化防御を一般化）。footprint: hooks/check-destructive.sh＋hooks/check-secrets.sh＋hooks/lib/patterns.sh（共有トークナイザ）＋tests＝M（2-5）。control-plane moat を触るため review+qa+security 必須・M のため deploy skip。正本＝docs/full-review-2026-07-19-dual-codex-fable.md §4.1／§5。size は brainstorm Step D で確定。"
 iteration: 75
 ui_surface: false
-last_updated: "2026-07-21T04:00:00Z"
+last_updated: "2026-07-21T08:00:00Z"
 gate_approvals:
   client_ready_for_dev: n/a
   brainstorm: approved
   plan: approved
   review: approved
   qa: approved
-  security: pending
+  security: approved
   deploy: pending
   dev_ready_for_client: pending
 current_refs:
@@ -25,7 +25,7 @@ current_refs:
   spec: "docs/specs/2026-07-20-iter75-moat-quote-split-design.md"
   review: "docs/qa-reports/iter75-review.md"
   qa: "docs/qa-reports/iter75-qa.md"
-  security: null
+  security: "docs/qa-reports/iter75-security.md"
   deploy: null
   translation: null
 external_evidence:
@@ -37,15 +37,14 @@ external_evidence:
     scope: "v0.13.0 計画 5 ラウンドレビュー"
     findings: "Round 1〜5 で計 25 件の指摘（hook 出力スキーマ陳腐化、TaskCreated/Completed 制御方式、Plan 条件付き許可、effort 配分、pre-compact.sh 同種破損、`if` 単一 rule 制約等）"
     resolution: "Rev.5 で全件反映、Phase 0a 即時実装着手 GO。hotfix/v0122-hook-schema ブランチで開始。"
-next_action: "**【iter75 security reject・3-failure 到達・ユーザー方針待ち】** security 1次(opus)=approve_with_notes／盲検2次(fable)=**reject**。両者が iter75 の「${IFS} クラス封鎖」オーバークレームを別綴りで摘発: SEC-1(High・盲検2次)=IFS param-expansion `${IFS:0:1}` family→silent secret commit chain・Finding 1(Medium・1次)=SAFE_TARGETS early-exit が `rm -rf${IFS}/x` を swallow→silent 再帰削除。SF-017 封鎖 goal への reject が review×2+security×1=**3回目**＝3-failure ルール発動。docs/second-opinion.md に3選択肢を整理（道A FF9 で IFS family＋SAFE_TARGETS 根本封鎖=推奨／道B 構造化 argv iter77 前倒し／道C 主張縮小して残余 SF 化・iter75 クローズ）。**deploy blocker なし**（Bash=threshold-raising 層）。review+qa は approved 済み・実装 96b6da8 は push 済み。ユーザー方針決定後に着手。"
-blockers:
-  - "SEC-1（High・security 盲検2次）: IFS param-expansion family（${IFS:0:1}/${IFS: -1}/${IFS/x/y}/${IFS#}）が未畳み込み→git${IFS:0:1}add .env＋commit で silent secret commit chain 再開（runtime 実証）。patterns.sh:335-336。安価に塞げる（原理的限界でない）。"
-  - "Finding 1（Medium・security 1次・pre-existing）: SAFE_TARGETS early-exit（check-destructive.sh:84-109）が rm -rf${IFS}/x を NORM 再判定（:145）前に swallow→silent 再帰削除（runtime victim 実削除）。iter75 の regression でなく既存穴だが ${IFS} 封鎖宣言クラス内・未記録。"
-failure_tracking:
-  goal: "SF-017 moat 網羅封鎖（難読化クラス全体）"
-  count: 3
-  last_attempt: "2026-07-21 security reject（盲検2次 SEC-1 High: IFS param-expansion ${IFS:0:1} family→silent secret commit chain／1次 Finding 1 Medium: SAFE_TARGETS early-exit が rm -rf${IFS}/x を swallow）。3-failure 到達＝docs/second-opinion.md 作成・ユーザー方針相談（道A FF9 で IFS family＋SAFE_TARGETS 根本封鎖=推奨／道B 構造化 argv iter77 前倒し／道C 主張縮小して残余 SF 化・iter75 クローズ）。"
+next_action: "**【iter75 FF9 完了・dev_ready_for_client ユーザー承認待ち】** 道A→道C 確定でクローズ。FF9 実装（patterns.sh の `${IFS...}` family 単一 sed 畳み込み＋check-destructive の SAFE_TARGETS early-exit を NORM==CMD ガード）→ grill-code（O(n²) DoS を単一 sed で解消・~500倍）→ security 再走（1次 opus が Root cause B=ゼロ幅 IFS の 2ⁿ 構造化 argv 限界を摘発／盲検2次 fable=approve・divergence なし）→ **道C: 主張を「非空 IFS 展開＋Finding 1」に正確化し残余（ゼロ幅/mixed IFS・param-default・変数間接・cmdsub）を SF-019 へ統合**。全 dev ゲート approved（security=approve_with_notes・deploy blocker なし）。v1.31.1→1.31.2 PATCH。full 1367 passed/2 skipped。**残: dev_ready_for_client はユーザー承認が必要（ship skill Red Flag）。ユーザー承認後に mode=Client へ or iter クローズ記録。** commit/push はセッションで実施済み想定（未実施なら実施）。"
+blockers: []
+failure_tracking: null
 session_history:
+  - date: "2026-07-21"
+    mode: Dev
+    phase: "docs"
+    note: "iter75 / v1.31.2（framework・SF-017 fix-forward「FF9」＝moat 難読化バイパスの空白注入クラス封鎖）を security 再走→道C 確定でクローズ（M＝deploy skip・review→ship→docs）。**発端**: 前回 security で 3-failure 到達（review×2＋security×1）＝docs/second-opinion.md でユーザーが道A（1回だけ根本封鎖）を選択。**FF9 実装（session=fable・実装は inline TDD）**: (1) SEC-1＝`aegis_dequote_normalize` に `${IFS...}` parameter-expansion family（`${IFS:0:1}`/`${IFS: -1}`/`${IFS/x/y}`/`${IFS#}`/`${IFS:-x}`）＋裸 `$IFS` を**単一 sed（非貪欲・O(n)）**で畳み込み（改行/タブ畳みを sed 前へ移動）。(2) Finding 1＝check-destructive の SAFE_TARGETS 早期 allow を `NORM==CMD`（難読化非実在）時のみ適用＝`rm -rf${IFS}/x` の silent 再帰削除を封鎖。RED→GREEN（tests/test_moat_quote_split.py 67 ケース）。**bash 実行シェルで runtime 実証**: IFS-family は word-split で実 `rm -rf`/`git add .env`＝実バイパス→ask 化。ANSI-C `$'\\x20'` は literal-in-word で command not found＝非 exploitable と実証し畳まず pin。**grill-code（fable）**: `${c//…}` 全置換が 5000 件で ~21s（O(n²)→hook timeout=fail-open 危険）を摘発→単一 sed で ~40ms（~500倍）に修正・scale pin 追加。**security 再走（1次 opus＋盲検2次 fable・物理隔離 e2e・read-only）**: 主張クラス（非空 `${IFS}`/quote/BS）内バイパス**0件**を両者確認・divergence なし。1次が **Root cause B**（ゼロ幅 IFS `${IFS:0:1→0}` は runtime で空展開＝glue だが静的 fold は過分割＝unsound／mixed split/glue は 2ⁿ 展開列挙が必要）を摘発、2次が param-default ネスト `${Q:-${IFS}}`（.env 実 staging e2e）・変数間接 `${!x}` を摘発。**道C 確定**: これらは全て**構造化 argv でしか根治できない SF-019 residual**（意図的難読化限定・事故経路なし・deploy blocker なし）＝主張を「非空 IFS 展開＋Finding 1」に正確化し残余を SF-019 へ統合、security=approve_with_notes でクローズ（FF10 は追わず＝事前合意の『新穴→道C・無限リトライ回避』に準拠）。full 1367 passed/2 skipped（trusted-runner 記録 green）・contract PASS。SF-017=CLOSED-in-review／SF-019 拡張／iter75-security.md 新規／LEARNINGS 3件追加／TO-CLIENT・version 3箇所 bump。**残: dev_ready_for_client はユーザー承認待ち（ship skill Red Flag＝自動承認しない）。** 次＝ユーザー承認。"
   - date: "2026-07-19"
     mode: Dev
     phase: "brainstorm"
@@ -54,10 +53,6 @@ session_history:
     mode: Dev
     phase: "brainstorm"
     note: "iter74 rollover＋brainstorm 記録（framework・Fable+Codex 二重網羅レビュー＋改善ロードマップ策定）。iter73 完全クローズ後に dev ゲート全 reset（sanctioned update-gate reset）・iteration=74・phase=brainstorm・非 requirements refs=null・spec=iter74 design。方法論＝2層ハイブリッド盲検（層1共通6次元 逐語同一＝moat/SF/locale-byte/test-strength/regression/North Star複雑性・層2特化＝Codex fresh-eyes配布／Fable ハーネス結合度/context経済/model-policy）。設計原理＝一致=高確度・乖離=バグの在処（iter72 F-CRIT-1 実績）。3文書を docs/specs/2026-07-19-iter74-* に保存。方法論自体を grill-plan で検証し致命5（突合ID規約/生出力必須/環境SHA固定/完了規律/fresh-first）＋要検討5（severityルーブリック/複雑性証拠形式/盲検起動条件/層2負荷/脅威モデル）を全反映。対象SHA=77566ed 固定。**未解決**: size/gate モデル（分析 iteration が review/qa/security/deploy に馴染まない＝research-iteration-type 不在・North Star 次元の指摘候補）／Codex は外部CLIでユーザー実行／Fable は hook-free clone 必須。次＝brainstorm gate。"
-  - date: "2026-07-19"
-    mode: Dev
-    phase: "docs"
-    note: "iter73 / v1.31.1（framework・locale/byte 掃討＝deny 側 moat フック check-destructive/secrets を byte-wise〔C locale〕決定化・**PATCH**＝invalid-byte fail-open crash の封鎖・機能的コマンドの判定不変・公開契約不変・後方互換）を全 dev ゲート approved まで完走（M＝deploy skip）。動機正本＝iter72 F-CRIT-1（SF-014 内・commit 90b4b61）と同型の locale 依存が deny 側に残存。設計正本＝docs/specs/2026-07-18-iter73-locale-byte-sweep-design.md。**実証で severity を HIGH 仮説→defensive robustness hardening へ格下げ**: crash は不正 UTF-8 バイトでのみ発生し、モデルの command は常に valid UTF-8＝脅威モデル内で到達不能（SF-009 同カテゴリ）。それでも直す＝制御フックは任意 stdin で crash しない堅牢性契約〔crash はフック自身の raw fail-safe fallback を迂回する第3の未定義状態＝parse 成功後の下流 crash〕＋iter72 一貫性＋stderr ノイズ除去＋forward-looking。**支配機構＝`tr` クラッシュ**（UTF-8 下で不正バイト→`Illegal byte sequence`→`set -euo pipefail` で rc=1・出力なし→fail-open）＋extract_command grep fast-path のコマンド drop。crash は 2 フック限定（runtime-state/deploy-gate は python3 抽出でバイト→空 CMD or tr 前 BSD grep で非 crash＝同型不成立・設計に恒久記録）。実装（session=fable・implementer=opus per-task commit）: Task1 RED（677b71a・crash 4 ケースが rc=1/stdout 空の fail-open を実測）→Task2 check-destructive.sh〔61b276f→95e08ae 抽出前へ〕→Task3 check-secrets.sh〔7bfb8f7〕＝各 `INPUT=$(cat)` 直後に `export LC_ALL=C LC_CTYPE=C LANG=C`。**配置は抽出「前」**（実装で判明: extract の grep fast-path 自体が UTF-8 下で不正バイトのコマンドを空 drop→fallback が deny を ask に格下げ・実測 UTF-8→LEN0/C→22）。C locale が python3 抽出を壊さないのは PEP 540 UTF-8 Mode（utf8_mode=1・stdin=utf-8・byte 一致実測）。plan→grill-plan（致命3〔到達性実証/test 意味論/crash 位置づけ〕＋要検討3 反映）→implement→grill-code（Critical0・C-locale narrowing 非退行を multibyte 隣接で実測）→**review（1次=opus 多角＝approve findings なし〔17 プローブ＋C/UTF-8 differential で narrowing miss ゼロ〕／specialist reviewer-testing＝Major F-T1〔destructive pin が mutation B〔export 抽出後移動〕を区別できず→fix-forward 2c5c575 で main-path「再帰削除」msg アサート化〕／盲検2次=fable blind＝approve_with_notes・Major F-B1〔Unicode 空白 narrowing＋誤コメント〕→親verify 実測で非 exploitable 決着〔bash IFS は ASCII のみ→`git<NBSP>add` は非コマンド〕→誤コメント訂正8be219d＋residual pin＋SF-016 起票で CLOSED-in-review）**→qa（対照表7項目 PASS・drill skip〔framework per-task-commit・`since` 案はテストファイルを floor 対象化し不採〕＋手動 mutation バッテリー M1-M4 全 killed〔export C→UTF-8 で両フック crash 回帰＋residual pin RED・配置 mutation・全削除〕＋掃討完全性再確認＋full 1302 passed record green）→**security（1次=opus＝approve findings なし〔OWASP 該当全 PASS・56-case narrowing miss ゼロ・PEP 540 は PYTHONUTF8=0 でも fail-safe〕／盲検2次=fable 物理隔離 clone＝approve_with_notes〔SF-016 を独立に非 exploitable 実証・実 repo で secret 検出健在・invalid-byte fail-open が pre=CRASH→post=deny で CLOSED を実測〕・divergence は verdict ラベルのみで実体収束・deploy blocker/新規依存/secrets 0）**→ship（v1.31.0→1.31.1 PATCH・bump 3箇所 e4f9595・TO-CLIENT）→docs（LEARNINGS line152 を iter73 deny 側掃討で拡張 conf8→9〔tr crash 機構・lib=関数local/フック=プロセス全体の scope 使い分け・PEP 540・C narrowing 副作用の accept 判断〕＋新 conf8〔severity 到達性較正＝prior High と pattern-match でもトリガ入力の emit 可能性を実証してから格付け〕・SF-016 起票・iter70 を evidence-archive 移設〔≤3 維持〕・docs-sync 整合）。実装コミット済（677b71a〜e4f9595）。**新規起票**: SF-016（C locale が Unicode 空白区切りの moat マッチを狭める・非 exploitable〔bash 非 word-split〕・accepted residual・pin 済み）。既知 flaky=test_update_gate_lock（回帰外）。**教訓核**: (1) locale/byte moat 修正の支配機構は grep 取りこぼしでなく `set -e` 下の `tr`/pipeline crash のこともある＝crash→fail-open。(2) prior High と同型でもトリガ入力の到達可能性を実証してから severity を付けよ（モデルは valid UTF-8 のみ emit＝不正バイト到達不能→HIGH→hardening 格下げ）。(3) 1次 approve/盲検2次 approve_with_notes の divergence が verdict ラベルのみ＝収束するケースもある（iter72 の新規 High 摘発と対照的だが独立レビューの value は不変＝SF-016 を盲検2次が摘発）。"
 ---
 
 ## Summary
