@@ -18,7 +18,7 @@ gate_approvals:
   qa: approved
   security: approved
   deploy: pending
-  dev_ready_for_client: pending
+  dev_ready_for_client: approved
 current_refs:
   requirements: []
   plan: "docs/plans/2026-07-20-iter75-moat-quote-split-implementation-plan.md"
@@ -37,7 +37,7 @@ external_evidence:
     scope: "v0.13.0 計画 5 ラウンドレビュー"
     findings: "Round 1〜5 で計 25 件の指摘（hook 出力スキーマ陳腐化、TaskCreated/Completed 制御方式、Plan 条件付き許可、effort 配分、pre-compact.sh 同種破損、`if` 単一 rule 制約等）"
     resolution: "Rev.5 で全件反映、Phase 0a 即時実装着手 GO。hotfix/v0122-hook-schema ブランチで開始。"
-next_action: "**【iter75 FF9 完了・dev_ready_for_client ユーザー承認待ち】** 道A→道C 確定でクローズ。FF9 実装（patterns.sh の `${IFS...}` family 単一 sed 畳み込み＋check-destructive の SAFE_TARGETS early-exit を NORM==CMD ガード）→ grill-code（O(n²) DoS を単一 sed で解消・~500倍）→ security 再走（1次 opus が Root cause B=ゼロ幅 IFS の 2ⁿ 構造化 argv 限界を摘発／盲検2次 fable=approve・divergence なし）→ **道C: 主張を「非空 IFS 展開＋Finding 1」に正確化し残余（ゼロ幅/mixed IFS・param-default・変数間接・cmdsub）を SF-019 へ統合**。全 dev ゲート approved（security=approve_with_notes・deploy blocker なし）。v1.31.1→1.31.2 PATCH。full 1367 passed/2 skipped。**残: dev_ready_for_client はユーザー承認が必要（ship skill Red Flag）。ユーザー承認後に mode=Client へ or iter クローズ記録。** commit/push はセッションで実施済み想定（未実施なら実施）。"
+next_action: "**【iter75 完全クローズ】** dev_ready_for_client=approved（ユーザー承認 2026-07-21）。全 dev ゲート完了（review/qa/security approved・deploy は M で exempt）。FF9（`${IFS...}` family 単一 sed 畳み込み＋SAFE_TARGETS NORM ガード）→ security 再走→道C 確定（残余ゼロ幅/mixed IFS・param-default・変数間接・cmdsub を SF-019 へ統合＝iter77 構造化 argv 根治）。v1.31.2・full 1372 passed/2 skipped・commit 2d04228＋gate 承認を push 済み。**次タスク着手時は state-machine の iteration rollover（brainstorm へ reset・dev ゲート pending 化・iteration++）を適用。** 未消化: SF-018（iter76 P0・runtime-state locale crash）／SF-019（iter77 構造化 argv）／SF-020・SF-021（iter76）。"
 blockers: []
 failure_tracking: null
 session_history:
