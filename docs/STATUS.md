@@ -3,29 +3,29 @@ framework: aegis
 framework_version: "1.31.2"
 project_name: "Aegis"
 mode: Dev
-phase: docs
+phase: brainstorm
 task_type: framework
 task_size: M
-task_size_rationale: "iter75（framework・P0＝SF-017 MOAT-BYPASS の修正＝check-destructive.sh/check-secrets.sh の生 regex 判定に SF-001 の shlex トークン化防御を一般化）。footprint: hooks/check-destructive.sh＋hooks/check-secrets.sh＋hooks/lib/patterns.sh（共有トークナイザ）＋tests＝M（2-5）。control-plane moat を触るため review+qa+security 必須・M のため deploy skip。正本＝docs/full-review-2026-07-19-dual-codex-fable.md §4.1／§5。size は brainstorm Step D で確定。"
-iteration: 75
+task_size_rationale: "iter76（framework・P0＝evidence 整合＋locale 掃討完了・暫定 M）。roadmap §5: 4.3 LOCALE-1＝SF-018（check-runtime-state.sh の不正バイト tr crash→fail-open・INPUT=$(cat) 直後に LC_ALL=C で iter73 と同型修正）＋4.2 washed-green/src allowlist（`pytest; true`/fake-output が green 不可）。effort S/M。**size は brainstorm Step D で確定**（SF-018 単体なら S・evidence 硬化を含めれば M）。正本＝docs/full-review-2026-07-19-dual-codex-fable.md §5。"
+iteration: 76
 ui_surface: false
-last_updated: "2026-07-21T08:00:00Z"
+last_updated: "2026-07-21T08:30:00Z"
 gate_approvals:
   client_ready_for_dev: n/a
-  brainstorm: approved
-  plan: approved
-  review: approved
-  qa: approved
-  security: approved
+  brainstorm: pending
+  plan: pending
+  review: pending
+  qa: pending
+  security: pending
   deploy: pending
-  dev_ready_for_client: approved
+  dev_ready_for_client: pending
 current_refs:
   requirements: []
-  plan: "docs/plans/2026-07-20-iter75-moat-quote-split-implementation-plan.md"
-  spec: "docs/specs/2026-07-20-iter75-moat-quote-split-design.md"
-  review: "docs/qa-reports/iter75-review.md"
-  qa: "docs/qa-reports/iter75-qa.md"
-  security: "docs/qa-reports/iter75-security.md"
+  plan: null
+  spec: null
+  review: null
+  qa: null
+  security: null
   deploy: null
   translation: null
 external_evidence:
@@ -37,7 +37,7 @@ external_evidence:
     scope: "v0.13.0 計画 5 ラウンドレビュー"
     findings: "Round 1〜5 で計 25 件の指摘（hook 出力スキーマ陳腐化、TaskCreated/Completed 制御方式、Plan 条件付き許可、effort 配分、pre-compact.sh 同種破損、`if` 単一 rule 制約等）"
     resolution: "Rev.5 で全件反映、Phase 0a 即時実装着手 GO。hotfix/v0122-hook-schema ブランチで開始。"
-next_action: "**【iter75 完全クローズ】** dev_ready_for_client=approved（ユーザー承認 2026-07-21）。全 dev ゲート完了（review/qa/security approved・deploy は M で exempt）。FF9（`${IFS...}` family 単一 sed 畳み込み＋SAFE_TARGETS NORM ガード）→ security 再走→道C 確定（残余ゼロ幅/mixed IFS・param-default・変数間接・cmdsub を SF-019 へ統合＝iter77 構造化 argv 根治）。v1.31.2・full 1372 passed/2 skipped・commit 2d04228＋gate 承認を push 済み。**次タスク着手時は state-machine の iteration rollover（brainstorm へ reset・dev ゲート pending 化・iteration++）を適用。** 未消化: SF-018（iter76 P0・runtime-state locale crash）／SF-019（iter77 構造化 argv）／SF-020・SF-021（iter76）。"
+next_action: "**【iter76 rollover 完了・brainstorm 待ち】** iter75 完全クローズ（v1.31.2・d4c4ded push 済）後に dev ゲート全 reset（sanctioned update-gate reset）・iteration=76・phase=brainstorm・非 requirements refs=null・task=framework/M（暫定）。**次アクション: brainstorm 開始前に state-machine『Before brainstorm』必須手順（STATUS 再読・refs 確認・objective/blockers/next 再述）→ aegis-brainstorm skill で iter76 スコープ確定。** iter76 テーマ（roadmap §5・P0）＝evidence 整合＋locale 掃討完了: SF-018（check-runtime-state.sh の不正バイト tr crash→fail-open）＋4.2 washed-green/src allowlist。原則: regex を足さず構造化 argv/実行イベントへ寄せる・『旧赤/新緑』回帰 pin を ship 条件に。未消化: SF-019（iter77 構造化 argv）／SF-020・SF-021（iter76 併合候補）。"
 blockers: []
 failure_tracking: null
 session_history:
