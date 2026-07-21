@@ -3,16 +3,16 @@ framework: aegis
 framework_version: "1.31.2"
 project_name: "Aegis"
 mode: Dev
-phase: brainstorm
+phase: plan
 task_type: framework
 task_size: M
-task_size_rationale: "iter76（framework・P0＝evidence 整合＋locale 掃討完了・暫定 M）。roadmap §5: 4.3 LOCALE-1＝SF-018（check-runtime-state.sh の不正バイト tr crash→fail-open・INPUT=$(cat) 直後に LC_ALL=C で iter73 と同型修正）＋4.2 washed-green/src allowlist（`pytest; true`/fake-output が green 不可）。effort S/M。**size は brainstorm Step D で確定**（SF-018 単体なら S・evidence 硬化を含めれば M）。正本＝docs/full-review-2026-07-19-dual-codex-fable.md §5。"
+task_size_rationale: "iter76（framework・P0＝evidence 整合＋locale 掃討完了・**M 確定**＝brainstorm Step D 2026-07-22）。案A＝roadmap 準拠 3 点セット: W1=SF-018（check-runtime-state.sh に LC_ALL=C・iter73 同型 3 本目）＋W2=washed-green 封鎖 2 軸（judge undecidable 拡張＋marker 矛盾軸）＋W3=SF-012(b) src allowlist。src 3 ファイル（check-runtime-state.sh/marker.sh/build-judge-card.py）＋tests＝M（deploy skip）。SF-020/021 は次 iter へ分離（L 化・テーマ混在回避）。設計正本＝docs/specs/2026-07-22-iter76-evidence-integrity-locale-design.md。"
 iteration: 76
 ui_surface: false
-last_updated: "2026-07-21T08:30:00Z"
+last_updated: "2026-07-22T00:30:00Z"
 gate_approvals:
   client_ready_for_dev: n/a
-  brainstorm: pending
+  brainstorm: approved
   plan: pending
   review: pending
   qa: pending
@@ -22,7 +22,7 @@ gate_approvals:
 current_refs:
   requirements: []
   plan: null
-  spec: null
+  spec: "docs/specs/2026-07-22-iter76-evidence-integrity-locale-design.md"
   review: null
   qa: null
   security: null
@@ -37,10 +37,14 @@ external_evidence:
     scope: "v0.13.0 計画 5 ラウンドレビュー"
     findings: "Round 1〜5 で計 25 件の指摘（hook 出力スキーマ陳腐化、TaskCreated/Completed 制御方式、Plan 条件付き許可、effort 配分、pre-compact.sh 同種破損、`if` 単一 rule 制約等）"
     resolution: "Rev.5 で全件反映、Phase 0a 即時実装着手 GO。hotfix/v0122-hook-schema ブランチで開始。"
-next_action: "**【iter76 rollover 完了・brainstorm 待ち】** iter75 完全クローズ（v1.31.2・d4c4ded push 済）後に dev ゲート全 reset（sanctioned update-gate reset）・iteration=76・phase=brainstorm・非 requirements refs=null・task=framework/M（暫定）。**次アクション: brainstorm 開始前に state-machine『Before brainstorm』必須手順（STATUS 再読・refs 確認・objective/blockers/next 再述）→ aegis-brainstorm skill で iter76 スコープ確定。** iter76 テーマ（roadmap §5・P0）＝evidence 整合＋locale 掃討完了: SF-018（check-runtime-state.sh の不正バイト tr crash→fail-open）＋4.2 washed-green/src allowlist。原則: regex を足さず構造化 argv/実行イベントへ寄せる・『旧赤/新緑』回帰 pin を ship 条件に。未消化: SF-019（iter77 構造化 argv）／SF-020・SF-021（iter76 併合候補）。"
+next_action: "**【iter76 plan フェーズ・実装計画作成中】** brainstorm gate 承認済（2026-07-22・案A＝W1 SF-018 LC_ALL 3本目＋W2 washed-green 2軸＋W3 src allowlist・M・SF-020/021 は次 iter 分離）。設計正本＝current_refs.spec。**次アクション: PLAN.template.md で実装計画（docs/plans/2026-07-22-iter76-evidence-integrity-locale-implementation-plan.md）作成→grill-plan で全指摘反映→plan gate 承認（--ref 原子 approve）→implement（TDD RED-first・旧赤/新緑 differential pin が ship 条件）。** 残余方針: 単一コマンド fake binary は iter77 attestation の天井＝test_residual_* pin。未消化: SF-019（構造化 argv）／SF-020・SF-021（次 iter・S 消化）。"
 blockers: []
 failure_tracking: null
 session_history:
+  - date: "2026-07-22"
+    mode: Dev
+    phase: "brainstorm"
+    note: "セッション復帰（session-recovery skill・status_doctor PASS・tree clean・HEAD=097c103）＋maintenance: body Session History 11→8（2026-06 期 3 件を evidence-archive へ移設・health ≤10 回復）・frontmatter session_history ≤3 維持（iter74 entry を移設）→Before brainstorm 手順→aegis-brainstorm 完走: 案A（roadmap 準拠 3 点セット・M）をユーザー承認・brainstorm-record＋design を docs/specs/2026-07-22-iter76-evidence-integrity-locale-* に保存・update-task --size M・brainstorm gate approve・phase→plan。SF-020/021 は次 iter 分離（L 化・テーマ混在回避）。次＝実装計画→grill-plan→plan gate。"
   - date: "2026-07-21"
     mode: Dev
     phase: "docs"
@@ -49,10 +53,6 @@ session_history:
     mode: Dev
     phase: "brainstorm"
     note: "iter75 rollover（framework・P0 SF-017 MOAT-BYPASS 修正）。iter74 の二重網羅レビュー（Codex 外部隔離＋Fable 盲検2次隔離 clone・対象 77566ed）を完遂し、親が乖離/片方のみを実走裁定→突合正本 docs/full-review-2026-07-19-dual-codex-fable.md（§5 ロードマップ iter75-82）を作成、生レビュー2本を証跡保全、SF-017（Critical MOAT-BYPASS）/SF-018（Medium LOCALE-1）を起票、iter74 deliverable を commit（a51a3f9）。**二重レビューの核成果**: 決定論 moat は健在だが「生シェル文字列（moat）と生テスト出力（evidence）」の最終2入力に実走再現できる欠陥。層1の乖離が2実バグを摘発（MOAT-BYPASS=Codex のみ／LOCALE-1=Fable のみ・互いの盲点）。iter75 は SF-001 の shlex トークン化を check-destructive/secrets へ一般化する。次＝brainstorm。"
-  - date: "2026-07-19"
-    mode: Dev
-    phase: "brainstorm"
-    note: "iter74 rollover＋brainstorm 記録（framework・Fable+Codex 二重網羅レビュー＋改善ロードマップ策定）。iter73 完全クローズ後に dev ゲート全 reset（sanctioned update-gate reset）・iteration=74・phase=brainstorm・非 requirements refs=null・spec=iter74 design。方法論＝2層ハイブリッド盲検（層1共通6次元 逐語同一＝moat/SF/locale-byte/test-strength/regression/North Star複雑性・層2特化＝Codex fresh-eyes配布／Fable ハーネス結合度/context経済/model-policy）。設計原理＝一致=高確度・乖離=バグの在処（iter72 F-CRIT-1 実績）。3文書を docs/specs/2026-07-19-iter74-* に保存。方法論自体を grill-plan で検証し致命5（突合ID規約/生出力必須/環境SHA固定/完了規律/fresh-first）＋要検討5（severityルーブリック/複雑性証拠形式/盲検起動条件/層2負荷/脅威モデル）を全反映。対象SHA=77566ed 固定。**未解決**: size/gate モデル（分析 iteration が review/qa/security/deploy に馴染まない＝research-iteration-type 不在・North Star 次元の指摘候補）／Codex は外部CLIでユーザー実行／Fable は hook-free clone 必須。次＝brainstorm gate。"
 ---
 
 ## Summary
@@ -77,11 +77,8 @@ Claude Code ネイティブの Aegis 運用フレームワーク。2026-06-05、
 
 ## Session History
 
-> 2026-04 期（v0.7.0〜v0.12.0）の 5 エントリは `docs/evidence-archive.md` に移設（2026-07-12・health 上限 ≤10 維持）。
+> 2026-04 期（v0.7.0〜v0.12.0）の 5 エントリは `docs/evidence-archive.md` に移設（2026-07-12）。2026-06 期（v1.0.0 再アーキ〜整合性監査）の 3 エントリも同所へ移設（2026-07-22・health 上限 ≤10 維持）。
 
-- 2026-06-05: future-proof 再アーキ着手。Phase 0b 確定 + Foundation（emit.sh 単一出力源 / patterns.sh / version owner）実装。Round 1/2 セカンドオピニオン反映。183 tests PASS、main マージ（未push）。
-- 2026-06-06: Phase R 再配分を連続 ship（routing 0.12.3／context 0.12.4／model-effort／name-hygiene／TDD 0.12.5／evidence 完了強制 0.12.6）。続けて Phase D（仕上げ）: migration guide(v0.12.2→v1.0.0)＋README リフレッシュ＋安定契約/SemVer 明文化＋version **1.0.0**。各タスクで brainstorm→2段グリル→実装→grill-code を完走。195 tests green・tier1/2 PASS。**再アーキ F→R→A→D 全完了＝v1.0.0「トレッドミルから降りる」看板を掲示。**
-- 2026-06-07: 機能整合性監査（charter 2026-06-07）。Layer 0-4 で 7 finding（P1×1/P2×4/P3×2）全修復。核心 F6（P1）＝setup.sh が hooks/lib を配布せず install 先で moat 全死→copy_hooks 修復＋scaffold smoke の hook 実発火で install 経路を契約化。v1.3.2 patch（298 tests・tag v1.3.2）。
 - 2026-06-28: iter52（framework・permission prompt 交通整理＝read-only 完全性ガード＋allow 10→14・M）完了・push 済 origin/main=5660f99。詳細は git log 5660f99。
 - 2026-06-29: iter53（framework・破壊的コマンド警告の日本語化＋REGEX↔WARN parity ドリフトガード・M・v1.14.0 据置）完了・push 済 origin/main=69632d0。詳細は git log 69632d0。
 - 2026-07-02: iter54（framework・ドッグフード前 Critical バッチ修正・L・v1.14.0→v1.15.0）完了・push 済 origin/main=9a36d72＝完全クローズ。case-insensitive FS の moat バイパス封鎖（条件付き case-fold・deny-only）＋setup.sh fail-open install 封鎖＋drill quotepath。詳細は git log 9a36d72。
