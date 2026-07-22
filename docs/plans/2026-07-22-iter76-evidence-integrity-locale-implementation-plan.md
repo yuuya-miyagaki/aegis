@@ -64,7 +64,8 @@ main 直コミット（本リポジトリの確立済み運用: タスク単位�
 **ファイル:** テスト `tests/test_hook_locale_byte.py` / `tests/test_marker_lib.py` / `tests/test_judge_card.py`（いずれも末尾 append・既存行は不変更）
 **意図:** iter76 の全挙動変更を「旧=赤」で実測 pin する（roadmap の differential 要件）。
 **TDD:** テスト → FAIL 分布確認 → コミット（実装なし）
-**受入条件:** 新規 18 テスト中 **11 RED / 7 PASS**（分布は下記）・既存テストは全 green のまま。
+**受入条件:** 新規 18 テスト中 **10 RED / 8 PASS**（分布は下記・Task 1 実測＋親裁定 2026-07-22 で訂正）・既存テストは全 green のまま。
+**実測訂正（Task 1 完了時・親実走裁定済み）:** pre-fix の実 fail-open モードは本機では **silent allow**（RS1: 0xFF＋STATUS 書込み → rc=0 `{}`＝deny が黙って allow 化・crash ではない）。SF-018 記載の tr crash（rc=1）は 77566ed 親再現の別モード（tr 単体は本機でも rc=1 で crash することを実測済み＝経路依存）。**両モードとも fail-open で LC_ALL=C が両方を封鎖**する構図は不変。RS2（byte benign）は pre/post とも allow が正しく differential にならないため PASS 側＝非退行 pin。差分 pin の mutation-killer は **RS1**（allow→deny flip）。
 
 - [ ] **Step 1-1: `tests/test_hook_locale_byte.py` 末尾に append**（既存 `run()`・`_UTF8_ENV` の直下慣習に従う。**ファイル冒頭 import に `tempfile` を追加**（現状 json/os/pathlib/subprocess のみ）。allow は `emit_allow`＝`{}` 出力＝`permissionDecision` キー不在＝**`decision is None` 規約**（既存 run() :74-76 と同一）——`"allow"` 文字列と比較してはならない〔grill 致命1〕）
 
@@ -330,8 +331,8 @@ class TestWashedGreenAndSrcAllowlist(unittest.TestCase):
 - [ ] **Step 1-4: RED 分布を実測**
 
 Run: `python3 -m pytest -q tests/test_hook_locale_byte.py tests/test_marker_lib.py tests/test_judge_card.py`
-Expected: **11 failed**（RS1・RS2／W2b-1・W2b-4・W2b-5／W2a-1・W2a-5／W3-1・W3-2・W3-3／helper 単体〔`_cmd_has_shell_operators` 未定義＝AttributeError〕）**/ 7 passed（新規分）**＋既存分は全 passed。
-※ RS1/RS2 の fail は decision=="CRASH"（rc1・stdout 空）による。W2b-5 の fail は regex 行が未存在＝re.sub 無置換＝verdict rc0 による。
+Expected（実測済み・9898153）: **10 failed**（RS1〔(0, None)=silent allow〕／W2b-1・W2b-4・W2b-5／W2a-1・W2a-5／W3-1・W3-2・W3-3／helper 単体〔`_cmd_has_shell_operators` 未定義＝AttributeError〕）**/ 8 passed（新規分・RS2 含む）**＋既存分 133 passed。
+※ W2b-5 の fail は regex 行が未存在＝re.sub 無置換＝verdict rc0 による。RS2 は benign コマンドの allow が pre/post とも正しく PASS（当初計画の「pre-fix CRASH」前提は本機で不成立＝上記実測訂正参照）。
 
 - [ ] **Step 1-5: コミット**
 
@@ -361,10 +362,12 @@ git commit -m "test(iter76): RED — SF-018 crash pin＋washed-green/src allowli
 export LC_ALL=C LC_CTYPE=C LANG=C
 ```
 
+- [ ] **Step 2-1b: テスト docstring の実測同期** — `TestRuntimeStateByteSafety` のクラス docstring（Task 1 で計画どおり committed）は「crash＝rc1・stdout 空」「RS2 が mutation-killer」という当初前提で書かれており実測と不一致。以下の事実に書き換える: (1) 本機の pre-fix 実挙動は silent allow（rc=0 `{}`・RS1 実測）で、SF-018 の tr crash（77566ed 親再現）は経路依存の別モード＝**どちらも fail-open・LC_ALL=C が両モードを封鎖** (2) mutation-killer は **RS1**（LC_ALL 除去/後方移動で deny→allow に戻り RED 化）・RS2 は benign 非退行 pin（削ってよい根拠にはならない旨は維持）。
+
 - [ ] **Step 2-2: GREEN 確認**
 
 Run: `python3 -m pytest -q tests/test_hook_locale_byte.py`
-Expected: 全 passed（RS1-RS4 含む）。
+Expected: 全 passed（RS1-RS4 含む・RS1 が allow→deny へ flip）。
 
 - [ ] **Step 2-3: 周辺非退行**（grill 致命2: `-k "runtime-state"` は式構文エラーになるため使用禁止・実在ファイルを明示実行）
 
@@ -550,12 +553,17 @@ git commit -m "fix(iter76): SF-012 — judge に washed-cmd transparent（observ
 
 本設計の「check-runtime-state.sh は python3 抽出が不正バイトで空 CMD になる
 ため同型（tr crash→fail-open）は不成立」という完全性主張は**誤り**（iter74
-二重レビュー Fable 盲検2次が反証・親実走確認＝SF-018）。CPython は
-surrogateescape で不正バイトを温存して CMD に流し、`tr '\n\r' ';;'` が UTF-8
-locale 下で crash する（rc=1・decision 未出力＝fail-open）。iter76 で
-`INPUT=$(cat)` 直後の `export LC_ALL=C LC_CTYPE=C LANG=C` により本 hook にも
-同型修正を適用し locale 掃討を完了した。回帰 pin＝
-`tests/test_hook_locale_byte.py::TestRuntimeStateByteSafety`。
+二重レビュー Fable 盲検2次が反証・SF-018）。不正バイトを積んだ入力に対する
+pre-fix の fail-open は**経路依存で 2 モード**あることを iter76 で実測確定:
+(a) tr crash（rc=1・decision 未出力・77566ed 親再現＝SF-018 記載）、
+(b) **silent allow**（rc=0 `{}`・iter76 Task 1/親裁定の本機実測＝0xFF を積んだ
+`echo … > docs/STATUS.md` の deny が判定素通りで allow 化。バイトが UTF-8
+locale 下の抽出/grep を汚染し runtime-state 検出が pattern-miss する）。
+(b) は stderr 信号すら出ない分 (a) より悪い。iter76 で `INPUT=$(cat)` 直後の
+`export LC_ALL=C LC_CTYPE=C LANG=C` により本 hook も byte-wise 化し、
+**両モードとも封鎖**して locale 掃討を完了した。回帰 pin＝
+`tests/test_hook_locale_byte.py::TestRuntimeStateByteSafety`（RS1=silent-allow
+の differential pin・RS2-4=非退行）。
 ```
 
 - [ ] **Step 5-2: iter76 設計/記録の「新規 regex ゼロ」記述を正確化** — design.md「推奨アプローチ > 採用理由」の「新規 regex ゼロ」を「新規 pattern は fail-token 整合軸 1 本のみ（`AEGIS_TEST_FAIL_TOKEN_REGEX`・SF-012(a) 記載の修正方向。count families は unittest の failed を抽出できないため）」へ、brainstorm-record「やらないこと」の同記述に同旨の追記。理由: 計画時精査で count families の EXEC（passed+failed 混合和）から failed 単独を分離できないと判明（roadmap 原則の「regex を足さない」は moat denylist の増殖防止であり、本件は evidence 整合軸＝SF-012(a) が自ら規定する修正）。
