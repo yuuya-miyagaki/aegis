@@ -47,9 +47,12 @@ aegis_require_lib "${SCRIPT_DIR}/lib/frontmatter.sh"
 INPUT=$(cat)
 
 # Byte-safety (iter76 SF-018): CMD below is arbitrary tool_input; under a
-# UTF-8 locale one invalid byte crashes `tr` ("Illegal byte sequence") and
-# `set -e` exits rc=1 with NO decision emitted = fail-open on the ONLY
-# non-framework runtime-state guard. C locale processes byte-wise; every
+# UTF-8 locale one invalid byte fails open on the ONLY non-framework
+# runtime-state guard, via TWO path-dependent modes (both reproduced):
+# (a) `tr` crash ("Illegal byte sequence") -> `set -e` exits rc=1 with NO
+# decision emitted; (b) SILENT ALLOW -> the byte poisons extraction/grep so
+# the runtime-state write is never detected (rc=0 `{}`, no stderr signal —
+# worse than (a)). C locale processes byte-wise and closes both; every
 # pattern in this hook is ASCII so matching is unchanged, and the python3
 # extraction keeps UTF-8 fidelity under C (PEP 540). Mirrors
 # check-destructive.sh / check-secrets.sh (iter73) — locale sweep complete.
