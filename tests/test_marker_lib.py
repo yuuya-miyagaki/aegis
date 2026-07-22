@@ -414,5 +414,62 @@ class TestCountProof(unittest.TestCase):
         self.assertEqual((rc, verdict), (0, "true"))
 
 
+PYTEST_FAILED = ("platform darwin -- Python 3.9.6, pytest-8.4.2\n"
+                 "rootdir: /tmp/x\ncollected 3 items\n\n"
+                 "=========== 1 failed, 2 passed in 0.42s ===========\n")
+
+
+class TestGreenContradictionVeto(unittest.TestCase):
+    """iter76 SF-012(a) Stage 6: 出力に positive な failure 証拠があるのに
+    exit code が 0 ＝ exit が洗浄された（`pytest -q; true`）か出力が偽造
+    された run ＝ green を証明できない → false。実 red run（exit≠0）は
+    軸の対象外＝verdict true のまま（judge の red 信号を守る）。"""
+
+    def test_w2b1_failed_summary_with_exit0_is_false(self):
+        # W2b-1（differential: pre-fix true）: washed-green の核。
+        rc, out = _verdict(PYTEST_FAILED, "python3 -m pytest -q; true", "0")
+        self.assertEqual((rc, out), (0, "false"))
+
+    def test_w2b2_failed_summary_with_exit1_stays_true(self):
+        # W2b-2（非退行）: 正直な red run — marker は「テストが走った」
+        # 証明として true を維持（status=fail 側が red を出す）。
+        rc, out = _verdict(PYTEST_FAILED, "python3 -m pytest -q", "1")
+        self.assertEqual((rc, out), (0, "true"))
+
+    def test_w2b3_cargo_zero_failed_green_stays_true(self):
+        # W2b-3（非退行）: cargo は green でも常に `0 failed` を出力する。
+        # 非ゼロアンカーが誤発火しないこと。
+        out_text = ("running 3 tests\n"
+                    "test tests::a ... ok\n"
+                    "test result: ok. 3 passed; 0 failed; 0 ignored; "
+                    "0 measured; 0 filtered out; finished in 0.01s\n")
+        rc, out = _verdict(out_text, "cargo test", "0")
+        self.assertEqual((rc, out), (0, "true"))
+
+    def test_w2b4_unittest_failed_banner_with_exit0_is_false(self):
+        # W2b-4（differential: pre-fix true）: unittest は Ran 行に failed
+        # カウントを持たない＝FAILED バナー自体が証拠。
+        out_text = "Ran 3 tests in 0.010s\n\nFAILED (failures=1)\n"
+        rc, out = _verdict(out_text, "python3 -m unittest; true", "0")
+        self.assertEqual((rc, out), (0, "false"))
+
+    def test_w2b5_rc3_when_fail_token_regex_emptied(self):
+        # W2b-5（differential: pre-fix rc0）: fail-token regex は 8 ソース
+        # rc3 ガードの一員 — 空にされた install は「veto が黙って無効」
+        # （fail-open）ではなく評価不能（rc3）。
+        with tempfile.TemporaryDirectory() as d:
+            lib_dir = Path(d)
+            shutil.copy(MARKER_LIB, lib_dir / "marker.sh")
+            pats = (ROOT / "hooks" / "lib" / "patterns.sh").read_text(
+                encoding="utf-8")
+            pats = re.sub(r"^AEGIS_TEST_FAIL_TOKEN_REGEX=.*$",
+                          "AEGIS_TEST_FAIL_TOKEN_REGEX=''",
+                          pats, flags=re.M)
+            (lib_dir / "patterns.sh").write_text(pats, encoding="utf-8")
+            rc, _out = _verdict(PYTEST_REAL, "python3 -m pytest tests/",
+                                "0", lib=lib_dir / "marker.sh")
+            self.assertEqual(rc, 3)
+
+
 if __name__ == "__main__":
     unittest.main()

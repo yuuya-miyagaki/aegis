@@ -1056,5 +1056,110 @@ class TestBinaryScanResilience(unittest.TestCase):
             self.assertTrue((root / "docs" / "qa-reports" / "judge-review.md").is_file())
 
 
+class TestWashedGreenAndSrcAllowlist(unittest.TestCase):
+    """iter76 W2a/W3 (SF-012): (a) observed-ok でシェル演算子連結 cmd は
+    TRANSPARENT（exit 洗浄＝green を証明できない・fail は red のまま）、
+    (b) src allowlist 外は TERMINAL unverified（fail-visible）。"""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self.tmp.name)
+        sp.run(["git", "-C", str(self.root), "init", "-q"],
+               check=True, capture_output=True)
+        sp.run(["git", "-C", str(self.root), "-c", "user.email=t@t",
+                "-c", "user.name=t", "commit", "-q", "--allow-empty",
+                "-m", "init"], check=True, capture_output=True)
+        _copy_lib(self.root)
+        (self.root / ".claude").mkdir()
+        self.log = self.root / ".claude" / "evidence-log.jsonl"
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def test_w2a1_washed_ok_cannot_certify_green(self):
+        # W2a-1（differential: pre-fix green）: `; true` は exit 0 を偽造
+        # する。出力の `1 failed` サマリで marker=true（fixture 既定）でも
+        # 複合 cmd の ok は信用できない → 他に entry が無ければ unverified。
+        fp = judge.current_fingerprint(self.root)
+        self.log.write_text(
+            _ev_line("python3 -m pytest -q; true", "ok", fp))
+        self.assertEqual(judge.read_test_result(self.root), "unverified")
+
+    def test_w2a2_washed_ok_is_transparent_older_clean_green_decides(self):
+        # W2a-2（意味論 pin）: washed-ok は trust-scan の undecidable-ok と
+        # 同じ TRANSPARENT — 同一 fp のより古い clean green は生きる。
+        fp = judge.current_fingerprint(self.root)
+        self.log.write_text(
+            _ev_line("python3 -m pytest -q", "ok", fp)
+            + _ev_line("python3 -m pytest -q | tee log.txt", "ok", fp))
+        self.assertEqual(judge.read_test_result(self.root), "green")
+
+    def test_w2a3_washed_fail_stays_red(self):
+        # W2a-3（非退行 pin）: 洗浄形でも fail した run は本物の失敗信号
+        # — red を🟡へ降格させない（fail-visible 維持）。
+        fp = judge.current_fingerprint(self.root)
+        self.log.write_text(
+            _ev_line("python3 -m pytest -q && echo ok", "fail", fp))
+        self.assertEqual(judge.read_test_result(self.root), "red")
+
+    def test_w2a4_quoted_operator_is_not_washed(self):
+        # W2a-4（誤検知防止 pin）: クォート内演算子は strips マスクで不活性
+        # （`pytest -k "a or b|c"` は clean 単一コマンド）。
+        fp = judge.current_fingerprint(self.root)
+        self.log.write_text(
+            _ev_line('python3 -m pytest -k "a or b|c"', "ok", fp))
+        self.assertEqual(judge.read_test_result(self.root), "green")
+
+    def test_w2a5_multiline_cmd_is_washed(self):
+        # W2a-5（differential: pre-fix green）: 改行はコマンド区切り
+        # （`;` 正規化）＝複合コマンドとして扱う。
+        fp = judge.current_fingerprint(self.root)
+        self.log.write_text(
+            _ev_line("python3 -m pytest -q\ntrue", "ok", fp))
+        self.assertEqual(judge.read_test_result(self.root), "unverified")
+
+    def test_w3_1_unknown_src_is_terminal_unverified(self):
+        # W3-1（differential: pre-fix green）: allowlist 外 src は
+        # decidable-by-default に落ちず終端🟡。
+        fp = judge.current_fingerprint(self.root)
+        row = json.loads(_ev_line("pytest", "ok", fp))
+        row["src"] = "forged"
+        self.log.write_text(json.dumps(row) + "\n")
+        self.assertEqual(judge.read_test_result(self.root), "unverified")
+
+    def test_w3_2_unknown_src_terminal_blocks_older_green(self):
+        # W3-2（differential: pre-fix green）: TERMINAL＝走査停止。偽 src
+        # の背後の古い clean green へ透過して green 化してはならない。
+        fp = judge.current_fingerprint(self.root)
+        row = json.loads(_ev_line("pytest", "ok", fp))
+        row["src"] = "forged"
+        self.log.write_text(
+            _ev_line("python3 -m pytest -q", "ok", fp)
+            + json.dumps(row) + "\n")
+        self.assertEqual(judge.read_test_result(self.root), "unverified")
+
+    def test_w3_3_missing_src_is_terminal_unverified(self):
+        # W3-3（differential: pre-fix green）: src キー欠如も同じ偽造クラス。
+        fp = judge.current_fingerprint(self.root)
+        row = json.loads(_ev_line("pytest", "ok", fp))
+        del row["src"]
+        self.log.write_text(json.dumps(row) + "\n")
+        self.assertEqual(judge.read_test_result(self.root), "unverified")
+
+    def test_helper_cmd_has_shell_operators(self):
+        # ヘルパー単体（grill 要検討1）: e2e（W2a-1/4）が fail した時の
+        # 切り分け用。strips は実 patterns.sh からロードした本物を使う。
+        strips = judge._tr_strip_patterns(ROOT_DIR)
+        self.assertEqual(len(strips), 2)
+        self.assertTrue(judge._cmd_has_shell_operators(
+            "python3 -m pytest -q; true", strips))
+        self.assertTrue(judge._cmd_has_shell_operators(
+            "python3 -m pytest -q\ntrue", strips))
+        self.assertFalse(judge._cmd_has_shell_operators(
+            'python3 -m pytest -k "a or b|c"', strips))
+        self.assertFalse(judge._cmd_has_shell_operators(
+            "python3 -m pytest -q", strips))
+
+
 if __name__ == "__main__":
     unittest.main()

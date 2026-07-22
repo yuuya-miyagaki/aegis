@@ -21,6 +21,8 @@ import json
 import os
 import pathlib
 import subprocess
+import tempfile
+import unittest
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 DESTRUCTIVE = ROOT / "hooks" / "check-destructive.sh"
@@ -188,3 +190,93 @@ def test_secrets_unicode_ws_separator_is_accepted_residual_allow():
     assert decision is None, (
         f"accepted residual: NBSP-separated non-command should allow, got {decision!r}. "
         f"If this changed to 'deny', the whitespace class was re-widened — revisit SF-016.")
+
+
+RUNTIME_STATE = ROOT / "hooks" / "check-runtime-state.sh"
+
+
+def _rs_root(tmp: pathlib.Path) -> pathlib.Path:
+    """check-runtime-state.sh 用 scratch root。docs/STATUS.md が無いと
+    early-allow で tr に到達しない。task_type は非 framework（feature）に
+    して post-fix の期待（STATUS 書込み=deny／無害=allow）を意味あるものに
+    する（framework は task_type 判定で early-allow するが、crash 地点の
+    tr :121 は判定より前なので pre-fix はどちらでも CRASH する）。"""
+    (tmp / "docs").mkdir(parents=True)
+    (tmp / "docs" / "STATUS.md").write_text(
+        "---\ntask_type: feature\n---\n", encoding="utf-8")
+    return tmp
+
+
+def run_rs(command_str, root):
+    """run() の check-runtime-state 版（CLAUDE_PROJECT_DIR 必須）。payload
+    構築・0xFF 縮退・CRASH/None==allow 判定は run() と同一規約。"""
+    payload = json.dumps(
+        {"tool_name": "Bash", "tool_input": {"command": command_str}},
+        ensure_ascii=False,
+    ).encode("utf-8").replace(b"\xc3\xbf", b"\xff")
+    env = dict(_UTF8_ENV, CLAUDE_PROJECT_DIR=str(root))
+    proc = subprocess.run(
+        ["bash", str(RUNTIME_STATE)], input=payload, env=env,
+        capture_output=True, timeout=30)
+    out = proc.stdout.decode(errors="replace").strip()
+    if not out:
+        return proc.returncode, "CRASH", ""
+    try:
+        obj = json.loads(out)
+    except (ValueError, json.JSONDecodeError):
+        return proc.returncode, "CRASH", ""
+    hso = obj.get("hookSpecificOutput", {})
+    decision = hso.get("permissionDecision")  # None == allow ({} empty object)
+    reason = hso.get("permissionDecisionReason", "")
+    return proc.returncode, decision, reason
+
+
+class TestRuntimeStateByteSafety(unittest.TestCase):
+    """SF-018 (iter76): check-runtime-state.sh は不正 UTF-8 stdin で crash
+    してはならない。crash＝rc1・stdout 空＝decision なし＝唯一の非 framework
+    runtime-state ガードの fail-open（iter73 掃討の未適用 3 本目。iter73 設計は
+    『python3 抽出でバイト→空 CMD＝同型不成立』と主張したが surrogateescape は
+    バイトを温存する＝反証済み・SF-018）。
+
+    mutation-killer 構図: RS1（deny 側）と RS2（allow 側）が対。runtime-state
+    の deny 文言は main/fallback 経路で共通のため reason 判別は使えず、RS2 の
+    『crash せず判定を通過して {} に到達した』が LC_ALL 挿入位置の変異
+    （extraction/tr の後方へ移動）を検出する唯一の証明。RS2 を冗長とみなして
+    削らないこと。"""
+
+    def test_rs1_byte_in_status_write_still_denies(self):
+        # RS1（differential: pre-fix CRASH）: 0xFF を積んだ runtime-state
+        # 書込みが crash せず通常どおり deny される。
+        with tempfile.TemporaryDirectory() as d:
+            root = _rs_root(pathlib.Path(d))
+            rc, decision, _ = run_rs(
+                "echo " + chr(0xFF) + " > docs/STATUS.md", root)
+            self.assertEqual((rc, decision), (0, "deny"))
+
+    def test_rs2_byte_in_benign_command_allows(self):
+        # RS2（differential: pre-fix CRASH）: runtime-state に触れない
+        # 0xFF 入りコマンドは allow（None==allow・crash による fail-open
+        # ではなく判定を通過した allow であることが要点）。
+        with tempfile.TemporaryDirectory() as d:
+            root = _rs_root(pathlib.Path(d))
+            rc, decision, _ = run_rs("echo " + chr(0xFF) + " hello", root)
+            self.assertEqual(rc, 0)
+            self.assertIsNone(decision)
+
+    def test_rs3_ascii_status_write_still_denies(self):
+        # RS3（非退行）: C locale 化が ASCII 経路の判定を変えない。
+        with tempfile.TemporaryDirectory() as d:
+            root = _rs_root(pathlib.Path(d))
+            rc, decision, _ = run_rs("echo x > docs/STATUS.md", root)
+            self.assertEqual((rc, decision), (0, "deny"))
+
+    def test_rs4_japanese_quoted_mention_still_allows(self):
+        # RS4（非退行）: C locale 下でも日本語（正 UTF-8 多バイト）は
+        # PEP 540 で保全され、OBS-006 carve-out（quoted メッセージ内の
+        # STATUS.md 言及は書込みでない）が維持される。
+        with tempfile.TemporaryDirectory() as d:
+            root = _rs_root(pathlib.Path(d))
+            rc, decision, _ = run_rs(
+                'git commit -m "docs/STATUS.md を更新"', root)
+            self.assertEqual(rc, 0)
+            self.assertIsNone(decision)
