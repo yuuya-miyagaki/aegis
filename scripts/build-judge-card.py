@@ -179,6 +179,23 @@ def _norm_cmd_match(cmd: str, pats: list, strips: list) -> bool:
     return any(p.search(cmd) for p in pats)
 
 
+_SHELL_OP_RE = re.compile(r"[;&|]")
+
+
+def _cmd_has_shell_operators(cmd: str, strips: list) -> bool:
+    """True when an observed command carries an UNQUOTED shell control
+    operator (; & | — newlines count: normalized to ';'). A compound
+    command's exit code belongs to the LAST list member, not the runner
+    (`pytest -q; true` exits 0 with failing tests), so an observed entry's
+    exit-derived status cannot certify green (SF-012a washed-green).
+    Quoted spans are masked to the inert token Q first — the SAME strips
+    pipeline as _norm_cmd_match, so `pytest -k "a|b"` stays clean."""
+    cmd = (cmd or "").replace("\n", ";")
+    for sp in strips:
+        cmd = sp.sub("Q", cmd)
+    return bool(_SHELL_OP_RE.search(cmd))
+
+
 def runner_cmd_matches(root: Path, cmd: str) -> bool | None:
     """Is `cmd` a recognized test-runner command, per the SAME normalization
     and patterns the judge uses to scan the evidence log? Returns None when the
@@ -257,6 +274,17 @@ def read_test_result_detail(root: Path) -> dict:
     The transparency skip precedes the fp check, so a stale undecidable-ok
     is skipped too (it is decidable-nothing; fp is irrelevant to noise).
 
+    iter76 (SF-012) adds two hardenings to this scan: (b) a src ALLOWLIST —
+    src outside {"manual","observed"} is TERMINAL 'unverified' (a forged or
+    unknown-writer entry can neither certify green nor be skipped over);
+    (a) WASHED-GREEN — an observed 'ok' whose cmd carries an unquoted shell
+    operator (; & |, newlines normalized to ';') is TRANSPARENT (its
+    exit-derived status is untrustworthy: `pytest -q; true`), while an
+    observed 'fail' with such a cmd stays decidable red.
+    Migration note: a legacy entry MISSING the src key hits the allowlist
+    terminus (unverified) — fail-visible; re-run the tests to upgrade the
+    log (same story as the v1.6.0 marker_verified schema note above).
+
     C-2 (v1.6.1): runner-name match alone is insufficient. An entry from an
     OBSERVED source (post-bash-observe.sh) is treated as 'green' / 'red'
     ONLY when it carries marker_verified:true (meaning the observer saw an
@@ -290,6 +318,25 @@ def read_test_result_detail(root: Path) -> dict:
         # via _norm_cmd_match so record-test-result.py's pre-validation cannot
         # drift from this scan's normalization.
         if not _norm_cmd_match(d.get("cmd"), pats, strips):
+            continue
+        # SF-012(b) (iter76): src allowlist — the only real writers are
+        # record-test-result.py (src:"manual") and evidence.sh
+        # (src:"observed"). Any other/missing src is a hand-written or
+        # unknown-writer entry this scan cannot certify — TERMINAL
+        # 'unverified' (fail-visible), never decidable-by-default and never
+        # skipped-over. A future legitimate src (e.g. "attested", iter77)
+        # must be added HERE in the same change that introduces its writer.
+        if d.get("src") not in ("manual", "observed"):
+            return unverified
+        # SF-012(a) (iter76): washed-green — an observed 'ok' whose cmd
+        # chains shell operators has an exit code the runner did not
+        # produce (`pytest -q; true`). It can certify nothing: TRANSPARENT
+        # like undecidable-ok noise (skip; an older clean decidable entry
+        # for the SAME fingerprint may still decide). An observed 'fail'
+        # with such a cmd stays decidable red — a wash that still failed
+        # is a real failure signal (fail-closed keeps it visible).
+        if (d.get("src") == "observed" and d.get("status") == "ok"
+                and _cmd_has_shell_operators(d.get("cmd"), strips)):
             continue
         # trust-scan (iter67): an observed entry whose marker was NOT
         # verified can certify neither green nor red (C-2) — with status
