@@ -3,7 +3,7 @@ framework: aegis
 framework_version: "1.31.2"
 project_name: "Aegis"
 mode: Dev
-phase: qa
+phase: security
 task_type: framework
 task_size: M
 task_size_rationale: "iter76（framework・P0＝evidence 整合＋locale 掃討完了・**M 確定**＝brainstorm Step D 2026-07-22）。案A＝roadmap 準拠 3 点セット: W1=SF-018（check-runtime-state.sh に LC_ALL=C・iter73 同型 3 本目）＋W2=washed-green 封鎖 2 軸（judge undecidable 拡張＋marker 矛盾軸）＋W3=SF-012(b) src allowlist。src 3 ファイル（check-runtime-state.sh/marker.sh/build-judge-card.py）＋tests＝M（deploy skip）。SF-020/021 は次 iter へ分離（L 化・テーマ混在回避）。設計正本＝docs/specs/2026-07-22-iter76-evidence-integrity-locale-design.md。"
