@@ -3,7 +3,7 @@
 ## 総合: 🟢 承認可
 
 ## ティア1: 機械事実（✅検証済・高信頼）
-- テスト: green（判定源: src=manual / cmd=python3 -m pytest / ts=2026-07-20T15:46:11Z）
+- テスト: green（判定源: src=manual / cmd=python3 -m pytest / ts=2026-07-22T15:44:10Z）
 - 未完成マーカー(変更行): なし
 - テスト強度ドリル(B1): SKIP
 

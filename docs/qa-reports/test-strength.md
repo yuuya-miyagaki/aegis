@@ -1,10 +1,6 @@
 # テスト強度ドリル結果（機械ブロック・ハーネス生成）
 
 ```
-verdict: FAIL
-mutants_total: 2
-mutants_caught: 0
-baseline: n/a
-since: 097c103371bf1874bd0ed6c285362dc0d5ca6624
-survived: []
+verdict: SKIP
+reason: iter76（evidence 整合＋locale 掃討）は framework 改修を per-task commit 済み（9898153..c1dc9a8）＝qa 承認時の working-tree diff（git diff HEAD）が空になる想定どおりの縁ケース（qa-verification SKILL 147-150）。`since:097c103` 案は実走で DRILL BLOCKED を実測（coverage floor が 8 tracked 非docs ファイルの全ハンクに mutant 要求＝test 追加 105/108/97 行の巨大ハンクを含み構造的不成立・framework 混在 diff／LEARNINGS line33/54）。代替実証（手動 mutation 同等・全て親 or reviewer が実走）: (1) RED-first TDD＝Task1 が 10 RED/8 PASS を実測（9898153）。各 RED は機能未実装ゆえの失敗を fail メッセージで確認（RS1 silent-allow・W2b-1/4/5・W2a-1/5・W3-1/2/3・helper 未定義）。(2) 親 in-session mutation（scratchpad コピー・本体 tree 不接触）: [W3-2] src allowlist :336 の `return unverified`→`continue`＝古い green を遮らず green 化（baseline unverified→mutant green＝pin RED 化・歯あり）。[W2a-2] washed transparent の `continue`→`return unverified`＝古い clean green を殺す（baseline green→mutant unverified＝pin RED 化・歯あり）。[W2b-6b] fail-token :319 の literal TAB→space degrade（iter71 M10 罠再現）＝go の FAIL<TAB>pkg を取りこぼす（baseline false→mutant true＝pin RED 化・歯あり）。[errors-gap] fix 前 regex で `1 passed,2 errors`+exit0 が marker true・judge green→第5 alt 追加で false（E1/E2 実測）。(3) SF-018 byte 封鎖: RS1 が pre-fix silent-allow(rc0 None)→post-fix deny に flip を実測（0d73d09）＋0xFE/混在/redirect の B1-B4 全 deny。(4) washed-green 10 綴り（A1-6＋V1-4）全 unverified・本物 green 保全を親 judge e2e で実測。(5) full suite 1394 passed/2 skipped・record green（marker:true・src=manual）・check_framework_contract PASS・status_doctor PASS。詳細=docs/qa-reports/iter76-qa.md・iter76-review.md（対照表D／バッテリA/B/C/E/V）。
 ```

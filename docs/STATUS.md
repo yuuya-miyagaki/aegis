@@ -15,7 +15,7 @@ gate_approvals:
   brainstorm: approved
   plan: approved
   review: approved
-  qa: pending
+  qa: approved
   security: pending
   deploy: pending
   dev_ready_for_client: pending
@@ -24,7 +24,7 @@ current_refs:
   plan: "docs/plans/2026-07-22-iter76-evidence-integrity-locale-implementation-plan.md"
   spec: "docs/specs/2026-07-22-iter76-evidence-integrity-locale-design.md"
   review: "docs/qa-reports/iter76-review.md"
-  qa: null
+  qa: "docs/qa-reports/iter76-qa.md"
   security: null
   deploy: null
   translation: null
