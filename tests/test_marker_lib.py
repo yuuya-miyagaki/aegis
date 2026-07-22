@@ -248,9 +248,13 @@ class TestCountProof(unittest.TestCase):
 
     def test_unittest_failed_with_skips_true(self):
         # Red-run verdict (the verdict proves "tests ran", not "green"):
-        # Ran(5) - skipped(2) = 3 bodies executed -> true.
+        # Ran(5) - skipped(2) = 3 bodies executed -> true. iter76 Stage 6:
+        # exit must be the HONEST nonzero of a failing unittest run — the
+        # old exit "0" here encoded the washed-green hole itself (a FAILED
+        # banner with exit 0 is now the Stage-6 contradiction -> false,
+        # pinned by TestGreenContradictionVeto).
         out = ("Ran 5 tests in 0.010s\n\nFAILED (failures=1, skipped=2)\n")
-        rc, verdict = _verdict(out, "python3 -m unittest t", "0")
+        rc, verdict = _verdict(out, "python3 -m unittest t", "1")
         self.assertEqual((rc, verdict), (0, "true"))
 
     def test_cargo_hybrid_echo_forge_true_known_residual(self):

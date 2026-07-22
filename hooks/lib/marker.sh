@@ -44,7 +44,7 @@
 #   stdout: "true" | "false" with rc 0
 #   rc 3  : evaluation impossible (patterns.sh not loaded / pattern data
 #           missing) — every caller must treat this as NOT verified.
-# NOTE: the rc3 guard below requires ALL SEVEN pattern sources non-empty.
+# NOTE: the rc3 guard below requires ALL EIGHT pattern sources non-empty.
 # If a future patterns.sh edit legitimately empties one (e.g. every runner
 # gains a STRONG marker and PAIRS goes away), update the guard in the SAME
 # change — otherwise every consumer hard-fails with rc3.
@@ -63,6 +63,7 @@ aegis_marker_verdict() {
      [ -z "${AEGIS_TEST_ZERO_RUN_REGEX[*]:-}" ] || \
      [ -z "${AEGIS_TEST_PROLOGUE_REGEX[*]:-}" ] || \
      [ -z "${AEGIS_TEST_IS_PYTEST_REGEX:-}" ] || \
+     [ -z "${AEGIS_TEST_FAIL_TOKEN_REGEX:-}" ] || \
      [ -z "${AEGIS_TEST_COUNT_FAMILIES[*]:-}" ]; then
     return 3
   fi
@@ -247,6 +248,18 @@ aegis_marker_verdict() {
     fi
   done
   if [ "$family_detected" -eq 1 ] && [ "$count_ok" -eq 0 ]; then
+    printf 'false'
+    return 0
+  fi
+  # Stage 6 (iter76 SF-012a): green-contradiction veto. POSITIVE failure
+  # evidence in the output while the reported exit code is 0 means the
+  # exit was laundered (`pytest -q; true` / `|| true` / `| tee`) or the
+  # output forged — either way this run cannot prove green. Real red runs
+  # (exit != 0) skip the axis so the caller's red signal survives; empty
+  # exit_code (an observer payload without exitCode) skips too — the
+  # judge-side washed-cmd check (build-judge-card.py) covers that path.
+  if [ "$exit_code" = "0" ] && \
+     printf '%s' "$out" | grep -aqE "$AEGIS_TEST_FAIL_TOKEN_REGEX"; then
     printf 'false'
     return 0
   fi

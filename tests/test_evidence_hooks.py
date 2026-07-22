@@ -43,12 +43,15 @@ def make_repo(d: Path) -> None:
                     "-m", "init"], check=True)
 
 
-def bash_payload(cmd: str, output: str = "") -> dict:
+def bash_payload(cmd: str, output: str = "", exit_code: int = 0) -> dict:
     """Build a synthetic Bash tool_response. `output` defaults to empty so
     pre-existing tests that don't care about output keep working; the
-    marker_verified field will then be `false` (C-2 v1.6.1)."""
+    marker_verified field will then be `false` (C-2 v1.6.1). `exit_code`
+    defaults to 0; a failing-run fixture MUST pass the honest nonzero exit
+    (iter76 SF-012a Stage 6 vetoes a FAILED banner reported with exit 0 as
+    a washed-green contradiction — see test_marker_lib Step 3-3)."""
     return {"tool_name": "Bash", "tool_input": {"command": cmd},
-            "tool_response": {"exitCode": 0, "output": output}}
+            "tool_response": {"exitCode": exit_code, "output": output}}
 
 
 # A realistic python -m unittest summary line so marker_verified:true is set
@@ -197,7 +200,8 @@ class TestObserveToJudgeEndToEnd(unittest.TestCase):
                                   output="..F\n"
                                          "------\n"
                                          "Ran 3 tests in 0.1s\n"
-                                         "FAILED (failures=1)\n"),
+                                         "FAILED (failures=1)\n",
+                                  exit_code=1),
                      self.root)
         self.assertEqual(rc, 0)
         self.assertEqual(judge.read_test_result(self.root), "red")
