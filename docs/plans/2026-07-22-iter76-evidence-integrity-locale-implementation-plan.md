@@ -609,7 +609,7 @@ git commit -m "docs(iter76): iter73 設計の完全性主張を訂正（SF-018�
 - 仕様カバレッジ: 設計の W1/W2a/W2b/W3 全てに Task と test がある（上表）。
 - 曖昧さ: 「washed の fail は red 維持」「未知 src は終端・washed-ok は透明」の非対称は W2a-2/3・W3-2 で挙動 pin 済み＝二義なし。
 - 整合性: `_cmd_has_shell_operators` は `_norm_cmd_match` と同一の正規化（改行→`;`・strips マスク）を再実装でなく同型で共有（レビューで byte-parity 確認）。
-- 既知の意図された flip: `test_unittest_failed_with_skips_true`（Task 3 Step 3-3）のみ。他の既存テストに exit=0×非ゼロ failed の組合せは無い（grep 実測済み: `0 failed` 形のみ）。
+- 既知の意図された flip（Task 3 実測で 2 件に訂正）: ①`test_unittest_failed_with_skips_true`（Step 3-3・計画時特定）②`test_evidence_hooks.py::test_observed_failure_certifies_red`（Task 3 実装中に GREEN gate で検出・`bash_payload` が FAILED 出力を exitCode 0 で流す同型 washed fixture → optional `exit_code` 引数追加＋当該テストのみ honest exit 1 へ。default 0 維持で他 fixture 非退行・2c47cf6）。計画時 grep は marker 系 2 ファイルのみで evidence_hooks を見落とした＝「1 件のみ」は過小主張だった。
 
 ## リスク
 
