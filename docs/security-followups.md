@@ -423,6 +423,15 @@ SF-001 系の網羅的閉鎖（rounds 5-11）で**実用的なシェル難読化
 - **道C による主張の正確化（iter75 security 再走）**: 静的文字列正規化で**健全に**畳めるのは**非空 IFS 展開**のみ。security 1次(opus)/盲検2次(fable) が、**空/ゼロ幅 IFS 展開**（`${IFS:0:0}`・オフセット超過）の unsound fold（過分割）と mixed split/glue（`rm${IFS}-${IFS:0:0}rf${IFS}/x`＝fold-to-space/fold-to-empty のどちらの純形でも非マッチ＝2ⁿ 展開列挙が必要）、param-default ネスト（`rm${Q:-${IFS}}-rf`）、変数間接（`x=IFS; rm${!x}-rf`）を摘発（bash runtime で実削除/実 leak を実証）。これらは全て**構造化 argv でしか根治できない＝SF-019 residual**（下記に統合）。全て意図的難読化を要し事故経路で発生しない（脅威モデル外・North Star から severity 低）。証跡＝`docs/qa-reports/iter75-security.md`。
 - **状態**: **CLOSED-in-review（iter75・道C 確定）**。review approved（`docs/qa-reports/iter75-review.md`）／qa approved（`docs/qa-reports/iter75-qa.md`）／security approve_with_notes（`docs/qa-reports/iter75-security.md`・deploy blocker なし）。正本＝`docs/full-review-2026-07-19-dual-codex-fable.md` §4.1。**review 盲検2次が2回・security 1次/盲検2次が各1回、独立に段階的に残穴を摘発（broad-stage/commit・backslash-newline→FF1-6／難読化大文字→FF7／ゼロ幅・mixed IFS・param-default・変数間接→SF-019 へ分離＝道C）＝独立盲検レビューが機能した実例**。残余は SF-019（構造化 argv・iter77 根治）・SF-020（raw 大文字直打ち）へ分離。
 
+### SF-022: marker Stage 6 の fail-token denylist は語彙不完全＝positive proof が根治（**Low・iter76 で緩和・iter77 attestation で根治**・盲検2次検出）
+
+- **発見**: iter76 review 盲検2次（fable・fresh）。1次バッテリは `failed`/`FAILED`/`FAIL` を叩いたが `errors` 語形を見落とし。2次が pytest の `===== 1 passed, 2 errors in 0.42s =====`（collection/setup error）を exit0 で流すと marker Stage 6 が veto せず `true` を返すことを摘発。
+- **種別**: marker Stage 6（SF-012(a)）は**失敗トークンの denylist**。iter76 実装時点では pytest の `errors` サマリ語形が非対象で、Stage-5 count family も EXEC が `passed|failed` のみ数えるため error を減算しない。
+- **重大度**: **Low（緩和済み・脅威モデル内で独立到達不能を実証）**。実証（iter76 review 親実走）: (E1) marker 単体は `1 passed, 2 errors`+exit0 で pre-fix `true`／(E2) judge e2e（observed・演算子なし単一 cmd）で pre-fix `green`＝**合成到達は可能**。だが**脅威モデル内では独立到達不能**——本物の単一 pytest が errors を出すと **exit 2**（非0）で status=fail、observed で status=ok にするには (a) 演算子洗浄（`; true`）→ judge W2a が捕捉／(b) fake runner binary → SF-014/iter77 attestation 天井、のどちらかが必要。record 経路（manual）は実 exit code ゲートで弾く。
+- **iter76 緩和**: `AEGIS_TEST_FAIL_TOKEN_REGEX` に第5 alt `[1-9][0-9]* errors? in [0-9]`（pytest の timing tail `N errors in T.TTs` に tight anchor・benign `caught 3 errors in total`／`5 errors in the log` は `in <digit>` 非該当で非マッチ）を追加し、judge を経由しない共通コア消費者（record/drill）でも errors washed を veto。pin＝`tests/test_marker_lib.py::test_w2b7_*`（errors-only／mixed）＋`test_w2b7b_benign_errors_wording_stays_true`（過剰マッチ防止）。
+- **根本原因/根治**: 列挙 denylist は原理的に不完全（LEARNINGS conf9・SF-014 と同型）＝失敗語彙を足し続けても網羅しない。**根治は iter77 の pytest execution attestation**（argv spawn＋structured event で「実行され passed/failed/error のいずれか」を positive proof・src=attested のみ decisive green）。本 SF はその天井の一事例で、iter76 は denylist を1語広げた net 改善に留まる。
+- **状態**: **iter76 緩和（errors 語形封鎖）・残余は iter77 attestation で根治**。denylist の原理的不完全性そのものは OPEN（iter77 で positive proof に置換）。
+
 ### SF-018: `check-runtime-state.sh` が不正 UTF-8 バイトで `tr` crash → fail-open（**Medium・OPEN**・iter74 二重レビュー Fable 検出＝iter73 完全性主張の反証）
 
 - **発見**: iter74 二重網羅レビュー（Fable 盲検2次・層1 locale-byte 次元）。Codex（外部）は同次元を「iter72/73 の byte hardening は closed」と結論したが、Codex は runtime-state フックを未攻撃。親が実走再現し確定＝乖離が摘発。

@@ -500,6 +500,31 @@ class TestGreenContradictionVeto(unittest.TestCase):
         rc, out = _verdict(out_text, "go test ./...", "0")
         self.assertEqual((rc, out), (0, "false"))
 
+    def test_w2b7_pytest_errors_summary_with_exit0_is_false(self):
+        # W2b-7（review 盲検2次 divergence pin）: pytest の collection/setup
+        # ERROR は Stage-5 count family が減算せず（EXEC は passed|failed のみ）
+        # `failed` 系 alt も拾わない語形。`N errors in <digit>`（pytest の
+        # timing tail）を exit0 と矛盾させれば false。marker 共通コアの穴
+        # （E1/E2 で合成到達を実測）を閉じる。errors-only／mixed 双方を pin。
+        for out_text in (
+            "platform darwin\nrootdir: /x\ncollected 3 items\n\n"
+            "===== 1 passed, 2 errors in 0.42s =====\n",
+            "platform darwin\nrootdir: /x\ncollected 0 items / 2 errors\n\n"
+            "===== 2 errors in 0.08s =====\n",
+        ):
+            rc, out = _verdict(out_text, "python3 -m pytest", "0")
+            self.assertEqual((rc, out), (0, "false"), out_text)
+
+    def test_w2b7b_benign_errors_wording_stays_true(self):
+        # W2b-7b（過剰マッチ防止 pin）: 緑 run の本文が「N errors」を含んでも
+        # timing tail 形（`in <digit>`）でなければ veto しない。`caught 3
+        # errors in total` は `in [0-9]` にアンカーされず非マッチ＝green 保全。
+        out_text = ("platform darwin\nrootdir: /x\ncollected 3 items\n\n"
+                    "test_x.py: caught 3 errors in total, all handled\n\n"
+                    "===== 3 passed in 0.42s =====\n")
+        rc, out = _verdict(out_text, "python3 -m pytest", "0")
+        self.assertEqual((rc, out), (0, "true"))
+
 
 if __name__ == "__main__":
     unittest.main()

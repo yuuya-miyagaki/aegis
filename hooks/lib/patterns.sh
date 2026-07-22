@@ -305,7 +305,18 @@ AEGIS_TEST_COUNT_FAMILIES=(
 # [[:space:]] (banned) nor \t (BSD grep matches literal backslash-t; iter71
 # M10). In line-oriented grep -E the `\n` alternative degrades to a literal
 # `n` (same accepted harmless over-match as the count-family patterns).
-AEGIS_TEST_FAIL_TOKEN_REGEX='(^|[^0-9A-Za-z_])[1-9][0-9]* failed|FAILED \((failures|errors)=|(^|\n)--- FAIL:|(^|\n)FAIL[ 	]'
+# 5th alt (iter76 review blind-2nd): pytest's ERROR summary word-form
+# (`===== 1 passed, 2 errors in 0.42s =====`, `===== 2 errors in 0.08s =====`)
+# — collection/setup errors that Stage-5's count family does NOT subtract
+# (its EXEC counts only passed|failed) and the `failed`/`FAILED (…errors=` alts
+# above do NOT cover. Anchored to `N errors in <digit>` (pytest's timing tail)
+# so benign body text like `caught 3 errors in total` / `5 errors in the log`
+# does NOT match (the digit after `in ` is the discriminator). Not independently
+# reachable to forge green (a real single-cmd pytest with errors exits nonzero;
+# reaching exit-0-with-errors needs a shell operator → judge W2a, or a fake
+# runner binary → iter77 attestation ceiling), but closes the shared marker
+# core for the non-judge consumers (record/drill). See docs/security-followups.md.
+AEGIS_TEST_FAIL_TOKEN_REGEX='(^|[^0-9A-Za-z_])[1-9][0-9]* failed|FAILED \((failures|errors)=|(^|\n)--- FAIL:|(^|\n)FAIL[ 	]|[1-9][0-9]* errors? in [0-9]'
 # K-1 (v1.6.2): pytest prologue regex. When a pytest-family command runs,
 # pytest prints a multi-line prologue (platform/Python version, rootdir,
 # collected N items) BEFORE the strong summary. A forged `echo "== 3 passed
