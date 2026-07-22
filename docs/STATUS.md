@@ -3,18 +3,18 @@ framework: aegis
 framework_version: "1.31.2"
 project_name: "Aegis"
 mode: Dev
-phase: review
+phase: qa
 task_type: framework
 task_size: M
 task_size_rationale: "iter76（framework・P0＝evidence 整合＋locale 掃討完了・**M 確定**＝brainstorm Step D 2026-07-22）。案A＝roadmap 準拠 3 点セット: W1=SF-018（check-runtime-state.sh に LC_ALL=C・iter73 同型 3 本目）＋W2=washed-green 封鎖 2 軸（judge undecidable 拡張＋marker 矛盾軸）＋W3=SF-012(b) src allowlist。src 3 ファイル（check-runtime-state.sh/marker.sh/build-judge-card.py）＋tests＝M（deploy skip）。SF-020/021 は次 iter へ分離（L 化・テーマ混在回避）。設計正本＝docs/specs/2026-07-22-iter76-evidence-integrity-locale-design.md。"
 iteration: 76
 ui_surface: false
-last_updated: "2026-07-22T00:30:00Z"
+last_updated: "2026-07-23T00:00:00Z"
 gate_approvals:
   client_ready_for_dev: n/a
   brainstorm: approved
   plan: approved
-  review: pending
+  review: approved
   qa: pending
   security: pending
   deploy: pending
@@ -23,7 +23,7 @@ current_refs:
   requirements: []
   plan: "docs/plans/2026-07-22-iter76-evidence-integrity-locale-implementation-plan.md"
   spec: "docs/specs/2026-07-22-iter76-evidence-integrity-locale-design.md"
-  review: null
+  review: "docs/qa-reports/iter76-review.md"
   qa: null
   security: null
   deploy: null
@@ -37,7 +37,7 @@ external_evidence:
     scope: "v0.13.0 計画 5 ラウンドレビュー"
     findings: "Round 1〜5 で計 25 件の指摘（hook 出力スキーマ陳腐化、TaskCreated/Completed 制御方式、Plan 条件付き許可、effort 配分、pre-compact.sh 同種破損、`if` 単一 rule 制約等）"
     resolution: "Rev.5 で全件反映、Phase 0a 即時実装着手 GO。hotfix/v0122-hook-schema ブランチで開始。"
-next_action: "**【iter76 review フェーズ】** implement 完了（Task1-5＝9898153/0d73d09/d3875e6/2c47cf6/c73afcf/e115e82・grill-code 反映 dc8ffd8・full 1391 passed/2 skipped・contract PASS・record green）。実測確定: SF-018 は 2 モード fail-open（tr crash＋silent allow）・意図された flip 2 件・RED 分布 10/8。**次アクション: aegis-review-gate＝1次 4角度 finder（opus・物理隔離 clone・read-only 6拘束）→親 verify（fable）→盲検2次（fable・fresh）→docs/qa-reports/iter76-review.md（対照表・severity・claims）→update-gate review approve --ref→qa へ。** 残余方針: 単一コマンド fake binary は iter77 attestation の天井。未消化: SF-019／SF-020・SF-021（次 iter・S 消化）。"
+next_action: "**【iter76 qa フェーズ】** review gate 原子承認済（🟢 承認可・--ref・c1dc9a8）。1次4角度＋盲検2次とも approve 系・Critical/Major 0・washed-green バイパス0（親 in-session 10綴り＋盲検2次独立実走）。盲検2次 divergence（pytest errors 語形）は実証裁定→tight anchor 緩和＋SF-022＋iter77 根治。**次アクション: qa-verification＝B1 drill（framework 混在 diff は sanctioned skip 判定＋fresh 変異）＋実環境 E2E（washed-green/SF-018 の hook 直接発火再実測）＋full record green→docs/qa-reports/iter76-qa.md（claims）→update-gate qa approve --ref→security へ。** 残余方針: 単一コマンド fake binary は iter77 attestation 天井。未消化: SF-019／SF-020・SF-021。"
 blockers: []
 failure_tracking: null
 session_history:

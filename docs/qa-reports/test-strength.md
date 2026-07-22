@@ -1,6 +1,10 @@
 # テスト強度ドリル結果（機械ブロック・ハーネス生成）
 
 ```
-verdict: SKIP
-reason: iter75 SF-017 fix-forward（moat 難読化封鎖）は framework 改修を per-task commit 済み（5398e72..402fdd9）＝qa 承認時の working-tree diff（git diff HEAD）が空になる想定どおりの縁ケース（qa-verification SKILL 147-150）。`since` 案は iter73 同様テストファイルを floor 対象化し不採。代替実証（手動 mutation 同等）: (1) RED-first TDD＝各 FF タスクが RED commit（初回 5398e72 で 6 バイパス・FF1 292f4a9 で非rm 大文字含む 7 バイパスが現状 allow を実測してから GREEN 化）。(2) review reviewer-testing の mutation 実測（scratchpad コピー・本体 tree 不接触）: [MA] helper backslash-newline 除去行削除→parity unit RED（killed）。[MB] check-secrets BROAD_NORM 無効化→F1 broad 2件 RED（killed）。[MC] check-destructive :149 を NORM に戻す→F3 rm 2件 RED（killed）。[MD] broad/commit 一律 DENY→誤検知回帰 pin 6件 RED（killed）。[FF7-mut] :161 の grep -i→grep→非rm 大文字 10件 RED（killed）。RED 真正性: FF7 前 5f03ac0 で非rm 大文字 10件 FAIL を実測。(3) review 3体独立実測: 1次=CMD_REGEX 全19＋LOWER＋rm の大文字難読化封鎖／盲検2次=24 パターン＋新軸攻撃（新穴なし）／testing=mutation 10/10 RED・網羅性。(4) full suite green（1341 passed/2 skipped・record green marker:true）・check_framework_contract PASS・status_doctor PASS。詳細=docs/qa-reports/iter75-qa.md・iter75-review.md。
+verdict: FAIL
+mutants_total: 2
+mutants_caught: 0
+baseline: n/a
+since: 097c103371bf1874bd0ed6c285362dc0d5ca6624
+survived: []
 ```
