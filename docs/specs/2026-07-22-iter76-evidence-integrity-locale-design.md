@@ -78,4 +78,6 @@
 2. **SF-018 の実 fail-open は 2 モード**（Task 1/親裁定で実測確定）: (a) tr crash（rc=1・77566ed 親再現）に加え、本機実測は (b) **silent allow**（rc=0 `{}`・バイトが UTF-8 locale 下の抽出/grep を汚染し runtime-state 検出が pattern-miss）。(b) は stderr 信号すら無い分 (a) より悪い。`LC_ALL=C` は両モードを封鎖（RS1=silent-allow differential pin・`tests/test_hook_locale_byte.py::TestRuntimeStateByteSafety`）。
 3. **意図された既存テスト flip は 2 件**（いずれも「失敗 run を exit 0 で流す washed fixture」を honest exit へ）: `test_marker_lib.py::test_unittest_failed_with_skips_true`・`test_evidence_hooks.py::test_observed_failure_certifies_red`（`bash_payload` に optional `exit_code` 追加・default 0 で他 fixture 非退行）。
 
-実装 commit 系列: 9898153（RED 10/8）→ 0d73d09/d3875e6（W1）→ 2c47cf6（W2b）→ c73afcf（W2a+W3）。
+4. **evidence cmd の 500 字切詰めと washed 検査の関係**（grill-code 🟢）: evidence.sh は cmd を 500 字で切詰めて保存するため、演算子が 500 字以降にある wash は judge の washed 検査（W2a）単体ではすり抜ける。ただし赤 run の green 偽装経路は多層で閉じている——出力に失敗証拠があれば Stage 6（W2b）が false／出力抑制なら summary marker 不成立で undecidable。つまり W2a は「500 字以内の実用形」を、W2b/marker が残りを被覆する設計＝穴ではない。
+
+実装 commit 系列: 9898153（RED 10/8）→ 0d73d09/d3875e6（W1）→ 2c47cf6（W2b）→ c73afcf（W2a+W3）→ grill-code fix-forward（`[[:space:]]` 契約違反修正＋W2b-6 pin・mutation 実証済み）。

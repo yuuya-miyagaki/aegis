@@ -474,6 +474,18 @@ class TestGreenContradictionVeto(unittest.TestCase):
                                 "0", lib=lib_dir / "marker.sh")
             self.assertEqual(rc, 3)
 
+    def test_w2b6_fail_line_anchor_with_exit0_is_false(self):
+        # W2b-6（grill-code 🟢 pin）: FAIL 行アンカー branch の単独 pin。
+        # 出力に「N failed」数値トークンが無くても、行頭 FAIL＋空白/TAB
+        # （jest/vitest の `FAIL src/…`・go の `FAIL<TAB>pkg`）が exit 0 と
+        # 矛盾すれば false。この alternation を削る mutant は W2b-1〜5 の
+        # どれにも捕まらないため専用 pin（数値 failed トークンは意図的に
+        # 置かず、第 1 択でなく第 4 択が発火することを固定する）。
+        out_text = ("FAIL src/app.test.ts\n"
+                    "Tests:       2 passed, 2 total\n")
+        rc, out = _verdict(out_text, "npx jest", "0")
+        self.assertEqual((rc, out), (0, "false"))
+
 
 if __name__ == "__main__":
     unittest.main()

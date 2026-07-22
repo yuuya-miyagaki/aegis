@@ -300,10 +300,12 @@ AEGIS_TEST_COUNT_FAMILIES=(
 # in its Ran-line, so its FAILED banner is matched directly; go/jest/vitest
 # print FAIL-prefixed lines. Incidental FAIL-looking text inside a green
 # run's captured body flips true->false only (fail-closed; same accepted
-# class as the count-family M-2 residual). ERE∩python-re subset per header;
-# in line-oriented grep -E the `\n` alternative degrades to a literal `n`
-# (same accepted harmless over-match as the count-family patterns above).
-AEGIS_TEST_FAIL_TOKEN_REGEX='(^|[^0-9A-Za-z_])[1-9][0-9]* failed|FAILED \((failures|errors)=|(^|\n)--- FAIL:|(^|\n)FAIL[[:space:]]'
+# class as the count-family M-2 residual). ERE∩python-re subset per the
+# CONSTRAINT above — the FAIL-line bracket uses a LITERAL TAB + space, NOT
+# [[:space:]] (banned) nor \t (BSD grep matches literal backslash-t; iter71
+# M10). In line-oriented grep -E the `\n` alternative degrades to a literal
+# `n` (same accepted harmless over-match as the count-family patterns).
+AEGIS_TEST_FAIL_TOKEN_REGEX='(^|[^0-9A-Za-z_])[1-9][0-9]* failed|FAILED \((failures|errors)=|(^|\n)--- FAIL:|(^|\n)FAIL[ 	]'
 # K-1 (v1.6.2): pytest prologue regex. When a pytest-family command runs,
 # pytest prints a multi-line prologue (platform/Python version, rootdir,
 # collected N items) BEFORE the strong summary. A forged `echo "== 3 passed
