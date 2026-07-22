@@ -3,7 +3,7 @@ framework: aegis
 framework_version: "1.31.2"
 project_name: "Aegis"
 mode: Dev
-phase: plan
+phase: implement
 task_type: framework
 task_size: M
 task_size_rationale: "iter76（framework・P0＝evidence 整合＋locale 掃討完了・**M 確定**＝brainstorm Step D 2026-07-22）。案A＝roadmap 準拠 3 点セット: W1=SF-018（check-runtime-state.sh に LC_ALL=C・iter73 同型 3 本目）＋W2=washed-green 封鎖 2 軸（judge undecidable 拡張＋marker 矛盾軸）＋W3=SF-012(b) src allowlist。src 3 ファイル（check-runtime-state.sh/marker.sh/build-judge-card.py）＋tests＝M（deploy skip）。SF-020/021 は次 iter へ分離（L 化・テーマ混在回避）。設計正本＝docs/specs/2026-07-22-iter76-evidence-integrity-locale-design.md。"
@@ -13,7 +13,7 @@ last_updated: "2026-07-22T00:30:00Z"
 gate_approvals:
   client_ready_for_dev: n/a
   brainstorm: approved
-  plan: pending
+  plan: approved
   review: pending
   qa: pending
   security: pending
@@ -21,7 +21,7 @@ gate_approvals:
   dev_ready_for_client: pending
 current_refs:
   requirements: []
-  plan: null
+  plan: "docs/plans/2026-07-22-iter76-evidence-integrity-locale-implementation-plan.md"
   spec: "docs/specs/2026-07-22-iter76-evidence-integrity-locale-design.md"
   review: null
   qa: null
@@ -37,7 +37,7 @@ external_evidence:
     scope: "v0.13.0 計画 5 ラウンドレビュー"
     findings: "Round 1〜5 で計 25 件の指摘（hook 出力スキーマ陳腐化、TaskCreated/Completed 制御方式、Plan 条件付き許可、effort 配分、pre-compact.sh 同種破損、`if` 単一 rule 制約等）"
     resolution: "Rev.5 で全件反映、Phase 0a 即時実装着手 GO。hotfix/v0122-hook-schema ブランチで開始。"
-next_action: "**【iter76 plan フェーズ・実装計画作成中】** brainstorm gate 承認済（2026-07-22・案A＝W1 SF-018 LC_ALL 3本目＋W2 washed-green 2軸＋W3 src allowlist・M・SF-020/021 は次 iter 分離）。設計正本＝current_refs.spec。**次アクション: PLAN.template.md で実装計画（docs/plans/2026-07-22-iter76-evidence-integrity-locale-implementation-plan.md）作成→grill-plan で全指摘反映→plan gate 承認（--ref 原子 approve）→implement（TDD RED-first・旧赤/新緑 differential pin が ship 条件）。** 残余方針: 単一コマンド fake binary は iter77 attestation の天井＝test_residual_* pin。未消化: SF-019（構造化 argv）／SF-020・SF-021（次 iter・S 消化）。"
+next_action: "**【iter76 implement フェーズ】** plan gate 原子承認済（--ref・grill-plan 致命3/要検討4 全反映・a8aade1）。**次アクション: subagent-dev で Task 1〜5 を実行（implementer=opus dispatch・タスク単位コミット）: Task1=RED differential pin 18本（11 RED/7 PASS 分布実測）→Task2=SF-018 LC_ALL→Task3=marker Stage6 矛盾veto→Task4=judge washed transparent＋src allowlist→Task5=設計正本訂正＋full green 記録→grill-code→review へ。** 各タスク Stage1 レビュー必須（read-only 6拘束）。意図された既存 flip は test_unittest_failed_with_skips_true の 1 件のみ。残余方針: 単一コマンド fake binary は iter77 attestation の天井。未消化: SF-019／SF-020・SF-021（次 iter・S 消化）。"
 blockers: []
 failure_tracking: null
 session_history:

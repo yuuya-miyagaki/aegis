@@ -53,7 +53,7 @@
   - SF-020/021（次 iter で S 消化・roadmap の attestation 前に挟む）。
   - SF-019（構造化 argv・iter77 系）・pytest execution attestation 本体（iter77）。
   - evidence.sh writer 側での wash 検査（reader＝judge を単一信頼権威とする・diff 最小化。marker.sh の矛盾軸は writer/record/drill 3 消費者共通で入る）。
-  - 新規 regex/denylist の追加（既存 count families・マスクパイプラインの再利用のみ）。
+  - 新規 regex/denylist の追加（既存 count families・マスクパイプラインの再利用のみ）。〔2026-07-22 実装同期: fail-token 整合軸 1 本（`AEGIS_TEST_FAIL_TOKEN_REGEX`）のみ追加に訂正——count families は unittest の failed を単離抽出できないと plan 時に判明。moat denylist の増殖ではなく SF-012(a) 記載の修正方向。詳細は design の §実装同期〕
   - record-test-result.py の変更（shell なし実行＝実行系防御が既に washed 形を構造的に無効化・iter70 検証済み。judge との非対称は by-design と設計ノートに明記）。
 
 ## 未解決事項

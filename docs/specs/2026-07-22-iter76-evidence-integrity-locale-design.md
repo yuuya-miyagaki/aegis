@@ -15,7 +15,7 @@
 ## 推奨アプローチ
 
 - 採用方針: 3 点セット。W1=SF-018 の `LC_ALL=C` 同型修正（+設計正本訂正+crash pin）。W2=washed-green 封鎖 2 軸（W2a: judge 側 undecidable 述語拡張＝observed cmd のクォート外シェル演算子検出／W2b: marker.sh stage5 の exit0×failed>0 矛盾軸）。W3=SF-012(b) src allowlist（終端🟡）。
-- 採用理由: SF-012 に既記載の修正方向をそのまま実装＝設計リスク最小。全変更が「green 認定の締め付け」方向のみ＝fail-open を作らない。既存 primitive（count families・quoted-span マスク・trust-scan）の再利用で新規 regex ゼロ。
+- 採用理由: SF-012 に既記載の修正方向をそのまま実装＝設計リスク最小。全変更が「green 認定の締め付け」方向のみ＝fail-open を作らない。既存 primitive（quoted-span マスク・trust-scan）の再利用が中心で、新規 pattern は fail-token 整合軸 1 本のみ（`AEGIS_TEST_FAIL_TOKEN_REGEX`・SF-012(a) が自ら規定する修正方向＝moat denylist の増殖ではない。当初の「count families 再利用で新規 regex ゼロ」は plan 時精査で撤回——EXEC は passed+failed 混合和で unittest の failed を単離抽出できない。§実装同期 参照）。
 - 検討した代替案と不採用理由: (a) cmd の精密解析（最終コマンド位置で exit 信頼性を判定）＝bash 文法の再実装に近く「conservative lexer に留める」原則違反、blanket が安全側で単純。(b) writer 側（evidence.sh）にも wash 検査＝信頼判定の権威が 2 箇所に割れ drift リスク、reader 1 点で十分。(c) 全部を marker 側で吸収（failed>0 で無条件 false）＝**実 red（rc≠0）を undecidable-fail→🟡 に降格させ red シグナルを失う**ため不可（red は red のまま残す）。
 
 ## コンポーネント分解
@@ -23,7 +23,7 @@
 - 分割方針: 変更 3 ファイル＝それぞれ独立した 1 責務。相互依存なし（順不同で実装可・TDD は W1→W2b→W2a→W3 順を推奨）。
 - 各ユニットの責務:
   - ユニット W1 `hooks/check-runtime-state.sh`: 入力読取（`INPUT=$(cat)`）直後に `export LC_ALL=C LC_CTYPE=C LANG=C` を張り、以降の tr/grep をバイト決定論化（iter73 の destructive/secrets と同型・3 本目で掃討完了）。
-  - ユニット W2b `hooks/lib/marker.sh`: stage 5（count proof）に整合軸を追加＝検出済み family の failed 合計 >0 **かつ** exit_code==0 → verdict "false"。exit_code 非 0/欠落（""）は現状維持。3 消費者（evidence.sh/record/drill）に自動波及。
+  - ユニット W2b `hooks/lib/marker.sh`: Stage 6（green 矛盾 veto）を追加＝出力に非ゼロ failure 証拠（`AEGIS_TEST_FAIL_TOKEN_REGEX`・patterns.sh 単一ソース）**かつ** exit_code==0 → verdict "false"。exit_code 非 0/欠落（""）は現状維持。rc3 ガードは 8 ソース化。3 消費者（evidence.sh/record/drill）に自動波及。（当初案の「stage 5 count families から failed 合計を算出」は plan 時精査で fail-token regex 方式へ精密化＝§実装同期）
   - ユニット W2a+W3 `scripts/build-judge-card.py` `read_test_result`: (W2a) undecidable 述語を「src==observed かつ（marker≠true **または** cmd にクォート外 `[;&|]`）」に拡張。演算子検出は既存パイプライン（改行→`;` 正規化＋strips で quoted-span→Q マスク）を通した文字列への正規表現 1 本＝`_norm_cmd_match` と同一の正規化を共有。(W3) 走査冒頭で `src not in ("manual","observed")` → 終端 unverified🟡。
 
 ## インターフェース定義
@@ -65,7 +65,17 @@
 
 ## 次のステップ
 
-- [ ] 実装計画を作成する → `docs/plans/2026-07-22-iter76-evidence-integrity-locale-implementation-plan.md`
+- [x] 実装計画を作成する → `docs/plans/2026-07-22-iter76-evidence-integrity-locale-implementation-plan.md`
 - テンプレート名: `PLAN.template.md`
 - 本設計ノートのパスを PLAN の「参照設計」に記載すること
 <!-- exit-check: 全セクション記入・自己レビュー完了 → plan へ -->
+
+## 実装同期（2026-07-22・plan/implement 時の精密化・dated 追記）
+
+設計から実装までに確定した差分 3 点。設計の主構造（3 点セット・fail-closed 方向のみ・trust-scan 意味論不変）は不変。
+
+1. **W2b の実装形**: 「count families から failed 合計を算出」→ **fail-token 整合 regex 1 本**（`AEGIS_TEST_FAIL_TOKEN_REGEX`・非ゼロ failed／FAILED バナー／FAIL 行アンカー）へ精密化。理由＝count families の EXEC は `[0-9]+ (passed|failed)` 混合和で unittest（`Ran N tests`）の failed を単離できない。SF-012(a) が自ら規定する形（fail トークン×exit=0）そのもの。誤発火は fail-closed 方向のみ（count-family M-2 と同じ受容クラス・cargo `0 failed` は非ゼロアンカーで除外＝pin 済み）。
+2. **SF-018 の実 fail-open は 2 モード**（Task 1/親裁定で実測確定）: (a) tr crash（rc=1・77566ed 親再現）に加え、本機実測は (b) **silent allow**（rc=0 `{}`・バイトが UTF-8 locale 下の抽出/grep を汚染し runtime-state 検出が pattern-miss）。(b) は stderr 信号すら無い分 (a) より悪い。`LC_ALL=C` は両モードを封鎖（RS1=silent-allow differential pin・`tests/test_hook_locale_byte.py::TestRuntimeStateByteSafety`）。
+3. **意図された既存テスト flip は 2 件**（いずれも「失敗 run を exit 0 で流す washed fixture」を honest exit へ）: `test_marker_lib.py::test_unittest_failed_with_skips_true`・`test_evidence_hooks.py::test_observed_failure_certifies_red`（`bash_payload` に optional `exit_code` 追加・default 0 で他 fixture 非退行）。
+
+実装 commit 系列: 9898153（RED 10/8）→ 0d73d09/d3875e6（W1）→ 2c47cf6（W2b）→ c73afcf（W2a+W3）。

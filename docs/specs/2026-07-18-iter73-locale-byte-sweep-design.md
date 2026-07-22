@@ -186,3 +186,19 @@ flowchart LR
   review（1次4角度=opus→親verify=fable・盲検2次=fable）→ qa → security →（M ゆえ deploy skip）→
   ship（bump）→ docs → dev_ready_for_client。
 <!-- exit-check: 全セクション記入・自己レビュー完了 → plan へ -->
+
+## 訂正（2026-07-22・iter76 SF-018）
+
+本設計の「check-runtime-state.sh は python3 抽出が不正バイトで空 CMD になる
+ため同型（tr crash→fail-open）は不成立」という完全性主張は**誤り**（iter74
+二重レビュー Fable 盲検2次が反証・SF-018）。不正バイトを積んだ入力に対する
+pre-fix の fail-open は**経路依存で 2 モード**あることを iter76 で実測確定:
+(a) tr crash（rc=1・decision 未出力・77566ed 親再現＝SF-018 記載）、
+(b) **silent allow**（rc=0 `{}`・iter76 Task 1/親裁定の本機実測＝0xFF を積んだ
+`echo … > docs/STATUS.md` の deny が判定素通りで allow 化。バイトが UTF-8
+locale 下の抽出/grep を汚染し runtime-state 検出が pattern-miss する）。
+(b) は stderr 信号すら出ない分 (a) より悪い。iter76 で `INPUT=$(cat)` 直後の
+`export LC_ALL=C LC_CTYPE=C LANG=C` により本 hook も byte-wise 化し、
+**両モードとも封鎖**して locale 掃討を完了した。回帰 pin＝
+`tests/test_hook_locale_byte.py::TestRuntimeStateByteSafety`（RS1=silent-allow
+の differential pin・RS2-4=非退行）。
