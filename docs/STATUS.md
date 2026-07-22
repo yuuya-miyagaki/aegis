@@ -1,9 +1,9 @@
 ---
 framework: aegis
-framework_version: "1.31.2"
+framework_version: "1.31.3"
 project_name: "Aegis"
 mode: Dev
-phase: security
+phase: docs
 task_type: framework
 task_size: M
 task_size_rationale: "iter76（framework・P0＝evidence 整合＋locale 掃討完了・**M 確定**＝brainstorm Step D 2026-07-22）。案A＝roadmap 準拠 3 点セット: W1=SF-018（check-runtime-state.sh に LC_ALL=C・iter73 同型 3 本目）＋W2=washed-green 封鎖 2 軸（judge undecidable 拡張＋marker 矛盾軸）＋W3=SF-012(b) src allowlist。src 3 ファイル（check-runtime-state.sh/marker.sh/build-judge-card.py）＋tests＝M（deploy skip）。SF-020/021 は次 iter へ分離（L 化・テーマ混在回避）。設計正本＝docs/specs/2026-07-22-iter76-evidence-integrity-locale-design.md。"
@@ -16,7 +16,7 @@ gate_approvals:
   plan: approved
   review: approved
   qa: approved
-  security: pending
+  security: approved
   deploy: pending
   dev_ready_for_client: pending
 current_refs:
@@ -25,7 +25,7 @@ current_refs:
   spec: "docs/specs/2026-07-22-iter76-evidence-integrity-locale-design.md"
   review: "docs/qa-reports/iter76-review.md"
   qa: "docs/qa-reports/iter76-qa.md"
-  security: null
+  security: "docs/qa-reports/iter76-security.md"
   deploy: null
   translation: null
 external_evidence:
@@ -37,10 +37,14 @@ external_evidence:
     scope: "v0.13.0 計画 5 ラウンドレビュー"
     findings: "Round 1〜5 で計 25 件の指摘（hook 出力スキーマ陳腐化、TaskCreated/Completed 制御方式、Plan 条件付き許可、effort 配分、pre-compact.sh 同種破損、`if` 単一 rule 制約等）"
     resolution: "Rev.5 で全件反映、Phase 0a 即時実装着手 GO。hotfix/v0122-hook-schema ブランチで開始。"
-next_action: "**【iter76 qa フェーズ】** review gate 原子承認済（🟢 承認可・--ref・c1dc9a8）。1次4角度＋盲検2次とも approve 系・Critical/Major 0・washed-green バイパス0（親 in-session 10綴り＋盲検2次独立実走）。盲検2次 divergence（pytest errors 語形）は実証裁定→tight anchor 緩和＋SF-022＋iter77 根治。**次アクション: qa-verification＝B1 drill（framework 混在 diff は sanctioned skip 判定＋fresh 変異）＋実環境 E2E（washed-green/SF-018 の hook 直接発火再実測）＋full record green→docs/qa-reports/iter76-qa.md（claims）→update-gate qa approve --ref→security へ。** 残余方針: 単一コマンド fake binary は iter77 attestation 天井。未消化: SF-019／SF-020・SF-021。"
+next_action: "**【iter76 docs フェーズ・dev_ready_for_client 申請待ち】** 全 dev 品質ゲート approved（review/qa/security・deploy は M size routing で自動除外）。ship 完了（TO-CLIENT iter76 版・v1.31.2→**v1.31.3 PATCH** 3箇所 bump・drift/contract/doctor PASS）＋docs 完了（LEARNINGS 既存2更新〔denylist 有界完成・locale 2モード〕＋新規2〔terminal↔transparent 双 pin・drill BLOCKED 実証〕＋process 1更新〔stall 引き取り〕・docs-sync drift なし）。**次アクション: ユーザーに dev_ready_for_client ゲート承認を申請→承認後 `bash scripts/update-gate.sh dev_ready_for_client approve` でクローズ。** 残余（deploy blocker なし）: SF-022（denylist 不完全性→iter77 attestation 根治）・単一コマンド fake binary（iter77 天井）・SF-019/020/021（次 iter）。push は未実施（gh auth switch --user yuuya-miyagaki）。"
 blockers: []
 failure_tracking: null
 session_history:
+  - date: "2026-07-23"
+    mode: Dev
+    phase: "docs"
+    note: "iter76 / v1.31.3（framework・evidence 整合＋locale 掃討完了＝roadmap §5 P0・**PATCH**＝既存 evidence-integrity/runtime-state moat の穴封鎖・公開契約不変）を全 dev ゲート approved まで完走（M＝deploy skip・review→ship→docs）。設計正本＝docs/specs/2026-07-22-iter76-evidence-integrity-locale-design.md。**実装（session=fable・implementer=opus per-task commit）**: W1=check-runtime-state.sh に LC_ALL=C（SF-018・2モード fail-open〔tr crash＋silent allow〕封鎖・iter73 掃討3本目）／W2b=marker.sh Stage6 green 矛盾 veto（exit0×失敗証拠→false・rc3 8ソース化・patterns.sh AEGIS_TEST_FAIL_TOKEN_REGEX 新設）／W2a+W3=judge washed-cmd transparent＋src allowlist（未知src終端🟡）。brainstorm(案A・SF-020/021 分離)→plan(grill-plan 致命3/要検討4 反映)→implement(Task1 RED 10/8 実測→Task2-5 per-task commit)→grill-code(🔴0・🟡1〔[[:space:]]契約違反→literal TAB〕＋🟢2〔W2b-6 pin〕fix-forward)→review(1次4角度 finder=opus〔仕様/敵対/テスト強度/保守性〕→**stall 多発を親が in-session 引き取り**・washed-green 10綴り〔A1-6+V1-4〕全 unverified／SF-018 byte 4綴り全 deny／record no-shell 免疫／差分歯 mutation を実走裁定・**盲検2次=fable が errors 語形の1次見落としを摘発**→実証裁定〔脅威モデル内独立到達不能〕＋tight anchor 緩和・SF-022 起票・保守性 F-1〔TAB 実バイト pin〕/F-3〔相互参照〕fix-forward)→qa(B1=since 案 DRILL BLOCKED 実証→sanctioned skip＋6軸 mutation 代替実証・E2E 3項目メイン tree PASS)→security(1次 親 in-session S1-S6〔注入/secrets/依存/ReDoS/moat174 非弱体化〕＋**盲検2次=fable が unittest unexpected successes バナー欠落〔A7〕摘発**→有界3語彙完成で封鎖〔treadmill でなくバナー網羅〕・新規脆弱性0)→ship(v1.31.2→1.31.3 PATCH・3箇所 bump・TO-CLIENT iter76 版・MANUAL/RUNBOOK/UAT=n/a〔framework 自己改善〕)→docs(LEARNINGS 既存2更新〔line148 denylist 有界完成・line156 locale 2モード〕＋新規2〔terminal↔transparent 双 pin・drill BLOCKED 実証〕＋line40 process〔stall 引き取り〕・docs-sync drift なし・昇格 該当なし)。実装コミット済（9898153〜）・未 push（gh auth switch --user yuuya-miyagaki）。**新規起票**: SF-022（marker Stage6 fail-token denylist の原理的不完全性・Low・脅威モデル内独立到達不能を実証・iter77 execution attestation で根治・iter76 は pytest errors＋unittest 有界バナー完成の net 改善）。**教訓核**: (1) denylist は「有界な構造化語彙〔unittest バナー3語〕は完成させてよい／無限空間は positive proof に委ねよ」（line148 精密化）。(2) 同一 fail-open が環境依存の2支配機構〔tr crash/silent allow〕を持つ＝入力バッテリで確認・byte-wise で両封鎖（line156）。(3) trust-scan の terminal↔transparent 逆向き2分岐は各々に非対称 mutant pin（新規 conf8）。(4) subagent の『最終報告直前 stall』は SendMessage 再開＋親 in-session 裁定で回収・finder の critical 候補は親が実走反証してから採否（line40）。**残: dev_ready_for_client はユーザー承認待ち（ship skill Red Flag＝自動承認しない）。** 次＝ユーザー承認。"
   - date: "2026-07-22"
     mode: Dev
     phase: "brainstorm"
@@ -49,10 +53,6 @@ session_history:
     mode: Dev
     phase: "docs"
     note: "iter75 / v1.31.2（framework・SF-017 fix-forward「FF9」＝moat 難読化バイパスの空白注入クラス封鎖）を security 再走→道C 確定でクローズ（M＝deploy skip・review→ship→docs）。**発端**: 前回 security で 3-failure 到達（review×2＋security×1）＝docs/second-opinion.md でユーザーが道A（1回だけ根本封鎖）を選択。**FF9 実装（session=fable・実装は inline TDD）**: (1) SEC-1＝`aegis_dequote_normalize` に `${IFS...}` parameter-expansion family（`${IFS:0:1}`/`${IFS: -1}`/`${IFS/x/y}`/`${IFS#}`/`${IFS:-x}`）＋裸 `$IFS` を**単一 sed（非貪欲・O(n)）**で畳み込み（改行/タブ畳みを sed 前へ移動）。(2) Finding 1＝check-destructive の SAFE_TARGETS 早期 allow を `NORM==CMD`（難読化非実在）時のみ適用＝`rm -rf${IFS}/x` の silent 再帰削除を封鎖。RED→GREEN（tests/test_moat_quote_split.py 67 ケース）。**bash 実行シェルで runtime 実証**: IFS-family は word-split で実 `rm -rf`/`git add .env`＝実バイパス→ask 化。ANSI-C `$'\\x20'` は literal-in-word で command not found＝非 exploitable と実証し畳まず pin。**grill-code（fable）**: `${c//…}` 全置換が 5000 件で ~21s（O(n²)→hook timeout=fail-open 危険）を摘発→単一 sed で ~40ms（~500倍）に修正・scale pin 追加。**security 再走（1次 opus＋盲検2次 fable・物理隔離 e2e・read-only）**: 主張クラス（非空 `${IFS}`/quote/BS）内バイパス**0件**を両者確認・divergence なし。1次が **Root cause B**（ゼロ幅 IFS `${IFS:0:1→0}` は runtime で空展開＝glue だが静的 fold は過分割＝unsound／mixed split/glue は 2ⁿ 展開列挙が必要）を摘発、2次が param-default ネスト `${Q:-${IFS}}`（.env 実 staging e2e）・変数間接 `${!x}` を摘発。**道C 確定**: これらは全て**構造化 argv でしか根治できない SF-019 residual**（意図的難読化限定・事故経路なし・deploy blocker なし）＝主張を「非空 IFS 展開＋Finding 1」に正確化し残余を SF-019 へ統合、security=approve_with_notes でクローズ（FF10 は追わず＝事前合意の『新穴→道C・無限リトライ回避』に準拠）。full 1367 passed/2 skipped（trusted-runner 記録 green）・contract PASS。SF-017=CLOSED-in-review／SF-019 拡張／iter75-security.md 新規／LEARNINGS 3件追加／TO-CLIENT・version 3箇所 bump。**残: dev_ready_for_client はユーザー承認待ち（ship skill Red Flag＝自動承認しない）。** 次＝ユーザー承認。"
-  - date: "2026-07-19"
-    mode: Dev
-    phase: "brainstorm"
-    note: "iter75 rollover（framework・P0 SF-017 MOAT-BYPASS 修正）。iter74 の二重網羅レビュー（Codex 外部隔離＋Fable 盲検2次隔離 clone・対象 77566ed）を完遂し、親が乖離/片方のみを実走裁定→突合正本 docs/full-review-2026-07-19-dual-codex-fable.md（§5 ロードマップ iter75-82）を作成、生レビュー2本を証跡保全、SF-017（Critical MOAT-BYPASS）/SF-018（Medium LOCALE-1）を起票、iter74 deliverable を commit（a51a3f9）。**二重レビューの核成果**: 決定論 moat は健在だが「生シェル文字列（moat）と生テスト出力（evidence）」の最終2入力に実走再現できる欠陥。層1の乖離が2実バグを摘発（MOAT-BYPASS=Codex のみ／LOCALE-1=Fable のみ・互いの盲点）。iter75 は SF-001 の shlex トークン化を check-destructive/secrets へ一般化する。次＝brainstorm。"
 ---
 
 ## Summary

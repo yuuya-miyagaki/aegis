@@ -1,48 +1,56 @@
 <!-- 正本: ship-and-docs skill -->
 <!-- exit-check: TO-CLIENT 完成・証拠参照済み・既知ギャップ記載済み → docs へ -->
-# 納品サマリー — iteration 75（v1.31.2・SF-017 fix-forward「FF9」＝moat 難読化バイパスの空白注入クラス封鎖）
+# 納品サマリー — iteration 76（v1.31.3・evidence 整合＋locale 掃討完了）
 
 ## 何を作ったか
 
-破壊的コマンド / secret-staging を検出する2つの PreToolUse moat フック（`check-destructive.sh` / `check-secrets.sh`）の**難読化バイパス**を、iter75 の fix-forward「FF9」で追加封鎖した。前回 security ゲートで摘発された2件に対応:
+「evidence-based completion」（＝テストが通ったという**証拠**でのみ完了を認める）の中核を守る2つの偽造経路を封鎖した。roadmap §5 iter76（P0）の完了条件を満たす。
 
-- **SEC-1（High）**: 共有正規化 helper `aegis_dequote_normalize` が literal `${IFS}`/`$IFS` しか畳まず、`${IFS:0:1}`・`${IFS: -1}`・`${IFS/x/y}`・`${IFS#}`・`${IFS:-x}` 等の **parameter-expansion 変種**が未畳み込み → `git${IFS:0:1}add .env`＋commit で secret staging を silent 通過していた。
-- **Finding 1（Medium・pre-existing）**: `check-destructive.sh` の SAFE_TARGETS 早期 allow が `rm -rf${IFS}/x`（flag 密着 `${IFS}`）を単一 flag トークン扱いで swallow → silent 再帰削除。
+- **washed-green（SF-012）**: 失敗したテストを exit code 洗浄（`pytest -q; true`／`|| true`／`| tee`）や偽出力で judge に「green」と誤認させる経路。`;`/`&&` は pipefail 非依存で無条件 exit0＝非エンジニア/AI が事故的に書く典型ゆえ実害が高い。
+- **SF-018（LOCALE-1）**: `check-runtime-state.sh`（非 framework モードで docs/STATUS.md・gate 値等の改竄を止める**唯一の**PreToolUse ガード）が不正 UTF-8 バイト入力で fail-open する穴。
 
 ## 主要な設計判断
 
-1. **非空 `${IFS...}` family を単一 sed で畳む**（`s/\$\{IFS[^}]*\}/ /g`・非貪欲・O(n)）。IFS 由来の展開値は shell 仕様上つねに空白の部分集合ゆえ「空白へ畳む」のが保守側（実バイパス捕捉・非バイパス変種は無害な false-ASK・MISS なし）。bash の `${c//…}` 全置換は多数一致で O(n²)＝5000 件 ~21s だが sed は ~40ms（hook timeout=fail-open 回避）。
-2. **SAFE_TARGETS 早期 allow を NORM!=CMD（難読化実在）時に skip**。難読化された rm を「artifact-only」とみなさず、下流の再帰削除検知に委ねる。平文の safe-artifact 削除（`rm -rf build` 等）は NORM==CMD ゆえ挙動不変。
-3. **道C による主張の正確化**: 静的文字列正規化で**健全に**畳めるのは**非空 IFS 展開**のみ。security 再走で判明した「空/ゼロ幅 IFS 展開（`${IFS:0:0}`）・mixed split/glue・param-default ネスト・変数間接・cmdsub」は 2ⁿ 展開列挙＝**構造化 argv（SF-019）でしか根治できない**残余として正確に分離（iter77 根治予定）。全て意図的難読化を要し事故経路で発生しない（脅威モデル外）。
+1. **判定の締め付けのみ（fail-closed 一方向）**: 全変更は「green 認定を狭める／deny を広げる」方向のみで、新しい fail-open を一切作らない。実 red（exit≠0）は red のまま（🟡 に誤降格しない）。
+2. **reader を信頼判定の単一権威に**: washed 検査は judge（reader）1点に置き、writer（evidence.sh）には検査を足さない（権威分裂＝drift を回避）。marker の矛盾 veto は 3消費者（evidence.sh/record/drill）共通コアに1回だけ入れる。
+3. **regex を足し続けない原則＋有界語彙の完成**: 失敗トークンの denylist は原理的に不完全（＝iter77 の positive proof＝実行イベント attestation が根治）。今回は pytest の `errors` timing-tail と unittest FAILED バナーの**有界3語彙**（failures/errors/unexpected successes）を tight anchor で完成させるに留め、無限の語彙追加はしない（SF-022）。
+4. **SF-018 は2モード fail-open を封鎖**: 実測で (a) `tr` crash（rc=1）と (b) **silent allow**（rc=0・バイト汚染で pattern-miss＝より悪い）の2経路を確認。`INPUT=$(cat)` 直後の `export LC_ALL=C LC_CTYPE=C LANG=C`（iter73 の destructive/secrets と同型・3本目）で両モードを byte-wise に封鎖し locale 掃討を完了。
 
 ## 変更ファイル
 
-- `hooks/lib/patterns.sh` — `aegis_dequote_normalize`: `${IFS...}` family＋`$IFS` を単一 sed 畳み込み（改行/タブ畳みを sed 前へ移動）。
-- `hooks/check-destructive.sh` — `NORM` を SAFE_TARGETS 判定前で計算し early-exit を `NORM==CMD` ガード。
-- `tests/test_moat_quote_split.py` — FF9 の RED→GREEN テスト＋残余 pin（67 ケース）。
-- ドキュメント: `docs/security-followups.md`（SF-017 封鎖範囲・道C 正確化／SF-019 拡張）、`docs/qa-reports/iter75-security.md`（新規）、`docs/LEARNINGS.md`。
+- `hooks/check-runtime-state.sh` — 入力読取直後に `LC_ALL=C`（byte-safety・SF-018）。
+- `hooks/lib/marker.sh` — Stage 6「green 矛盾 veto」（exit0×失敗証拠→false）＋rc3 ガードを8ソース化。
+- `hooks/lib/patterns.sh` — `AEGIS_TEST_FAIL_TOKEN_REGEX` 新設（`failed`／`FAILED (failures|errors|unexpected successes)=`／`--- FAIL:`／`FAIL<TAB>`／`N errors in <digit>`）。
+- `scripts/build-judge-card.py` — src allowlist（manual/observed 以外→終端🟡）＋observed-ok の複合コマンド transparent skip（`_cmd_has_shell_operators`）。
+- テスト: `tests/test_{hook_locale_byte,marker_lib,judge_card,evidence_hooks}.py`（RS1-4／W2b-1〜8／W2a-1〜5／W3-1〜3／helper・旧赤/新緑 differential pin）。
+- ドキュメント: `docs/security-followups.md`（SF-022 新設）、iter73 設計正本の訂正、`docs/qa-reports/iter76-{review,qa,security}.md`（新規）、`docs/LEARNINGS.md`。
 
 ## テスト・QA・security 結果
 
-- **full suite: 1367 passed / 2 skipped**（trusted-runner 記録・green・現コード fingerprint 一致）。framework contract PASS・moat スイート 163 passed。
-- **review**: approved（`docs/qa-reports/iter75-review.md`）。
-- **qa**: approved（`docs/qa-reports/iter75-qa.md`）。
-- **security**: **approve_with_notes**（`docs/qa-reports/iter75-security.md`）。1次(opus)＋盲検2次(fable) が独立検証。**主張クラス（非空 `${IFS}`/quote/BS）内バイパス0件**を両者が確認、divergence なし。**deploy blocker なし**（Bash moat は脅威モデル上「敷居を上げる層」）。
+- **full suite: 1395 passed / 2 skipped**（trusted-runner 記録・green・現コード fingerprint 一致）。framework contract PASS・deny 系 moat スイート 174 passed（非弱体化）。
+- **review**: approved（`docs/qa-reports/iter76-review.md`）。1次4角度（仕様準拠/敵対/テスト強度/保守性）＋盲検2次。盲検2次が `errors` 語形の見落としを摘発→実証裁定（脅威モデル内独立到達不能）＋tight anchor で緩和。
+- **qa**: approved（`docs/qa-reports/iter76-qa.md`）。B1 drill は per-task commit 済み＝`since` 案で DRILL BLOCKED を実測のうえ sanctioned skip＋6軸 mutation 代替実証。E2E 3項目（SF-018 deny／washed false-true／未知src unverified）メイン tree PASS。
+- **security**: approved（`docs/qa-reports/iter76-security.md`）。1次（親 in-session）＋盲検2次とも **新規脆弱性0**。注入/secrets/依存/ReDoS クリア・moat 174 tests 非弱体化。盲検2次が unittest `unexpected successes=` バナー欠落（A7）を摘発→有界バナー完成で封鎖。washed-green **10綴り**＋SF-018 **4バイト**の主張クラス内バイパス0を両者が実測。
 
 ## SemVer
 
-v1.31.1 → **v1.31.2 PATCH**（既存 moat feature の難読化バイパス封鎖＝挙動変化は難読化入力のみ・機能的コマンドの判定不変・公開契約不変・後方互換。iter73 の locale/byte 掃討と同カテゴリ）。
+v1.31.2 → **v1.31.3 PATCH**（既存 evidence-integrity/runtime-state moat の穴を塞ぐ security/robustness fix＝挙動変化は「偽造 green の締め付け」と「不正バイトの fail-open 封鎖」のみ・公開契約〔CLI/evidence-log スキーマ/judge カード形式〕不変・後方互換。iter66/iter75 の PATCH と同カテゴリ）。
 
 ## 残留リスク・既知の制限（脅威モデル内で意図的に受容）
 
-- **SF-019（構造化 argv 待ち・iter77 根治予定）**: brace 展開・param-default（ネスト含む）・cmdsub・変数間接・**ゼロ幅/mixed IFS 展開**は静的文字列正規化の射程外。いずれも意図的難読化を要し、LLM が事故的に emit する経路ではない（North Star＝事故防止から severity 低）。回帰 pin＝`tests/test_moat_quote_split.py::test_ff9_residual_*` / `test_residual_*`（将来の argv 判定で flip→revisit を強制）。
-- **SF-020（raw 大文字直打ち・iter76）／SF-021（`git stage` エイリアス・iter76）**: iter75 diff とは独立の既存穴（本 fix で導入も解消もしない）。
-- Bash moat は **sandbox ではなく threshold-raising 層**（canonical 脅威モデル・SF-004）。敵対的・意図的難読化の無限回避は範囲外。
+- **SF-022（denylist 原理的不完全性・iter77 根治予定）**: marker Stage 6 の失敗語彙 denylist は列挙式ゆえ原理的に不完全。今回 pytest `errors`・unittest 有界バナーは封鎖したが、任意の偽造出力は網羅できない。**ただし脅威モデル内で独立到達不能**を実証済み（実 runner は失敗時 exit≠0・exit0 washing は judge W2a が捕捉・単一コマンド fake binary は下記天井）。根治は iter77 の execution attestation（argv spawn＋structured event で「N tests executed」を positive proof・src=attested のみ decisive green）。回帰 pin＝`test_w2b7_*`／`test_w2b8`／`test_residual_*`。
+- **単一コマンド fake binary**（`./pytest` 型 PATH hijack）・**evidence cmd 500字切詰め以降の演算子**＝iter77 attestation の領分。多層防御（W2a=500字以内／marker=出力に失敗証拠必要）で穴でないと論証済み。
+- **SF-019（構造化 argv 待ち・iter77）／SF-020（raw 大文字 case-fold・次 iter S）／SF-021（`git stage` エイリアス・次 iter S）**: 本 iter の射程外（テーマ分離＝盲検レビューの焦点保全）。iter75 TO-CLIENT で「iter76 併合候補」としていたが、L 化・テーマ混在回避のため次 iter へ再分離した。
+- evidence-log.jsonl への直接書込みは脅威モデル外（それが可能なら src:manual green を直接書ける＝capability 増分なし）。
+
+## 操作マニュアル / 運用 RUNBOOK / UAT
+
+いずれも**該当なし**（生成せず）: 本 iteration は Aegis フレームワーク自身の内部改善（開発者向けツールの moat/evidence 強化）で、外部クライアント・非エンジニア利用者・運用者・監視対象が存在しない。`docs/requirements/ACCEPTANCE.md` も無い（framework 自己改善に受入基準の外部合意なし）。開発者に必要な情報はすべて本 TO-CLIENT と `docs/qa-reports/iter76-*.md`・`docs/security-followups.md`（SF-022）に集約。
 
 ## 運用上の注意
 
-- 挙動変化は**難読化コマンドのみ**（`${IFS}`・quote-split 等が ASK/DENY を出すようになった）。通常のコマンド（`rm -rf build`・`git commit -m "…"` 等）の判定は不変。
-- 正規化は呼び出し側 `LC_ALL=C` 前提（byte-wise・不正バイトで sed が crash しないことを iter73 で実証済み）。
+- 挙動変化は**証拠判定の締め付けのみ**: 失敗テストを exit 洗浄した run が green と認められなくなった（🟡 unverified 化＝正しく再記録を促す）。正直な green run の判定は不変。
+- SF-018 修正で、不正バイトを含む Bash コマンドでも runtime-state ガードが crash せず正しく deny/allow を返す。
 
 ## 次のアクション
 
