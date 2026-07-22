@@ -36,6 +36,17 @@
 
 → washed-green 経路 **バイパス 0件**・本物 green は保全。
 
+**追加変種（1次敵対 finder が旗を立てた綴りを親が judge e2e で実証・全 unverified）**:
+
+| 変種 | marker_verified | judge |
+|---|---|---|
+| V1 `pytest -q > out.txt; true`（失敗出力可視） | False | unverified |
+| V2 同（出力ファイル化で観測空） | False | unverified |
+| V3 `pytest -q $(printf ';') true`（cmdsub 区切り） | False | unverified |
+| V4 `pytest -q && true` | False | unverified |
+
+→ redirect・cmdsub・`&&` いずれも Stage 6（失敗証拠×exit0）＋judge W2a（演算子検出）の二重で封鎖。
+
 ### B. SF-018 バイトバッテリ（0xFF 以外でも silent-allow に落ちないか）
 
 | 攻撃（STATUS 書込み・非 framework） | decision | 判定 |
