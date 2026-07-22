@@ -90,6 +90,10 @@
 
 全完了条件（`pytest; true`/`|| echo`/`| tee`/fake-output/unknown-src が green 不可・runtime-state byte crash 消滅・設計正本訂正・旧赤/新緑 pin）が実 assert で裏取り済み。W2b-6/6b は既存 branch の coverage pin＝in-scope（scope creep でない）。
 
+### 仕様準拠（reviewer・4角度目・承認後に最終報告到着＝corroboration）
+
+verdict **approve・findings 0件**（Critical/Major/Minor いずれも0）。全4 production 変更が計画のファイル/位置/意味論に一致・差分 pin が pre-fix コードに対し実測成立・full green・contract PASS・設計逸脱は全て dated 記録を独立確認。唯一の note は plan baseline 見積り（1367 passed）が実測（1394）と stale＝**実装計画スナップショット規約どおり**（正確な現数は本 QA/レポート側・非該当）。review 承認判断を事後裏付け。
+
 ### テスト強度（親裁定＝上表 D）・敵対/セキュリティ（親裁定＝上表 A/B/C）
 
 Critical 0・新規バイパス 0。既知天井（単一コマンド fake binary＝PATH hijack・log 直書き）は iter77 attestation 領分／脅威モデル外＝**新規穴でない**（design §残余・test_residual 相当は iter77 で flip 強制）。
