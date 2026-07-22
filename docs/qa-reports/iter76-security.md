@@ -51,6 +51,18 @@ review 1次敵対＋盲検2次＋親 in-session で実走済み（`docs/qa-repor
 
 **新規脆弱性 0件**（Critical/High/Medium/Low いずれも新規なし）。全変更が fail-closed 方向・注入/secrets/依存/ReDoS 面いずれもクリア・deny 系 moat 非弱体化を実測。
 
+## 盲検2次（security・fable・fresh clone・verdict 非開示）＝approve・A7 corroboration
+
+**verdict: approve**（新規脆弱性なし・Critical/High ゼロ）。独立実走で確認:
+- washed-green: honest 経路で green 化ゼロ（marker Stage6／judge W2a+W3・演算子回避〔redirect/cmdsub/`!`〕も exit 非洗浄 or runner_match=False で封鎖）。
+- SF-018: 0xFF/0xFE/NUL/UTF-16 BOM 全 deny・`LC_ALL=C` で locale 非依存 fail-closed（親 locale を UTF-8 強制しても上書き）。
+- 注入/fail-open/ReDoS（240KB/100K 病的入力・線形）/moat（純加算・削除ゼロ・DESTRUCTIVE 24本健在）＝全クリア。
+- read-only 遵守（clone `git status` 空を複数回確認・mutation は clone 外 sec2attack1/sec2root1）。
+
+**A7（Low・非到達・fix-forward で封鎖）**: `FAILED (unexpected successes=1)`+exit0 で marker true を摘発。ただし実 unittest は exit1（2次自身が実測）＝**独立到達不能**（洗浄は W2a／fake は iter77）。SF-022 の denylist 不完全性クラスの一事例で、unittest FAILED バナー語彙は failures/errors/unexpected successes の**有界3種**＝既存 alt を完成（`FAILED \((failures|errors|unexpected successes)=`）して封鎖。pin＝`test_w2b8`。**1次との実質同意**（両者 approve・新規脆弱性0・A7 は非到達残余を有界完成で緩和）。
+
+その他 2次認定の既知天井（単一コマンド fake binary＝iter77／log 直書き＝脅威モデル外／fail-token false-negative＝fail-closed 方向）は 1次と収束。
+
 ```claims
 tests_pass: true
 no_stubs: true
@@ -58,10 +70,10 @@ no_new_vulnerabilities: true
 deploy_blocker: false
 verdict: approve
 second_opinion:
-  verdict: <盲検2次の結果を追記>
-  divergence_points: []
+  verdict: approve
+  divergence_points: ["A7=unittest FAILED バナーの unexpected successes= 語形が fail-token 未収載（marker true）→ 2次自身が実 unittest exit1 で独立到達不能を実測・有界バナー完成で fix-forward 封鎖・SF-022"]
 ```
 
-## Exit 判定（1次）
+## Exit 判定（1次＋2次収束）
 
-**approve**（新規脆弱性0・全分岐 fail-closed・注入/secrets/依存/ReDoS クリア・moat 174 tests 非弱体化・washed-green/SF-018 の主張クラス内バイパス0を review 期＋security 期で実測・deploy blocker なし）。盲検2次の結果を待って claims に追記し、divergence があれば再裁定する。
+**approve**（新規脆弱性0・全分岐 fail-closed・注入/secrets/依存/ReDoS クリア・moat 174 tests 非弱体化・washed-green/SF-018 の主張クラス内バイパス0を 1次 in-session＋2次盲検 fresh の両方で実測・deploy blocker なし）。2次の A7（unittest バナー語彙欠落）は 2次自身が独立到達不能を実測のうえ有界バナー完成で fix-forward 封鎖（SF-022 記録・test_w2b8 pin）。1次/2次とも verdict=approve で実質同意・divergence は A7 の1点のみで非ブロッキング。

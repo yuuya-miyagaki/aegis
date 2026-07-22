@@ -525,6 +525,18 @@ class TestGreenContradictionVeto(unittest.TestCase):
         rc, out = _verdict(out_text, "python3 -m pytest", "0")
         self.assertEqual((rc, out), (0, "true"))
 
+    def test_w2b8_unittest_unexpected_successes_banner_with_exit0_is_false(self):
+        # W2b-8（security 盲検2次 A7 pin）: unittest の FAILED バナーは
+        # failures=/errors=/unexpected successes= の3語（有界）。既存 alt は
+        # failures/errors のみ捕捉し `FAILED (unexpected successes=N)`（@expectedFailure
+        # が予期せず pass＝実 unittest は exit1）を取りこぼしていた。バナー語彙を
+        # 完成させ exit0 矛盾で false。実到達は演算子（W2a）/fake binary（iter77）
+        # 必須で独立到達不能だが、有界バナーの網羅として封鎖（SF-022）。
+        out_text = ("Ran 3 tests in 0.01s\n\n"
+                    "FAILED (unexpected successes=1)\n")
+        rc, out = _verdict(out_text, "python3 -m unittest", "0")
+        self.assertEqual((rc, out), (0, "false"))
+
 
 if __name__ == "__main__":
     unittest.main()

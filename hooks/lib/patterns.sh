@@ -297,7 +297,9 @@ AEGIS_TEST_COUNT_FAMILIES=(
 # output => the exit was laundered (`pytest -q; true` / `|| true` / `| tee`)
 # or the output forged — the run cannot certify green. NONZERO counts only
 # (cargo prints `0 failed` on every green run). unittest has no count token
-# in its Ran-line, so its FAILED banner is matched directly; go/jest/vitest
+# in its Ran-line, so its FAILED banner is matched directly (the banner's
+# BOUNDED vocabulary is failures=/errors=/unexpected successes=; all three
+# anchored — the last added iter76 security 2nd-opinion A7); go/jest/vitest
 # print FAIL-prefixed lines. Incidental FAIL-looking text inside a green
 # run's captured body flips true->false only (fail-closed; same accepted
 # class as the count-family M-2 residual). ERE∩python-re subset per the
@@ -316,7 +318,7 @@ AEGIS_TEST_COUNT_FAMILIES=(
 # reaching exit-0-with-errors needs a shell operator → judge W2a, or a fake
 # runner binary → iter77 attestation ceiling), but closes the shared marker
 # core for the non-judge consumers (record/drill). See docs/security-followups.md.
-AEGIS_TEST_FAIL_TOKEN_REGEX='(^|[^0-9A-Za-z_])[1-9][0-9]* failed|FAILED \((failures|errors)=|(^|\n)--- FAIL:|(^|\n)FAIL[ 	]|[1-9][0-9]* errors? in [0-9]'
+AEGIS_TEST_FAIL_TOKEN_REGEX='(^|[^0-9A-Za-z_])[1-9][0-9]* failed|FAILED \((failures|errors|unexpected successes)=|(^|\n)--- FAIL:|(^|\n)FAIL[ 	]|[1-9][0-9]* errors? in [0-9]'
 # K-1 (v1.6.2): pytest prologue regex. When a pytest-family command runs,
 # pytest prints a multi-line prologue (platform/Python version, rootdir,
 # collected N items) BEFORE the strong summary. A forged `echo "== 3 passed
