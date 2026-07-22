@@ -232,17 +232,24 @@ def run_rs(command_str, root):
 
 
 class TestRuntimeStateByteSafety(unittest.TestCase):
-    """SF-018 (iter76): check-runtime-state.sh は不正 UTF-8 stdin で crash
-    してはならない。crash＝rc1・stdout 空＝decision なし＝唯一の非 framework
-    runtime-state ガードの fail-open（iter73 掃討の未適用 3 本目。iter73 設計は
-    『python3 抽出でバイト→空 CMD＝同型不成立』と主張したが surrogateescape は
-    バイトを温存する＝反証済み・SF-018）。
+    """SF-018 (iter76): check-runtime-state.sh は不正 UTF-8 stdin で
+    runtime-state ガードを fail-open させてはならない（唯一の非 framework
+    runtime-state ガード。iter73 掃討の未適用 3 本目。iter73 設計は『python3
+    抽出でバイト→空 CMD＝同型不成立』と主張したが surrogateescape はバイトを
+    温存する＝反証済み・SF-018）。
 
-    mutation-killer 構図: RS1（deny 側）と RS2（allow 側）が対。runtime-state
-    の deny 文言は main/fallback 経路で共通のため reason 判別は使えず、RS2 の
-    『crash せず判定を通過して {} に到達した』が LC_ALL 挿入位置の変異
-    （extraction/tr の後方へ移動）を検出する唯一の証明。RS2 を冗長とみなして
-    削らないこと。"""
+    pre-fix の fail-open は本機で経路依存の 2 モードあることを実測確定した:
+    (a) tr crash（rc=1・stdout 空＝decision なし・77566ed 親再現＝SF-018 記載）、
+    (b) silent allow（rc=0 `{}`＝deny が判定素通りで allow 化。0xFF を積んだ
+    `echo … > docs/STATUS.md` がバイト汚染で pattern-miss する＝RS1 の本機実測・
+    親裁定 2026-07-22）。どちらも fail-open で、`INPUT=$(cat)` 直後の
+    `export LC_ALL=C` が両モードを封鎖する構図は不変。
+
+    mutation-killer は RS1（differential）: LC_ALL 挿入を除去/後方（extraction/tr
+    の後方）へ移動させると RS1 が deny→allow に戻り RED 化する＝挿入位置の変異を
+    検出する唯一の証明。RS2 は benign コマンドの allow が pre/post とも正しい
+    非退行 pin（differential にならないが、冗長として削ってよい根拠にはならない
+    ——判定を通過した allow であることを保証する）。"""
 
     def test_rs1_byte_in_status_write_still_denies(self):
         # RS1（differential: pre-fix CRASH）: 0xFF を積んだ runtime-state
