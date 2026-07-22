@@ -486,6 +486,20 @@ class TestGreenContradictionVeto(unittest.TestCase):
         rc, out = _verdict(out_text, "npx jest", "0")
         self.assertEqual((rc, out), (0, "false"))
 
+    def test_w2b6b_fail_line_tab_byte_with_exit0_is_false(self):
+        # W2b-6b（review 保守性 F-1 pin）: fail-token regex の第4択は
+        # `(^|\n)FAIL[ <TAB>]` で、bracket 内は space + **literal TAB(0x09)**。
+        # W2b-6 の fixture は FAIL の後が space のため TAB バイトを検証せず、
+        # エディタ/コピペで TAB が space に化けても（コメントが名指しする go の
+        # `FAIL<TAB>pkg` 経路が壊れても）緑のまま＝iter71 M10 と同型の穴。
+        # ここは go の実出力（FAIL<TAB>pkg<TAB>time）を **literal TAB** で構成し、
+        # TAB alternation バイトの回帰を pin する。TAB が space に degrade した
+        # regex ではこの行はマッチせず true に化ける（RED 化）。
+        out_text = "FAIL\tgithub.com/x/y\t0.021s\n"
+        assert "\t" in out_text  # 明示: このテストの主眼は TAB バイト
+        rc, out = _verdict(out_text, "go test ./...", "0")
+        self.assertEqual((rc, out), (0, "false"))
+
 
 if __name__ == "__main__":
     unittest.main()

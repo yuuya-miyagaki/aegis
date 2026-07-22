@@ -189,7 +189,14 @@ def _cmd_has_shell_operators(cmd: str, strips: list) -> bool:
     (`pytest -q; true` exits 0 with failing tests), so an observed entry's
     exit-derived status cannot certify green (SF-012a washed-green).
     Quoted spans are masked to the inert token Q first — the SAME strips
-    pipeline as _norm_cmd_match, so `pytest -k "a|b"` stays clean."""
+    pipeline as _norm_cmd_match, so `pytest -k "a|b"` stays clean.
+
+    Sibling defense for the SAME washed-green threat on the MANUAL path:
+    record-test-result.py rejects `_SHELL_OP_TOKENS` at record time via
+    shlex tokens (it runs the command WITHOUT a shell, so a compound cmd
+    cannot wash there anyway). The two are intentionally different shapes —
+    manual has argv (shlex tokens), observed has only the raw string (regex)
+    — but if you change the operator set here, revisit that guard too."""
     cmd = (cmd or "").replace("\n", ";")
     for sp in strips:
         cmd = sp.sub("Q", cmd)
