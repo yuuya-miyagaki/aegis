@@ -3,29 +3,29 @@ framework: aegis
 framework_version: "1.31.3"
 project_name: "Aegis"
 mode: Dev
-phase: docs
+phase: plan
 task_type: framework
 task_size: M
-task_size_rationale: "iter76（framework・P0＝evidence 整合＋locale 掃討完了・**M 確定**＝brainstorm Step D 2026-07-22）。案A＝roadmap 準拠 3 点セット: W1=SF-018（check-runtime-state.sh に LC_ALL=C・iter73 同型 3 本目）＋W2=washed-green 封鎖 2 軸（judge undecidable 拡張＋marker 矛盾軸）＋W3=SF-012(b) src allowlist。src 3 ファイル（check-runtime-state.sh/marker.sh/build-judge-card.py）＋tests＝M（deploy skip）。SF-020/021 は次 iter へ分離（L 化・テーマ混在回避）。設計正本＝docs/specs/2026-07-22-iter76-evidence-integrity-locale-design.md。"
-iteration: 76
+task_size_rationale: "iter77（framework・SF-020＋SF-021 封鎖＝両 High・OPEN・silent allow の先行クローズ・**M 確定**＝brainstorm Step D 2026-07-26）。案A（High 先行）をユーザー承認: SF-020=check-destructive.sh raw 経路 grep -i 化（iter75 FF7 と同方式・CMD_LC は chmod -R 大文字リテラル破壊で不採用）＋SF-021=_STAGE_BROAD_RE (add|stage) 拡張。src 2 ファイル（check-destructive.sh/check-secrets.sh）＋tests＝M（qa/security ゲート維持・deploy skip）。attestation は iter78 へ。設計正本＝docs/specs/2026-07-26-iter77-moat-case-fold-stage-alias-design.md。"
+iteration: 77
 ui_surface: false
-last_updated: "2026-07-23T00:00:00Z"
+last_updated: "2026-07-26T00:00:00Z"
 gate_approvals:
   client_ready_for_dev: n/a
   brainstorm: approved
-  plan: approved
-  review: approved
-  qa: approved
-  security: approved
+  plan: pending
+  review: pending
+  qa: pending
+  security: pending
   deploy: pending
-  dev_ready_for_client: approved
+  dev_ready_for_client: pending
 current_refs:
   requirements: []
-  plan: "docs/plans/2026-07-22-iter76-evidence-integrity-locale-implementation-plan.md"
-  spec: "docs/specs/2026-07-22-iter76-evidence-integrity-locale-design.md"
-  review: "docs/qa-reports/iter76-review.md"
-  qa: "docs/qa-reports/iter76-qa.md"
-  security: "docs/qa-reports/iter76-security.md"
+  plan: null
+  spec: "docs/specs/2026-07-26-iter77-moat-case-fold-stage-alias-design.md"
+  review: null
+  qa: null
+  security: null
   deploy: null
   translation: null
 external_evidence:
@@ -37,7 +37,7 @@ external_evidence:
     scope: "v0.13.0 計画 5 ラウンドレビュー"
     findings: "Round 1〜5 で計 25 件の指摘（hook 出力スキーマ陳腐化、TaskCreated/Completed 制御方式、Plan 条件付き許可、effort 配分、pre-compact.sh 同種破損、`if` 単一 rule 制約等）"
     resolution: "Rev.5 で全件反映、Phase 0a 即時実装着手 GO。hotfix/v0122-hook-schema ブランチで開始。"
-next_action: "**【iter76 完全クローズ】** 全 dev ゲート approved（review/qa/security/dev_ready_for_client・deploy は M size routing で自動除外）＝v1.31.3 PATCH。full 1395 passed/2 skipped・deny 系 moat 174 非弱体化・contract/drift/doctor PASS・record green。**次アクション: (a) push（ユーザー指示があれば `gh auth switch --user yuuya-miyagaki` 後に origin/main へ）／(b) 次イテレーション rollover（iter77＝roadmap §5＝pytest execution attestation〔SF-014/SF-022 の denylist 不完全性を positive proof で根治・src=attested のみ decisive green〕。SF-019 構造化 argv も同系）／(c) SF-020・SF-021（次 iter・S・raw 大文字 case-fold＋git stage エイリアス）。** 残余（deploy blocker なし）: SF-022／単一コマンド fake binary（iter77 天井）。未 push（origin/main 未更新）。"
+next_action: "**【iter77 brainstorm 完了・plan 着手】** スコープ確定＝SF-020＋SF-021 封鎖（案A・High 2件先行クローズをユーザー承認・attestation は iter78 へ）。brainstorm gate approved・task M・設計正本＝docs/specs/2026-07-26-iter77-moat-case-fold-stage-alias-design.md。次: 実装計画 docs/plans/2026-07-26-iter77-moat-case-fold-stage-alias-implementation-plan.md 作成→grill-plan（fable）→全指摘反映→plan gate approve --ref→implement（TDD・implementer dispatch model:opus）。未解決2点（safe-target 大文字交差・raw grep サイト全列挙）は plan RED フェーズで実測決定。未 push（origin/main 未更新・iter76 分含む）。"
 blockers: []
 failure_tracking: null
 session_history:
