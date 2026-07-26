@@ -63,6 +63,9 @@
 - `git commit -a` の scope 境界（Minor・c6）を「バイパスではなく正しい境界」（`commit -a` は tracked のみ staging・untracked .env は非対象）と裁定＝非 finding。
 
 ```claims
+verdict: approve_with_notes
+tests_pass: true
+no_stubs: true
 second_opinion:
   reviewer: reviewer(fable)・fresh context・1次 verdict 非開示
   verdict: approve_with_notes
