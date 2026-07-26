@@ -65,10 +65,10 @@ if [ -z "$CMD" ]; then
   done
   if [ -z "$_raw_hit" ]; then
     for i in "${!AEGIS_DESTRUCTIVE_CMD_REGEX[@]}"; do
-      if printf '%s' "$INPUT" | grep -qE "${AEGIS_DESTRUCTIVE_CMD_REGEX[$i]}" 2>/dev/null; then _raw_hit=1; break; fi
+      if printf '%s' "$INPUT" | grep -iqE "${AEGIS_DESTRUCTIVE_CMD_REGEX[$i]}" 2>/dev/null; then _raw_hit=1; break; fi
     done
   fi
-  if [ -n "$_raw_hit" ] || printf '%s' "$INPUT" | grep -qE 'rm[[:space:]]+(-[a-zA-Z]*[rR]|--recursive)' 2>/dev/null; then
+  if [ -n "$_raw_hit" ] || printf '%s' "$INPUT" | grep -iqE 'rm[[:space:]]+(-[a-zA-Z]*[rR]|--recursive)' 2>/dev/null; then
     emit_ask "[careful] コマンドの解析に失敗しましたが、入力が破壊的コマンドのパターンに一致します。意図を確認してください。"
   else
     emit_allow
@@ -125,7 +125,7 @@ WARN=""
 # rm -r recursive: special-cased (the safe-targets exception above already
 # returned for build-artifact-only deletes, so this is a real recursive delete).
 # [rR] covers both -r (GNU) and -R (BSD/macOS) recursive flags (R4).
-if printf '%s' "$CMD" | grep -qE 'rm\s+(-[a-zA-Z]*[rR]|--recursive)' 2>/dev/null; then
+if printf '%s' "$CMD" | grep -iqE 'rm\s+(-[a-zA-Z]*[rR]|--recursive)' 2>/dev/null; then
   WARN="破壊的: 再帰削除 (rm -r/-R)。ファイルを完全に削除します（復元できません）。"
 fi
 
@@ -142,7 +142,7 @@ fi
 # RAW command patterns (git / bulk-delete) from patterns.sh.
 if [ -z "$WARN" ]; then
   for i in "${!AEGIS_DESTRUCTIVE_CMD_REGEX[@]}"; do
-    if printf '%s' "$CMD" | grep -qE "${AEGIS_DESTRUCTIVE_CMD_REGEX[$i]}" 2>/dev/null; then
+    if printf '%s' "$CMD" | grep -iqE "${AEGIS_DESTRUCTIVE_CMD_REGEX[$i]}" 2>/dev/null; then
       WARN="${AEGIS_DESTRUCTIVE_CMD_WARN[$i]}"
       break
     fi
@@ -160,6 +160,13 @@ if [ -z "$WARN" ]; then
     # git branch の [dD]、restore の W）ため、事前 lower 化すると chmod -R → chmod -r
     # で regex 内の R リテラルが非マッチとなり大文字難読化を捕捉できない（実測）。
     # 生ではなく NORM に grep -i を当てることで rm 系・SQL・全 CMD_REGEX を一様に捕捉。
+    # iter77 SF-020: raw 経路（:67-68/:71 fallback、:128 rm 再帰、:144-145 CMD_REGEX
+    # ループ）も同方式で grep -i 化し、この NORM 経路と対称化した。難読化なし（NORM==CMD）
+    # の平文大文字コマンド（RM -rf / GIT RESET --HARD / CHMOD -R）は NORM 経路が走らない
+    # ため、raw 経路で case-fold しないと case-insensitive FS で実行される破壊コマンドを
+    # silent allow していた（case-insensitive FS では /bin/rm が RM で起動する＝実バイパス）。
+    # SAFE_TARGETS の sed（:88 小文字 ^rm のみ）は意図的に fold しない: allow 例外を
+    # 大文字へ広げると moat 弱体化のため。帰結として大文字 RM は safe-artifact でも ask。
     if printf '%s' "$NORM" | grep -iqE 'rm\s+(-[a-zA-Z]*[rR]|--recursive)' 2>/dev/null; then
       WARN="難読化された破壊的コマンド（連結クォート/バックスラッシュ）の可能性: 再帰削除。意図を確認してください。"
     fi
