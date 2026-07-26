@@ -166,7 +166,12 @@ _STAGE_ENV_RE="git[[:space:]]+${GIT_PRE_OPTS}${GIT_STAGE_VERB}([[:space:]]+(--[A
 # iter75-ff (SF-017 F1): broad-stage / commit のトリガも単一ソース化。生 CMD の
 # deny 経路と正規化 NORM の ask 経路が同一トリガを共有する（NORM でも broad/commit
 # を再検出して難読化バイパスを塞ぐ・盲検2次 F1）。
-_STAGE_BROAD_RE="git[[:space:]]+${GIT_PRE_OPTS}add[[:space:]]+(-a|--all|\.\.?/?($|[^[:alnum:]._/-])|\.[^[:space:]]*[*?[])"
+# iter77 SF-021: verb を (add|stage) に拡張。`git stage` は `git add` の完全 alias で
+# 同じ -A/--all/. broad-stage 綴りを取る（`git stage -A` == `git add -A`）。
+# GIT_STAGE_VERB（:111・(add|stage|update-index)）は流用しない: update-index は
+# -A/--all/. の broad 綴りを持たない別コマンド（plumbing）で、混ぜると broad regex が
+# 意味を成さない綴りを許容してしまうため、broad 検出は add|stage のみを対象にする。
+_STAGE_BROAD_RE="git[[:space:]]+${GIT_PRE_OPTS}(add|stage)[[:space:]]+(-a|--all|\.\.?/?($|[^[:alnum:]._/-])|\.[^[:space:]]*[*?[])"
 _STAGE_COMMIT_RE="git[[:space:]]+${GIT_PRE_OPTS}commit"
 
 # iter75-ff (SF-017 F1): broad-stage スキャンを関数抽出（挙動保存リファクタ）。
@@ -287,8 +292,11 @@ if printf '%s' "$STRIPPED" | grep -qE "$_STAGE_ENV_RE" 2>/dev/null; then
 fi
 
 # Broad staging that would include .env or high-risk credentials: git add -A, git add .
-# Only `add` (not stage / update-index) has the -A/--all/. broad-stage spellings.
-# C-1: matched on CMD_LC so `GIT ADD -a` folds too; `-A` is spelled `-a` here.
+# iter77 SF-021 訂正（旧コメントは事実誤認だった）: `git stage` は `git add` の完全
+# alias なので同じ -A/--all/. broad-stage 綴りを取る（stage も検出対象）。除外すべきは
+# `update-index` のみ — これは -A/--all/. の broad 綴りを持たない別 plumbing コマンド。
+# よって broad 検出の verb は (add|stage)（GIT_STAGE_VERB の update-index は含めない）。
+# C-1: matched on CMD_LC so `GIT ADD -a` / `GIT STAGE -a` folds too; `-A` is spelled `-a` here.
 # iter56 ①: a bare `\.` prefix-matched leading-dot FILENAMES (.env.example,
 # .gitignore — 2 real denies in dogfood M2). Broad-dot means a token that
 # stages a whole directory: . / .. / ./ / ../ followed by EOL or any
@@ -316,12 +324,12 @@ if [ "$BROAD_RAW" = true ] || [ "$BROAD_NORM" = true ]; then
   if [ -n "$BROAD_KIND" ]; then
     if [ "$BROAD_RAW" = true ]; then
       if [ "$BROAD_KIND" = highrisk ]; then
-        emit_deny "[secrets] git add -A / git add . は repository 内の高リスク認証ファイル (PEM鍵/SSH鍵/credentials.json/service-account.json) を含む可能性があります。個別のファイル名を指定し、高リスクファイルは事前に削除/移動してください。"
+        emit_deny "[secrets] broad staging (git add -A / git stage -A / git add .) は repository 内の高リスク認証ファイル (PEM鍵/SSH鍵/credentials.json/service-account.json) を含む可能性があります。個別のファイル名を指定し、高リスクファイルは事前に削除/移動してください。"
       else
-        emit_deny "[secrets] git add -A / git add . は .env を含む可能性があります。個別のファイル名を指定して git add してください。"
+        emit_deny "[secrets] broad staging (git add -A / git stage -A / git add .) は .env を含む可能性があります。個別のファイル名を指定してステージングしてください。"
       fi
     else
-      emit_ask "[secrets] 難読化された形（連結クォート/バックスラッシュ/\${IFS}）で repository 内の .env / 認証ファイルを broad staging（git add -A / git add .）しようとしている可能性があります。意図を確認してください。生の形（例: git add -A）は拒否されます。"
+      emit_ask "[secrets] 難読化された形（連結クォート/バックスラッシュ/\${IFS}）で repository 内の .env / 認証ファイルを broad staging（git add -A / git stage -A / git add .）しようとしている可能性があります。意図を確認してください。生の形（例: git add -A / git stage -A）は拒否されます。"
     fi
     exit 0
   fi
