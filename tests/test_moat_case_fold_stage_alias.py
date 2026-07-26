@@ -134,6 +134,18 @@ def test_d7_fallback_uppercase_rm_asks():
     assert v == "ask"
 
 
+# --- D-7b (review テスト強度 mutation (d) 検知者不在の封鎖): fallback の
+#     CMD_REGEX ループ（:67-68）の -i を pin する。D-7 は rm 特例 grep（:71）しか
+#     踏まないため、:68 の -i 除去 mutant は D-7b なしでは 18/18 green のまま通る
+#     （mutation 実走で検知者不在を実証・2026-07-26）。---
+_TRUNC_GIT_UPPER = '{"tool_input":{"command":"GIT RESET --HARD'
+
+
+def test_d7b_fallback_uppercase_cmd_regex_family_asks():
+    v, _ = _run_raw("check-destructive.sh", _TRUNC_GIT_UPPER)
+    assert v == "ask"
+
+
 # === S 系: check-secrets.sh の stage alias / case-fold ===
 # broad-stage 検出は repo 走査で secret の実在を確認して初めて deny になるため、
 # 実 .env 入り tmp repo を CWD にして起動する。
