@@ -464,7 +464,7 @@ SF-001 系の網羅的閉鎖（rounds 5-11）で**実用的なシェル難読化
 - **修正方針**: **ロードマップ iter77 の構造化 argv（実行イベント/argv 判定）で根治**——raw shell text ではなく実際に渡る argv を真実とすれば brace/param/cmdsub の展開結果を直接判定できる。または SF-001 の control-plane リゾルバ（brace/param 展開対応済み）を destructive/secrets へ移植（重い・共有トークナイザの複雑化＝North Star の作者保守可能性に非整合ぎみ）。系としては**「raw shell text を真実の代理にするな」**の一般化。
 - **状態**: **OPEN（accepted residual・iter77 系で根治予定）**。iter75 の残余 pin（`tests/test_moat_quote_split.py::test_residual_*` 2 件）が将来対応時に flip して revisit を強制する。cmdsub 部分は SF-004 と同じく敵対閉鎖は原理的に不可（脅威モデル外）。
 
-### SF-020: `check-destructive.sh` が大文字コマンド名を case-fold せず case-insensitive FS で破壊コマンドが silent allow（**High・OPEN**・iter75 grill-code 検出＝iter54 secrets case-fold の destructive 版・非対称）
+### SF-020: `check-destructive.sh` が大文字コマンド名を case-fold せず case-insensitive FS で破壊コマンドが silent allow（**High・CLOSED-in-review iter77**・iter75 grill-code 検出＝iter54 secrets case-fold の destructive 版・非対称）
 
 - **発見**: iter75 grill-code（本セッション・fable・2026-07-20）。SF-017 修正（quote-split 封鎖）の網羅性グリルで隣接検出。iter75 diff の欠陥ではなく既存挙動の穴。
 - **種別**: iter54（case-insensitive FS の moat バイパス封鎖・commit 9a36d72）が secrets 側で塞いだ case-fold 非対称の **destructive 版**。`check-secrets.sh` は `CMD_LC`（小文字化）で `.ENV`→`.env` を捕捉し `GIT ADD .ENV` を deny するが、`check-destructive.sh` は raw CMD を生 grep し大文字コマンド名（`RM`）を取りこぼす。
@@ -481,9 +481,9 @@ SF-001 系の網羅的閉鎖（rounds 5-11）で**実用的なシェル難読化
 - **修正方針（残存分）**: destructive の **raw 破壊語判定を `CMD_LC` ベースへ**寄せ secrets と対称化（大文字コマンド名も小文字 regex にマッチ）。難読化経路は iter75 対応済みゆえ raw 経路のみ。回帰 pin: safe-artifact 除外（`rm -rf node_modules`）が case-fold で誤変化しないこと・LOWER 化が iter73 の C locale narrowing（SF-016）と衝突しないこと。TDD で raw `RM -rf`→ASK（旧=赤/新=緑）。effort S。iter76 候補。
 - **範囲（iter75 review 1次 F-1 追記・2026-07-20）**: raw 大文字残余はコマンド名だけでなく **redirect システムパスの大文字**も含む。実測: `echo x > /ETC/passwd`（大文字 `/ETC`・`NORM==CMD`）→ allow（`>\s*/(etc|usr|bin...)` パターンの `etc|usr|bin` リテラルが case-fold されない）。難読化形 `echo x >${IFS}/ETC/passwd`（`NORM!=CMD`）は iter75 fix-forward の grep -i で ask 済み。iter76 の raw 大文字 case-fold 対応で redirect システムパスも一括消化（`grep -i` or `CMD_LC` 化）。
 - **関連実測（ANSI-C quoting は無害＝穴でない・記録のみ）**: 同グリルで `rm$'\t'-rf`・`git$'\t'add .env` を exploit 候補として疑ったが実測で反証。ANSI-C quoting `$'\t'` はタブを生成するが**それ自体がクォート**ゆえ単語分割を起こさない（実測: `set -- foo$'\t'bar` → argc=1・`foo<TAB>bar` が単一語。対照 `${IFS}` は argc=2）。よって `rm$'\t'-rf` は実行時に `rm<TAB>-rf` という非存在1語コマンド→`command not found`＝機能的に無害。現状 allow は正しく moat の穴ではない（SF-019 の残余にも含めない）。同カテゴリで unicode 全角 `ｒｍ`（`ｒｍ -rf`）も fix-forward の grill-plan で helper 非畳み込みを実測したが、bash で `ｒｍ` は別コードポイント＝非存在コマンド・case-insensitive FS でも `rm` に解決されず＝**SF-016（Unicode 空白）と同カテゴリの無害**（塞ぐ必要なし・pin 不要）。
-- **状態**: **OPEN（未修正・iter76 P0 候補で消化予定）**。iter54 が secrets case-fold を単独 iter で扱った前例に倣い、destructive case-fold も独立 iter・独立 TDD で対応（quote-split 修正への混載は review/qa/security の焦点を割るため不採）。
+- **状態**: **CLOSED-in-review（iter77・2026-07-26）**。修正: `check-destructive.sh` の raw 経路 grep 4 サイト（fallback CMD_REGEX ループ／fallback rm 再帰／本体 rm 再帰特例／本体 CMD_REGEX ループ）を `grep -qE`→`grep -iqE` に case-fold し NORM 経路（iter75 FF7 で既 -i）と対称化（commit 298043f）。redirect システムパス大文字（`> /ETC/passwd`）も同配列 grep の -i で一括封鎖。SAFE_TARGETS の sed（safe-artifact 早期 allow）は**意図的に非 fold**＝allow 例外を大文字へ広げない（大文字 `RM -rf node_modules` も ask に落ちる／D-6 pin）。review 実走: 大文字/混在/長flag/redirect大文字/fallback の全形（`RM`・`Rm -Rf`・`GIT RESET --HARD`・`CHMOD -R`・`DD OF=`・`MKFS`・`SHRED`・`> /ETC`・fallback 大文字6形）が ask、クラス内バイパス 0 件。pin=tests/test_moat_case_fold_stage_alias.py（D 系・mutation 6/6 検知者確立）。review approved（`docs/qa-reports/iter77-review.md`・approve_with_notes）。残: raw 大文字とは別クラスの `>>` append redirect 穴を SF-023 として分離起票（case 非依存・fail-safe 側）。
 
-### SF-021: `check-secrets.sh` の broad-stage 検出器が `git stage` エイリアスを見ておらず `git stage -A/.` が silent allow（**High・OPEN**・iter75 fix-forward grill-code 検出＝broad 検出器の動詞網羅穴）
+### SF-021: `check-secrets.sh` の broad-stage 検出器が `git stage` エイリアスを見ておらず `git stage -A/.` が silent allow（**High・CLOSED-in-review iter77**・iter75 fix-forward grill-code 検出＝broad 検出器の動詞網羅穴）
 
 - **発見**: iter75 fix-forward grill-code（本セッション・fable・2026-07-20）。盲検2次 F1（broad-stage 難読化）の封鎖検証中に、broad-stage 検出器自体が `git add` のみで `git stage` を見ていない動詞網羅穴を隣接検出。
 - **種別**: broad-stage 検出器（`_STAGE_BROAD_RE`・`git...add...(-a|--all|.)`）の**動詞網羅漏れ**。`git stage` は `git add` の完全なエイリアス（git 公式・`-A`/`--all`/`.` を取る）だが、regex は `add` のみ。SF-017（quote-split クラス）とも SF-020（case-fold）とも別軸。
@@ -496,7 +496,15 @@ SF-001 系の網羅的閉鎖（rounds 5-11）で**実用的なシェル難読化
   ```
 - **根本原因**: `check-secrets.sh` の `_STAGE_BROAD_RE`（および旧 inline regex）が `git[[:space:]]+...add[[:space:]]+...` で `add` 固定。加えてコメント `:181`「Only `add` (not stage / update-index) has the -A/--all/. broad-stage spellings」は**事実誤認**（`git stage` は add と同一の broad 綴りを持つ。`update-index` は別＝低レベルで挙動が異なるが `stage` は完全同義）。
 - **修正方針**: `_STAGE_BROAD_RE` の `add` を `(add|stage)` に拡張。二経路トリガ（raw=deny/norm=ask）は既存構造のまま流用（`git stage -A`→deny・`git${IFS}stage -A`→ask）。コメント :181 を訂正。回帰 pin: `git stage`（実 .env）→deny・`git stagearea`(誤マッチ回避)→allow。effort S。**iter76 で SF-020（raw 大文字）と併せて broad/destructive 網羅 iter として消化**（iter75 は review reject 分〔F1/F2/F3/F4〕でクローズ・焦点保全）。
-- **状態**: **OPEN（未修正・iter76 で SF-020 と併合消化予定）**。iter75 fix-forward の diff が導入した穴ではなく既存の動詞網羅漏れ（生 `git stage -A` も iter75 前から allow）。
+- **状態**: **CLOSED-in-review（iter77・2026-07-26）**。修正: `_STAGE_BROAD_RE` の verb `add`→`(add|stage)`（commit 1a81bd6）。`${GIT_STAGE_VERB}`（`(add|stage|update-index)`）は流用せず broad 検出は `(add|stage)` のみ（`update-index` は `-A/--all/.` の broad 綴りを持たない plumbing＝混ぜると非実在綴りを許容）。事実誤認コメント（旧「Only add … has broad-stage spellings」）を訂正。deny/ask 文言を `git add -A / git stage -A / git add .` へ verb 非依存に汎化。review 実走: `git stage -A/--all/./-a`・`.[!e]*` glob・`GIT STAGE -A`・`git -c x=y stage -A`・`git${IFS}stage -A`（実 .env）が全て deny/ask、対照 `git stagearea`・`git update-index --add`（broad 綴りなし）・個別 `git stage README.md` は正しく allow。明示 .env 経路（`_STAGE_ENV_RE`・update-index 含む）は不変＝`git update-index --add .env` は依然 deny。pin=tests/test_moat_case_fold_stage_alias.py（S 系・mutation (e) を S-1/2/3/5/5b が検知）。review approved（`docs/qa-reports/iter77-review.md`）。
+
+### SF-023: `check-destructive.sh` の `>` redirect システムパス検出が `>>` (append) を取りこぼす（**Low・OPEN**・iter77 review 敵対 finder 検出＝既存 regex カバレッジ穴・case 非依存）
+
+- **発見**: iter77 review 敵対バイパス finder（opus・2026-07-26）＋親裏取り。SF-020 の redirect 大文字封鎖の検証中に隣接検出。
+- **種別**: `AEGIS_DESTRUCTIVE_CMD_REGEX` の redirect パターン `(^|[^0-9>])>\s*/(etc|usr|bin|sbin|boot|sys|lib)(/|[[:space:]]|$)` の**左コンテキスト負クラス `[^0-9>]`** が、`>>`（append）の 2 番目の `>` を「直前が `>`」として弾くため、`echo x >> /etc/passwd` が非マッチ＝allow。SF-020（case-fold）とは独立で、**小文字形 `echo x >> /etc/passwd` も同じく allow**（親実走確認）＝case 非依存の既存穴。
+- **重大度**: **Low**。(1) `> /etc/passwd`（truncate・単発）は既に ask 済みで、append は truncate より危険度が低い（追記は既存内容を消さない）。(2) システムパスへの `>>` は通常 sudo を要し PreToolUse の可視範囲では稀。(3) fail-safe 側（allow のままで deny を弱めるものではない・新規退行ではない）。iter77 が導入した穴ではなく `>` パターン新設時からの既存カバレッジ穴。
+- **修正方針（未実施）**: 負クラスを `(^|[^0-9])>>?\s*/(etc|...)` 等へ拡張して `>>` も捕捉。回帰 pin: `echo x >> /etc/passwd`→ask・`echo 2>>log`（fd リダイレクトの誤爆回避）→allow・`a>>b`（非システムパス）→allow。effort S。テーマは redirect 系の網羅で SF-020 と同系だが、case-fold クラスとは別軸ゆえ iter77 スコープ外（焦点保全）。次 iter 候補。
+- **状態**: **OPEN（未修正・iter77 で分離起票）**。fail-safe 側（allow・危険方向でない）ゆえ非ブロッキング。
 
 ## CLOSED
 
