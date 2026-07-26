@@ -3,7 +3,7 @@ framework: aegis
 framework_version: "1.31.3"
 project_name: "Aegis"
 mode: Dev
-phase: implement
+phase: review
 task_type: framework
 task_size: M
 task_size_rationale: "iter77（framework・SF-020＋SF-021 封鎖＝両 High・OPEN・silent allow の先行クローズ・**M 確定**＝brainstorm Step D 2026-07-26）。案A（High 先行）をユーザー承認: SF-020=check-destructive.sh raw 経路 grep -i 化（iter75 FF7 と同方式・CMD_LC は chmod -R 大文字リテラル破壊で不採用）＋SF-021=_STAGE_BROAD_RE (add|stage) 拡張。src 2 ファイル（check-destructive.sh/check-secrets.sh）＋tests＝M（qa/security ゲート維持・deploy skip）。attestation は iter78 へ。設計正本＝docs/specs/2026-07-26-iter77-moat-case-fold-stage-alias-design.md。"
@@ -37,7 +37,7 @@ external_evidence:
     scope: "v0.13.0 計画 5 ラウンドレビュー"
     findings: "Round 1〜5 で計 25 件の指摘（hook 出力スキーマ陳腐化、TaskCreated/Completed 制御方式、Plan 条件付き許可、effort 配分、pre-compact.sh 同種破損、`if` 単一 rule 制約等）"
     resolution: "Rev.5 で全件反映、Phase 0a 即時実装着手 GO。hotfix/v0122-hook-schema ブランチで開始。"
-next_action: "**【iter77 plan 完了・implement 着手】** plan gate approved（--ref 原子設定）。grill-plan 致命4＋要検討4 全反映済み（D-4→GIT RESET --HARD/CHMOD -R 具体化・Task4 record green 追記・D-7 条件付き降格・RED 停止条項）。次: Task 1 RED（tests/test_moat_case_fold_stage_alias.py・pin 15 本の旧実装 赤/緑実測・implementer=opus dispatch・per-task commit）→Task 2 SF-020（check-destructive.sh 4 サイト grep -i）→Task 3 SF-021（_STAGE_BROAD_RE (add|stage)）→Task 4 統合検証（full+moat 174 維持+record green）→grill-code→review。未 push（origin/main 未更新・iter76 分含む）。"
+next_action: "**【iter77 implement 完了・review 着手】** Task1 RED（赤11/緑4・a200862）→Task2 SF-020（grep -i 4サイト・298043f）→Task3 SF-021（(add|stage)＋文言汎化・1a81bd6）→Task4 統合検証（full 1411 passed/2 skipped・moat 非弱体化=1395 全 green 維持＋新規・削除0・contract/drift/doctor PASS・record green）→grill-code（🔴0・🟡2 pin fix-forward 18/18・cac9993・🟢1=rm regex 左境界なし FP 既存クラスは ship 時台帳判断）。Task4 qa agent の plan-mode 詰まりは親が record 実行を in-session 引き取り（iter76 stall 引き取りと同型）。次: review フェーズ（1次 finder=opus fan-out＋盲検2次=fable→iter77-review.md→review gate）。未 push。"
 blockers: []
 failure_tracking: null
 session_history:
