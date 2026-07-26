@@ -106,6 +106,13 @@ def test_d6_uppercase_rm_safe_artifact_asks():
     assert _run("check-destructive.sh", "RM -rf node_modules") == "ask"
 
 
+# --- D-6b (grill-code 追加): 混在ケース。全大文字 pin（D-1）では「-i を RM|rm の
+#     手動 alternation に置換する」treadmill 型 mutant を検知できない（D-1 は緑のまま
+#     混在ケースだけ silent allow に戻る）。-i の case-insensitive 性そのものを固定する。---
+def test_d6b_mixed_case_rm_recursive_asks():
+    assert _run("check-destructive.sh", "Rm -rF /tmp/x") == "ask"
+
+
 # --- D-7: fallback 経路（CMD 抽出不能）の case-fold ---
 # 誘発方法: 閉じクォート欠落の truncated JSON。grep fast-path は閉じ `"` 必須で
 # 不一致、python3 は json.loads 失敗 → CMD 空 → :60 fallback へ。
@@ -153,6 +160,12 @@ def test_s4_git_stagearea_not_falsely_blocked():
 # --- S-5: 大文字 GIT STAGE -A（case-insensitive FS では実 git）→ deny ---
 def test_s5_uppercase_git_stage_dash_A_with_real_env_denies():
     assert _run_in_repo("check-secrets.sh", "GIT STAGE -A", files=ENV_FILE) == "deny"
+
+
+# --- S-5b (grill-code 追加): 大文字×難読化の合成。CMD_LC（case fold）と NORM_LC
+#     （${IFS} 畳み込み後 fold）の二重経路が同時に機能することを固定する。---
+def test_s5b_uppercase_ifs_git_stage_dash_A_with_real_env_asks():
+    assert _run_in_repo("check-secrets.sh", "GIT${IFS}STAGE -A", files=ENV_FILE) == "ask"
 
 
 # --- S-6 対照: 生 `git add -A` の broad-stage deny は不変（回帰 pin）---
