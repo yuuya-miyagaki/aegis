@@ -1,19 +1,22 @@
 # iter77 Task1 (RED): moat case-fold / stage-alias pins.
 #
 # 旧実装（未修正 hooks）の実測ギャップを pin する:
-#   - check-destructive.sh: 生経路（rm 特例 :128 / CMD_REGEX ループ :144 / fallback :60-77）
+#   - check-destructive.sh: 生経路（rm 再帰特例 / CMD_REGEX ループ / fallback 経路）
 #     が case-sensitive で、非難読化の大文字コマンド（RM -rf / GIT RESET --HARD /
 #     CHMOD -R / > /ETC/...）を silent allow する。NORM 経路の grep -i は
 #     NORM!=CMD（難読化実在）のときしか走らないため、平文大文字は素通り。
 #     macOS 等 case-insensitive FS では /bin/rm が RM で実行される＝実バイパス。
-#   - check-secrets.sh: _STAGE_BROAD_RE (:169) が verb `add` のみで、`git stage -A` /
+#   - check-secrets.sh: _STAGE_BROAD_RE が verb `add` のみで、`git stage -A` /
 #     `git stage .`（stage は add の完全 alias）の broad staging が repo 内の実 .env
 #     ごと素通りする。大文字 `GIT STAGE -A` も同様。難読化形 git${IFS}stage -A も
 #     NORM 経路の同 regex を通るため素通り。
 #
-# 期待値は修正後の仕様（新実装）。旧実装での実測（2026-07-26・HEAD=ad04973）:
-#   赤11: D-1 D-2 D-3 D-4a D-4b D-6 D-7 S-1 S-2 S-3 S-5（すべて allow だった）
-#   緑4:  D-5 (allow) / S-4 (allow) / S-6 (deny) / S-7 (deny)
+# 期待値は修正後の仕様（新実装）。旧実装（HEAD=ad04973）での実測（2026-07-26・
+# 本 19 pin を旧 hooks に対して実走・review 盲検2次が再走裏取り）: 赤14 / 緑5。
+#   赤14: D-1 D-2 D-3 D-4a D-4b D-6 D-6b D-7 D-7b S-1 S-2 S-3 S-5 S-5b（すべて allow だった）
+#   緑5:  D-5 (allow) / S-4 (allow) / S-6 (deny) / S-7 (deny) ＋ D-7-lowercase 対照 (ask)
+# 註: 当初 RED コミット(a200862)は 15 pin で赤11/緑4。その後 grill-code(D-6b/S-5b)・
+#     review テスト強度(D-7b) の 3 pin を追加し、いずれも旧実装で赤＝合計 赤14/緑5。
 import json, subprocess, os, tempfile, shutil
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))

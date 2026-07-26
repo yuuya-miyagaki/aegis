@@ -160,13 +160,15 @@ if [ -z "$WARN" ]; then
     # git branch の [dD]、restore の W）ため、事前 lower 化すると chmod -R → chmod -r
     # で regex 内の R リテラルが非マッチとなり大文字難読化を捕捉できない（実測）。
     # 生ではなく NORM に grep -i を当てることで rm 系・SQL・全 CMD_REGEX を一様に捕捉。
-    # iter77 SF-020: raw 経路（:67-68/:71 fallback、:128 rm 再帰、:144-145 CMD_REGEX
-    # ループ）も同方式で grep -i 化し、この NORM 経路と対称化した。難読化なし（NORM==CMD）
-    # の平文大文字コマンド（RM -rf / GIT RESET --HARD / CHMOD -R）は NORM 経路が走らない
-    # ため、raw 経路で case-fold しないと case-insensitive FS で実行される破壊コマンドを
-    # silent allow していた（case-insensitive FS では /bin/rm が RM で起動する＝実バイパス）。
-    # SAFE_TARGETS の sed（:88 小文字 ^rm のみ）は意図的に fold しない: allow 例外を
-    # 大文字へ広げると moat 弱体化のため。帰結として大文字 RM は safe-artifact でも ask。
+    # iter77 SF-020: raw 経路（fallback の CMD_REGEX ループ／fallback の rm 再帰 grep／
+    # 本体の rm 再帰特例／本体の CMD_REGEX ループ）も同方式で grep -i 化し、この NORM 経路
+    # と対称化した。難読化なし（NORM==CMD）の平文大文字コマンド（RM -rf / GIT RESET --HARD
+    # / CHMOD -R）は NORM 経路が走らないため、raw 経路で case-fold しないと case-insensitive
+    # FS で実行される破壊コマンドを silent allow していた（/bin/rm が RM で起動する＝実バイパス）。
+    # fallback の RAW_LOWER 経路（LOWER_REGEX ループ）は先に lower 化してから照合するため
+    # -i 不要（既に fold 済み）＝ここでは非対象。SAFE_TARGETS の sed（小文字 ^rm のみ・
+    # 上流の safe-artifact 例外）は意図的に fold しない: allow 例外を大文字へ広げると moat
+    # 弱体化のため。帰結として大文字 RM は safe-artifact でも ask。
     if printf '%s' "$NORM" | grep -iqE 'rm\s+(-[a-zA-Z]*[rR]|--recursive)' 2>/dev/null; then
       WARN="難読化された破壊的コマンド（連結クォート/バックスラッシュ）の可能性: 再帰削除。意図を確認してください。"
     fi
