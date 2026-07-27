@@ -3,7 +3,7 @@ framework: aegis
 framework_version: "1.31.3"
 project_name: "Aegis"
 mode: Dev
-phase: qa
+phase: security
 task_type: framework
 task_size: M
 task_size_rationale: "iter77（framework・SF-020＋SF-021 封鎖＝両 High・OPEN・silent allow の先行クローズ・**M 確定**＝brainstorm Step D 2026-07-26）。案A（High 先行）をユーザー承認: SF-020=check-destructive.sh raw 経路 grep -i 化（iter75 FF7 と同方式・CMD_LC は chmod -R 大文字リテラル破壊で不採用）＋SF-021=_STAGE_BROAD_RE (add|stage) 拡張。src 2 ファイル（check-destructive.sh/check-secrets.sh）＋tests＝M（qa/security ゲート維持・deploy skip）。attestation は iter78 へ。設計正本＝docs/specs/2026-07-26-iter77-moat-case-fold-stage-alias-design.md。"
@@ -15,7 +15,7 @@ gate_approvals:
   brainstorm: approved
   plan: approved
   review: approved
-  qa: pending
+  qa: approved
   security: pending
   deploy: pending
   dev_ready_for_client: pending
@@ -24,7 +24,7 @@ current_refs:
   plan: "docs/plans/2026-07-26-iter77-moat-case-fold-stage-alias-implementation-plan.md"
   spec: "docs/specs/2026-07-26-iter77-moat-case-fold-stage-alias-design.md"
   review: "docs/qa-reports/iter77-review.md"
-  qa: null
+  qa: "docs/qa-reports/iter77-qa.md"
   security: null
   deploy: null
   translation: null

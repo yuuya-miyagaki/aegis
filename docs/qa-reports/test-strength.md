@@ -1,10 +1,6 @@
 # テスト強度ドリル結果（機械ブロック・ハーネス生成）
 
 ```
-verdict: FAIL
-mutants_total: 5
-mutants_caught: 0
-baseline: n/a
-since: ad04973f80f76608ce38ac837f57216463888d3a
-survived: []
+verdict: SKIP
+reason: iter77（SF-020 case-fold＋SF-021 stage エイリアス）は framework 改修を per-task commit 済み（a200862..d4cea18）＝qa 承認時の working-tree diff（git diff HEAD）が空になる想定どおりの縁ケース（qa-verification SKILL 147-150）。`since:ad04973` 案は実走で DRILL BLOCKED を実測（coverage floor が (a) check-secrets.sh の emit_deny 文言 3 行〔:327/329/332〕＝テストが文言を pin しない意図的設計ゆえ捕捉 mutant 不能・(b) 新規テストファイル tests/test_moat_case_fold_stage_alias.py 全体〔1-193〕＝テストコード自体は変異で強度証明できない循環、に mutant を要求＝framework 混在 diff の構造的不成立／LEARNINGS line33/54）。代替実証（手動 mutation 同等・全て親 or reviewer が scratchpad コピー側で実走・本体 tree 不接触）: (1) RED-first TDD＝現 19 pin を旧実装（ad04973）で実走し 14 failed/5 passed を実測（review 盲検2次＋親が独立再現裏取り・全 RED は機能未実装ゆえの allow を assert 失敗で確認）。当初 RED コミット a200862 は 15 pin で赤11/緑4。(2) 差分歯 mutation 6 種を親 in-session 実走（コピー側・元 tree の git status 空を確認）: [(a) 本体 rm再帰特例 :128 の -i 除去]→D-1/D-2/D-6/D-6b が検知（歯あり）。[(b) 本体 CMD_REGEX ループ :145 の -i 除去]→D-3/D-4a/D-4b 検知。[(c) fallback rm :71 の -i 除去]→D-7 検知。[(d) fallback CMD_REGEX :68 の -i 除去]→検知者不在を摘発→D-7b pin 追加で封鎖・変異再走で D-7b が FAIL を実証（ea21045）。[(e) _STAGE_BROAD_RE (add|stage)→add 巻き戻し]→S-1/S-2/S-3/S-5/S-5b 検知。[(f) treadmill: -i を (RM|rm) 手動 alternation 置換]→D-6b（混在 Rm -rF）検知。＝差分歯 6/6 に検知者確立。(3) 敵対クラス内バイパス探索: SF-020（大文字/混在/長flag/redirect大文字/fallback）65+ 入力・SF-021（stage alias 全 broad 綴り/case-fold/GIT_PRE_OPTS/難読化）を実 hook 実走し主張クラス内バイパス 0 件。回帰（rm -rf node_modules・git stage README.md・commit メッセージ内言及）新規誤検知 0 件。(4) full suite 1411 passed/2 skipped・record green（marker:true・src=manual・2026-07-26）・check_framework_contract PASS・check_reference_drift PASS・status_doctor PASS。詳細=docs/qa-reports/iter77-qa.md・iter77-review.md（対照表／mutation 表 A／敵対バッテリ B）。
 ```
