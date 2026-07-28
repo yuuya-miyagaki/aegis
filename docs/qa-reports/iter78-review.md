@@ -96,6 +96,7 @@ finder stall（"stays green under mutant" 断片）→ **親が mutation バッ�
 全 Critical/Major は review 内で fix-forward 済み（M3 検知者・counts 検証・drift なし独立確認）。残る notes は accepted residual（SF-024 の OS-limit・drill subsume・load-bearing 不変は pin 保証）＋ D-1 jargon（qa 文脈で actionable）。
 
 ```claims
+verdict: approve_with_notes
 second_opinion:
   verdict: approve_with_notes
   divergence_points: ["敵対2次が attested read-time counts 非検証を摘発（1次仕様準拠は見落とし）→ 親裁定で counts 検証を追加", "テスト強度が M3 突合の検知者不在を摘発 → pin 追加", "5b event 偽造は design が名指し済み残余だが severity 較正を SF-024 で精密化（Low・OS-limit・非拡大）", "盲検2次エージェントがハード stall→親 in-session 独立検証で回収（drift/counts 堅牢/rotation/plugin 例外 全安全・新規 finding 0）"]
