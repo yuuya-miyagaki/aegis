@@ -100,3 +100,7 @@ iter74 rollover＋brainstorm 記録（framework・Fable+Codex 二重網羅レビ
 ### session-history: iteration 75 rollover (brainstorm, 2026-07-19・archived iter76 docs 2026-07-23＝frontmatter ≤3 維持)
 
 iter75 rollover（framework・P0 SF-017 MOAT-BYPASS 修正）。iter74 の二重網羅レビュー（Codex 外部隔離＋Fable 盲検2次隔離 clone・対象 77566ed）を完遂し、親が乖離/片方のみを実走裁定→突合正本 docs/full-review-2026-07-19-dual-codex-fable.md（§5 ロードマップ iter75-82）を作成、生レビュー2本を証跡保全、SF-017（Critical MOAT-BYPASS）/SF-018（Medium LOCALE-1）を起票、iter74 deliverable を commit（a51a3f9）。**二重レビューの核成果**: 決定論 moat は健在だが「生シェル文字列（moat）と生テスト出力（evidence）」の最終2入力に実走再現できる欠陥。層1の乖離が2実バグを摘発（MOAT-BYPASS=Codex のみ／LOCALE-1=Fable のみ・互いの盲点）。iter75 は SF-001 の shlex トークン化を check-destructive/secrets へ一般化。（iter75 の完全クローズは 2026-07-21 の docs entry・SF-018 は iter76 で消化＝本 archive）。
+
+### session-history: iteration 76 recovery+brainstorm (2026-07-22・archived iter78 docs 2026-07-28＝frontmatter ≤3 維持)
+
+セッション復帰（session-recovery skill・status_doctor PASS・tree clean・HEAD=097c103）＋maintenance: body Session History 11→8（2026-06 期 3 件を evidence-archive へ移設・health ≤10 回復）・frontmatter session_history ≤3 維持（iter74 entry を移設）→Before brainstorm 手順→aegis-brainstorm 完走: 案A（roadmap 準拠 3 点セット・M）をユーザー承認・brainstorm-record＋design を docs/specs/2026-07-22-iter76-evidence-integrity-locale-* に保存・update-task --size M・brainstorm gate approve・phase→plan。SF-020/021 は次 iter 分離（L 化・テーマ混在回避）。次＝実装計画→grill-plan→plan gate。
