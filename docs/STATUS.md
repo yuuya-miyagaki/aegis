@@ -3,7 +3,7 @@ framework: aegis
 framework_version: "1.31.4"
 project_name: "Aegis"
 mode: Dev
-phase: implement
+phase: review
 task_type: framework
 task_size: M
 task_size_rationale: "iter78（framework・pytest execution attestation＝roadmap full-review §5 行77 P0/P1・**M 確定**＝brainstorm Step D 2026-07-28）。案A（pytest プラグイン attestation）採用: argv spawn＋structured event で positive proof・src=attested のみ pytest family の decisive green・fake 出力は event 不能。src 4 ファイル（attest-test-run.py 新規／aegis_attest_plugin.py 新規／build-judge-card.py／record-test-result.py）＋tests＝M（deploy skip）。SF-014/SF-022 根治・SF-015 attested 経路解消。B1 drill 統合は roadmap 行78＝次 iter へ分離。設計正本＝docs/specs/2026-07-28-iter78-pytest-execution-attestation-design.md。"
@@ -37,7 +37,7 @@ external_evidence:
     scope: "v0.13.0 計画 5 ラウンドレビュー"
     findings: "Round 1〜5 で計 25 件の指摘（hook 出力スキーマ陳腐化、TaskCreated/Completed 制御方式、Plan 条件付き許可、effort 配分、pre-compact.sh 同種破損、`if` 単一 rule 制約等）"
     resolution: "Rev.5 で全件反映、Phase 0a 即時実装着手 GO。hotfix/v0122-hook-schema ブランチで開始。"
-next_action: "**【plan approved・implement 着手】** iter78＝pytest execution attestation。grill-plan 致命3（反転 pin 実測 18 件・exit5=red 統一・redirect 挿入位置）反映済＝plan 正本 docs/plans/2026-07-28-iter78-pytest-execution-attestation-implementation-plan.md。次: Task1 RED バッテリ実測→Task2 plugin→Task3 attestor→Task4 judge＋契約更新 pin（A13+B5）→Task5 record redirect→Task6 統合検証＋ドッグフード attest→grill-code→review。implementer=opus per-task commit・session=fable。未 push 累積（iter76/77 分）。"
+next_action: "**【implement 完了・review 着手】** iter78 attestation 実装完了（dd06cca..c55761e）: Task1 RED 28pin 赤14/緑14 実測→Task2 plugin（ceb492c）→Task3 attestor（b16e834）→Task4 judge 契約＋pin17 契約更新・mutation 2 実証（3504bdd）→Task5 record 誘導＋pin5+表外2（d0d70a9）→Task6 統合検証＝full 1442 green・ドッグフード attest green・judge 判定源 src=attested 実測（4ae0eb3）→grill-code 🔴0/🟡1 fix-forward B11 pin（c55761e）。次: review 1次4角度 finder=opus（仕様準拠/敵対/テスト強度/保守性）＋盲検2次=fable→review gate approve --ref。"
 blockers: []
 failure_tracking: null
 session_history:
