@@ -3,16 +3,16 @@ framework: aegis
 framework_version: "1.31.4"
 project_name: "Aegis"
 mode: Dev
-phase: brainstorm
+phase: plan
 task_type: framework
 task_size: M
-task_size_rationale: "iter77（framework・SF-020＋SF-021 封鎖＝両 High・OPEN・silent allow の先行クローズ・**M 確定**＝brainstorm Step D 2026-07-26）。案A（High 先行）をユーザー承認: SF-020=check-destructive.sh raw 経路 grep -i 化（iter75 FF7 と同方式・CMD_LC は chmod -R 大文字リテラル破壊で不採用）＋SF-021=_STAGE_BROAD_RE (add|stage) 拡張。src 2 ファイル（check-destructive.sh/check-secrets.sh）＋tests＝M（qa/security ゲート維持・deploy skip）。attestation は iter78 へ。設計正本＝docs/specs/2026-07-26-iter77-moat-case-fold-stage-alias-design.md。"
+task_size_rationale: "iter78（framework・pytest execution attestation＝roadmap full-review §5 行77 P0/P1・**M 確定**＝brainstorm Step D 2026-07-28）。案A（pytest プラグイン attestation）採用: argv spawn＋structured event で positive proof・src=attested のみ pytest family の decisive green・fake 出力は event 不能。src 4 ファイル（attest-test-run.py 新規／aegis_attest_plugin.py 新規／build-judge-card.py／record-test-result.py）＋tests＝M（deploy skip）。SF-014/SF-022 根治・SF-015 attested 経路解消。B1 drill 統合は roadmap 行78＝次 iter へ分離。設計正本＝docs/specs/2026-07-28-iter78-pytest-execution-attestation-design.md。"
 iteration: 78
 ui_surface: false
 last_updated: "2026-07-28T00:00:00Z"
 gate_approvals:
   client_ready_for_dev: n/a
-  brainstorm: pending
+  brainstorm: approved
   plan: pending
   review: pending
   qa: pending
@@ -22,7 +22,7 @@ gate_approvals:
 current_refs:
   requirements: []
   plan: null
-  spec: null
+  spec: "docs/specs/2026-07-28-iter78-pytest-execution-attestation-design.md"
   review: null
   qa: null
   security: null
@@ -37,7 +37,7 @@ external_evidence:
     scope: "v0.13.0 計画 5 ラウンドレビュー"
     findings: "Round 1〜5 で計 25 件の指摘（hook 出力スキーマ陳腐化、TaskCreated/Completed 制御方式、Plan 条件付き許可、effort 配分、pre-compact.sh 同種破損、`if` 単一 rule 制約等）"
     resolution: "Rev.5 で全件反映、Phase 0a 即時実装着手 GO。hotfix/v0122-hook-schema ブランチで開始。"
-next_action: "**【iter78 rollover 完了・brainstorm 着手】** iter78＝roadmap（full-review §5 行77）＝pytest execution attestation。SF-022/SF-014/SF-015 の denylist/出力ベース marker の原理的不完全性を positive proof（argv spawn＋structured event・src=attested のみ decisive green・fake 出力は event 不能）で根治。M・1-2 iter 想定。次: aegis-brainstorm skill で設計→brainstorm-record＋design doc→update-task --size→brainstorm gate approve→plan。未 push 累積（iter76/77 分・`gh auth switch --user yuuya-miyagaki` 後に origin/main へ）。"
+next_action: "**【brainstorm approved・plan 着手】** iter78＝pytest execution attestation（案A＝pytest プラグイン・M・v1.32.0 MINOR 想定）。brainstorm-record＋design 保存済（docs/specs/2026-07-28-iter78-pytest-execution-attestation-*）。次: implementation-plan 作成（judge pytest-green 制限で契約変更となる既存 pin の列挙含む）→grill-plan（fable・全指摘反映）→plan gate approve --ref→implement（TDD Task1 RED 実測から）。未 push 累積（iter76/77 分）。"
 blockers: []
 failure_tracking: null
 session_history:
