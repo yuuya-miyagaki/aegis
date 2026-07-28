@@ -3,29 +3,29 @@ framework: aegis
 framework_version: "1.31.4"
 project_name: "Aegis"
 mode: Dev
-phase: docs
+phase: brainstorm
 task_type: framework
 task_size: M
 task_size_rationale: "iter77（framework・SF-020＋SF-021 封鎖＝両 High・OPEN・silent allow の先行クローズ・**M 確定**＝brainstorm Step D 2026-07-26）。案A（High 先行）をユーザー承認: SF-020=check-destructive.sh raw 経路 grep -i 化（iter75 FF7 と同方式・CMD_LC は chmod -R 大文字リテラル破壊で不採用）＋SF-021=_STAGE_BROAD_RE (add|stage) 拡張。src 2 ファイル（check-destructive.sh/check-secrets.sh）＋tests＝M（qa/security ゲート維持・deploy skip）。attestation は iter78 へ。設計正本＝docs/specs/2026-07-26-iter77-moat-case-fold-stage-alias-design.md。"
-iteration: 77
+iteration: 78
 ui_surface: false
-last_updated: "2026-07-26T00:00:00Z"
+last_updated: "2026-07-28T00:00:00Z"
 gate_approvals:
   client_ready_for_dev: n/a
-  brainstorm: approved
-  plan: approved
-  review: approved
-  qa: approved
-  security: approved
+  brainstorm: pending
+  plan: pending
+  review: pending
+  qa: pending
+  security: pending
   deploy: pending
-  dev_ready_for_client: approved
+  dev_ready_for_client: pending
 current_refs:
   requirements: []
-  plan: "docs/plans/2026-07-26-iter77-moat-case-fold-stage-alias-implementation-plan.md"
-  spec: "docs/specs/2026-07-26-iter77-moat-case-fold-stage-alias-design.md"
-  review: "docs/qa-reports/iter77-review.md"
-  qa: "docs/qa-reports/iter77-qa.md"
-  security: "docs/qa-reports/iter77-security.md"
+  plan: null
+  spec: null
+  review: null
+  qa: null
+  security: null
   deploy: null
   translation: null
 external_evidence:
@@ -37,7 +37,7 @@ external_evidence:
     scope: "v0.13.0 計画 5 ラウンドレビュー"
     findings: "Round 1〜5 で計 25 件の指摘（hook 出力スキーマ陳腐化、TaskCreated/Completed 制御方式、Plan 条件付き許可、effort 配分、pre-compact.sh 同種破損、`if` 単一 rule 制約等）"
     resolution: "Rev.5 で全件反映、Phase 0a 即時実装着手 GO。hotfix/v0122-hook-schema ブランチで開始。"
-next_action: "**【iter77 完全クローズ】** 全 dev ゲート approved（brainstorm/plan/review/qa/security/dev_ready_for_client・deploy は M size routing で自動除外）＝v1.31.4 PATCH。full 1411 passed/2 skipped・record green・moat 非弱体化（1395 全 green 維持・削除0・failure0）・contract/drift/doctor PASS。SF-020/021=CLOSED-in-review・SF-023 新規起票（>> append redirect・Low・fail-safe）。**次アクション: (a) push（ユーザー指示があれば `gh auth switch --user yuuya-miyagaki` 後に origin/main へ・iter76 分含む未 push が累積）／(b) 次イテレーション rollover（iter78＝roadmap §5＝pytest execution attestation〔SF-022/SF-014 の denylist 原理的不完全性を positive proof で根治・src=attested のみ decisive green〕・M・1-2 iter／代替＝SF-023 append redirect・S）。** 未 push（origin/main 未更新）。"
+next_action: "**【iter78 rollover 完了・brainstorm 着手】** iter78＝roadmap（full-review §5 行77）＝pytest execution attestation。SF-022/SF-014/SF-015 の denylist/出力ベース marker の原理的不完全性を positive proof（argv spawn＋structured event・src=attested のみ decisive green・fake 出力は event 不能）で根治。M・1-2 iter 想定。次: aegis-brainstorm skill で設計→brainstorm-record＋design doc→update-task --size→brainstorm gate approve→plan。未 push 累積（iter76/77 分・`gh auth switch --user yuuya-miyagaki` 後に origin/main へ）。"
 blockers: []
 failure_tracking: null
 session_history:
