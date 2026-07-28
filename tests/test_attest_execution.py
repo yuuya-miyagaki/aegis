@@ -314,6 +314,24 @@ class TestAttestE2E(unittest.TestCase):
         self.assertFalse(self.log.exists(),
                          "イベント妨害で green を証明できない＝記録してはならない")
 
+    def test_event_file_invalid_bytes_fails_closed_rc2(self):
+        # B11（grill-code 🟡 fix-forward）: event ファイルへの不正 UTF-8 バイト
+        # 注入（truncate と別綴りの in-process 妨害）。素の UnicodeDecodeError
+        # traceback（rc1＝「red 記録済み」の誤信号）ではなく、破損＝評価不能
+        # として rc2・記録なし・診断メッセージに倒れること。
+        self._write("conftest.py",
+                    "import os\n"
+                    "def pytest_sessionfinish(session):\n"
+                    "    p = os.environ.get('AEGIS_ATTEST_EVENT_PATH')\n"
+                    "    if p:\n"
+                    "        open(p, 'ab').write(b'\\xff\\xfe broken\\n')\n")
+        self._write("t_pass.py", "def test_a():\n    assert True\n")
+        rc, out, err = self._attest("python3 -m pytest t_pass.py")
+        self.assertEqual(rc, 2, out + err)
+        self.assertNotIn("Traceback", err)
+        self.assertIn("attest 不成立", err)
+        self.assertFalse(self.log.exists())
+
 
 # ---------------------------------------------------------------------------
 # グループ C — judge 契約（合成 evidence-log で新契約を pin）

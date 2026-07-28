@@ -14,7 +14,9 @@ returncode, corrupt event JSON, timeout) is rc2: no record, no green —
 fail-closed. Residual ceiling (documented, pre-existing class): in-process
 sabotage (conftest unregistering the plugin / forging events) and
 hand-written log entries — deliberate self-deception, contained by
-defence-in-depth (drill, human preview, fingerprint)."""
+defence-in-depth (drill, human preview, fingerprint). Plugin suppression via
+PYTEST_ADDOPTS / ini addopts (`-p no:aegis_attest_plugin`) collapses to the
+same rc2 (missing events) — it cannot mint a green."""
 from __future__ import annotations
 import hashlib
 import importlib.util
@@ -130,13 +132,22 @@ def main(argv=None) -> int:
 
         # 6) read + aggregate events. A single corrupt line fails CLOSED.
         raw_bytes = event_path.read_bytes()
+        # strict decode: the plugin only ever writes valid UTF-8 (json.dumps),
+        # so a non-UTF-8 byte in the stream IS corruption (in-process
+        # sabotage / partial write) — rc2 like any other corrupt line, not a
+        # bare UnicodeDecodeError traceback (grill-code iter78: rc1 would
+        # falsely signal "red recorded").
+        try:
+            raw_text = raw_bytes.decode("utf-8", errors="strict")
+        except UnicodeDecodeError:
+            return _reject("イベントストリーム破損（不正バイト）— attest 不成立")
         calls: dict[str, tuple] = {}
         setup_teardown_errors = 0
         setup_skipped = 0
         call_skipped_nonxfail = 0
         collection_errors = 0
         sessionfinish = None
-        for line in raw_bytes.decode("utf-8", errors="strict").splitlines():
+        for line in raw_text.splitlines():
             line = line.strip()
             if not line:
                 continue
