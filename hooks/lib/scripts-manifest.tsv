@@ -27,3 +27,4 @@ scripts/eval_scaffold_smoke.py	framework-only
 scripts/eval_scenario.py	framework-only
 scripts/_artifact_template_map.py	import-only
 scripts/platform_manifest.py	import-only
+scripts/aegis_attest_plugin.py	import-only
