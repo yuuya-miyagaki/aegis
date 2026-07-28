@@ -77,6 +77,20 @@ class _RecordFixture(unittest.TestCase):
             "def test_a():\n    pass\n", encoding="utf-8")
         (self.root / "t_fail.py").write_text(
             "def test_a():\n    assert False\n", encoding="utf-8")
+        # iter78 契約更新: record が整形式 pytest を attest へ redirect するように
+        # なったため、record 経由の accept/red pin は非 pytest（unittest 双子）へ
+        # 移す。実出力で weak pair marker（Ran N tests in ... / OK|FAILED）が
+        # 成立する。
+        (self.root / "u_pass.py").write_text(
+            "import unittest\n"
+            "class T(unittest.TestCase):\n"
+            "    def test_a(self):\n        self.assertTrue(True)\n",
+            encoding="utf-8")
+        (self.root / "u_fail.py").write_text(
+            "import unittest\n"
+            "class T(unittest.TestCase):\n"
+            "    def test_a(self):\n        self.assertTrue(False)\n",
+            encoding="utf-8")
         sp.run(["git", "-C", str(self.root), "add", "-A"],
                check=True, capture_output=True)
         sp.run(["git", "-C", str(self.root), "commit", "-qm", "i"],
@@ -170,12 +184,13 @@ class TestRecordRejection(_RecordFixture):
 
 class TestRecordAccept(_RecordFixture):
     def test_valid_runner_still_records(self):
-        # R4 (iter71, updated): the accept path now requires a POSITIVE marker
-        # verdict on a green run. `-q` is removed so pytest emits its prologue +
-        # strong summary (the -q form is intentionally rejected post-iter71).
-        # The recorded entry must carry marker:true (additive audit field).
-        # RED until Task 4 adds the write-time marker gate + marker field.
-        cmd = f"python3 -m pytest {self.root / 't_pass.py'}"
+        # R4 (iter71, updated): the accept path requires a POSITIVE marker
+        # verdict on a green run; the recorded entry carries marker:true
+        # (additive audit field).
+        # iter78 契約更新: pytest は attest へ redirect されるようになったため、
+        # accept path の実走 pin を非 pytest（unittest 双子 u_pass）へ移す。
+        # unittest の weak pair marker（Ran 1 test in .../OK）が実出力で成立する。
+        cmd = "python3 -m unittest u_pass"
         self.assertLess(len(cmd), 500, "cmd must stay under the 500-char cap")
         rc, err = _run_main(["--root", str(self.root), cmd])
         self.assertEqual(rc, 0, err)
@@ -208,15 +223,17 @@ class TestRecordMarkerProof(_RecordFixture):
         self.assertIn("positive proof", err)
 
     def test_quiet_pytest_green_rejected_with_guidance(self):
-        # R2: `pytest -q` on a passing file exits 0 but emits neither the strong
-        # summary nor the prologue -> no positive marker -> rc2, no log, and the
-        # guidance must call out the `-q` operational change.
+        # iter78 契約更新（redirect pin へ転用）: 旧 R2 は `pytest -q` の実行後に
+        # marker 不成立を確認する pin だったが、`-q` は attest 経路ではもはや制約
+        # ではない（attest は子出力を一切読まない＝marker 抑制は無関係）。整形式
+        # の quiet pytest は **実行される前に** redirect され、rc2・stderr に
+        # "attest-test-run"・ログ非書込となることを pin する。
         rc, err = _run_main(
             ["--root", str(self.root),
              f"python3 -m pytest -q {self.root / 't_pass.py'}"])
         self.assertEqual(rc, 2, err)
         self.assertFalse(self.log.exists())
-        self.assertIn("-q", err)
+        self.assertIn("attest-test-run", err)
 
     @unittest.skipUnless(shutil.which("npm"), "npm not installed")
     def test_npm_true_green_rejected(self):
@@ -233,7 +250,9 @@ class TestRecordMarkerProof(_RecordFixture):
         # R5 (both-green pin): a red run (exit!=0) is still recorded as it is
         # today — marker proof is only required for the green claim, and a red
         # run carries no forgeable positive signal. status=fail, no marker field.
-        cmd = f"python3 -m pytest {self.root / 't_fail.py'}"
+        # iter78 契約更新: pytest は attest へ redirect されるため、record 経由の
+        # red 実走 pin を非 pytest（unittest 双子 u_fail）へ移す。
+        cmd = "python3 -m unittest u_fail"
         rc, err = _run_main(["--root", str(self.root), cmd])
         self.assertEqual(rc, 0, err)
         self.assertTrue(self.log.exists())
@@ -245,10 +264,12 @@ class TestRecordMarkerProof(_RecordFixture):
         # R6: no marker.sh in the target root -> the verdict cannot be computed
         # -> fail-closed reject (rc2, no log). A green run must never be recorded
         # when the proof mechanism itself is missing.
+        # iter78 契約更新: cmd を非 pytest（unittest u_pass）へスワップ。pytest だと
+        # redirect が marker 検査より先に発火し、marker-lib 欠如の fail-closed 目的が
+        # 死ぬため。non-pytest なら実行に到達し marker.sh 欠如で fail-closed する。
         (self.root / "hooks" / "lib" / "marker.sh").unlink(missing_ok=True)
         rc, err = _run_main(
-            ["--root", str(self.root),
-             f"python3 -m pytest {self.root / 't_pass.py'}"])
+            ["--root", str(self.root), "python3 -m unittest u_pass"])
         self.assertEqual(rc, 2, err)
         self.assertFalse(self.log.exists())
 

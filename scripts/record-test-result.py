@@ -48,7 +48,11 @@ fix candidate for both is execution attestation (the audit_deps
 positive-proof track, iter73+).
 
 The accepted green entry's optional `"marker": true` is an additive audit-
-transparency field; the judge does not consume it."""
+transparency field; the judge does not consume it.
+
+iter78: the pytest family is redirected to execution attestation
+(scripts/attest-test-run.py); the output-based residuals (a)-(c) above now
+apply only to NON-pytest runners."""
 from __future__ import annotations
 import hashlib
 import importlib.util
@@ -129,6 +133,24 @@ def main(argv=None) -> int:
             args.command, patterns_lib=root / "hooks" / "lib" / "patterns.sh")
     except drill.DrillError as exc:
         return _reject(str(exc))
+
+    # iter78: pytest-family results are recorded via EXECUTION ATTESTATION
+    # only (scripts/attest-test-run.py — argv spawn + structured events).
+    # This writer's marker-based proof is the output layer the attestation
+    # replaces; keeping a second green path here would let a forged output
+    # bypass the stronger proof. Red goes through attest too — one path per
+    # runner family. Placed AFTER the malformation checks so their rc2
+    # messages are preserved; a well-formed pytest cmd is redirected BEFORE
+    # execution. None = patterns unreadable — fail-closed like step 1.
+    fam = judge.is_pytest_family_cmd(root, args.command[:500])
+    if fam is None:
+        return _reject("patterns.sh を読み込めません — pytest family 判定を実行"
+                       "できないため fail-closed（framework install が壊れています）")
+    if fam:
+        return _reject(
+            "pytest family は execution attestation 経由でのみ記録します: "
+            'python3 scripts/attest-test-run.py "<コマンド>" を使ってください'
+            "（green/red とも attest 側で記録・出力ベース marker 経路は廃止）")
 
     status_code, output = drill._execute(args.command, root, 600)
     status = "ok" if status_code == "passed" else "fail"

@@ -673,6 +673,19 @@ class TestRecordTestResultManual(unittest.TestCase):
             "def test_a():\n    pass\n", encoding="utf-8")
         (self.root / "t_fail.py").write_text(
             "def test_a():\n    assert False\n", encoding="utf-8")
+        # iter78 契約更新: record が整形式 pytest を attest へ redirect するように
+        # なったため、record 経由の実走 pin を非 pytest（unittest 双子）へ移す。
+        # unittest の weak pair marker（Ran N tests in .../OK|FAILED）が成立する。
+        (self.root / "u_pass.py").write_text(
+            "import unittest\n"
+            "class T(unittest.TestCase):\n"
+            "    def test_a(self):\n        self.assertTrue(True)\n",
+            encoding="utf-8")
+        (self.root / "u_fail.py").write_text(
+            "import unittest\n"
+            "class T(unittest.TestCase):\n"
+            "    def test_a(self):\n        self.assertTrue(False)\n",
+            encoding="utf-8")
         sp.run(["git", "-C", str(self.root), "add", "-A"],
                check=True, capture_output=True)
         sp.run(["git", "-C", str(self.root), "commit", "-qm", "i"],
@@ -682,13 +695,14 @@ class TestRecordTestResultManual(unittest.TestCase):
     def tearDown(self):
         self.tmp.cleanup()
 
-    def _pytest(self, target):
-        # iter71: `-q` removed — post-iter71 record requires a positive marker
-        # (strong summary + prologue), which `-q` suppresses.
-        return f"python3 -m pytest {self.root / target}"
+    def _runner(self, module):
+        # iter78 契約更新: 旧 `_pytest` は pytest 実走コマンドを返したが、pytest は
+        # record では attest へ redirect されるようになった。record 経由の実走 pin
+        # は非 pytest（unittest）へ移す。
+        return f"python3 -m unittest {module}"
 
     def test_passing_command_appends_manual_ok(self):
-        rc = record.main(["--root", str(self.root), self._pytest("t_pass.py")])
+        rc = record.main(["--root", str(self.root), self._runner("u_pass")])
         self.assertEqual(rc, 0)
         row = json.loads((self.root / ".claude" / "evidence-log.jsonl")
                          .read_text(encoding="utf-8").splitlines()[-1])
@@ -697,13 +711,13 @@ class TestRecordTestResultManual(unittest.TestCase):
         self.assertRegex(row["fp"], r"^[0-9a-f]{64}$")
 
     def test_failing_command_appends_manual_fail(self):
-        record.main(["--root", str(self.root), self._pytest("t_fail.py")])
+        record.main(["--root", str(self.root), self._runner("u_fail")])
         row = json.loads((self.root / ".claude" / "evidence-log.jsonl")
                          .read_text(encoding="utf-8").splitlines()[-1])
         self.assertEqual(row["status"], "fail")
 
     def test_no_test_result_json_written(self):
-        record.main(["--root", str(self.root), self._pytest("t_pass.py")])
+        record.main(["--root", str(self.root), self._runner("u_pass")])
         self.assertFalse(
             (self.root / "docs" / "qa-reports" / "test-result.json").exists())
 
