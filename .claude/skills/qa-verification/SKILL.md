@@ -43,11 +43,11 @@ QA レポート完了前に以下を全て実施する:
 - [ ] 各検証項目に PASS/FAIL 判定を付与した
 - [ ] FAIL 項目にはブロッカーとして原因を記録した
 
-> **手動記録の green（exit 0）は marker verdict 必須（iter71）**: `scripts/record-test-result.py`
-> は 0 件実行の偽 green（`unittest discover` パターン不一致・`npm test`→`true`・pytest `-q`）を
-> **rc2 拒否・ログ非書込**。red は従来どおり記録。受理 green には additive な
-> `"marker": true`（judge 非消費の監査）。iter72 以降は marker に加え
-> **executed 実数（passed+failed・skip 除外）≧1** を要求（all-skip green 不成立・cargo doc-tests 空も受理）。
+> **pytest は attestation 必須（iter78）**: 記録は
+> `python3 scripts/attest-test-run.py "<コマンド>"` のみ（green/red・`-q` 可）。
+> judge の pytest green は `src:"attested"` のみ decisive（record は rc2 誘導）。
+> **非 pytest green は marker 必須（iter71/72)**: `record-test-result.py` は
+> 0 件実行の偽 green を rc2 拒否・**executed（skip 除外）≧1** 要求。red は記録。
 
 ## 機能対照表（必須出力）
 

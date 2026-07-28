@@ -16,6 +16,9 @@
 # record-test-result.py appends the same schema with src:"manual". A manual
 # green may additionally carry an optional "marker": true (iter71 SF-014
 # audit field; not consumed by the judge).
+# attest-test-run.py (iter78) appends src:"attested" entries with additive
+# "counts" (structured event tallies) and "exit" fields — the ONLY src that
+# can certify a pytest-family green in the judge.
 #
 # Source: source "$(dirname "$0")/lib/evidence.sh"
 
