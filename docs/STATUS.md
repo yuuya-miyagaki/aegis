@@ -1,9 +1,9 @@
 ---
 framework: aegis
-framework_version: "1.31.4"
+framework_version: "1.32.0"
 project_name: "Aegis"
 mode: Dev
-phase: review
+phase: ship
 task_type: framework
 task_size: M
 task_size_rationale: "iter78（framework・pytest execution attestation＝roadmap full-review §5 行77 P0/P1・**M 確定**＝brainstorm Step D 2026-07-28）。案A（pytest プラグイン attestation）採用: argv spawn＋structured event で positive proof・src=attested のみ pytest family の decisive green・fake 出力は event 不能。src 4 ファイル（attest-test-run.py 新規／aegis_attest_plugin.py 新規／build-judge-card.py／record-test-result.py）＋tests＝M（deploy skip）。SF-014/SF-022 根治・SF-015 attested 経路解消。B1 drill 統合は roadmap 行78＝次 iter へ分離。設計正本＝docs/specs/2026-07-28-iter78-pytest-execution-attestation-design.md。"
@@ -14,18 +14,18 @@ gate_approvals:
   client_ready_for_dev: n/a
   brainstorm: approved
   plan: approved
-  review: pending
-  qa: pending
-  security: pending
+  review: approved
+  qa: approved
+  security: approved
   deploy: pending
   dev_ready_for_client: pending
 current_refs:
   requirements: []
   plan: "docs/plans/2026-07-28-iter78-pytest-execution-attestation-implementation-plan.md"
   spec: "docs/specs/2026-07-28-iter78-pytest-execution-attestation-design.md"
-  review: null
-  qa: null
-  security: null
+  review: "docs/qa-reports/iter78-review.md"
+  qa: "docs/qa-reports/iter78-qa.md"
+  security: "docs/qa-reports/iter78-security.md"
   deploy: null
   translation: null
 external_evidence:
@@ -37,7 +37,7 @@ external_evidence:
     scope: "v0.13.0 計画 5 ラウンドレビュー"
     findings: "Round 1〜5 で計 25 件の指摘（hook 出力スキーマ陳腐化、TaskCreated/Completed 制御方式、Plan 条件付き許可、effort 配分、pre-compact.sh 同種破損、`if` 単一 rule 制約等）"
     resolution: "Rev.5 で全件反映、Phase 0a 即時実装着手 GO。hotfix/v0122-hook-schema ブランチで開始。"
-next_action: "**【implement 完了・review 着手】** iter78 attestation 実装完了（dd06cca..c55761e）: Task1 RED 28pin 赤14/緑14 実測→Task2 plugin（ceb492c）→Task3 attestor（b16e834）→Task4 judge 契約＋pin17 契約更新・mutation 2 実証（3504bdd）→Task5 record 誘導＋pin5+表外2（d0d70a9）→Task6 統合検証＝full 1442 green・ドッグフード attest green・judge 判定源 src=attested 実測（4ae0eb3）→grill-code 🔴0/🟡1 fix-forward B11 pin（c55761e）。次: review 1次4角度 finder=opus（仕様準拠/敵対/テスト強度/保守性）＋盲検2次=fable→review gate approve --ref。"
+next_action: "**【review approved・qa 着手】** iter78 attestation。review 完了（🟢 judge card・judge 判定源 src=attested・executed=1447）: 4角度 finder（仕様準拠 approve_with_notes/敵対 バイパス0/テスト強度 M3 gap 摘発/保守性）＋盲検2次は agent ハード stall→親 in-session で独立検証回収（drift/counts 堅牢/rotation/plugin 例外 全安全・新規 finding 0）。fix-forward: judge read-time counts 検証・M3 pin・_mask_cmd 単一ソース化・SF-024 起票（in-process event 偽造＋attested 手書き＝OS-limit・drill subsume・load-bearing 不変 pin 保証）。review 正本 docs/qa-reports/iter78-review.md。次: qa-verification skill（drill 実行可否実測→BLOCKED なら sanctioned skip＋代替実証・機能対照表）→qa gate approve --ref。"
 blockers: []
 failure_tracking: null
 session_history:
