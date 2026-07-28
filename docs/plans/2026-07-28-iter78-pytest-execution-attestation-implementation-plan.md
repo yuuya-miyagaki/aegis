@@ -59,7 +59,7 @@
 - `test_green_recorded_on_passing_suite`（2 passed → rc0・エントリ src=attested/status ok/counts.executed==2/exit==0）
 - `test_red_recorded_on_failing_suite`（1 failed → rc1・status fail・fail-visible）
 - `test_zero_run_rejected_all_skip`（全 `@pytest.mark.skip` → rc2・記録なし）
-- `test_zero_run_rejected_no_tests`（テスト 0 収集・pytest exit 5 → rc2）
+- `test_no_tests_collected_recorded_red`（テスト 0 収集・pytest exit 5 → **rc1・status fail 記録**。exit≠0 は red の実信号＝record の exit-5 先例と整合・fail-visible。rc2 は「exit 0 なのに proof なし」の場合のみ）
 - `test_collect_only_rejected`（`pytest --collect-only` → executed=0 → rc2。NO_RUN denylist なしで positive proof が塞ぐことの実証）
 - `test_all_xfail_green`（全 `@pytest.mark.xfail` で失敗する suite → exit 0・executed==N → rc0 green＝SF-015 の attested 経路解消 pin）
 - `test_collection_error_red`（import エラー suite → status fail・counts.collection_errors>=1）
@@ -230,8 +230,9 @@ defence-in-depth (drill, human preview, fingerprint)."""
    - `sessionfinish is None` → rc2「イベント欠落＝attest 不成立」
    - `sessionfinish != proc.returncode` → rc2「exit 突合不一致」
    - `proc.returncode == 0 and (failed or errors or collection_errors)` → rc2「exit 0 なのに失敗イベント＝不整合」
-   - `proc.returncode == 0 and executed == 0` → rc2「実行 0 件（all-skip / 収集 0）は green 不成立」
-8. 記録: `status = "ok" if returncode == 0 else "fail"`。エントリは Task 1 スキーマ通り（`cmd` はユーザーコマンド `[:500]`＝注入 `-p` を含めない・`payload_sha` はイベントファイル生バイトの sha256・`fp` は `judge.current_fingerprint(root)`）。`.claude/evidence-log.jsonl` へ追記。イベントファイルを削除。stdout に `attested: green|red`。rc は green=0／red=1。
+   - `proc.returncode == 0 and executed == 0` → rc2「実行 0 件（all-skip / collect-only）は green 不成立」
+   - ※ `returncode != 0` は突合系（sessionfinish 欠落/不一致）を除き **red として記録**（exit 5 の収集 0 も red＝record の exit-5 先例と整合・fail-visible）。
+8. 記録: `status = "ok" if returncode == 0 else "fail"`。エントリは Task 1 スキーマ通り（`cmd` はユーザーコマンド `[:500]`＝注入 `-p` を含めない・`payload_sha` はイベントファイル生バイトの sha256・`fp` は `judge.current_fingerprint(root)`）。`.claude/evidence-log.jsonl` へ追記。stdout に `attested: green|red`。rc は green=0／red=1。**イベントファイルは try/finally で全パス（timeout・rc2 含む）削除**。
 
 - [ ] **Step 2: manifest 行を追加**（`scripts/attest-test-run.py	ask`）
 
@@ -343,18 +344,41 @@ def is_pytest_family_cmd(root: Path, cmd: str) -> bool | None:
 
 - [ ] **Step 3: 契約更新 pin の書き替え（削除 0）**
 
-Explore 調査（2026-07-28）で確定した反転 pin は 6 件。方針: **pin の目的（何を守るか）は不変のまま、pytest 固有でない目的の pin はコマンドを非 pytest ランナーへ差し替えて保存**する。各書き替えに `iter78 契約更新:` で始まる理由コメントを付ける。
+grill-plan 実測（2026-07-28・親が対象 3 ファイルの全 `_ev_line`/record 呼出を読んで分類）で確定した契約更新は **2 クラス・約 16 件**。方針: **pin の目的（何を守るか）は不変のまま、pytest 固有でない目的の pin はコマンドを非 pytest ランナーへ機械的に差し替えて保存**。各書き替えに `iter78 契約更新:` で始まる理由コメントを付ける。**削除 0**。
 
-| # | テスト | 旧契約 | 書き替え |
-|---|---|---|---|
-| 1 | `tests/test_test_runner_realness.py::test_manual_record_is_trusted_even_without_marker` | manual ok（pytest cmd）は marker_verified なしで green | 目的=「manual は marker_verified を要さない」は**非 pytest に限り存続** → cmd を `npm test`（または unittest 形）へ差し替え。pytest-manual の新契約は Task 1 の `test_manual_pytest_ok_no_longer_decides` が pin |
-| 2 | `tests/test_judge_card.py::test_w2a2_washed_ok_is_transparent_older_clean_green_decides` | washed ok は transparent・古い clean pytest ok が green | 目的=washed 透明化 → 両 cmd を npm/jest family に差し替えて保存 |
-| 3 | `tests/test_judge_card.py::test_w2a4_quoted_operator_is_not_washed` | クォート内演算子は washed 扱いしない（pytest ok green） | 目的=クォートマスク → cmd を `jest -t "a|b"` 形へ差し替え |
-| 4 | `tests/test_record_test_result.py::test_valid_runner_still_records` | pytest manual green 記録 rc0 | 目的=「valid runner の green 受理」→ 極小 **unittest** ファイル実走（`python3 -m unittest`・weak pair marker が実出力で成立）へ差し替え。pytest 拒否は Task 1 グループ D が pin |
-| 5 | `tests/test_record_test_result.py::test_red_run_recorded_without_marker` | pytest manual red 記録 rc0 | 同上（unittest の失敗ファイルへ差し替え） |
-| 6 | `tests/test_judge_card.py::test_passing_command_appends_manual_ok` | record 経由 pytest manual ok 追記 | 同上（unittest 成功ファイルへ差し替え） |
+**スワップ標準レシピ**: judge-scan 系合成エントリは cmd `pytest`/`python3 -m pytest …` → `python3 -m unittest`（runner regex 一致・marker 経路存続）へ。washed/クォート系は `jest …`/`npm test` 形も可。record 実走系は t_pass.py/t_fail.py（pytest 形式）の**unittest 双子**（`u_pass.py`/`u_fail.py`: `unittest.TestCase` サブクラス・`python3 -m unittest` で実走・weak pair marker `Ran N tests in`+`OK`/`FAILED` が実出力で成立）を fixture に追加して差し替え。
 
-取りこぼし検査（必須）: `grep -n "pytest" tests/test_judge_card.py tests/test_test_runner_realness.py tests/test_evidence_lib.py tests/test_evidence_hooks.py tests/test_record_test_result.py | grep -v "^\s*#"` を実行し、`_ev_line`/record 呼び出しで pytest cmd × ok × green/rc0 期待の未列挙テストがないか確認。Task 1 Step 2 の RED 実測・Task 6 Step 1 の full suite で発見された分もここに追記して同方針で書き替える。
+クラス A — assertion が反転する（書き替え必須）:
+
+| # | テスト | 反転 |
+|---|---|---|
+| A1 | `test_judge_card.py::TestReadTestResult::test_broken_lines_skipped` | pytest ok green→unverified（cmd スワップ） |
+| A2 | `test_judge_card.py::TestReadTestResult::test_rotated_dot1_is_scanned` | 同上 |
+| A3 | `test_judge_card.py::test_w2a2_washed_ok_is_transparent_older_clean_green_decides` | 古い clean pytest ok green→unverified（両 cmd を npm/jest へ） |
+| A4 | `test_judge_card.py::test_w2a4_quoted_operator_is_not_washed` | pytest ok green→unverified（`jest -t "a|b"` 形へ） |
+| A5 | `test_judge_card.py::test_passing_command_appends_manual_ok` | record 経由 pytest manual ok → rc2（unittest 双子実走へ） |
+| A6 | `test_test_runner_realness.py::test_entry_with_marker_verified_true_and_ok_returns_green` | observed pytest ok green→unverified（cmd スワップ。pytest 版の新契約は Task 1 C が pin） |
+| A7 | `test_test_runner_realness.py::test_manual_record_is_trusted_even_without_marker` | manual pytest ok green→unverified（cmd スワップ） |
+| A8 | `test_test_runner_realness.py::test_trusted_green_survives_noise_ok_entry` | trusted green の cmd が pytest → unverified（ヘルパー default cmd="pytest tests/" ごとスワップ） |
+| A9 | `test_test_runner_realness.py::test_marker_verified_green_survives_noise_ok_entry` | 同上 |
+| A10 | `test_record_test_result.py::test_valid_runner_still_records` | pytest manual green rc0→rc2（unittest 双子実走へ） |
+| A11 | `test_record_test_result.py::test_red_run_recorded_without_marker` | pytest manual red rc0→rc2（同上） |
+| A12 | `test_record_test_result.py::test_quiet_pytest_green_rejected_with_guidance` | 旧: 実行後 marker 不成立 rc2（`-q` 案内）→ 新: 実行前 redirect rc2。**redirect pin に転用**（quiet pytest が実行されず attest 誘導 rc2 になること＋`-q` は attest では制約でなくなる旨をコメント） |
+| A13 | `test_record_test_result.py::test_marker_lib_missing_fail_closed` | 旧: pytest cmd で marker lib 欠如 rc2 → 新: redirect が先に発火し目的が死ぬ → cmd を unittest 形へスワップして fail-closed pin を保存 |
+
+クラス B — assertion は通るが pin の検出力が死ぬ（cmd スワップで保存）:
+
+| # | テスト | 理由 |
+|---|---|---|
+| B1 | `test_judge_card.py::TestReadTestResult::test_stale_fp_is_unverified` | pytest ok は fp 検査前に transparent 化＝fp gate を踏まなくなる → unittest へ |
+| B2 | `test_judge_card.py::TestReadTestResult::test_newest_stale_does_not_fall_back_to_older_fresh` | 同上（no-fallback の検出力保存） |
+| B3 | `test_judge_card.py::test_mask_is_substitution_not_deletion` | 削除変異時の green 偽装経路が pytest 制限で塞がれ mutation killer が無効化 → `"echo" vitest run` 形へ |
+| B4 | `test_test_runner_realness.py::test_entry_without_marker_verified_field_returns_unverified` | schema 欠如の透明化 pin が pytest 制限に先取りされる → unittest へ |
+| B5 | `test_test_runner_realness.py::test_entry_with_marker_verified_false_returns_unverified` | 同上 |
+
+非反転の確認済み（変更しない）: `test_fail_with_matching_fp_is_red`・`test_latest_matching_entry_wins`・`test_w2a3_washed_fail_stays_red`・`test_w2a5_multiline_cmd_is_washed`・W3-1/2/3（src="forged"）・`test_decidable_red_cannot_be_laundered_by_noise_ok_entry`・`test_evidence_hooks.py::test_observed_ok_certifies_green`（unittest）・record の no_run/env/operator/quote/zero-run/npm 系（redirect を既存検証の**後**に置くため文言不変＝Task 5 参照）。
+
+手順（必須）: 本 Task の実装後に `python3 -m pytest tests/test_judge_card.py tests/test_test_runner_realness.py tests/test_record_test_result.py tests/test_evidence_lib.py tests/test_evidence_hooks.py -v 2>&1 | tail -20` を回し、落ちた全件が上表と一致することを突合。**表外の落ちが出たら同方針で書き替えてこの表に追記**（silent 修正禁止）。
 
 - [ ] **Step 4: グループ C＋既存 judge 系を実行**
 
@@ -381,7 +405,7 @@ git commit -m "feat(iter78): judge — src=attested 受入＋pytest family の d
 
 - [ ] **Step 1: 実装**
 
-step 1（runner match）の直後に挿入:
+**挿入位置は step 3（NO_RUN 検査）の後・`drill._execute` の直前**（step 1 直後ではない）。理由: 既存の malformation 系 pin（no-run flag／env prefix／shell operator／unparsable quote）の rc2 文言を保存し契約更新の面積を最小化する。pytest × malformed は従来文言のまま rc2、pytest × well-formed のみが redirect に到達する（どちらも記録なし＝安全性は同値）。
 
 ```python
     # iter78: pytest-family results are recorded via EXECUTION ATTESTATION
@@ -389,7 +413,9 @@ step 1（runner match）の直後に挿入:
     # This writer's marker-based proof is the output layer the attestation
     # replaces; keeping a second green path here would let a forged output
     # bypass the stronger proof. Red goes through attest too — one path per
-    # runner family. None = patterns unreadable — fail-closed like step 1.
+    # runner family. Placed AFTER the malformation checks so their rc2
+    # messages are preserved; a well-formed pytest cmd is redirected BEFORE
+    # execution. None = patterns unreadable — fail-closed like step 1.
     fam = judge.is_pytest_family_cmd(root, args.command[:500])
     if fam is None:
         return _reject("patterns.sh を読み込めません — pytest family 判定を実行"
@@ -426,8 +452,7 @@ Expected: 全 green（Task 1 で控えた赤の実数が全て緑化・skip 数�
 
 - [ ] **Step 2: ドッグフード attest（本 repo の suite を attestor で実走）**
 
-Run: `python3 scripts/attest-test-run.py "python3 -m pytest -x -q tests/test_attest_execution.py"`
-の**代わりに**、フル: `python3 scripts/attest-test-run.py "python3 -m pytest"`（rc0・`attested: green`）
+Run: `python3 scripts/attest-test-run.py --timeout 1800 "python3 -m pytest"`（rc0・`attested: green`。フル suite は e2e が子 pytest を多数 spawn するため timeout を明示的に広げる）
 → `python3 scripts/build-judge-card.py 2>/dev/null | grep -i test`（または judge card 出力相当）で tests:green・src=attested を確認。
 ※ 注意: attest 実行自体の observed エントリ（`attest-test-run.py Q` 形）は runner 非該当で scan 対象外＝attested が deciding entry になることを確認する。
 
@@ -438,7 +463,7 @@ Expected: すべて PASS
 
 - [ ] **Step 4: skill 手順の更新**
 
-`.claude/skills/qa-verification/SKILL.md` の「手動記録の green は marker verdict 必須」節に pytest→attest の一段落を追記（非 pytest は従来通り record）。tdd/ship 系 skill に record-test-result 言及があれば同様に（Explore 調査結果に従う）。
+`.claude/skills/qa-verification/SKILL.md` の「手動記録の green は marker verdict 必須」節（L46-50）に pytest→attest の一段落を追記（非 pytest は従来通り record）。tdd/SKILL.md は record 言及なし＝変更不要（Explore 確認済み）。`hooks/lib/evidence.sh` ヘッダの schema コメント（L16 付近「record-test-result.py appends the same schema with src:"manual"」）に attested writer（attest-test-run.py・counts/exit 付き）の1行を追記＝3 writer の文書整合。
 
 - [ ] **Step 5: Commit**
 
@@ -452,5 +477,13 @@ git commit -m "feat(iter78): 統合検証 — full green・ドッグフード at
 ## Self-Review チェック（plan 完成時に実施済みであること)
 
 1. spec カバレッジ: design の全節（attestor/plugin/judge/record/manifest/テスト戦略 7 分類）に対応 Task あり。
-2. placeholder ゼロ（AFFECTED-PINS プレースホルダは grill-plan 前に Explore 結果で置換すること）。
+2. placeholder ゼロ（AFFECTED-PINS は grill-plan 実測で A1-A13＋B1-B5 に確定済み）。
 3. 型/名前整合: `is_pytest_family_cmd`・`AEGIS_ATTEST_EVENT_PATH`・イベント3種・counts 8 キーは全 Task で同一綴り。
+
+## grill-plan 反映記録（2026-07-28）
+
+- 致命1: 反転 pin の undercount（Explore 1次調査 6 件→親実測 A13＋B5=18 件）→ Task 4 に全量表＋スワップ標準レシピ＋実測突合手順を明記。
+- 致命2: pytest exit 5 の期待矛盾（グループ B が rc2・verdict 規則が red）→ red 記録 rc1 に統一（record の exit-5 先例と整合・fail-visible）。
+- 致命3: record redirect の挿入位置が step1 直後だと malformation 系 pin の文言が全滅→ NO_RUN 後・実行前へ移動（churn 最小化・安全性同値）。
+- 要検討反映: dogfood attest に `--timeout 1800` 明示／イベントファイルは try/finally 全パス削除／evidence.sh ヘッダに attested writer 追記。
+- YAGNI 確認: attested counts の judge カード表示は不要（`判定源: src=` の汎用表示で attested が出ることを親が実測確認済み）。
