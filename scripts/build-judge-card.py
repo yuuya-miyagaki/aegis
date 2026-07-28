@@ -335,6 +335,17 @@ def read_test_result_detail(root: Path) -> dict:
     terminus (unverified) — fail-visible; re-run the tests to upgrade the
     log (same story as the v1.6.0 marker_verified schema note above).
 
+    iter78 (SF-014/SF-022) adds two coupled changes to this scan: (1) the src
+    ALLOWLIST admits "attested" (the src emitted by scripts/attest-test-run.py,
+    added in the same change) — an attested entry is decidable on fp match; and
+    (2) pytest-family green is decided by EXECUTION ATTESTATION ONLY. An
+    observed/manual 'ok' whose cmd is in the pytest family (AEGIS_TEST_IS_PYTEST_
+    REGEX, normalized identically to the runner scan) is TRANSPARENT (skipped) —
+    its output/exit-derived proof is exactly the layer the attestation replaces,
+    so it can certify nothing; an older attested entry for the SAME fingerprint
+    may still decide. A pytest-family 'fail' stays decidable red (fail-visible),
+    and non-pytest runners keep the marker path unchanged.
+
     C-2 (v1.6.1): runner-name match alone is insufficient. An entry from an
     OBSERVED source (post-bash-observe.sh) is treated as 'green' / 'red'
     ONLY when it carries marker_verified:true (meaning the observer saw an
@@ -356,6 +367,9 @@ def read_test_result_detail(root: Path) -> dict:
     strips = _tr_strip_patterns(root)
     if len(strips) != 2:
         return unverified
+    ispy = _is_pytest_regex(root)
+    if ispy is None:
+        return unverified
     current = current_fingerprint(root)
     if not _HEX64.match(current):
         return unverified
@@ -370,14 +384,29 @@ def read_test_result_detail(root: Path) -> dict:
         if not _norm_cmd_match(d.get("cmd"), pats, strips):
             continue
         # SF-012(b) (iter76): src allowlist — the only real writers are
-        # record-test-result.py (src:"manual") and evidence.sh
-        # (src:"observed"). Any other/missing src is a hand-written or
-        # unknown-writer entry this scan cannot certify — TERMINAL
-        # 'unverified' (fail-visible), never decidable-by-default and never
-        # skipped-over. A future legitimate src (e.g. "attested", iter77)
-        # must be added HERE in the same change that introduces its writer.
-        if d.get("src") not in ("manual", "observed"):
+        # record-test-result.py (src:"manual"), evidence.sh (src:"observed"),
+        # and attest-test-run.py (src:"attested"). Any other/missing src is a
+        # hand-written or unknown-writer entry this scan cannot certify —
+        # TERMINAL 'unverified' (fail-visible), never decidable-by-default and
+        # never skipped-over. "attested" was introduced in iter78 in the same
+        # change as its writer (scripts/attest-test-run.py); any OTHER src
+        # remains terminal.
+        if d.get("src") not in ("manual", "observed", "attested"):
             return unverified
+        # iter78 (SF-014/SF-022 root fix): pytest-family green is decided by
+        # EXECUTION ATTESTATION only. An observed/manual 'ok' whose cmd is in
+        # the pytest family carries only output/exit-derived proof — the very
+        # layer the attestation replaces — so it can certify nothing:
+        # TRANSPARENT (an older attested entry for the SAME fingerprint may
+        # still decide). 'fail' stays decidable red (fail-visible). Non-pytest
+        # runners keep the marker path unchanged (roadmap §6: no simultaneous
+        # ecosystem adapters).
+        _norm = (d.get("cmd") or "").replace("\n", ";")
+        for _sp in strips:
+            _norm = _sp.sub("Q", _norm)
+        if (d.get("src") in ("manual", "observed")
+                and d.get("status") == "ok" and ispy.search(_norm)):
+            continue
         # SF-012(a) (iter76): washed-green — an observed 'ok' whose cmd
         # chains shell operators has an exit code the runner did not
         # produce (`pytest -q; true`). It can certify nothing: TRANSPARENT
@@ -385,7 +414,13 @@ def read_test_result_detail(root: Path) -> dict:
         # for the SAME fingerprint may still decide). An observed 'fail'
         # with such a cmd stays decidable red — a wash that still failed
         # is a real failure signal (fail-closed keeps it visible).
-        if (d.get("src") == "observed" and d.get("status") == "ok"
+        # iter78: extended to src=attested too — the real attested writer
+        # (attest-test-run.py) spawns argv WITHOUT a shell, so it structurally
+        # cannot emit a shell-operator cmd; a matching attested entry is thus
+        # hand-forged only, and transparency here is pure defense-in-depth
+        # (safe side: it can never LAUNDER a real signal, only decline to
+        # certify a forgery).
+        if (d.get("src") in ("observed", "attested") and d.get("status") == "ok"
                 and _cmd_has_shell_operators(d.get("cmd"), strips)):
             continue
         # trust-scan (iter67): an observed entry whose marker was NOT

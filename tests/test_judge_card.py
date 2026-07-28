@@ -163,7 +163,10 @@ class TestReadTestResultFromEvidence(unittest.TestCase):
         self.assertEqual(judge.read_test_result(self.root), "red")
 
     def test_stale_fp_is_unverified(self):
-        self.log.write_text(_ev_line("pytest", "ok", "f" * 64))
+        # iter78 契約更新: pytest ok は fp 検査より前に transparent 化される
+        # ため、fp gate（この pin の対象）を踏まなくなる。非 pytest ランナーへ
+        # スワップして stale-fp→unverified の検出力を保存する。
+        self.log.write_text(_ev_line("python3 -m unittest", "ok", "f" * 64))
         self.assertEqual(judge.read_test_result(self.root), "unverified")
 
     def test_newest_stale_does_not_fall_back_to_older_fresh(self):
@@ -173,9 +176,13 @@ class TestReadTestResultFromEvidence(unittest.TestCase):
         # iter67 trust-scan で透明化されるのは undecidable-ok〔observed かつ
         # marker 未検証〕のみ。ここの entries は marker_verified=True＝decidable
         # なので透明化されず、最新 stale が終端 unverified のまま（不変）。
+        # iter78 契約更新: pytest ok は transparent 化されるため、この「最新
+        # stale が終端」の検出力が pytest では死ぬ。非 pytest ランナー
+        # （unittest）へスワップして「最新 decidable stale が遡らない」pin を保存。
         fp = judge.current_fingerprint(self.root)
         self.log.write_text(
-            _ev_line("pytest", "ok", fp) + _ev_line("pytest", "ok", "f" * 64))
+            _ev_line("python3 -m unittest", "ok", fp)
+            + _ev_line("python3 -m unittest", "ok", "f" * 64))
         self.assertEqual(judge.read_test_result(self.root), "unverified")
 
     def test_non_test_commands_ignored(self):
@@ -190,14 +197,19 @@ class TestReadTestResultFromEvidence(unittest.TestCase):
         self.assertEqual(judge.read_test_result(self.root), "red")
 
     def test_broken_lines_skipped(self):
+        # iter78 契約更新: green を期待するので pytest ok（transparent 化される）
+        # は使えない。非 pytest（unittest）へスワップ — broken 行 skip の検出力保存。
         fp = judge.current_fingerprint(self.root)
-        self.log.write_text("{{{broken\n" + _ev_line("pytest", "ok", fp))
+        self.log.write_text(
+            "{{{broken\n" + _ev_line("python3 -m unittest", "ok", fp))
         self.assertEqual(judge.read_test_result(self.root), "green")
 
     def test_rotated_dot1_is_scanned(self):
+        # iter78 契約更新: green 期待のため pytest ok を非 pytest（unittest）へ
+        # スワップ。rotated .1 の scan の検出力を保存。
         fp = judge.current_fingerprint(self.root)
         (self.root / ".claude" / "evidence-log.jsonl.1").write_text(
-            _ev_line("pytest", "ok", fp))
+            _ev_line("python3 -m unittest", "ok", fp))
         self.log.write_text("")
         self.assertEqual(judge.read_test_result(self.root), "green")
 
@@ -244,11 +256,15 @@ class TestReadTestResultFromEvidence(unittest.TestCase):
     def test_mask_is_substitution_not_deletion(self):
         """grill-code v1.5.2 J1: マスクは「Q 置換」であり「削除」ではないことを
         production 消費者（read_test_result）で直接ピン留めする。
-        '"echo" pytest' (ok) は Q 置換なら 'Q pytest' → 非分類 → unverified。
-        削除実装に変異すると ' pytest' → コマンド位置一致 → green 偽装が成立し、
-        このテストが RED になる（mutation killer）。"""
+        iter78 契約更新: 旧 cmd '"echo" pytest' の pytest は green 制限で
+        transparent 化され、削除変異時の green 偽装経路（この pin の killer 対象）
+        が pytest 制限に塞がれて mutation killer が無効化される。非 pytest
+        ランナー（vitest）へスワップ:
+        '"echo" vitest run' (ok) は Q 置換なら 'Q vitest run' → 非分類 →
+        unverified。削除実装に変異すると ' vitest run' → コマンド位置一致 →
+        green 偽装が成立し、このテストが RED になる（mutation killer 保存）。"""
         fp = judge.current_fingerprint(self.root)
-        self.log.write_text(_ev_line('"echo" pytest', "ok", fp))
+        self.log.write_text(_ev_line('"echo" vitest run', "ok", fp))
         self.assertEqual(judge.read_test_result(self.root), "unverified")
 
     def test_missing_strip_patterns_is_unverified(self):
@@ -842,9 +858,12 @@ class TestReadTestResultDetail(unittest.TestCase):
         self.tmp.cleanup()
 
     def _manual_green(self):
+        # iter78 契約更新: manual pytest ok は green 制限で transparent 化され
+        # green を返さなくなる。deciding-entry の cmd/src/ts 露出（この pin の
+        # 対象）を保存するため非 pytest ランナー（unittest）へスワップ。
         fp = judge.current_fingerprint(self.root)
         row = {"v": 1, "ts": "2026-07-14T00:00:00Z", "src": "manual",
-               "cmd": "python3 -m pytest -q", "status": "ok",
+               "cmd": "python3 -m unittest", "status": "ok",
                "payload_sha": "0" * 64, "fp": fp}
         self.log.write_text(json.dumps(row) + "\n", encoding="utf-8")
 
@@ -1088,10 +1107,14 @@ class TestWashedGreenAndSrcAllowlist(unittest.TestCase):
     def test_w2a2_washed_ok_is_transparent_older_clean_green_decides(self):
         # W2a-2（意味論 pin）: washed-ok は trust-scan の undecidable-ok と
         # 同じ TRANSPARENT — 同一 fp のより古い clean green は生きる。
+        # iter78 契約更新: pytest だと古い clean green も green 制限で
+        # transparent 化され「古い clean が生きる」意味論が検証できない。washed
+        # 意味論は非 pytest でも同一なので npm/jest family（clean=`npm test`・
+        # washed=`npm test | tee log.txt`）へスワップして検出力を保存。
         fp = judge.current_fingerprint(self.root)
         self.log.write_text(
-            _ev_line("python3 -m pytest -q", "ok", fp)
-            + _ev_line("python3 -m pytest -q | tee log.txt", "ok", fp))
+            _ev_line("npm test", "ok", fp)
+            + _ev_line("npm test | tee log.txt", "ok", fp))
         self.assertEqual(judge.read_test_result(self.root), "green")
 
     def test_w2a3_washed_fail_stays_red(self):
@@ -1104,10 +1127,13 @@ class TestWashedGreenAndSrcAllowlist(unittest.TestCase):
 
     def test_w2a4_quoted_operator_is_not_washed(self):
         # W2a-4（誤検知防止 pin）: クォート内演算子は strips マスクで不活性
-        # （`pytest -k "a or b|c"` は clean 単一コマンド）。
+        # （`jest -t "a|b"` は clean 単一コマンド）。
+        # iter78 契約更新: pytest だと green 制限で transparent 化され「washed
+        # ではない＝green 決定」の検出力が死ぬ。クォート不活性化は runner 非依存
+        # なので非 pytest（jest）へスワップして検出力を保存。
         fp = judge.current_fingerprint(self.root)
         self.log.write_text(
-            _ev_line('python3 -m pytest -k "a or b|c"', "ok", fp))
+            _ev_line('jest -t "a|b"', "ok", fp))
         self.assertEqual(judge.read_test_result(self.root), "green")
 
     def test_w2a5_multiline_cmd_is_washed(self):

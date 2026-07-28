@@ -220,37 +220,50 @@ class TestReadTestResultSchemaMigration(unittest.TestCase):
         log.write_text(json.dumps(entry) + "\n", encoding="utf-8")
 
     def test_entry_without_marker_verified_field_returns_unverified(self):
-        """v1.6.0 log entries (no marker_verified key) must NOT pass green."""
+        """v1.6.0 log entries (no marker_verified key) must NOT pass green.
+
+        iter78 契約更新: pytest ok は green 制限で marker 検査より前に
+        transparent 化されるため、この「marker キー欠如の observed ok は
+        decidable にならない」検出力が pytest では死ぬ（transparent も unverified
+        になるので assertion は通るが理由が別）。非 pytest（unittest）へスワップ
+        して marker 経路の検出力を保存。"""
         with self._scratch_repo() as _:
             r = Path(_)
             fp = self._fp(r)
             self._write_entry(r, {
                 "v": 1, "ts": "2026-06-12T00:00:00Z",
-                "src": "observed", "cmd": "pytest",
+                "src": "observed", "cmd": "python3 -m unittest",
                 "status": "ok",
                 "payload_sha": "x" * 64, "fp": fp,
             })
             self.assertEqual(self.mod.read_test_result(r), "unverified")
 
     def test_entry_with_marker_verified_false_returns_unverified(self):
+        # iter78 契約更新: pytest --version は green 制限で marker 検査より前に
+        # transparent 化され、marker_verified:false ゲート（この pin の対象）の
+        # 検出力が死ぬ。非 pytest（unittest）へスワップして marker false ゲートを
+        # 保存（runner regex 一致・marker 未成立の形）。
         with self._scratch_repo() as _:
             r = Path(_)
             fp = self._fp(r)
             self._write_entry(r, {
                 "v": 1, "ts": "2026-06-12T00:00:00Z",
-                "src": "observed", "cmd": "pytest --version",
+                "src": "observed", "cmd": "python3 -m unittest --version",
                 "status": "ok", "marker_verified": False,
                 "payload_sha": "x" * 64, "fp": fp,
             })
             self.assertEqual(self.mod.read_test_result(r), "unverified")
 
     def test_entry_with_marker_verified_true_and_ok_returns_green(self):
+        # iter78 契約更新: observed pytest ok は green 制限で transparent 化され
+        # green を返さなくなる。observed+marker_verified:true の green 経路
+        # （この pin の対象）を保存するため非 pytest（unittest）へスワップ。
         with self._scratch_repo() as _:
             r = Path(_)
             fp = self._fp(r)
             self._write_entry(r, {
                 "v": 1, "ts": "2026-06-12T00:00:00Z",
-                "src": "observed", "cmd": "pytest tests/",
+                "src": "observed", "cmd": "python3 -m unittest",
                 "status": "ok", "marker_verified": True,
                 "payload_sha": "x" * 64, "fp": fp,
             })
@@ -280,9 +293,13 @@ class TestReadTestResultSchemaMigration(unittest.TestCase):
         with self._scratch_repo() as _:
             r = Path(_)
             fp = self._fp(r)
+            # iter78 契約更新: manual pytest ok は green 制限で transparent 化
+            # され green を返さなくなる。manual が marker なしでも trusted＝
+            # decidable green（この pin の対象）を保存するため非 pytest
+            # （unittest）へスワップ。
             self._write_entry(r, {
                 "v": 1, "ts": "2026-06-12T00:00:00Z",
-                "src": "manual", "cmd": "pytest tests/",
+                "src": "manual", "cmd": "python3 -m unittest",
                 "status": "ok",
                 "payload_sha": "x" * 64, "fp": fp,
             })
@@ -569,12 +586,18 @@ class TestReadTestResultTrustScan(unittest.TestCase):
 
     def test_trusted_green_survives_noise_ok_entry(self):
         """manual green の後ろに no-run な observed/ok/mv=False が積まれても、
-        後者は透明で古い manual green が勝つ。"""
+        後者は透明で古い manual green が勝つ。
+
+        iter78 契約更新: green を期待する trusted manual エントリの cmd を
+        非 pytest（unittest）へスワップ（pytest だと green 制限で transparent 化
+        され「trusted green が勝つ」検出力が死ぬ）。noise エントリは pytest ok
+        のままでよい — pytest 制限で transparent 化されても「skip される」意味は
+        同じ（noise の目的＝decidable green を覆さないこと）で保存される。"""
         with self._scratch_repo() as _:
             r = Path(_)
             fp = self._fp(r)
             self._write_entries(r, [
-                self._entry("manual", "ok", fp),
+                self._entry("manual", "ok", fp, cmd="python3 -m unittest"),
                 self._entry("observed", "ok", fp, marker_verified=False,
                             cmd="pytest --collect-only -q"),
             ])
@@ -583,12 +606,17 @@ class TestReadTestResultTrustScan(unittest.TestCase):
                 "undecidable-ok ノイズが未実装（終端 unverified）＝RED")
 
     def test_marker_verified_green_survives_noise_ok_entry(self):
-        """marker_verified=true の green も後続 no-run ノイズを透過して勝つ。"""
+        """marker_verified=true の green も後続 no-run ノイズを透過して勝つ。
+
+        iter78 契約更新: green を期待する marker_verified:true エントリの cmd を
+        非 pytest（unittest）へスワップ（pytest だと green 制限で transparent 化
+        され検出力が死ぬ）。noise（mv=False）は pytest のままで透明維持。"""
         with self._scratch_repo() as _:
             r = Path(_)
             fp = self._fp(r)
             self._write_entries(r, [
-                self._entry("observed", "ok", fp, marker_verified=True),
+                self._entry("observed", "ok", fp, marker_verified=True,
+                            cmd="python3 -m unittest"),
                 self._entry("observed", "ok", fp, marker_verified=False),
             ])
             self.assertEqual(
@@ -635,12 +663,16 @@ class TestReadTestResultTrustScan(unittest.TestCase):
 
     def test_v160_ok_entry_is_transparent_in_sequence(self):
         """marker_verified キー自体を持たない v1.6.0 の observed/ok も
-        undecidable-ok として透明（古い manual green が勝つ）。"""
+        undecidable-ok として透明（古い manual green が勝つ）。
+
+        iter78 契約更新: green を期待する trusted manual エントリの cmd を
+        非 pytest（unittest）へスワップ。v1.6.0 noise（marker キー欠如）は
+        pytest のままで透明維持。"""
         with self._scratch_repo() as _:
             r = Path(_)
             fp = self._fp(r)
             self._write_entries(r, [
-                self._entry("manual", "ok", fp),
+                self._entry("manual", "ok", fp, cmd="python3 -m unittest"),
                 self._entry("observed", "ok", fp),  # marker_verified 欠如
             ])
             self.assertEqual(
@@ -672,12 +704,15 @@ class TestReadTestResultTrustScan(unittest.TestCase):
 
     def test_transparency_spans_rotated_log(self):
         """透明化は rotated (.1) 境界をまたぐ：.1 側の古い manual green を
-        current 側の undecidable-ok を透過して拾う。"""
+        current 側の undecidable-ok を透過して拾う。
+
+        iter78 契約更新: green を期待する .1 側の trusted manual エントリの cmd を
+        非 pytest（unittest）へスワップ。current 側 noise は pytest のまま透明維持。"""
         with self._scratch_repo() as _:
             r = Path(_)
             fp = self._fp(r)
             self._write_entries(r, [
-                self._entry("manual", "ok", fp),                       # -> .1
+                self._entry("manual", "ok", fp, cmd="python3 -m unittest"),  # -> .1
                 self._entry("observed", "ok", fp, marker_verified=False),  # current
             ], rotated_split=1)
             self.assertEqual(
@@ -686,12 +721,15 @@ class TestReadTestResultTrustScan(unittest.TestCase):
 
     def test_transparency_precedes_fp_check(self):
         """undecidable-ok の透明化は fp 検査より前：最新 observed/ok が
-        stale fp でも undecidable-ok として透明化され、古い manual green が勝つ。"""
+        stale fp でも undecidable-ok として透明化され、古い manual green が勝つ。
+
+        iter78 契約更新: green を期待する trusted manual エントリの cmd を
+        非 pytest（unittest）へスワップ。stale noise は pytest のまま透明維持。"""
         with self._scratch_repo() as _:
             r = Path(_)
             fp = self._fp(r)
             self._write_entries(r, [
-                self._entry("manual", "ok", fp),
+                self._entry("manual", "ok", fp, cmd="python3 -m unittest"),
                 self._entry("observed", "ok", self.STALE, marker_verified=False),
             ])
             self.assertEqual(
