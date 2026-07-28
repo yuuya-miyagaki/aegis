@@ -76,12 +76,27 @@ finder stall（"stays green under mutant" 断片）→ **親が mutation バッ�
 - mutation: 7 判断点に検知者確立（M3 gap を摘発→封鎖）。
 - 敵対: 7 攻撃クラス実走・新規 Critical/Major バイパス 0・残余2は SF-024 で文書化＋緩和。
 
+## 盲検2次（独立）
+
+盲検2次エージェント（fable・fresh context）を dispatch したが**ハード stall**（37分ツール活動なし・SendMessage 再開も無応答＝他5 finder の plan-mode stall より重い死亡）。LEARNINGS line40「再開1回で駄目なら即親 in-session」に従い、**独立2次の実質を親が in-session で実走**（iter77 の残 mutation 親回収と同じ運用）。1次・角度B の battery が触れていない角度を新たに検証:
+
+| 独立2次の観点 | 試行 | 観測 | 判定 |
+|---|---|---|---|
+| record↔judge drift | glued `python3 -mpytest`・quoted `"pytest"`・`PYTHONPATH=x pytest`・`poetry run pytest` の is_pytest 判定 | 両者同一 regex 共有・glued/quoted は非 runner fail-closed・env-prefix は両者 rc2 | 非対称なし |
+| counts 壊れ耐性 | attested ok の counts=`"forged"`/`null`/`{executed:"1"}` | 全て unverified（isinstance dict+int ガード） | fail-closed 堅牢 |
+| log rotation | .1 log の attested green | 正しく green 判定 | 正常 |
+| plugin 例外妨害 | conftest が `pytest_runtest_logreport` で raise | run 壊れ → **red 記録**（rc1・green 化不能） | 封鎖（fail-visible） |
+| load-bearing 不変 | 実失敗 suite に偽 sessionfinish/pass 注入 | real exit 勝ち red 記録 | 封鎖（本物の red は green 化不能） |
+
+- 独立2次の**新規 finding 0**。SF-024 残余記述は**正直**（過小/過大なし）と独立確認: load-bearing 不変「本物の red は偽イベントでも green にできない」を独立実走で再現、drill subsume（all-skip→marker false）を実測、attested 手書き天井が fp-moat 同クラスであることを確認。
+- 分岐点: 1次仕様準拠が見落とした attested read-time counts 非検証を敵対2次が摘発→counts 検証で緩和（親裁定）。M3 突合の検知者不在をテスト強度が摘発→pin 追加。いずれも fix-forward 済み。
+
 ## 総合判定: **approve_with_notes**
 
-全 Critical/Major は review 内で fix-forward 済み（M3 検知者・counts 検証）。残る notes は accepted residual（SF-024 の OS-limit・drill subsume・load-bearing 不変は pin 保証）＋ D-1 jargon（qa 文脈で actionable）。
+全 Critical/Major は review 内で fix-forward 済み（M3 検知者・counts 検証・drift なし独立確認）。残る notes は accepted residual（SF-024 の OS-limit・drill subsume・load-bearing 不変は pin 保証）＋ D-1 jargon（qa 文脈で actionable）。
 
 ```claims
 second_opinion:
   verdict: approve_with_notes
-  divergence_points: ["敵対2次が attested read-time counts 非検証を摘発（1次仕様準拠は見落とし）→ 親裁定で counts 検証を追加", "テスト強度が M3 突合の検知者不在を摘発 → pin 追加", "5b event 偽造は design が名指し済み残余だが severity 較正を SF-024 で精密化（Low・OS-limit・非拡大）"]
+  divergence_points: ["敵対2次が attested read-time counts 非検証を摘発（1次仕様準拠は見落とし）→ 親裁定で counts 検証を追加", "テスト強度が M3 突合の検知者不在を摘発 → pin 追加", "5b event 偽造は design が名指し済み残余だが severity 較正を SF-024 で精密化（Low・OS-limit・非拡大）", "盲検2次エージェントがハード stall→親 in-session 独立検証で回収（drift/counts 堅牢/rotation/plugin 例外 全安全・新規 finding 0）"]
 ```
