@@ -88,7 +88,8 @@ finder stall（"stays green under mutant" 断片）→ **親が mutation バッ�
 | plugin 例外妨害 | conftest が `pytest_runtest_logreport` で raise | run 壊れ → **red 記録**（rc1・green 化不能） | 封鎖（fail-visible） |
 | load-bearing 不変 | 実失敗 suite に偽 sessionfinish/pass 注入 | real exit 勝ち red 記録 | 封鎖（本物の red は green 化不能） |
 
-- 独立2次の**新規 finding 0**。SF-024 残余記述は**正直**（過小/過大なし）と独立確認: load-bearing 不変「本物の red は偽イベントでも green にできない」を独立実走で再現、drill subsume（all-skip→marker false）を実測、attested 手書き天井が fp-moat 同クラスであることを確認。
+- 独立2次の**新規 finding 0**（親 in-session 回収時点）。SF-024 残余記述は**正直**（過小/過大なし）と独立確認: load-bearing 不変「本物の red は偽イベントでも green にできない」を独立実走で再現、drill subsume（all-skip→marker false）を実測、attested 手書き天井が fp-moat 同クラスであることを確認。
+- **後日談（盲検2次 agent が約90分後に完走・post-close）**: stall と思われた盲検2次 review agent が最終的に findings を返し、read-time counts 検証の **bool 型混同ホール**（`counts.executed: true` が bool⊂int で `>=1` を通過し green 化）を摘発。**Minor**（trust boundary 不拡大＝SF-024(b) 手書き天井内・forger は `executed:5` で既に green 可＝attack class 不増・consistency check の宣言意図が silently 破れる code-clarity 欠陥）。post-close hardening として `isinstance(bool)` 明示拒否を追加（単調強化＝ゲート結論不変）・pin `test_handwritten_attested_bool_executed_fails_closed`（ガード除去で RED 実証）・full 1447 green・contract PASS。**教訓**: 「stall」判定した agent も後で完走しうる＝親 in-session 回収で iteration は止めず進めつつ、遅れて返った findings も取り込む（line40 の運用が損失ゼロで機能）。
 - 分岐点: 1次仕様準拠が見落とした attested read-time counts 非検証を敵対2次が摘発→counts 検証で緩和（親裁定）。M3 突合の検知者不在をテスト強度が摘発→pin 追加。いずれも fix-forward 済み。
 
 ## 総合判定: **approve_with_notes**

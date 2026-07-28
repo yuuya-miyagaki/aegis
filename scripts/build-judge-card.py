@@ -455,9 +455,16 @@ def read_test_result_detail(root: Path) -> dict:
         # gate. 'fail' is unaffected (fail-visible red survives).
         if d.get("src") == "attested" and d.get("status") == "ok":
             _counts = d.get("counts")
+            _ex = _counts.get("executed") if isinstance(_counts, dict) else None
+            # bool is a subclass of int in Python, so `executed: true` would
+            # pass an isinstance(int) check and satisfy `>= 1` (iter78 blind-2nd
+            # review): reject bool explicitly. The real attestor only ever emits
+            # an int, so a bool executed is definitionally hand-forged — keep the
+            # positive-proof gate honest (fail-closed), not a trust boundary.
             if (not isinstance(_counts, dict)
-                    or not isinstance(_counts.get("executed"), int)
-                    or _counts.get("executed") < 1):
+                    or isinstance(_ex, bool)
+                    or not isinstance(_ex, int)
+                    or _ex < 1):
                 return unverified
         return {"tests": "green" if d.get("status") == "ok" else "red",
                 "cmd": d.get("cmd"), "src": d.get("src"), "ts": d.get("ts")}

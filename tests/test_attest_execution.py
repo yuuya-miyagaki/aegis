@@ -515,6 +515,20 @@ class TestJudgeContract(unittest.TestCase):
                      counts=counts, exit_code=0))
         self.assertEqual(judge.read_test_result(self.root), "unverified")
 
+    def test_handwritten_attested_bool_executed_fails_closed(self):
+        # C12d（iter78 盲検2次 review 摘発・post-close hardening）: counts.executed
+        # が JSON boolean（true）だと Python の bool は int の subclass で
+        # isinstance(int) を通過し True>=1 で green 化していた型混同ホール。実
+        # attestor は int しか吐かないので bool は定義上 hand-forged＝positive
+        # proof gate の宣言意図（実整数 executed>=1）を silently 破らせない。
+        fp = self._fp()
+        counts = {"executed": True, "passed": True, "failed": 0, "skipped": 0,
+                  "errors": 0, "xfailed": 0, "xpassed": 0, "collection_errors": 0}
+        self.log.write_text(
+            _ev_line("python3 -m pytest", "ok", fp, src="attested",
+                     counts=counts, exit_code=0))
+        self.assertEqual(judge.read_test_result(self.root), "unverified")
+
     def test_handwritten_attested_forge_residual_documented(self):
         # C12c documenting pin: read-time counts 検証は trust boundary では
         # ない。counts.executed>=1 を「捏造」した手書き attested/ok/fp 一致は
