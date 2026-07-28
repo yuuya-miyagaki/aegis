@@ -3,7 +3,7 @@ framework: aegis
 framework_version: "1.31.4"
 project_name: "Aegis"
 mode: Dev
-phase: plan
+phase: implement
 task_type: framework
 task_size: M
 task_size_rationale: "iter78（framework・pytest execution attestation＝roadmap full-review §5 行77 P0/P1・**M 確定**＝brainstorm Step D 2026-07-28）。案A（pytest プラグイン attestation）採用: argv spawn＋structured event で positive proof・src=attested のみ pytest family の decisive green・fake 出力は event 不能。src 4 ファイル（attest-test-run.py 新規／aegis_attest_plugin.py 新規／build-judge-card.py／record-test-result.py）＋tests＝M（deploy skip）。SF-014/SF-022 根治・SF-015 attested 経路解消。B1 drill 統合は roadmap 行78＝次 iter へ分離。設計正本＝docs/specs/2026-07-28-iter78-pytest-execution-attestation-design.md。"
@@ -13,7 +13,7 @@ last_updated: "2026-07-28T00:00:00Z"
 gate_approvals:
   client_ready_for_dev: n/a
   brainstorm: approved
-  plan: pending
+  plan: approved
   review: pending
   qa: pending
   security: pending
@@ -21,7 +21,7 @@ gate_approvals:
   dev_ready_for_client: pending
 current_refs:
   requirements: []
-  plan: null
+  plan: "docs/plans/2026-07-28-iter78-pytest-execution-attestation-implementation-plan.md"
   spec: "docs/specs/2026-07-28-iter78-pytest-execution-attestation-design.md"
   review: null
   qa: null
@@ -37,7 +37,7 @@ external_evidence:
     scope: "v0.13.0 計画 5 ラウンドレビュー"
     findings: "Round 1〜5 で計 25 件の指摘（hook 出力スキーマ陳腐化、TaskCreated/Completed 制御方式、Plan 条件付き許可、effort 配分、pre-compact.sh 同種破損、`if` 単一 rule 制約等）"
     resolution: "Rev.5 で全件反映、Phase 0a 即時実装着手 GO。hotfix/v0122-hook-schema ブランチで開始。"
-next_action: "**【brainstorm approved・plan 着手】** iter78＝pytest execution attestation（案A＝pytest プラグイン・M・v1.32.0 MINOR 想定）。brainstorm-record＋design 保存済（docs/specs/2026-07-28-iter78-pytest-execution-attestation-*）。次: implementation-plan 作成（judge pytest-green 制限で契約変更となる既存 pin の列挙含む）→grill-plan（fable・全指摘反映）→plan gate approve --ref→implement（TDD Task1 RED 実測から）。未 push 累積（iter76/77 分）。"
+next_action: "**【plan approved・implement 着手】** iter78＝pytest execution attestation。grill-plan 致命3（反転 pin 実測 18 件・exit5=red 統一・redirect 挿入位置）反映済＝plan 正本 docs/plans/2026-07-28-iter78-pytest-execution-attestation-implementation-plan.md。次: Task1 RED バッテリ実測→Task2 plugin→Task3 attestor→Task4 judge＋契約更新 pin（A13+B5）→Task5 record redirect→Task6 統合検証＋ドッグフード attest→grill-code→review。implementer=opus per-task commit・session=fable。未 push 累積（iter76/77 分）。"
 blockers: []
 failure_tracking: null
 session_history:
