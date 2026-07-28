@@ -38,6 +38,8 @@
     "scripts/run-test-strength-drill.py",
     "scripts/build-judge-card.py",
     "scripts/record-test-result.py",
+    "scripts/attest-test-run.py",
+    "scripts/aegis_attest_plugin.py",
     "scripts/status_doctor.py",
     "scripts/retro_report.py",
     "scripts/check_reference_drift.py",

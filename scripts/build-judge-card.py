@@ -167,6 +167,49 @@ def _tr_strip_patterns(root: Path) -> list:
     return pats
 
 
+def _is_pytest_regex(root: Path):
+    """Load AEGIS_TEST_IS_PYTEST_REGEX from patterns.sh (single source; same
+    bash-source printf route as _test_runner_patterns). None = unreadable /
+    uncompilable — callers must fail CLOSED (unverified / rc2), never treat
+    as 'not pytest'."""
+    lib = root / "hooks" / "lib" / "patterns.sh"
+    if not lib.is_file():
+        return None
+    try:
+        out = subprocess.run(
+            ["bash", "-c",
+             'source "$1"; printf "%s" "$AEGIS_TEST_IS_PYTEST_REGEX"',
+             "_", str(lib)],
+            capture_output=True, text=True, timeout=10)
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    raw = out.stdout.strip()
+    if not raw:
+        return None
+    try:
+        return re.compile(raw)
+    except re.error:
+        return None
+
+
+def is_pytest_family_cmd(root: Path, cmd: str) -> bool | None:
+    """Is `cmd` in the pytest family, per the SAME normalization pipeline as
+    _norm_cmd_match (newlines→';', quoted spans masked to Q)? None = cannot
+    evaluate (fail-closed). Single source for the judge scan's green
+    restriction (iter78), attest-test-run.py's admission check, and
+    record-test-result.py's redirect — checker == consumer."""
+    ispy = _is_pytest_regex(root)
+    if ispy is None:
+        return None
+    strips = _tr_strip_patterns(root)
+    if len(strips) != 2:
+        return None
+    c = (cmd or "").replace("\n", ";")
+    for sp in strips:
+        c = sp.sub("Q", c)
+    return bool(ispy.search(c))
+
+
 def _norm_cmd_match(cmd: str, pats: list, strips: list) -> bool:
     """Normalize a cmd (newlines→';', quoted spans masked to the inert token
     Q via `strips`) then test it against the runner patterns `pats`. This is

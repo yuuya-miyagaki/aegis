@@ -21,6 +21,7 @@ scripts/update-gate.sh	ask
 scripts/update-task.sh	ask
 scripts/record-test-result.py	ask
 scripts/run-test-strength-drill.py	ask
+scripts/attest-test-run.py	ask
 scripts/context_budget.py	framework-only
 scripts/run_eval.py	framework-only
 scripts/eval_scaffold_smoke.py	framework-only
