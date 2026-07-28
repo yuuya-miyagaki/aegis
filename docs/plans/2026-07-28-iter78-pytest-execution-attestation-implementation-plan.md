@@ -380,6 +380,11 @@ grill-plan 実測（2026-07-28・親が対象 3 ファイルの全 `_ev_line`/re
 
 手順（必須）: 本 Task の実装後に `python3 -m pytest tests/test_judge_card.py tests/test_test_runner_realness.py tests/test_record_test_result.py tests/test_evidence_lib.py tests/test_evidence_hooks.py -v 2>&1 | tail -20` を回し、落ちた全件が上表と一致することを突合。**表外の落ちが出たら同方針で書き替えてこの表に追記**（silent 修正禁止）。
 
+**実装実測での表外追記（2026-07-28・review 角度A F-1 で開示要求）**: 上表 A/B（18件）に加え、実 diff で以下が同方針（目的保存 cmd スワップ・削除0）で書き替わった。理由コメント付きで silent でない。
+- Task4（judge・realness の transparency 系 A クラス3件）: `test_v160_ok_entry_is_transparent_in_sequence`／`test_transparency_spans_rotated_log`／`test_transparency_precedes_fp_check`（deciding entry のみ非 pytest へ・noise entry は pytest 維持）。judge 契約更新は計17件。
+- Task5（record・`_pytest`→`_runner` ヘルパー改名の随伴2件）: `test_failing_command_appends_manual_fail`／`test_no_test_result_json_written`（unittest 双子実走へ）。record 契約更新は計7件。
+- **review fix-forward（2026-07-28）**: 敵対2 finder（SF-024）＋テスト強度 M3 gap 反映で judge に read-time counts 検証を追加・`_mask_cmd` ヘルパーで正規化を単一ソース化。追加 pin: `test_forged_sessionfinish_mismatch_rejected`／`test_forged_pass_events_cannot_green_a_real_red`／`test_handwritten_attested_no_counts_fails_closed`／`test_handwritten_attested_zero_executed_fails_closed`／`test_handwritten_attested_forge_residual_documented`／`test_event_file_invalid_bytes_fails_closed_rc2`（grill-code B11）。C12 は契約強化（counts 皆無→unverified）にリネーム。
+
 - [ ] **Step 4: グループ C＋既存 judge 系を実行**
 
 Run: `python3 -m pytest tests/test_attest_execution.py tests/test_test_runner_realness.py tests/test_judge_card.py tests/test_evidence_lib.py tests/test_evidence_hooks.py -v 2>&1 | tail -8`

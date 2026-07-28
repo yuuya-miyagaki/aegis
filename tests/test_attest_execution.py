@@ -332,6 +332,43 @@ class TestAttestE2E(unittest.TestCase):
         self.assertIn("attest 不成立", err)
         self.assertFalse(self.log.exists())
 
+    def test_forged_sessionfinish_mismatch_rejected(self):
+        # B12（iter78 review テスト強度 M3 gap fix-forward）: exitstatus と実
+        # returncode の突合（sessionfinish != rc → rc2）に検知者が無かった。
+        # conftest の pytest_unconfigure（プラグインの sessionfinish より後に
+        # 発火＝last-wins で上書き）が偽 exitstatus を注入 → 実 rc=0 と不一致
+        # → rc2・記録なし。この突合を消すと green 化する＝差分 pin。
+        self._write("conftest.py",
+                    "import os\n"
+                    "def pytest_unconfigure(config):\n"
+                    "    p = os.environ.get('AEGIS_ATTEST_EVENT_PATH')\n"
+                    "    if p:\n"
+                    "        open(p, 'a').write("
+                    "'{\"e\":\"sessionfinish\",\"exitstatus\":7}\\n')\n")
+        self._write("t_pass.py", "def test_a():\n    assert True\n")
+        rc, out, err = self._attest("python3 -m pytest t_pass.py")
+        self.assertEqual(rc, 2, out + err)
+        self.assertIn("突合不一致", err)
+        self.assertFalse(self.log.exists())
+
+    def test_forged_pass_events_cannot_green_a_real_red(self):
+        # B13（load-bearing 不変・review 敵対 5a/5c の in-session 裁定）: 被
+        # テスト側 conftest が偽 call passed イベントを注入しても、実失敗
+        # suite は real exit!=0 が突合で勝ち **red 記録**（green 化不能）。
+        # attestation の中核保証＝「本物の red は偽イベントでも green にできない」。
+        self._write("conftest.py",
+                    "import os, json\n"
+                    "def pytest_sessionstart(session):\n"
+                    "    p = os.environ.get('AEGIS_ATTEST_EVENT_PATH')\n"
+                    "    if p:\n"
+                    "        open(p, 'a').write(json.dumps("
+                    "{'e':'test','nodeid':'f::x','when':'call',"
+                    "'outcome':'passed','wasxfail':False}) + '\\n')\n")
+        self._write("t_fail.py", "def test_a():\n    assert False\n")
+        rc, out, err = self._attest("python3 -m pytest t_fail.py")
+        self.assertEqual(rc, 1, out + err)
+        self.assertEqual(self._last_row()["status"], "fail")
+
 
 # ---------------------------------------------------------------------------
 # グループ C — judge 契約（合成 evidence-log で新契約を pin）
@@ -456,16 +493,42 @@ class TestJudgeContract(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             self.assertIsNone(judge.is_pytest_family_cmd(Path(d), "pytest"))
 
-    def test_handwritten_attested_residual_documented(self):
-        # C12: counts/exit の無い手書き attested/ok/fp 一致 → green。
-        # documenting pin: 手書き attested は counts/exit が無くても status で
-        # 決まる＝manual と同一の「手書き偽造天井」を持つ。これは attestation
-        # が根治する脅威ではなく **pre-existing な self-deception 天井**（防御
-        # 多層＝drill/human preview/fingerprint で contain）であることを記録する。
-        # 反転させる契約変更が入ったら、この天井の意図的許容を再確認すること。
+    def test_handwritten_attested_no_counts_fails_closed(self):
+        # C12（iter78 review adversarial 2nd で契約強化）: counts の無い手書き
+        # attested/ok/fp 一致 → **unverified**（fail-closed）。旧契約は green
+        # だったが、judge が read-time に counts.executed>=1 を要求するよう
+        # 強化＝「counts 皆無の attested が fp 一致だけで green」の非対称を除去。
         fp = self._fp()
         self.log.write_text(
             _ev_line("python3 -m pytest", "ok", fp, src="attested"))
+        self.assertEqual(judge.read_test_result(self.root), "unverified")
+
+    def test_handwritten_attested_zero_executed_fails_closed(self):
+        # C12b: counts.executed==0 の手書き attested/ok → unverified。
+        # executed>=1 の positive proof を read-time でも要求する mutation killer
+        # （この check を消すと green に戻る＝差分 pin）。
+        fp = self._fp()
+        counts = {"executed": 0, "passed": 0, "failed": 0, "skipped": 3,
+                  "errors": 0, "xfailed": 0, "xpassed": 0, "collection_errors": 0}
+        self.log.write_text(
+            _ev_line("python3 -m pytest", "ok", fp, src="attested",
+                     counts=counts, exit_code=0))
+        self.assertEqual(judge.read_test_result(self.root), "unverified")
+
+    def test_handwritten_attested_forge_residual_documented(self):
+        # C12c documenting pin: read-time counts 検証は trust boundary では
+        # ない。counts.executed>=1 を「捏造」した手書き attested/ok/fp 一致は
+        # 依然 green＝同一ユーザー権限内の手書き偽造天井（fp が唯一の moat・
+        # manual 非 pytest と同クラス・SF ledger 記載）。この天井を閉じるには
+        # 別ユーザー/コンテナの trust boundary が要る（roadmap §6 で対象外）。
+        # 防御多層（drill=all-skip は marker false で BLOCKED / human preview /
+        # fingerprint）で contain。反転契約が入ったら天井の意図的許容を再確認。
+        fp = self._fp()
+        counts = {"executed": 1, "passed": 1, "failed": 0, "skipped": 0,
+                  "errors": 0, "xfailed": 0, "xpassed": 0, "collection_errors": 0}
+        self.log.write_text(
+            _ev_line("python3 -m pytest", "ok", fp, src="attested",
+                     counts=counts, exit_code=0))
         self.assertEqual(judge.read_test_result(self.root), "green")
 
 

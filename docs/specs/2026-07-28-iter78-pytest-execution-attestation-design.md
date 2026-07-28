@@ -113,9 +113,12 @@ graph TD
 6. **非弱体化**: 既存 full suite green 維持。judge の pytest green 制限で契約変更となる既存 pin は**削除せず契約更新**として1件ずつ列挙・書き替え（plan で列挙）。
 7. **残余文書化 pin**: 手書き attested エントリが status で決まる（manual と同一の pre-existing 天井）ことを記録する documenting test（TestSkipSuiteResidual の流儀）。
 
-## 残余リスク（受容・文書化）
+## 残余リスク（受容・文書化・iter78 review で精密化＝SF-024）
 
-- in-process 妨害（conftest・fake pytest バイナリ）と evidence-log 手書き偽造は pre-existing 天井と同クラス・非拡大（brainstorm-record「残余天井」参照）。fail-closed 側に倒れることのみ pin で保証。
+- **in-process イベント偽造**（被テスト conftest が env `AEGIS_ATTEST_EVENT_PATH` を読み偽 `call passed` イベントを追記）: all-skip/all-pass suite の `executed` を水増しし attested green を捏造しうる。ただし **load-bearing 不変は保持** — 実失敗 suite は real exit code が sessionfinish 突合で勝ち red 記録（`test_forged_pass_events_cannot_green_a_real_red`／`test_forged_sessionfinish_mismatch_rejected` で pin）＝**本物の red は偽イベントでも green にできない**。作れるのは偽陽性のみで、drill が subsume（all-skip → marker false → BLOCKED）。
+- **attested 手書き天井**: evidence-log 直書きの `src:"attested",ok,fp 一致` は fp 一致で green＝既存の非 pytest manual/observed 手書きと同クラス（fp が唯一の moat）。iter78 review で **read-time counts 検証**（`executed>=1` 必須・fail-closed）を追加し「counts 皆無で green」の非対称を除去したが、counts 捏造した手書きは依然 green（consistency check であって trust boundary でない）。
+- 上記いずれも**同一ユーザー権限内の OS-limit**（event チャネルは子が到達可能・SF-004 同型）で、真の根治は別ユーザー/コンテナ境界＝**roadmap §6 が対象外と明示**。denylist 的 event 構造検証は roadmap §5 の反パターンゆえ不採。正直な限界主張＝「**accidental な偽 green（`;true`・`-q`・all-skip 単体・collect-only・fake 出力）は全封鎖／故意の in-process 偽造のみ OS-limit で残り drill が subsume**」。詳細は SF-024。
+- fake pytest バイナリ（PATH 差し替え）も同クラス（SF-014 天井）。
 - 非 pytest ランナーは marker 経路のまま（roadmap 行78 以降で扱う）。
 
 ## 版数・ゲート routing

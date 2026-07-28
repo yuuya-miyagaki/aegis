@@ -192,11 +192,25 @@ def _is_pytest_regex(root: Path):
         return None
 
 
+def _mask_cmd(cmd: str, strips: list) -> str:
+    """The ONE cmd-normalization pipeline (newlines→';', then each quoted-span
+    strip pattern substituted to the inert token Q). Single-sourced so every
+    consumer — is_pytest_family_cmd, _norm_cmd_match, _cmd_has_shell_operators,
+    and read_test_result_detail's inline pytest-family test — normalizes a
+    command identically. A drift here would let record (checker) and judge
+    (consumer) disagree on whether a cmd is pytest / washed (iter78 review
+    maintainability finding)."""
+    c = (cmd or "").replace("\n", ";")
+    for sp in strips:
+        c = sp.sub("Q", c)
+    return c
+
+
 def is_pytest_family_cmd(root: Path, cmd: str) -> bool | None:
     """Is `cmd` in the pytest family, per the SAME normalization pipeline as
-    _norm_cmd_match (newlines→';', quoted spans masked to Q)? None = cannot
-    evaluate (fail-closed). Single source for the judge scan's green
-    restriction (iter78), attest-test-run.py's admission check, and
+    _norm_cmd_match (newlines→';', quoted spans masked to Q via _mask_cmd)?
+    None = cannot evaluate (fail-closed). Single source for the judge scan's
+    green restriction (iter78), attest-test-run.py's admission check, and
     record-test-result.py's redirect — checker == consumer."""
     ispy = _is_pytest_regex(root)
     if ispy is None:
@@ -204,22 +218,16 @@ def is_pytest_family_cmd(root: Path, cmd: str) -> bool | None:
     strips = _tr_strip_patterns(root)
     if len(strips) != 2:
         return None
-    c = (cmd or "").replace("\n", ";")
-    for sp in strips:
-        c = sp.sub("Q", c)
-    return bool(ispy.search(c))
+    return bool(ispy.search(_mask_cmd(cmd, strips)))
 
 
 def _norm_cmd_match(cmd: str, pats: list, strips: list) -> bool:
-    """Normalize a cmd (newlines→';', quoted spans masked to the inert token
-    Q via `strips`) then test it against the runner patterns `pats`. This is
-    the single-source normalize+match used by BOTH read_test_result's scan and
-    record-test-result.py's pre-validation — so the checker (record) and the
-    consumer (judge) can never drift in how they normalize a command."""
-    cmd = (cmd or "").replace("\n", ";")
-    for sp in strips:
-        cmd = sp.sub("Q", cmd)
-    return any(p.search(cmd) for p in pats)
+    """Normalize a cmd (via _mask_cmd) then test it against the runner patterns
+    `pats`. This is the single-source normalize+match used by BOTH
+    read_test_result's scan and record-test-result.py's pre-validation — so the
+    checker (record) and the consumer (judge) can never drift in how they
+    normalize a command."""
+    return any(p.search(_mask_cmd(cmd, strips)) for p in pats)
 
 
 _SHELL_OP_RE = re.compile(r"[;&|]")
@@ -240,10 +248,7 @@ def _cmd_has_shell_operators(cmd: str, strips: list) -> bool:
     cannot wash there anyway). The two are intentionally different shapes —
     manual has argv (shlex tokens), observed has only the raw string (regex)
     — but if you change the operator set here, revisit that guard too."""
-    cmd = (cmd or "").replace("\n", ";")
-    for sp in strips:
-        cmd = sp.sub("Q", cmd)
-    return bool(_SHELL_OP_RE.search(cmd))
+    return bool(_SHELL_OP_RE.search(_mask_cmd(cmd, strips)))
 
 
 def runner_cmd_matches(root: Path, cmd: str) -> bool | None:
@@ -401,11 +406,9 @@ def read_test_result_detail(root: Path) -> dict:
         # still decide). 'fail' stays decidable red (fail-visible). Non-pytest
         # runners keep the marker path unchanged (roadmap §6: no simultaneous
         # ecosystem adapters).
-        _norm = (d.get("cmd") or "").replace("\n", ";")
-        for _sp in strips:
-            _norm = _sp.sub("Q", _norm)
         if (d.get("src") in ("manual", "observed")
-                and d.get("status") == "ok" and ispy.search(_norm)):
+                and d.get("status") == "ok"
+                and ispy.search(_mask_cmd(d.get("cmd"), strips))):
             continue
         # SF-012(a) (iter76): washed-green — an observed 'ok' whose cmd
         # chains shell operators has an exit code the runner did not
@@ -441,6 +444,21 @@ def read_test_result_detail(root: Path) -> dict:
         # C-2: marker_verified gate for observed entries.
         if undecidable:
             return unverified
+        # iter78 (review adversarial 2nd, a25db95c): an attested GREEN must
+        # carry the writer's positive proof (counts.executed>=1). The real
+        # attestor (attest-test-run.py) always emits it; a truncated / legacy /
+        # hand-minimal attested 'ok' fails CLOSED here instead of greening on
+        # fp-match alone. This is NOT a trust boundary — a same-user forger can
+        # fabricate counts, and the fingerprint stays the moat (same ceiling as
+        # a hand-written manual entry) — it removes the "no counts still greens"
+        # asymmetry the review surfaced and mirrors observed's marker_verified
+        # gate. 'fail' is unaffected (fail-visible red survives).
+        if d.get("src") == "attested" and d.get("status") == "ok":
+            _counts = d.get("counts")
+            if (not isinstance(_counts, dict)
+                    or not isinstance(_counts.get("executed"), int)
+                    or _counts.get("executed") < 1):
+                return unverified
         return {"tests": "green" if d.get("status") == "ok" else "red",
                 "cmd": d.get("cmd"), "src": d.get("src"), "ts": d.get("ts")}
     return unverified
