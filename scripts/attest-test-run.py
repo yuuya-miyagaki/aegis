@@ -15,8 +15,11 @@ fail-closed. Residual ceiling (documented, pre-existing class): in-process
 sabotage (conftest unregistering the plugin / forging events) and
 hand-written log entries — deliberate self-deception, contained by
 defence-in-depth (drill, human preview, fingerprint). Plugin suppression via
-PYTEST_ADDOPTS / ini addopts (`-p no:aegis_attest_plugin`) collapses to the
-same rc2 (missing events) — it cannot mint a green."""
+PYTEST_ADDOPTS / ini addopts (`-p no:aegis_attest_plugin`) does NOT take
+effect: this attestor always appends an explicit `-p aegis_attest_plugin`,
+which pytest resolves last-wins, so the plugin still loads and emits real
+events (verified — iter78 blind-2nd security). A bare cmdline `-p no:` is
+rejected pre-spawn (rc2). Either way no green can be minted from a real red."""
 from __future__ import annotations
 import hashlib
 import importlib.util

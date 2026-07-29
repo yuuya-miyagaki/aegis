@@ -54,7 +54,16 @@
 | 並行 attest 一時ファイル衝突 | 2プロセス同時 attest | evidence-log 3行全て valid JSON・torn 0（POSIX append 原子性）・残留一時ファイル0（mkstemp 一意＋finally 削除） | 安全 |
 | symlink/event path 乗っ取り | event path 制御可否 | attestor が root/.claude/tmp に mkstemp 生成＝ユーザー非制御（cmd 指定不可・env は親が上書き） | 安全 |
 
-- 独立2次の**新規脆弱性 0**。1次の結論（新規脆弱性0・load-bearing 不変保持・SF-024 は OS-limit 残余）と**一致**（分岐なし）。
+- 独立2次（親 in-session 回収）の**新規脆弱性 0**。1次の結論（新規脆弱性0・load-bearing 不変保持・SF-024 は OS-limit 残余）と**一致**（分岐なし）。
+
+### 盲検2次 agent の完走（約18時間後・post-close）
+
+stall と判断した盲検2次 security agent が最終的に完走し、**verdict approve_with_notes・新規 Critical/High 0** を返した。独立実走で以下を確認し本レポートに収束:
+- **本物の red→green は構造的に不能**を多綴りで反証（偽 sessionfinish=0 のみ注入→red／空 suite＋偽 pass 注入 exit5→red／strict-xfail exit 非0→red）。green を作れるのは conftest が `os._exit(0)` で**実 exit code ごと握った**場合のみで、それでも fp 束縛（悪意 conftest を可視コミット木に残さないと clean tree で fp が変わり unverified に落ちる＝実走 STEP1/2 確認）＝SF-024 の既知天井と同クラス（fp が唯一の moat）。
+- moat は**強化**（pytest manual/observed 手書き green の transparent 化・counts gate の非対称除去）・依存0・secrets 0・ReDoS なし（2000-test 1.9s/42MB）・並行 attest/symlink 安全・`_mask_cmd` parity 一致（drift なし）。
+- **独立 note 2件**（いずれも Informational・非ブロッキング）:
+  - **F1（bool 型混同）**: read-time counts gate の `isinstance(int)` が `executed: true`（bool⊂int）を通す。→ **既に post-close で修正済**（`isinstance(bool)` 明示拒否・pin `test_handwritten_attested_bool_executed_fails_closed`・盲検2次の独立発見が修正を裏付け）。
+  - **F2（doc-accuracy）**: attest-test-run.py docstring の「PYTEST_ADDOPTS `-p no:` は rc2 に collapse」は不正確＝attestor が明示 `-p aegis_attest_plugin` を末尾付与し pytest 後勝ちで**プラグインは走る**（rc0・実 proof・green mint 不能は不変）。→ **docstring を実測に合わせて精緻化**（`PYTEST_ADDOPTS='-p no:...'` で rc0・executed=1 を実走裏取り）。
 
 ## Blockers
 
@@ -65,6 +74,6 @@
 ```claims
 verdict: approve
 second_opinion:
-  verdict: approve
-  divergence_points: ["盲検2次エージェントがハード stall→親 in-session で独立検証回収（整数overflow/並行/symlink 全安全・新規脆弱性0・1次と分岐なし）"]
+  verdict: approve_with_notes
+  divergence_points: ["盲検2次を親 in-session で先行回収（整数overflow/並行/symlink 全安全）＋盲検2次 agent が約18時間後に完走 approve_with_notes・新規 Critical/High 0・real red→green 不能を独立多綴り反証・SF-024 天井に収束", "独立 note F1（counts の bool 型混同）＝既に post-close 修正済み・独立発見が裏付け／F2（docstring の PYTEST_ADDOPTS rc2 主張が不正確）＝実測に合わせ精緻化・いずれも Informational 非ブロッキング"]
 ```
